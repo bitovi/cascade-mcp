@@ -1,0 +1,75 @@
+name: Test
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  push:
+    branches: ['*']
+
+jobs:
+  unit-test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm i
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm run test
+  e2e-test:
+    name: Run E2E Tests
+    runs-on: ubuntu-latest
+    environment:
+      name: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Generate .env and repo_env
+        run: |
+          chmod +x scripts/generate-build-env.sh
+          ./scripts/generate-build-env.sh
+        env:
+          VITE_COMMIT_SHA: ${{ github.sha }}
+          VITE_AUTH_SERVER_URL: ${{ vars.VITE_AUTH_SERVER_URL }}
+          VITE_JIRA_CLIENT_ID: ${{ secrets.VITE_JIRA_CLIENT_ID }}
+          VITE_JIRA_SCOPE: ${{ vars.VITE_JIRA_SCOPE }}
+          VITE_JIRA_CALLBACK_URL: ${{ vars.VITE_JIRA_CALLBACK_URL }}
+          VITE_JIRA_API_URL: ${{ vars.VITE_JIRA_API_URL }}
+          VITE_JIRA_APP_KEY: ''
+          BACKEND_SENTRY_DSN: ''
+          VITE_FRONTEND_SENTRY_DSN: ''
+          VITE_STATUS_REPORTS_ENV: ''
+          AWS_SECRET_ACCESS_KEY: ''
+          AWS_ACCESS_KEY_ID: ''
+
+      - name: Add Test User .env
+        run: |
+          echo "JIRA_TEST_USERNAME=${{ vars.JIRA_TEST_USERNAME }}" >> .env
+          echo "JIRA_TEST_PASSWORD=${{ secrets.JIRA_TEST_PASSWORD }}" >> .env
+          echo "JIRA_CLIENT_SECRET=${{ secrets.JIRA_CLIENT_SECRET }}" >> .env
+          echo "JIRA_TOTP_SECRET=${{ secrets.JIRA_TOTP_SECRET }}" >> .env
+          echo "PORT=${{ vars.PORT }}"
+          echo ".env file updated"
+
+      - name: Install Dependencies
+        run: |
+          npm ci
+          npx playwright install
+          sudo npx playwright install-deps
+          npm run build
+
+      - name: Run E2E Tests
+        run: npm run test:e2e
+      - name: Save Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-videos
+          path: playwright/report

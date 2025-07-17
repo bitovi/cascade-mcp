@@ -1,0 +1,40 @@
+name: Destroy staging (Manual)
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  EC2-Deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: main
+      url: ${{ steps.deploy.outputs.vm_url }}
+    steps:
+      - id: deploy
+        name: Deploy
+        uses: bitovi/github-actions-deploy-docker-to-ec2@v1
+        with:
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID_JIRA_INTEGRATIONS }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY_JIRA_INTEGRATIONS }}
+          aws_default_region: us-east-1
+
+          tf_state_bucket_destroy: true
+          tf_stack_destroy: true
+
+          aws_r53_enable: true
+          aws_r53_create_sub_cert: true
+          aws_r53_sub_domain_name: status-reports-staging
+          aws_r53_domain_name: bitovi.tools
+          aws_elb_app_port: 3000
+
+          docker_full_cleanup: true
+
+          aws_ec2_instance_type: t3.small
+          aws_ec2_instance_root_vol_size: 16
+
+          # Provide a secret called `DOT_ENV` to append environment variables to the .env file
+          env_ghs: ${{ secrets.DOT_ENV }}

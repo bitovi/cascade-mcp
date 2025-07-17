@@ -1,0 +1,189 @@
+name: Deploy Latest tag
+
+on:
+  release:
+    types: [published, created, edited]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  Build-Status-Reports:
+    runs-on: ubuntu-latest
+    environment:
+      name: prod
+    outputs:
+      latest_tag: ${{ steps.latest_tag.outputs.latest_tag }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Get Latest Release Tag
+        id: latest_tag
+        run: |
+          LATEST_TAG=$(curl --silent -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/releases/latest" | jq -r '.tag_name')
+          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Generate .env and repo_env
+        run: |
+          chmod +x scripts/generate-build-env.sh
+          ./scripts/generate-build-env.sh
+        env:
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_JIRA_INTEGRATIONS }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_JIRA_INTEGRATIONS }}
+          BACKEND_SENTRY_DSN: ${{ vars.BACKEND_SENTRY_DSN }}
+          VITE_COMMIT_SHA: ${{ github.sha }}
+          VITE_AUTH_SERVER_URL: ${{ vars.VITE_AUTH_SERVER_URL }}
+          VITE_JIRA_CLIENT_ID: ${{ vars.VITE_JIRA_CLIENT_ID }}
+          VITE_JIRA_SCOPE: ${{ vars.VITE_JIRA_SCOPE }}
+          VITE_JIRA_CALLBACK_URL: ${{ vars.VITE_JIRA_CALLBACK_URL }}
+          VITE_JIRA_API_URL: ${{ vars.VITE_JIRA_API_URL }}
+          VITE_FRONTEND_SENTRY_DSN: ${{ vars.VITE_FRONTEND_SENTRY_DSN }}
+          VITE_STATUS_REPORTS_ENV: prod
+          VITE_JIRA_APP_KEY: bitovi.status-report
+
+      - name: Build
+        run: |
+          npm ci
+          npm run create:atlassian-connect
+          npm run build
+
+      - name: Build to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build
+          if-no-files-found: error
+          include-hidden-files: true
+          path: ./dist
+
+  Deploy-Auth-Server:
+    needs: Build-Status-Reports
+    runs-on: ubuntu-latest
+    if: ${{ github.ref_name == needs.Build-Status-Reports.outputs.latest_tag }}
+    environment:
+      name: prod
+      url: ${{ steps.deploy.outputs.vm_url}}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download Build
+        uses: actions/download-artifact@v4
+        with:
+          name: build
+          path: dist
+
+      - id: deploy
+        name: Deploy
+        uses: bitovi/github-actions-deploy-docker-to-ec2@v1
+        with:
+          checkout: false
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID_JIRA_INTEGRATIONS}}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY_JIRA_INTEGRATIONS}}
+          aws_default_region: us-east-1
+
+          aws_resource_identifier: bitovi-jira-status-reports-prod-new
+          tf_state_bucket: bitovi-jira-status-reports-prod-tf-state
+          tf_state_bucket_destroy: true
+
+          aws_r53_enable: true
+          aws_r53_create_sub_cert: true
+          aws_r53_sub_domain_name: api-status-reports
+          aws_r53_domain_name: bitovi.tools
+          aws_elb_app_port: 3000
+
+          docker_full_cleanup: true
+
+          aws_ec2_instance_type: t3.small
+          aws_ec2_instance_root_vol_size: 16
+
+          repo_env: repo_env
+          env_ghs: ${{ secrets.DOT_ENV }}
+
+      - name: Skip deployment
+        if: ${{ github.ref_name != steps.latest_tag.outputs.latest_tag }}
+        run: echo "This is not the latest tag. Deployment skipped."
+
+  Deploy-Static-Assets:
+    needs: Build-Status-Reports
+    runs-on: ubuntu-latest
+    if: ${{ github.ref_name == needs.Build-Status-Reports.outputs.latest_tag }}
+    environment:
+      name: prod
+      url: ${{ steps.deploy.outputs.vm_url}}
+    steps:
+      - name: Download Build
+        uses: actions/download-artifact@v4
+        with:
+          name: build
+          path: dist
+
+      - id: deploy
+        name: Deploy static assets to S3
+        uses: bitovi/github-actions-deploy-static-site-to-aws@v0.2.6
+        with:
+          checkout: false
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID_JIRA_INTEGRATIONS}}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY_JIRA_INTEGRATIONS}}
+          aws_default_region: us-east-1
+          aws_site_source_folder: ./dist
+
+          aws_resource_identifier: bitovi-jira-status-reports-prod-static-new
+          tf_state_bucket: bitovi-jira-status-reports-prod-static-tf-state
+
+          aws_r53_sub_domain_name: status-reports
+          aws_r53_domain_name: bitovi.tools
+          aws_site_cdn_aliases: status-reports.bitovi.tools,statusreports.bitovi.com
+          aws_r53_cert_arn: ${{ vars.AWS_CERT_ARN }}
+
+          tf_action: 'apply'
+          tf_state_bucket_destroy: true
+          aws_site_cdn_enabled: true
+
+      - name: Skip deployment
+        if: ${{ github.ref_name != steps.latest_tag.outputs.latest_tag }}
+        run: echo "This is not the latest tag. Deployment skipped."
+
+  Sentry-Release-Backend:
+    needs: Deploy-Auth-Server
+    if: ${{ success() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create Sentry release
+        uses: getsentry/action-release@v1
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_BACKEND_PROJECT }}
+        with:
+          environment: prod
+          version: ${{ needs.Build-Status-Reports.outputs.latest_tag }}
+
+  Sentry-Release-Frontend:
+    needs: Deploy-Static-Assets
+    if: ${{ success() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create Sentry release
+        uses: getsentry/action-release@v1
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_FRONTEND_PROJECT }}
+        with:
+          environment: prod
+          version: ${{ needs.Build-Status-Reports.outputs.latest_tag }}

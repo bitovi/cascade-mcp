@@ -98,17 +98,22 @@ export function authorize(req, res) {
     usingMcpPkce: !codeVerifier,
   });
 
-  const url =
-    `${ATLASSIAN.authUrl}?` +
-    new URLSearchParams({
-      client_id: ATLASSIAN.clientId, // Always use our Atlassian client ID for the actual auth
-      response_type: responseType,
-      redirect_uri: ATLASSIAN.redirectUri, // Use our server callback URI
-      scope: ATLASSIAN.scopes, // Use our scopes for Atlassian
-      state: mcpState, // Use MCP client's state
-      code_challenge: codeChallenge,
-      code_challenge_method: codeChallengeMethod,
-    }).toString();
+  // Build URL parameters, omitting state if it's undefined
+  const urlParams = {
+    client_id: ATLASSIAN.clientId, // Always use our Atlassian client ID for the actual auth
+    response_type: responseType,
+    redirect_uri: ATLASSIAN.redirectUri, // Use our server callback URI
+    scope: ATLASSIAN.scopes, // Use our scopes for Atlassian
+    code_challenge: codeChallenge,
+    code_challenge_method: codeChallengeMethod,
+  };
+  
+  // Only include state if it's defined
+  if (mcpState !== undefined) {
+    urlParams.state = mcpState;
+  }
+
+  const url = `${ATLASSIAN.authUrl}?` + new URLSearchParams(urlParams).toString();
 
   console.log('Redirecting to Atlassian:', url);
   res.redirect(url);
@@ -134,6 +139,8 @@ export async function callback(req, res) {
 
   // Handle URL encoding issue: + gets decoded as space, so we need to convert back
   const normalizedReceivedState = state ? state.replace(/ /g, '+') : state;
+  
+  // State validation: both should be undefined or both should match
   const stateMatches = normalizedReceivedState === req.session.state;
 
   if (!code || !stateMatches) {
