@@ -1,0 +1,16 @@
+version: '3.9'
+services:
+  app:
+    container_name: jira-qa-metrics
+    env_file: .env
+    restart: always
+    build: .
+    ports:
+      - $PORT:$PORT
+    volumes:
+      - .:/app
+      # needed for the deployment. comment out if you want to manage node_modules from your local machine
+      # better approach: if you need to add or remove node_modules, just rebuild the image `docker-compose up --build`
+      - /app/node_modules
+    stdin_open: true
+    tty: true

@@ -52,23 +52,185 @@ export function clearAuthContext(transportId) {
   authContextStore.delete(transportId);
 }
 
+// // Register tool to list Jira issues
+// mcp.registerTool(
+//   'list-jira-issues',
+//   {
+//     title: 'List Jira Issues',
+//     description: 'Fetch Jira issues from the first accessible site using JQL queries',
+//     inputSchema: {
+//       jql: z.string().optional().describe('JQL (Jira Query Language) query to filter issues'),
+//       maxResults: z.number().optional().default(50).describe('Maximum number of results to return'),
+//       fields: z
+//         .string()
+//         .optional()
+//         .default('summary,status,assignee,created,updated')
+//         .describe('Comma-separated list of fields to return'),
+//     },
+//   },
+//   async ({ jql, maxResults = 50, fields = 'summary,status,assignee,created,updated' }, context) => {
+//     const authInfo = getAuthInfo(context);
+//     const token = authInfo?.atlassian_access_token;
+
+//     if (!token) {
+//       return {
+//         content: [
+//           {
+//             type: 'text',
+//             text: 'Error: No valid Atlassian access token found in session context.',
+//           },
+//         ],
+//       };
+//     }
+
+//     try {
+//       // Get accessible sites
+//       const siteRes = await fetch('https://api.atlassian.com/oauth/token/accessible-resources', {
+//         headers: {
+//           Authorization: `Bearer ${token}`,
+//           Accept: 'application/json',
+//         },
+//       });
+
+//       if (!siteRes.ok) {
+//         throw new Error(`Failed to fetch sites: ${siteRes.status} ${siteRes.statusText}`);
+//       }
+
+//       const sites = await siteRes.json();
+//       if (!sites.length) {
+//         return { content: [{ type: 'text', text: 'No accessible Jira sites.' }] };
+//       }
+
+//       const cloudId = sites[0].id;
+
+//       // Build search parameters
+//       const searchParams = new URLSearchParams({
+//         maxResults: maxResults.toString(),
+//         fields: fields,
+//       });
+
+//       if (jql) {
+//         searchParams.append('jql', jql);
+//       }
+
+//       // Fetch issues
+//       const issuesRes = await fetch(`https://api.atlassian.com/ex/jira/${cloudId}/rest/api/3/search?${searchParams}`, {
+//         headers: {
+//           Authorization: `Bearer ${token}`,
+//           Accept: 'application/json',
+//         },
+//       });
+
+//       if (!issuesRes.ok) {
+//         throw new Error(`Failed to fetch issues: ${issuesRes.status} ${issuesRes.statusText}`);
+//       }
+
+//       const data = await issuesRes.json();
+
+//       if (!data.issues || data.issues.length === 0) {
+//         return { content: [{ type: 'text', text: 'No issues found.' }] };
+//       }
+
+//       const issuesSummary = data.issues
+//         .map((issue) => {
+//           const summary = issue.fields.summary || 'No summary';
+//           const status = issue.fields.status?.name || 'No status';
+//           const assignee = issue.fields.assignee?.displayName || 'Unassigned';
+//           return `- ${issue.key}: ${summary} [${status}] (${assignee})`;
+//         })
+//         .join('\n');
+
+//       return {
+//         content: [
+//           {
+//             type: 'text',
+//             text: `Found ${data.issues.length} issues:\n\n${issuesSummary}`,
+//           },
+//         ],
+//       };
+//     } catch (err) {
+//       logger.error('Error fetching issues from Jira:', err);
+//       return { content: [{ type: 'text', text: `Error fetching issues from Jira: ${err.message}` }] };
+//     }
+//   },
+// );
+
+// Register tool to get accessible sites
+// mcp.registerTool(
+//   'get-accessible-sites',
+//   {
+//     title: 'Get Accessible Jira Sites',
+//     description: 'Get list of accessible Jira sites for the authenticated user',
+//     inputSchema: {},
+//   },
+//   async (_, context) => {
+//     const authInfo = getAuthInfo(context);
+//     const token = authInfo?.atlassian_access_token;
+
+//     if (!token) {
+//       return {
+//         content: [
+//           {
+//             type: 'text',
+//             text: 'Error: No valid Atlassian access token found in session context.',
+//           },
+//         ],
+//       };
+//     }
+
+//     try {
+//       const response = await fetch('https://api.atlassian.com/oauth/token/accessible-resources', {
+//         headers: {
+//           Authorization: `Bearer ${token}`,
+//           Accept: 'application/json',
+//         },
+//       });
+
+//       if (!response.ok) {
+//         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+//       }
+
+//       const sites = await response.json();
+
+//       if (!sites.length) {
+//         return { content: [{ type: 'text', text: 'No accessible Jira sites found.' }] };
+//       }
+
+//       const sitesList = sites.map((site) => `- ${site.name} (${site.url}) - ID: ${site.id}`).join('\n');
+
+//       return {
+//         content: [
+//           {
+//             type: 'text',
+//             text: `Accessible Jira Sites (${sites.length}):\n\n${sitesList}`,
+//           },
+//         ],
+//       };
+//     } catch (err) {
+//       logger.error('Error fetching accessible sites:', err);
+//       return { content: [{ type: 'text', text: `Error fetching accessible sites: ${err.message}` }] };
+//     }
+//   },
+// );
+
+async function blobToBase64(blob) {
+  const arrayBuffer = await blob.arrayBuffer(); // Get the ArrayBuffer from the Blob
+  const buffer = Buffer.from(arrayBuffer); // Create a Buffer from the ArrayBuffer
+  return buffer.toString('base64');
+}
+
 // Register tool to list Jira issues
 mcp.registerTool(
-  'list-jira-issues',
+  'get-jira-attachments',
   {
-    title: 'List Jira Issues',
-    description: 'Fetch Jira issues from the first accessible site using JQL queries',
+    title: 'Get Jira Issues Attachments',
+    description: 'Fetch Jira attachments by attachment ID',
     inputSchema: {
-      jql: z.string().optional().describe('JQL (Jira Query Language) query to filter issues'),
-      maxResults: z.number().optional().default(50).describe('Maximum number of results to return'),
-      fields: z
-        .string()
-        .optional()
-        .default('summary,status,assignee,created,updated')
-        .describe('Comma-separated list of fields to return'),
+      attachmentIds: z.array(z.string()).describe('Array of attachment IDs to fetch'),
+      cloudId: z.string().describe('The cloud ID to specify the Jira site'),
     },
   },
-  async ({ jql, maxResults = 50, fields = 'summary,status,assignee,created,updated' }, context) => {
+  async ({ attachmentIds }, context) => {
     const authInfo = getAuthInfo(context);
     const token = authInfo?.atlassian_access_token;
 
@@ -85,130 +247,60 @@ mcp.registerTool(
 
     try {
       // Get accessible sites
-      const siteRes = await fetch('https://api.atlassian.com/oauth/token/accessible-resources', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
-      });
+      // const siteRes = await fetch('https://api.atlassian.com/oauth/token/accessible-resources', {
+      //   headers: {
+      //     Authorization: `Bearer ${token}`,
+      //     Accept: 'application/json',
+      //   },
+      // });
 
-      if (!siteRes.ok) {
-        throw new Error(`Failed to fetch sites: ${siteRes.status} ${siteRes.statusText}`);
+      // if (!siteRes.ok) {
+      //   throw new Error(`Failed to fetch sites: ${siteRes.status} ${siteRes.statusText}`);
+      // }
+
+      // const sites = await siteRes.json();
+      // if (!sites.length) {
+      //   return { content: [{ type: 'text', text: 'No accessible Jira sites.' }] };
+      // }
+
+      // const cloudId = sites[0].id;
+
+      const responses = await Promise.all(
+        attachmentIds.map((id) =>
+          fetch(`https://api.atlassian.com/ex/jira/${cloudId}/rest/api/3/attachment/content/${id}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: 'application/json',
+            },
+          })
+            .then(async (res) => {
+              return { blob: await res.blob(), mimeType: res.headers.get('Content-Type') };
+            })
+            .then(async ({ blob, ...rest }) => {
+              return {
+                mimeType: 'image/png',
+                encoded: await blobToBase64(blob),
+              };
+            }),
+        ),
+      );
+
+      if (!responses || responses.length === 0) {
+        return { content: [{ type: 'text', text: 'No attachments found.' }] };
       }
-
-      const sites = await siteRes.json();
-      if (!sites.length) {
-        return { content: [{ type: 'text', text: 'No accessible Jira sites.' }] };
-      }
-
-      const cloudId = sites[0].id;
-
-      // Build search parameters
-      const searchParams = new URLSearchParams({
-        maxResults: maxResults.toString(),
-        fields: fields,
-      });
-
-      if (jql) {
-        searchParams.append('jql', jql);
-      }
-
-      // Fetch issues
-      const issuesRes = await fetch(`https://api.atlassian.com/ex/jira/${cloudId}/rest/api/3/search?${searchParams}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
-      });
-
-      if (!issuesRes.ok) {
-        throw new Error(`Failed to fetch issues: ${issuesRes.status} ${issuesRes.statusText}`);
-      }
-
-      const data = await issuesRes.json();
-
-      if (!data.issues || data.issues.length === 0) {
-        return { content: [{ type: 'text', text: 'No issues found.' }] };
-      }
-
-      const issuesSummary = data.issues
-        .map((issue) => {
-          const summary = issue.fields.summary || 'No summary';
-          const status = issue.fields.status?.name || 'No status';
-          const assignee = issue.fields.assignee?.displayName || 'Unassigned';
-          return `- ${issue.key}: ${summary} [${status}] (${assignee})`;
-        })
-        .join('\n');
 
       return {
-        content: [
-          {
-            type: 'text',
-            text: `Found ${data.issues.length} issues:\n\n${issuesSummary}`,
-          },
-        ],
+        content: responses.map(({ encoded, mimeType }) => {
+          return {
+            type: 'image',
+            mimeType: mimeType,
+            data: encoded,
+          };
+        }),
       };
     } catch (err) {
       logger.error('Error fetching issues from Jira:', err);
-      return { content: [{ type: 'text', text: `Error fetching issues from Jira: ${err.message}` }] };
-    }
-  },
-);
-
-// Register tool to get accessible sites
-mcp.registerTool(
-  'get-accessible-sites',
-  {
-    title: 'Get Accessible Jira Sites',
-    description: 'Get list of accessible Jira sites for the authenticated user',
-    inputSchema: {},
-  },
-  async (_, context) => {
-    const authInfo = getAuthInfo(context);
-    const token = authInfo?.atlassian_access_token;
-
-    if (!token) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: 'Error: No valid Atlassian access token found in session context.',
-          },
-        ],
-      };
-    }
-
-    try {
-      const response = await fetch('https://api.atlassian.com/oauth/token/accessible-resources', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const sites = await response.json();
-
-      if (!sites.length) {
-        return { content: [{ type: 'text', text: 'No accessible Jira sites found.' }] };
-      }
-
-      const sitesList = sites.map((site) => `- ${site.name} (${site.url}) - ID: ${site.id}`).join('\n');
-
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Accessible Jira Sites (${sites.length}):\n\n${sitesList}`,
-          },
-        ],
-      };
-    } catch (err) {
-      logger.error('Error fetching accessible sites:', err);
-      return { content: [{ type: 'text', text: `Error fetching accessible sites: ${err.message}` }] };
+      return { content: [{ type: 'text', text: `Error fetching attachments from Jira: ${err.message}` }] };
     }
   },
 );

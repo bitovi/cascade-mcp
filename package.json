@@ -1,0 +1,46 @@
+{
+  "name": "test-oauth",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start-local": "node server/server.js",
+    "typecheck": "tsc",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "**/*": "prettier --write --ignore-unknown"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.15.1",
+    "@sentry/node": "^8.51.0",
+    "@sentry/profiling-node": "^8.51.0",
+    "aws-sdk": "^2.1692.0",
+    "axios": "^1.1.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "express-session": "^1.18.1",
+    "jose": "^6.0.12",
+    "node-fetch": "^3.3.2",
+    "otpauth": "^9.3.6",
+    "undici": "^6.19.5",
+    "undici-types": "^6.19.5",
+    "uuid": "^11.0.3",
+    "winston": "^3.17.0",
+    "winston-cloudwatch": "^6.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "commander": "^12.1.0",
+    "fsevents": "^2.3.3",
+    "husky": "^9.1.4",
+    "prettier": "3.5.3",
+    "semver": "^7.6.3",
+    "typescript": "^5.5.4"
+  }
+}

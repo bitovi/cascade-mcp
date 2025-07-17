@@ -5,7 +5,6 @@ import * as Sentry from '@sentry/node';
 import express from 'express';
 import session from 'express-session';
 import dotenv from 'dotenv';
-import { fetchTokenWithAccessCode } from './helper.js';
 import { oauthMetadata, authorize, callback, jiraIssues, register } from './oauth.js';
 import { handleMcpPost, handleSessionRequest } from './mcp-service.js';
 import { jwtSign } from './tokens.js';
@@ -88,6 +87,7 @@ app.delete('/mcp', handleSessionRequest);
 
 // --- Existing Endpoints ---
 
+/*
 app.get('/access-token', async (req, res) => {
   try {
     const code = req.query.code;
@@ -115,7 +115,7 @@ app.get('/access-token', async (req, res) => {
       message: `${error.message}`,
     });
   }
-});
+});*/
 
 app.post('/domain', async (req, res) => {
   logger.info(`[domain] - ${req.body.domain}`);

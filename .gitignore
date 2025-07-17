@@ -1,0 +1,9 @@
+node_modules/
+.vscode/
+.env*
+.env.local
+!/playwright/.env*
+.env.mis
+.DS_Store
+/blob-report/
+/dist/
