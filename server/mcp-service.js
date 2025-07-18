@@ -35,43 +35,16 @@ export async function handleMcpPost(req, res) {
     // New initialization request
     console.log('New MCP initialization request');
 
-    // Extract auth info
-    let authInfo = null;
-    const auth = req.headers.authorization;
-    const tokenFromQuery = req.query.token;
-    const authServerUrl = process.env.VITE_AUTH_SERVER_URL;
+    // Extract and validate auth info
+    let { authInfo, errored } = getAuthInfoFromBearer(req, res);
+    if (errored) { return; }
 
-    if (auth && auth.startsWith('Bearer ')) {
-      try {
-        const payload = parseJWT(auth.slice('Bearer '.length));
-        authInfo = payload;
-        console.log('Successfully parsed JWT payload:', authInfo);
-        // Validate that we have an Atlassian access token
-        if (!authInfo.atlassian_access_token) {
-          console.log('JWT payload missing atlassian_access_token');
-          return sendMissingAtlassianAccessToken(res, req, 'authorization bearer token');
-        }
-      } catch (err) {
-        logger.error('Error parsing JWT token from header:', err);
-        return send401(res,{ error: 'Invalid token' })
-      }
-    } else if (tokenFromQuery) {
-      try {
-        const payload = parseJWT(tokenFromQuery);
-        authInfo = payload;
-        console.log('Successfully parsed JWT payload from query:', authInfo);
-
-        // Validate that we have an Atlassian access token
-        if (!authInfo.atlassian_access_token) {
-          console.log('JWT payload from query missing atlassian_access_token');
-          return sendMissingAtlassianAccessToken(res, req, 'query parameter');
-        }
-      } catch (err) {
-        logger.error('Error parsing JWT token from query:', err);
-        return send401(res,{ error: 'Invalid token' })
-      }
-    } else {
-      // No authentication provided - require authentication immediately
+    if (!authInfo) {
+      ({ authInfo, errored } = getAuthInfoFromQueryToken(req, res));
+    }
+    if (errored) { return; }
+    
+    if (!authInfo) {
       return sendMissingAtlassianAccessToken(res, req, 'anywhere');
     }
 
@@ -134,7 +107,71 @@ export async function handleSessionRequest(req, res) {
   await transport.handleRequest(req, res);
 }
 
+// === Helper Functions ===
 
+/**
+ * Extract and validate auth info from Authorization Bearer header
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @returns {Object} - {authInfo, errored} where authInfo is the parsed JWT payload or null, errored is boolean
+ */
+function getAuthInfoFromBearer(req, res) {
+  const auth = req.headers.authorization;
+  
+  if (!auth || !auth.startsWith('Bearer ')) {
+    return { authInfo: null, errored: false };
+  }
+
+  try {
+    const payload = parseJWT(auth.slice('Bearer '.length));
+    console.log('Successfully parsed JWT payload from bearer token:', payload);
+    
+    // Validate that we have an Atlassian access token
+    if (!payload.atlassian_access_token) {
+      console.log('JWT payload missing atlassian_access_token');
+      sendMissingAtlassianAccessToken(res, req, 'authorization bearer token');
+      return { authInfo: null, errored: true };
+    }
+    
+    return { authInfo: payload, errored: false };
+  } catch (err) {
+    logger.error('Error parsing JWT token from header:', err);
+    send401(res, { error: 'Invalid token' });
+    return { authInfo: null, errored: true };
+  }
+}
+
+/**
+ * Extract and validate auth info from query token parameter
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @returns {Object} - {authInfo, errored} where authInfo is the parsed JWT payload or null, errored is boolean
+ */
+function getAuthInfoFromQueryToken(req, res) {
+  const tokenFromQuery = req.query.token;
+  
+  if (!tokenFromQuery) {
+    return { authInfo: null, errored: false };
+  }
+
+  try {
+    const payload = parseJWT(tokenFromQuery);
+    console.log('Successfully parsed JWT payload from query:', payload);
+
+    // Validate that we have an Atlassian access token
+    if (!payload.atlassian_access_token) {
+      console.log('JWT payload from query missing atlassian_access_token');
+      sendMissingAtlassianAccessToken(res, req, 'query parameter');
+      return { authInfo: null, errored: true };
+    }
+    
+    return { authInfo: payload, errored: false };
+  } catch (err) {
+    logger.error('Error parsing JWT token from query:', err);
+    send401(res, { error: 'Invalid token' });
+    return { authInfo: null, errored: true };
+  }
+}
 
 function send401(res, jsonResponse ){
   return res
