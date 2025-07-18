@@ -1,0 +1,13 @@
+{
+  "description": "Create stunning, branded status reports for your Jira projects with this intuitive app, offering customizable designs to showcase progress and timelines.",
+  "vendor": {
+    "name": "Bitovi",
+    "url": "http://bitovi.com"
+  },
+  "authentication": {
+    "type": "none"
+  },
+  "apiVersion": 1,
+  "scopes": ["read", "write"],
+  "enableLicensing": true
+}
