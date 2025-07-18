@@ -6,7 +6,7 @@ services:
     restart: always
     build: .
     ports:
-      - 3000:3000
+      - $PORT:$PORT
     volumes:
       - .:/app
       # needed for the deployment. comment out if you want to manage node_modules from your local machine

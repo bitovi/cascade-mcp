@@ -63,7 +63,7 @@ jobs:
 
       - id: deploy
         name: Deploy
-        uses: bitovi/github-actions-deploy-docker-to-ec2@v1.0.1
+        uses: bitovi/github-actions-deploy-docker-to-ec2@v1.0.2
         with:
           checkout: true
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID_JIRA_INTEGRATIONS}}
