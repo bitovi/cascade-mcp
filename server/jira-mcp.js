@@ -231,7 +231,7 @@ mcp.registerTool(
       cloudId: z.string().describe('The cloud ID to specify the Jira site'),
     },
   },
-  async ({ attachmentIds }, context) => {
+  async ({ attachmentIds, cloudId }, context) => {
     const authInfo = getAuthInfo(context);
     const token = authInfo?.atlassian_access_token;
 
