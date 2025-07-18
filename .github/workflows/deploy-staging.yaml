@@ -17,15 +17,14 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
+#
+#      - name: Setup Node
+#        uses: actions/setup-node@v4
+#        with:
+#          node-version: 22
 
       - name: Generate .env and repo_env
         run: |
-          chmod +x scripts/generate-build-env.sh
           ./scripts/generate-build-env.sh
         env:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_JIRA_INTEGRATIONS }}
@@ -41,26 +40,26 @@ jobs:
           VITE_STATUS_REPORTS_ENV: staging
           VITE_JIRA_APP_KEY: jira-mcp-auth-bridge-staging
 
-      - name: Build
-        run: |
-          npm ci
-
+#      - name: Build
+#        run: |
+#          npm ci
+#
        #  npm run create:atlassian-connect -- --environment=staging
        #  npm run build
 
-      - name: Build to Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: build
-          if-no-files-found: error
-          include-hidden-files: true
-          path: ./server
-
-      - name: Download Build
-        uses: actions/download-artifact@v4
-        with:
-          name: build
-          path: server
+#      - name: Build to Artifacts
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: build
+#          if-no-files-found: error
+#          include-hidden-files: true
+#          path: ./server
+#
+#      - name: Download Build
+#        uses: actions/download-artifact@v4
+#        with:
+#          name: build
+#          path: server
 
       - id: deploy
         name: Deploy
@@ -80,6 +79,7 @@ jobs:
           aws_elb_app_port: 3000
 
           docker_full_cleanup: true
+          docker_remove_orphans: true
 
           aws_ec2_instance_type: t3.small
           aws_ec2_instance_root_vol_size: 16
