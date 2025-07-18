@@ -17,11 +17,6 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-#
-#      - name: Setup Node
-#        uses: actions/setup-node@v4
-#        with:
-#          node-version: 22
 
       - name: Generate .env and repo_env
         run: |
@@ -29,37 +24,14 @@ jobs:
         env:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_JIRA_INTEGRATIONS }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_JIRA_INTEGRATIONS }}
-          #BACKEND_SENTRY_DSN: ${{ vars.BACKEND_SENTRY_DSN }}
           VITE_COMMIT_SHA: ${{ github.sha }}
           VITE_AUTH_SERVER_URL: ${{ vars.VITE_AUTH_SERVER_URL }}
           VITE_JIRA_CLIENT_ID: ${{ vars.VITE_JIRA_CLIENT_ID }}
           VITE_JIRA_SCOPE: ${{ vars.VITE_JIRA_SCOPE }}
           VITE_JIRA_CALLBACK_URL: ${{ vars.VITE_JIRA_CALLBACK_URL }}
           VITE_JIRA_API_URL: ${{ vars.VITE_JIRA_API_URL }}
-          #VITE_FRONTEND_SENTRY_DSN: ${{ vars.VITE_FRONTEND_SENTRY_DSN }}
           VITE_STATUS_REPORTS_ENV: staging
           VITE_JIRA_APP_KEY: jira-mcp-auth-bridge-staging
-
-#      - name: Build
-#        run: |
-#          npm ci
-#
-       #  npm run create:atlassian-connect -- --environment=staging
-       #  npm run build
-
-#      - name: Build to Artifacts
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: build
-#          if-no-files-found: error
-#          include-hidden-files: true
-#          path: ./server
-#
-#      - name: Download Build
-#        uses: actions/download-artifact@v4
-#        with:
-#          name: build
-#          path: server
 
       - id: deploy
         name: Deploy
@@ -84,43 +56,5 @@ jobs:
           aws_ec2_instance_type: t3.small
           aws_ec2_instance_root_vol_size: 16
 
-          #repo_env: repo_env
+          repo_env: repo_env
           env_ghs: ${{ secrets.DOT_ENV_STAGING }}
-#
-#  Sentry-Release-Backend:
-#    needs: Deploy-Auth-Server
-#    if: ${{ success() }}
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: actions/checkout@v4
-#        with:
-#          fetch-depth: 0
-#
-#      - name: Create Sentry release
-#        uses: getsentry/action-release@v1
-#        env:
-#          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-#          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
-#          SENTRY_PROJECT: ${{ secrets.SENTRY_BACKEND_PROJECT }}
-#        with:
-#          environment: staging
-#          version: ${{ github.sha }}
-#
-#  Sentry-Release-Frontend:
-#    needs: Deploy-Static-Assets
-#    if: ${{ success() }}
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: actions/checkout@v4
-#        with:
-#          fetch-depth: 0
-#
-#      - name: Create Sentry release
-#        uses: getsentry/action-release@v1
-#        env:
-#          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-#          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
-#          SENTRY_PROJECT: ${{ secrets.SENTRY_FRONTEND_PROJECT }}
-#        with:
-#          environment: staging
-#          version: ${{ github.sha }}
