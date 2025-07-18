@@ -8,6 +8,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { logger } from './logger.js';
+import { jwtVerify } from './tokens.js';
 
 // Global auth context store (keyed by transport/session)
 const authContextStore = new Map();
@@ -276,9 +277,9 @@ mcp.registerTool(
             .then(async (res) => {
               return { blob: await res.blob(), mimeType: res.headers.get('Content-Type') };
             })
-            .then(async ({ blob, ...rest }) => {
+            .then(async ({ blob, mimeType }) => {
               return {
-                mimeType: 'image/png',
+                mimeType: mimeType || 'application/octet-stream',
                 encoded: await blobToBase64(blob),
               };
             }),
@@ -304,6 +305,54 @@ mcp.registerTool(
     }
   },
 );
+
+/**
+ * JWT-Protected Jira Issues Endpoint
+ * Fetches Jira issues using the JWT token containing Atlassian access token
+ */
+export async function jiraIssues(req, res) {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing or invalid Authorization header' });
+  }
+
+  const token = auth.slice('Bearer '.length);
+  try {
+    // Decode JWT to get Atlassian token
+    const payload = await jwtVerify(token);
+    const atlassianToken = payload.atlassian_access_token;
+
+    if (!atlassianToken) {
+      return res.status(401).json({ error: 'No Atlassian token in JWT' });
+    }
+
+    // Get accessible sites
+    const siteResponse = await fetch('https://api.atlassian.com/oauth/token/accessible-resources', {
+      headers: { Authorization: `Bearer ${atlassianToken}` },
+    });
+    const sites = await siteResponse.json();
+
+    if (!sites.length) {
+      return res.status(400).json({ error: 'No accessible Jira sites' });
+    }
+
+    const cloudId = sites[0].id;
+
+    // Fetch issues
+    const issuesResponse = await fetch(`https://api.atlassian.com/ex/jira/${cloudId}/rest/api/3/search`, {
+      headers: {
+        Authorization: `Bearer ${atlassianToken}`,
+        Accept: 'application/json',
+      },
+    });
+
+    const issues = await issuesResponse.json();
+    res.json(issues);
+  } catch (err) {
+    logger.error('JWT verification or Jira API error:', err);
+    res.status(500).json({ error: 'Failed to fetch Jira issues' });
+  }
+}
 
 // Export the MCP server instance for use in server.js
 export { mcp };
