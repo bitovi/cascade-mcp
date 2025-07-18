@@ -51,9 +51,9 @@ jobs:
       - name: Build
         run: |
           npm ci
-          npm run build
-        
-      # npm run create:atlassian-connect
+
+       #  npm run create:atlassian-connect -- --environment=staging
+       #  npm run build
 
       - name: Build to Artifacts
         uses: actions/upload-artifact@v4
@@ -61,7 +61,7 @@ jobs:
           name: build
           if-no-files-found: error
           include-hidden-files: true
-          path: ./dist
+          path: ./server
 
   Deploy-Auth-Server:
     needs: Build-Status-Reports
