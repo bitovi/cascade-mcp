@@ -2,7 +2,7 @@ import winston from 'winston';
 import WinstonCloudWatch from 'winston-cloudwatch';
 
 const cloudWatchConfig = {
-  logGroupName: 'status-reports-for-jira',
+  logGroupName: 'jira-mcp-auth-bridge',
   logStreamName: 'domain-logging',
   awsRegion: 'us-east-1',
   credentials: {
