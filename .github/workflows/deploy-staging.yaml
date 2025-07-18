@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: staging
+      url: ${{ steps.deploy.outputs.vm_url}}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -54,16 +55,6 @@ jobs:
           if-no-files-found: error
           include-hidden-files: true
           path: ./server
-
-  Deploy-Auth-Server:
-    needs: Build-Status-Reports
-    runs-on: ubuntu-latest
-    environment:
-      name: staging
-      url: ${{ steps.deploy.outputs.vm_url}}
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
 
       - name: Download Build
         uses: actions/download-artifact@v4
