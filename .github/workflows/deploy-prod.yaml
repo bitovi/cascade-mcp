@@ -51,8 +51,9 @@ jobs:
       - name: Build
         run: |
           npm ci
-          npm run create:atlassian-connect
           npm run build
+        
+      # npm run create:atlassian-connect
 
       - name: Build to Artifacts
         uses: actions/upload-artifact@v4
@@ -88,7 +89,7 @@ jobs:
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY_JIRA_INTEGRATIONS}}
           aws_default_region: us-east-1
 
-          aws_resource_identifier: bitovi-jira-mcp-auth-bridge-prod-new
+          aws_resource_identifier: bitovi-jira-mcp-auth-bridge-prod
           tf_state_bucket: bitovi-jira-mcp-auth-bridge-prod-tf-state
           tf_state_bucket_destroy: true
 
