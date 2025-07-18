@@ -51,7 +51,7 @@ export function authorize(req, res) {
   const mcpCodeChallengeMethod = req.query.code_challenge_method;
   const mcpResource = req.query.resource; // MCP resource parameter (RFC 8707)
 
-  console.log('OAuth authorize request from MCP client:', {
+  console.log('GET /authorize request from MCP client:', {
     mcpClientId,
     mcpRedirectUri,
     mcpScope,
@@ -155,8 +155,6 @@ export async function callback(req, res) {
   }
   const ATLASSIAN = getAtlassianConfig();
   const mcpRedirectUri = req.session.mcpRedirectUri;
-  const mcpClientId = req.session.mcpClientId;
-  const originalState = req.session.state; // Use the original stored state
   const usingMcpPkce = req.session.usingMcpPkce;
 
   // If we're using MCP's PKCE, we can't do the token exchange here
@@ -175,10 +173,11 @@ export async function callback(req, res) {
     delete req.session.usingMcpPkce;
 
     // Redirect back to MCP client with the authorization code
-    const redirectUrl = `${mcpRedirectUri}?code=${encodeURIComponent(code)}&state=${encodeURIComponent(originalState)}`;
+    const redirectUrl = `${mcpRedirectUri}?code=${encodeURIComponent(code)}&state=${encodeURIComponent(normalizedReceivedState)}`;
     console.log('Redirecting to MCP client with auth code:', redirectUrl);
     return res.redirect(redirectUrl);
   }
+  return;
 
   // Otherwise, handle token exchange ourselves (legacy flow)
   try {

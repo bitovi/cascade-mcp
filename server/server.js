@@ -49,6 +49,7 @@ app.use(function onError(err, req, res, next) {
 app.get('/.well-known/oauth-authorization-server', oauthMetadata);
 
 // OAuth 2.0 Protected Resource Metadata (RFC9728) for MCP discovery
+// I'm not sure this actually gets called
 app.get('/.well-known/oauth-protected-resource', (req, res) => {
   console.log('🔍 OAuth Protected Resource Metadata requested!', {
     headers: req.headers,
