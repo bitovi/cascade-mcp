@@ -93,7 +93,7 @@ jobs:
           aws_ec2_instance_type: t3.small
           aws_ec2_instance_root_vol_size: 16
 
-          repo_env: repo_env
+          #repo_env: repo_env
           env_ghs: ${{ secrets.DOT_ENV_STAGING }}
 #
 #  Sentry-Release-Backend:
