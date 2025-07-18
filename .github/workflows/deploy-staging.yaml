@@ -51,7 +51,6 @@ jobs:
           aws_elb_app_port: 3000
 
           docker_full_cleanup: true
-          docker_remove_orphans: true
 
           aws_ec2_instance_type: t3.small
           aws_ec2_instance_root_vol_size: 16

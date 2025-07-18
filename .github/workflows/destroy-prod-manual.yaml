@@ -27,13 +27,13 @@ jobs:
           tf_stack_destroy: true
 
           aws_r53_enable: true
-          aws_r53_sub_domain_name: status-reports
+          aws_r53_sub_domain_name: jira-mcp-auth-bridge
           aws_r53_domain_name: bitovi.tools
           aws_elb_app_port: 3000
 
           aws_ec2_instance_type: t3.small
-          aws_ec2_instance_root_vol_size: 30
+          aws_ec2_instance_root_vol_size: 16
 
           # Provide a secret called `DOT_ENV` to append environment variables to the .env file
-
+          repo_env: repo_env
           env_ghs: ${{ secrets.DOT_ENV }}

@@ -3,7 +3,6 @@ on:
   workflow_dispatch:
     inputs:
       aws_ec2-resource_identifier:
-      aws_s3-resource_identifier:
 jobs:
   destroy-server:
     runs-on: ubuntu-latest
@@ -18,16 +17,3 @@ jobs:
           aws_resource_identifier: ${{ github.event.inputs.aws_ec2-resource_identifier }}
 
           tf_stack_destroy: true
-  destroy-static:
-    runs-on: ubuntu-latest
-    steps:
-      - id: destroy
-        name: Destroy
-        uses: bitovi/github-actions-deploy-static-site-to-aws@v0.2.6
-        with:
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID_JIRA_INTEGRATIONS}}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY_JIRA_INTEGRATIONS}}
-          aws_default_region: us-east-1
-          aws_resource_identifier: ${{ github.event.inputs.aws_s3-resource_identifier }}
-
-          tf_action: 'destroy'

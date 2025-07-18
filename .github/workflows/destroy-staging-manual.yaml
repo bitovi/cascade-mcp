@@ -11,7 +11,7 @@ jobs:
   EC2-Deploy:
     runs-on: ubuntu-latest
     environment:
-      name: main
+      name: staging
       url: ${{ steps.deploy.outputs.vm_url }}
     steps:
       - id: deploy
@@ -27,7 +27,7 @@ jobs:
 
           aws_r53_enable: true
           aws_r53_create_sub_cert: true
-          aws_r53_sub_domain_name: status-reports-staging
+          aws_r53_sub_domain_name: jira-mcp-auth-bridge-staging
           aws_r53_domain_name: bitovi.tools
           aws_elb_app_port: 3000
 
@@ -36,5 +36,5 @@ jobs:
           aws_ec2_instance_type: t3.small
           aws_ec2_instance_root_vol_size: 16
 
-          # Provide a secret called `DOT_ENV` to append environment variables to the .env file
-          env_ghs: ${{ secrets.DOT_ENV }}
+          repo_env: repo_env
+          env_ghs: ${{ secrets.DOT_ENV_STAGING }}
