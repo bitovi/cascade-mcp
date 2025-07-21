@@ -1,3 +1,24 @@
+/**
+ * MCP Service Module
+ * 
+ * This module handles the HTTP transport layer for the Model Context Protocol (MCP) server.
+ * It acts as the bridge between incoming HTTP requests and the MCP server implementation,
+ * managing authentication, session handling, and request routing.
+ * 
+ * Key responsibilities:
+ * - Session management: Creates and maintains MCP transport sessions with unique IDs
+ * - Authentication: Validates JWT tokens containing Atlassian access tokens from headers or query params
+ * - Request routing: Handles POST (client-to-server), GET, and DELETE requests appropriately  
+ * - Transport lifecycle: Sets up StreamableHTTPServerTransport instances and cleans up on close
+ * - Auth context: Associates authentication information with each session for downstream use
+ * 
+ * This module contains:
+ * - handleMcpPost(): Main handler for MCP client communication (initialization and ongoing requests)
+ * - handleSessionRequest(): Handler for GET/DELETE requests using existing sessions
+ * - Authentication helpers: JWT parsing and validation functions
+ * - Error response utilities: Standardized 401 and error response functions
+ */
+
 import { mcp, setAuthContext, clearAuthContext } from './jira-mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';

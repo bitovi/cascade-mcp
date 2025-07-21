@@ -1,13 +1,39 @@
+/**
+ * OAuth 2.0 Authorization Server Module with PKCE Support
+ * 
+ * This module implements a complete OAuth 2.0 authorization server that acts as a bridge
+ * between MCP clients (like VS Code Copilot) and Atlassian services. It supports the 
+ * Proof Key for Code Exchange (PKCE) extension for enhanced security with public clients.
+ * 
+ * Key responsibilities:
+ * - OAuth 2.0 Discovery: Provides well-known endpoints for client discovery and metadata
+ * - Dynamic Client Registration: Allows MCP clients to register themselves (RFC 7591)
+ * - Authorization Flow: Handles the OAuth authorization code flow with PKCE
+ * - Token Exchange: Exchanges authorization codes for JWT tokens containing Atlassian credentials
+ * - Session Management: Manages OAuth state and PKCE parameters across the flow
+ * 
+ * OAuth Flow Overview:
+ * 1. Client Discovery: /.well-known/oauth-authorization-server and /.well-known/oauth-protected-resource
+ * 2. Dynamic Registration: /register (creates client_id for MCP clients)
+ * 3. Authorization: /authorize (redirects to Atlassian with PKCE parameters)
+ * 4. Callback: /callback (receives auth code from Atlassian, handles MCP vs server PKCE)
+ * 5. Token Exchange: /access-token (exchanges code for JWT with embedded Atlassian tokens)
+ * 
+ * This module contains:
+ * - OAuth metadata endpoints for client discovery
+ * - Dynamic client registration for MCP clients
+ * - Authorization initiation with Atlassian redirect
+ * - Callback handling with state validation
+ * - Token exchange with JWT creation
+ * - PKCE utility functions for cryptographic operations
+ * 
+ * Functions are ordered by their usage in the flow
+ */
 import crypto from 'crypto';
 import { jwtSign, jwtVerify } from './tokens.js';
 import { logger } from './logger.js';
 import { randomUUID } from 'crypto';
 import { createAtlassianAuthUrl, getAtlassianConfig, extractAtlassianCallbackParams, exchangeCodeForAtlassianTokens } from './atlassian-auth-code-flow.js';
-
-
-/**
- * Functions are ordered by their usage in the flow
- */
 
 /**
  * OAuth Metadata Endpoint
@@ -72,10 +98,15 @@ export function register(req, res) {
     // In production, you'd want to store this in a database
     const clientId = `mcp_${randomUUID()}`;
 
-    // Validate redirect URIs (MCP clients should use vscode:// scheme)
-    const validRedirectUris = redirect_uris.filter(
-      (uri) => uri.startsWith('vscode://') || uri.startsWith('http://localhost'),
-    );
+    // Validate redirect URIs - accept any valid URI
+    const validRedirectUris = redirect_uris.filter((uri) => {
+      try {
+        new URL(uri); // This will throw if URI is invalid
+        return true;
+      } catch {
+        return false;
+      }
+    });
 
     if (validRedirectUris.length === 0) {
       return res.status(400).json({

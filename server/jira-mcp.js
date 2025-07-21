@@ -213,6 +213,201 @@ export function clearAuthContext(transportId) {
 //     }
 //   },
 // );
+/*
+// Register search tool per OpenAI MCP specification
+mcp.registerTool(
+  'search',
+  {
+    title: 'Search Jira Issues',
+    description: 'Search for Jira issues using JQL or text query',
+    inputSchema: {
+      query: z.string().describe('A single query string to search for issues'),
+    },
+  },
+  async ({ query }, context) => {
+    console.log('Received search query:', query);
+    const authInfo = getAuthInfo(context);
+    const token = authInfo?.atlassian_access_token;
+
+    if (!token) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'Error: No valid Atlassian access token found in session context.',
+          },
+        ],
+      };
+    }
+
+    try {
+      // Get accessible sites
+      const siteRes = await fetch('https://api.atlassian.com/oauth/token/accessible-resources', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+      });
+
+      if (!siteRes.ok) {
+        throw new Error(`Failed to fetch sites: ${siteRes.status} ${siteRes.statusText}`);
+      }
+
+      const sites = await siteRes.json();
+      if (!sites.length) {
+        return { content: [{ type: 'text', text: 'No accessible Jira sites found.' }] };
+      }
+      const targetCloudId = sites[0].id;
+
+      // Search for issues
+      const searchUrl = `https://api.atlassian.com/ex/jira/${targetCloudId}/rest/api/3/search`;
+      const searchParams = new URLSearchParams({
+        jql: query.includes(':') || query.includes('=') ? query : `text ~ "${query}"`,
+        maxResults: '50',
+        fields: 'key,summary,status,assignee,priority,created,updated,description',
+      });
+
+      const issuesRes = await fetch(`${searchUrl}?${searchParams}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+      });
+
+      if (!issuesRes.ok) {
+        throw new Error(`Failed to search issues: ${issuesRes.status} ${issuesRes.statusText}`);
+      }
+
+      const issuesData = await issuesRes.json();
+      
+      if (!issuesData.issues || issuesData.issues.length === 0) {
+        return [];
+      }
+
+      // Return array of search results per OpenAI specification
+      const searchResults = issuesData.issues.map(issue => {
+        const status = issue.fields.status?.name || 'Unknown';
+        const assignee = issue.fields.assignee?.displayName || 'Unassigned';
+        const priority = issue.fields.priority?.name || 'Unknown';
+        const created = new Date(issue.fields.created).toLocaleDateString();
+        
+        // Create snippet text
+        const snippet = `Status: ${status} | Assignee: ${assignee} | Priority: ${priority} | Created: ${created}`;
+        
+        return {
+          id: issue.key,
+          title: `${issue.key}: ${issue.fields.summary}`,
+          text: snippet,
+          url: `https://atlassian.net/browse/${issue.key}` // Generic URL format
+        };
+      });
+
+      return searchResults;
+    } catch (err) {
+      logger.error('Error searching Jira issues:', err);
+      return { content: [{ type: 'text', text: `Error searching Jira issues: ${err.message}` }] };
+    }
+  },
+);
+
+// Register fetch tool per OpenAI MCP specification
+mcp.registerTool(
+  'fetch',
+  {
+    title: 'Fetch Jira Issue Details',
+    description: 'Retrieve the full contents of a Jira issue by ID',
+    inputSchema: {
+      id: z.string().describe('A unique identifier for the Jira issue (issue key)'),
+    },
+  },
+  async ({ id }, context) => {
+    const authInfo = getAuthInfo(context);
+    const token = authInfo?.atlassian_access_token;
+
+    if (!token) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'Error: No valid Atlassian access token found in session context.',
+          },
+        ],
+      };
+    }
+
+    try {
+      // Get accessible sites
+      const siteRes = await fetch('https://api.atlassian.com/oauth/token/accessible-resources', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+      });
+
+      if (!siteRes.ok) {
+        throw new Error(`Failed to fetch sites: ${siteRes.status} ${siteRes.statusText}`);
+      }
+
+      const sites = await siteRes.json();
+      if (!sites.length) {
+        return { content: [{ type: 'text', text: 'No accessible Jira sites found.' }] };
+      }
+      const targetCloudId = sites[0].id;
+
+      // Get issue details
+      const issueRes = await fetch(`https://api.atlassian.com/ex/jira/${targetCloudId}/rest/api/3/issue/${id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+      });
+
+      if (!issueRes.ok) {
+        if (issueRes.status === 404) {
+          return { content: [{ type: 'text', text: `Issue ${id} not found.` }] };
+        }
+        throw new Error(`Failed to fetch issue: ${issueRes.status} ${issueRes.statusText}`);
+      }
+
+      const issue = await issueRes.json();
+      
+      const status = issue.fields.status?.name || 'Unknown';
+      const assignee = issue.fields.assignee?.displayName || 'Unassigned';
+      const priority = issue.fields.priority?.name || 'Unknown';
+      const created = new Date(issue.fields.created).toLocaleDateString();
+      const updated = new Date(issue.fields.updated).toLocaleDateString();
+      const description = issue.fields.description?.content?.[0]?.content?.[0]?.text || 'No description';
+      
+      // Create full text content
+      const fullText = `Summary: ${issue.fields.summary}\n\n` +
+                      `Status: ${status}\n` +
+                      `Assignee: ${assignee}\n` +
+                      `Priority: ${priority}\n` +
+                      `Created: ${created}\n` +
+                      `Updated: ${updated}\n\n` +
+                      `Description:\n${description}`;
+
+      // Return single object per OpenAI specification
+      return {
+        id: issue.key,
+        title: `${issue.key}: ${issue.fields.summary}`,
+        text: fullText,
+        url: `https://atlassian.net/browse/${issue.key}`, // Generic URL format
+        metadata: {
+          status: status,
+          assignee: assignee,
+          priority: priority,
+          created: created,
+          updated: updated,
+          issueType: issue.fields.issuetype?.name || 'Unknown'
+        }
+      };
+    } catch (err) {
+      logger.error('Error fetching Jira issue:', err);
+      return { content: [{ type: 'text', text: `Error fetching Jira issue: ${err.message}` }] };
+    }
+  },
+);*/
 
 async function blobToBase64(blob) {
   const arrayBuffer = await blob.arrayBuffer(); // Get the ArrayBuffer from the Blob
