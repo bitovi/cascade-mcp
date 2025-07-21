@@ -9,7 +9,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  Build-Status-Reports:
+  Build-Server:
     runs-on: ubuntu-latest
     environment:
       name: staging
