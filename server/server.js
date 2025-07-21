@@ -5,6 +5,7 @@ import * as Sentry from '@sentry/node';
 import express from 'express';
 import session from 'express-session';
 import dotenv from 'dotenv';
+import morgan from 'morgan';
 import { oauthMetadata, oauthProtectedResourceMetadata, authorize, callback, register, accessToken } from './pkce.js';
 import { handleMcpPost, handleSessionRequest } from './mcp-service.js';
 import cors from 'cors';
@@ -33,6 +34,13 @@ app.use(
 
 app.use(cors());
 
+// HTTP request logging middleware
+app.use(morgan('common', {
+  stream: {
+    write: (message) => logger.info(message.trim())
+  }
+}));
+
 // middlewares
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -45,6 +53,29 @@ app.use(function onError(err, req, res, next) {
 });
 
 // --- OAuth Endpoints ---
+// Root endpoint for service discovery
+app.get('/', (req, res) => {
+  res.json({
+    name: 'Jira MCP Auth Bridge',
+    description: 'OAuth 2.0 bridge for MCP clients to access Jira services',
+    version: '1.0.0',
+    endpoints: {
+      oauth_metadata: '/.well-known/oauth-authorization-server',
+      protected_resource_metadata: '/.well-known/oauth-protected-resource',
+      authorization: '/authorize',
+      token: '/access-token',
+      registration: '/register',
+      mcp: '/mcp'
+    },
+    supported_grant_types: ['authorization_code'],
+    supported_response_types: ['code'],
+    pkce_supported: true,
+    client_id: process.env.VITE_JIRA_CLIENT_ID,
+    scopes: process.env.VITE_JIRA_SCOPE,
+    redirect_uri: process.env.VITE_JIRA_CALLBACK_URL,
+  });
+});
+
 app.get('/.well-known/oauth-authorization-server', oauthMetadata);
 
 // OAuth 2.0 Protected Resource Metadata (RFC9728) for MCP discovery
