@@ -275,11 +275,11 @@ mcp.registerTool(
             },
           })
             .then(async (res) => {
-              return { blob: await res.blob(), mimeType: res.headers.get('Content-Type') };
+              return res.blob(); // Get the response as a Blob
             })
-            .then(async ({ blob, mimeType }) => {
+            .then(async (blob) => {
               return {
-                mimeType: mimeType || 'application/octet-stream',
+                mimeType: blob.type,
                 encoded: await blobToBase64(blob),
               };
             }),
