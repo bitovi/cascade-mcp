@@ -64,28 +64,6 @@ function getAuthInfo(context) {
   return null;
 }
 
-
-// Wrapper function to handle authentication for MCP tools
-function withAuthHandling(toolCallback) {
-  return async (params, context) => {
-    try {
-      return await toolCallback(params, context);
-    } catch (err) {
-      logger.error('Tool execution error:', err);
-      
-      // Check if this is an MCP OAuth authentication error
-      if (err instanceof InvalidTokenError) {
-        logger.info('Authentication expired (MCP OAuth error), propagating to trigger re-authentication');
-        // Re-throw the MCP OAuth error as-is - the MCP framework will handle it properly
-        throw err;
-      }
-      
-      // Re-throw other errors as-is
-      throw err;
-    }
-  };
-}
-
 // Function to store auth info for a transport
 export function setAuthContext(transportId, authInfo) {
   authContextStore.set(transportId, authInfo);
@@ -485,7 +463,7 @@ mcp.registerTool(
       cloudId: z.string().describe('The cloud ID to specify the Jira site'),
     },
   },
-  withAuthHandling(async ({ attachmentIds, cloudId }, context) => {
+  async ({ attachmentIds, cloudId }, context) => {
     logger.info('get-jira-attachments called', { 
       attachmentIds, 
       cloudId, 
@@ -673,7 +651,7 @@ mcp.registerTool(
       logger.error('Error fetching attachments from Jira:', err);
       return { content: [{ type: 'text', text: `Error fetching attachments from Jira: ${err.message}` }] };
     }
-  }),
+  },
 );
 
 /**
