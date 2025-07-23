@@ -125,21 +125,6 @@ export async function handleMcpPost(req, res) {
       return;
     }
     
-    // Check for legacy AUTH_EXPIRED errors for backwards compatibility
-    if (error && error.message === 'AUTH_EXPIRED') {
-      console.log('Legacy authentication expired - converting to proper OAuth error');
-      
-      const resourceMetadataUrl = `${process.env.AUTH_BASE_URL || 'http://localhost:3000'}/oauth/.well-known/oauth_authorization_server`;
-      const wwwAuthValue = `Bearer error="invalid_token", error_description="The access token expired", resource_metadata="${resourceMetadataUrl}"`;
-      
-      res.set('WWW-Authenticate', wwwAuthValue);
-      res.status(401).json({
-        error: 'invalid_token',
-        error_description: 'The access token expired'
-      });
-      return;
-    }
-    
     // Re-throw other errors
     throw error;
   }
