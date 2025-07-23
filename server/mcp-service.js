@@ -22,6 +22,7 @@
 import { mcp, setAuthContext, clearAuthContext } from './jira-mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
+import { InvalidTokenError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 import { randomUUID } from 'node:crypto';
 import { logger } from './logger.js';
 
@@ -107,8 +108,41 @@ export async function handleMcpPost(req, res) {
     return;
   }
 
-  // Handle the request
-  await transport.handleRequest(req, res, req.body);
+  // Handle the request with authentication error interception
+  try {
+    await transport.handleRequest(req, res, req.body);
+  } catch (error) {
+    // Check if this is an MCP OAuth authentication error
+    if (error instanceof InvalidTokenError) {
+      console.log('MCP OAuth authentication expired - sending proper OAuth 401 response');
+      
+      // Send proper OAuth 401 response with WWW-Authenticate header
+      const resourceMetadataUrl = `${process.env.AUTH_BASE_URL || 'http://localhost:3000'}/oauth/.well-known/oauth_authorization_server`;
+      const wwwAuthValue = `Bearer error="${error.errorCode}", error_description="${error.message}", resource_metadata="${resourceMetadataUrl}"`;
+      
+      res.set('WWW-Authenticate', wwwAuthValue);
+      res.status(401).json(error.toResponseObject());
+      return;
+    }
+    
+    // Check for legacy AUTH_EXPIRED errors for backwards compatibility
+    if (error && error.message === 'AUTH_EXPIRED') {
+      console.log('Legacy authentication expired - converting to proper OAuth error');
+      
+      const resourceMetadataUrl = `${process.env.AUTH_BASE_URL || 'http://localhost:3000'}/oauth/.well-known/oauth_authorization_server`;
+      const wwwAuthValue = `Bearer error="invalid_token", error_description="The access token expired", resource_metadata="${resourceMetadataUrl}"`;
+      
+      res.set('WWW-Authenticate', wwwAuthValue);
+      res.status(401).json({
+        error: 'invalid_token',
+        error_description: 'The access token expired'
+      });
+      return;
+    }
+    
+    // Re-throw other errors
+    throw error;
+  }
 }
 
 /**
@@ -117,6 +151,28 @@ export async function handleMcpPost(req, res) {
 export async function handleSessionRequest(req, res) {
   console.log('=== MCP SESSION REQUEST ===');
   console.log(req.method);
+  
+  // For GET requests (SSE streams), validate authentication first
+  if (req.method === 'GET') {
+    // Extract and validate auth info
+    let { authInfo, errored } = getAuthInfoFromBearer(req, res);
+    if (errored) { return; }
+
+    if (!authInfo) {
+      ({ authInfo, errored } = getAuthInfoFromQueryToken(req, res));
+    }
+    if (errored) { return; }
+    
+    if (!authInfo) {
+      // For GET requests, send 401 with invalid_token to trigger re-auth
+      console.log('No valid auth found for GET request - triggering re-authentication');
+      return res
+        .status(401)
+        .header('WWW-Authenticate', 'Bearer realm="mcp", error="invalid_token"')
+        .end();
+    }
+  }
+  
   const sessionId = req.headers['mcp-session-id'];
   if (!sessionId || !transports[sessionId]) {
     console.log(`Invalid or missing session ID: ${sessionId}`);
@@ -157,7 +213,7 @@ function getAuthInfoFromBearer(req, res) {
     return { authInfo: payload, errored: false };
   } catch (err) {
     logger.error('Error parsing JWT token from header:', err);
-    send401(res, { error: 'Invalid token' });
+    send401(res, { error: 'Invalid token' }, true); // Trigger re-auth for invalid tokens
     return { authInfo: null, errored: true };
   }
 }
@@ -189,33 +245,36 @@ function getAuthInfoFromQueryToken(req, res) {
     return { authInfo: payload, errored: false };
   } catch (err) {
     logger.error('Error parsing JWT token from query:', err);
-    send401(res, { error: 'Invalid token' });
+    send401(res, { error: 'Invalid token' }, true); // Trigger re-auth for invalid tokens
     return { authInfo: null, errored: true };
   }
 }
 
-function send401(res, jsonResponse ){
+function send401(res, jsonResponse, includeInvalidToken = false) {
+  const wwwAuthHeader = includeInvalidToken 
+    ? `Bearer realm="mcp", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource", error="invalid_token"`
+    : `Bearer realm="mcp", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource"`;
+    
   return res
       .status(401)
-      .header(
-        'WWW-Authenticate',
-        `Bearer realm="mcp", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource"`,
-      )
+      .header('WWW-Authenticate', wwwAuthHeader)
       .json({ error: 'Invalid or missing token' });
 }
 
 function sendMissingAtlassianAccessToken(res, req, where = 'bearer header') {
   const message = `Authentication token missing Atlassian access token in ${where}.`;
   console.log(message);
-  return send401(res,{
-    jsonrpc: '2.0',
-    error: {
-      code: -32001,
-      message: message,
-    },
-    id: req.body.id || null,
-  });
-
+  return res
+      .status(401)
+      .header('WWW-Authenticate', `Bearer realm="mcp", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource", error="invalid_token"`)
+      .json({
+        jsonrpc: '2.0',
+        error: {
+          code: -32001,
+          message: message,
+        },
+        id: req.body.id || null,
+      });
 }
 
 function parseJWT(token) {

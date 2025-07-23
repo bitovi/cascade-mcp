@@ -6,6 +6,7 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { InvalidTokenError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 import { z } from 'zod';
 import { logger } from './logger.js';
 import { jwtVerify } from './tokens.js';
@@ -26,6 +27,26 @@ const mcp = new McpServer(
   },
 );
 
+let testForcingAuthError = false;
+/*
+setTimeout(() => {
+  testForcingAuthError = true;
+  logger.info('Test forcing auth error enabled');
+}, 10000); // Enable after 10 seconds for testing purposes
+*/
+
+
+// Helper function to handle 401 responses from Jira API
+function handleJiraAuthError(response, operation = 'Jira API request') {
+  if (testForcingAuthError || response.status === 401) {
+    // Token has expired or is invalid, throw the proper MCP OAuth error
+    throw new InvalidTokenError(`Authentication required: ${operation} returned 401. The access token expired and re-authentication is needed.`);
+  }
+  if (!response.ok) {
+    throw new Error(`${operation} failed: ${response.status} ${response.statusText}`);
+  }
+}
+
 // Helper function to get auth info from context
 function getAuthInfo(context) {
   // First try to get from context if it's directly available
@@ -41,6 +62,28 @@ function getAuthInfo(context) {
   }
 
   return null;
+}
+
+
+// Wrapper function to handle authentication for MCP tools
+function withAuthHandling(toolCallback) {
+  return async (params, context) => {
+    try {
+      return await toolCallback(params, context);
+    } catch (err) {
+      logger.error('Tool execution error:', err);
+      
+      // Check if this is an MCP OAuth authentication error
+      if (err instanceof InvalidTokenError) {
+        logger.info('Authentication expired (MCP OAuth error), propagating to trigger re-authentication');
+        // Re-throw the MCP OAuth error as-is - the MCP framework will handle it properly
+        throw err;
+      }
+      
+      // Re-throw other errors as-is
+      throw err;
+    }
+  };
 }
 
 // Function to store auth info for a transport
@@ -67,7 +110,6 @@ export function clearAuthContext(transportId) {
 //         .optional()
 //         .default('summary,status,assignee,created,updated')
 //         .describe('Comma-separated list of fields to return'),
-//     },
 //   },
 //   async ({ jql, maxResults = 50, fields = 'summary,status,assignee,created,updated' }, context) => {
 //     const authInfo = getAuthInfo(context);
@@ -443,7 +485,7 @@ mcp.registerTool(
       cloudId: z.string().describe('The cloud ID to specify the Jira site'),
     },
   },
-  async ({ attachmentIds, cloudId }, context) => {
+  withAuthHandling(async ({ attachmentIds, cloudId }, context) => {
     logger.info('get-jira-attachments called', { 
       attachmentIds, 
       cloudId, 
@@ -514,9 +556,7 @@ mcp.registerTool(
               contentLength: response.headers.get('content-length')
             });
 
-            if (!response.ok) {
-              throw new Error(`Failed to fetch attachment ${id}: ${response.status} ${response.statusText}`);
-            }
+            handleJiraAuthError(response, `Fetch attachment ${id}`);
 
             logger.info(`Converting response to blob for attachment ${id}`);
             const blob = await response.blob();
@@ -633,7 +673,7 @@ mcp.registerTool(
       logger.error('Error fetching attachments from Jira:', err);
       return { content: [{ type: 'text', text: `Error fetching attachments from Jira: ${err.message}` }] };
     }
-  },
+  }),
 );
 
 /**
