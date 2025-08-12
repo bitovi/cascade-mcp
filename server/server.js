@@ -8,6 +8,7 @@ import dotenv from 'dotenv';
 import morgan from 'morgan';
 import { oauthMetadata, oauthProtectedResourceMetadata, authorize, callback, register, accessToken } from './pkce.js';
 import { handleMcpPost, handleSessionRequest } from './mcp-service.js';
+import { renderManualTokenPage } from './manual-token-flow.js';
 import cors from 'cors';
 import { logger } from './logger.js';
 import { jiraIssues } from './jira-mcp.js';
@@ -65,7 +66,8 @@ app.get('/', (req, res) => {
       authorization: '/authorize',
       token: '/access-token',
       registration: '/register',
-      mcp: '/mcp'
+      mcp: '/mcp',
+      manual_token: '/get-access-token'
     },
     supported_grant_types: ['authorization_code'],
     supported_response_types: ['code'],
@@ -80,6 +82,9 @@ app.get('/.well-known/oauth-authorization-server', oauthMetadata);
 
 // OAuth 2.0 Protected Resource Metadata (RFC9728) for MCP discovery
 app.get('/.well-known/oauth-protected-resource', oauthProtectedResourceMetadata);
+
+// Manual token retrieval page
+app.get('/get-access-token', renderManualTokenPage);
 
 app.get('/authorize', authorize);
 app.post('/register', express.json(), register);
