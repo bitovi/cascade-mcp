@@ -34,6 +34,7 @@ import { jwtSign, jwtVerify } from './tokens.js';
 import { logger } from './logger.js';
 import { randomUUID } from 'crypto';
 import { createAtlassianAuthUrl, getAtlassianConfig, extractAtlassianCallbackParams, exchangeCodeForAtlassianTokens } from './atlassian-auth-code-flow.js';
+import { isManualFlow, handleManualFlowCallback } from './manual-token-flow.js';
 
 /**
  * OAuth Metadata Endpoint
@@ -226,8 +227,14 @@ export async function callback(req, res) {
       codeVerifier: req.session.codeVerifier ? 'present' : 'missing',
       mcpClientId: req.session.mcpClientId,
       mcpRedirectUri: req.session.mcpRedirectUri,
+      manualFlow: req.session.manualFlow ? 'present' : 'missing',
     },
   });
+
+  // Check if this is a manual flow callback
+  if (isManualFlow(req)) {
+    return await handleManualFlowCallback(req, res, { code, normalizedState });
+  }
 
   // State validation: both should be undefined or both should match
   const stateMatches = normalizedState === req.session.state;
