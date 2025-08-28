@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 import { logger } from '../logger.js';
-import { getAuthInfo, handleJiraAuthError, resolveCloudId } from './auth-helpers.js';
+import { getAuthInfoSafe, handleJiraAuthError, resolveCloudId } from './auth-helpers.js';
 
 /**
  * Convert a blob to base64 string
@@ -58,7 +58,8 @@ export function registerGetJiraAttachmentsTool(mcp) {
         attachmentCount: attachmentIds?.length 
       });
 
-      const authInfo = getAuthInfo(context);
+      // Get auth info with proper error handling
+      const authInfo = getAuthInfoSafe(context, 'get-jira-attachments');
       const token = authInfo?.atlassian_access_token;
 
       if (!token) {

@@ -49,7 +49,7 @@ export function oauthMetadata(req, res) {
     registration_endpoint: process.env.VITE_AUTH_SERVER_URL + '/register',
     code_challenge_methods_supported: ['S256'],
     response_types_supported: ['code'],
-    grant_types_supported: ['authorization_code'],
+    grant_types_supported: ['authorization_code', 'refresh_token'],
     token_endpoint_auth_methods_supported: ['none', 'client_secret_post'],
     scopes_supported: ['read:jira-work', 'offline_access'],
   });
@@ -336,6 +336,11 @@ export async function accessToken(req, res) {
     // Get config for creating JWT
     const ATLASSIAN_CONFIG = getAtlassianConfig();
 
+    // Calculate JWT expiration: 1 minute before Atlassian token expires
+    const atlassianExpiresIn = tokenData.expires_in || 3600; // Default to 1 hour if not provided
+    const jwtExpiresIn = Math.max(60, atlassianExpiresIn - 60); // At least 60 seconds, but 1 minute less than Atlassian
+    const jwtExpirationTime = Math.floor(Date.now() / 1000) + jwtExpiresIn;
+
     // Create JWT with embedded Atlassian token
     const jwt = await jwtSign({
       sub: 'user-' + randomUUID(),
@@ -344,15 +349,28 @@ export async function accessToken(req, res) {
       scope: ATLASSIAN_CONFIG.scopes,
       atlassian_access_token: tokenData.access_token,
       refresh_token: tokenData.refresh_token,
+      exp: jwtExpirationTime
+    });
+
+    // Create a refresh token (longer-lived, contains Atlassian refresh token)
+    const refreshToken = await jwtSign({
+      type: 'refresh_token',
+      sub: 'user-' + randomUUID(),
+      iss: process.env.VITE_AUTH_SERVER_URL,
+      aud: resource || process.env.VITE_AUTH_SERVER_URL,
+      scope: ATLASSIAN_CONFIG.scopes,
+      atlassian_refresh_token: tokenData.refresh_token,
+      exp: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60) // 30 days
     });
 
     console.log('OAuth token exchange successful for client:', client_id);
 
-    // Return OAuth-compliant response
+    // Return OAuth-compliant response with actual JWT expiration time
     return res.json({
       access_token: jwt,
       token_type: 'Bearer',
-      expires_in: 3600, // 1 hour
+      expires_in: jwtExpiresIn, // Use actual JWT expiration time
+      refresh_token: refreshToken, // Include refresh token
       scope: ATLASSIAN_CONFIG.scopes,
     });
   } catch (error) {
@@ -360,6 +378,138 @@ export async function accessToken(req, res) {
     res.status(500).json({
       error: 'server_error',
       error_description: 'Internal server error during token exchange',
+    });
+  }
+}
+
+/**
+ * OAuth refresh token endpoint (POST)
+ * Handles refresh token grant type to get new access tokens
+ */
+export async function refreshToken(req, res) {
+  console.log('OAuth refresh token request:', {
+    body: req.body,
+    contentType: req.headers['content-type'],
+  });
+
+  try {
+    const { grant_type, refresh_token, client_id, scope } = req.body;
+
+    if (grant_type !== 'refresh_token') {
+      return res.status(400).json({
+        error: 'unsupported_grant_type',
+        error_description: 'Only refresh_token grant type is supported',
+      });
+    }
+
+    if (!refresh_token) {
+      return res.status(400).json({
+        error: 'invalid_request',
+        error_description: 'Missing refresh_token',
+      });
+    }
+
+    // Verify and decode the refresh token
+    let refreshPayload;
+    try {
+      refreshPayload = await jwtVerify(refresh_token);
+    } catch (error) {
+      console.error('Invalid refresh token:', error.message);
+      return res.status(400).json({
+        error: 'invalid_grant',
+        error_description: 'Invalid or expired refresh token',
+      });
+    }
+
+    // Validate it's actually a refresh token
+    if (refreshPayload.type !== 'refresh_token') {
+      return res.status(400).json({
+        error: 'invalid_grant',
+        error_description: 'Token is not a refresh token',
+      });
+    }
+
+    // Check if refresh token is expired
+    const now = Math.floor(Date.now() / 1000);
+    if (refreshPayload.exp && now >= refreshPayload.exp) {
+      return res.status(400).json({
+        error: 'invalid_grant',
+        error_description: 'Refresh token has expired',
+      });
+    }
+
+    // Use the Atlassian refresh token to get a new access token
+    let newAtlassianTokens;
+    try {
+      const ATLASSIAN_CONFIG = getAtlassianConfig();
+      
+      const tokenRes = await fetch(ATLASSIAN_CONFIG.tokenUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          grant_type: 'refresh_token',
+          client_id: ATLASSIAN_CONFIG.clientId,
+          client_secret: ATLASSIAN_CONFIG.clientSecret,
+          refresh_token: refreshPayload.atlassian_refresh_token,
+        }),
+      });
+
+      newAtlassianTokens = await tokenRes.json();
+      
+      if (!newAtlassianTokens.access_token) {
+        throw new Error(`Atlassian refresh failed: ${JSON.stringify(newAtlassianTokens)}`);
+      }
+    } catch (error) {
+      console.error('Atlassian refresh token exchange failed:', error.message);
+      return res.status(400).json({
+        error: 'invalid_grant',
+        error_description: 'Failed to refresh Atlassian access token',
+      });
+    }
+
+    // Calculate new JWT expiration (1 minute before Atlassian token expires)
+    const atlassianExpiresIn = newAtlassianTokens.expires_in || 3600;
+    const jwtExpiresIn = Math.max(60, atlassianExpiresIn - 60);
+    const jwtExpirationTime = Math.floor(Date.now() / 1000) + jwtExpiresIn;
+
+    // Create new access token with new Atlassian tokens
+    const newAccessToken = await jwtSign({
+      sub: refreshPayload.sub,
+      iss: refreshPayload.iss,
+      aud: refreshPayload.aud,
+      scope: refreshPayload.scope,
+      atlassian_access_token: newAtlassianTokens.access_token,
+      refresh_token: newAtlassianTokens.refresh_token || refreshPayload.atlassian_refresh_token,
+      exp: jwtExpirationTime
+    });
+
+    // Create new refresh token (if Atlassian provided a new one)
+    const newRefreshToken = await jwtSign({
+      type: 'refresh_token',
+      sub: refreshPayload.sub,
+      iss: refreshPayload.iss,
+      aud: refreshPayload.aud,
+      scope: refreshPayload.scope,
+      atlassian_refresh_token: newAtlassianTokens.refresh_token || refreshPayload.atlassian_refresh_token,
+      exp: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60) // 30 days
+    });
+
+    console.log('OAuth refresh token exchange successful for client:', client_id);
+
+    // Return new tokens
+    return res.json({
+      access_token: newAccessToken,
+      token_type: 'Bearer',
+      expires_in: jwtExpiresIn,
+      refresh_token: newRefreshToken,
+      scope: refreshPayload.scope,
+    });
+
+  } catch (error) {
+    console.error('OAuth refresh token error:', error);
+    res.status(500).json({
+      error: 'server_error',
+      error_description: 'Internal server error during token refresh',
     });
   }
 }

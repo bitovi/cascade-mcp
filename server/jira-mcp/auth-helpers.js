@@ -16,6 +16,36 @@ setTimeout(() => {
 }, 10000); // Enable after 10 seconds for testing purposes
 */
 
+let testForcingTokenExpired = false;
+/*
+setTimeout(() => {
+  testForcingTokenExpired = true;
+  logger.info('Test forcing token expired enabled');
+}, 15000); // Enable after 15 seconds for testing purposes
+*/
+
+/**
+ * Check if a JWT token is expired
+ * @param {Object} authInfo - Authentication info object containing exp field
+ * @returns {boolean} True if token is expired, false otherwise
+ */
+function isTokenExpired(authInfo) {
+  // Test mechanism to force token expiration
+  if (testForcingTokenExpired) {
+    logger.info('Test mechanism: forcing token expired');
+    return true;
+  }
+  
+  if (!authInfo?.exp) {
+    // If no expiration field, assume it's expired for safety
+    return true;
+  }
+  
+  // JWT exp field is in seconds, Date.now() is in milliseconds
+  const now = Math.floor(Date.now() / 1000);
+  return now >= authInfo.exp;
+}
+
 /**
  * Helper function to handle 401 responses from Jira API
  * @param {Response} response - Fetch response object
@@ -41,17 +71,63 @@ export function handleJiraAuthError(response, operation = 'Jira API request') {
 export function getAuthInfo(context) {
   // First try to get from context if it's directly available
   if (context?.authInfo?.atlassian_access_token) {
+    if (isTokenExpired(context.authInfo)) {
+      logger.info('Auth token from context is expired - triggering re-authentication');
+      throw new InvalidTokenError('The access token expired and re-authentication is needed.');
+    }
     return context.authInfo;
   }
 
-  // Try to get from the stored auth context using any available session identifier
-  for (const [sessionId, authInfo] of authContextStore.entries()) {
+  // Try to get session ID from context to safely retrieve auth info
+  const sessionId = context?.sessionId || context?.transport?.sessionId;
+  if (sessionId) {
+    const authInfo = authContextStore.get(sessionId);
     if (authInfo?.atlassian_access_token) {
+      if (isTokenExpired(authInfo)) {
+        logger.info('Auth token from session context is expired - triggering re-authentication');
+        throw new InvalidTokenError('The access token expired and re-authentication is needed.');
+      }
       return authInfo;
     }
   }
 
+  // No auth found in context
+  logger.error('No auth context found', { 
+    hasDirectAuthInfo: !!context?.authInfo,
+    contextSessionId: context?.sessionId || context?.transport?.sessionId,
+    totalAuthContexts: authContextStore.size
+  });
   return null;
+}
+
+/**
+ * Safe wrapper for getAuthInfo with consistent error handling
+ * @param {Object} context - MCP context object
+ * @param {string} toolName - Name of the tool calling this function for logging
+ * @returns {Object} Auth info object
+ * @throws {InvalidTokenError} When token is expired (to trigger OAuth re-authentication)
+ * @throws {Object} When other errors occur (MCP tool error response format)
+ */
+export function getAuthInfoSafe(context, toolName = 'unknown-tool') {
+  try {
+    return getAuthInfo(context);
+  } catch (error) {
+    // If it's an InvalidTokenError, re-throw it to trigger OAuth re-authentication
+    if (error.constructor.name === 'InvalidTokenError') {
+      logger.info(`Token expired in ${toolName}, re-throwing for OAuth re-auth`);
+      throw error;
+    }
+    // For other errors, log and throw a tool error response
+    logger.error(`Unexpected error getting auth info in ${toolName}:`, error);
+    throw {
+      content: [
+        {
+          type: 'text',
+          text: `Error: Failed to get authentication info - ${error.message}`,
+        },
+      ],
+    };
+  }
 }
 
 /**
@@ -69,6 +145,15 @@ export function setAuthContext(transportId, authInfo) {
  */
 export function clearAuthContext(transportId) {
   authContextStore.delete(transportId);
+}
+
+/**
+ * Function to get auth context for a transport
+ * @param {string} transportId - Transport identifier
+ * @returns {Object|undefined} Auth info object or undefined if not found
+ */
+export function getAuthContext(transportId) {
+  return authContextStore.get(transportId);
 }
 
 /**

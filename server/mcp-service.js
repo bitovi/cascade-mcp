@@ -116,11 +116,13 @@ export async function handleMcpPost(req, res) {
     if (error instanceof InvalidTokenError) {
       console.log('MCP OAuth authentication expired - sending proper OAuth 401 response');
       
-      // Send proper OAuth 401 response with WWW-Authenticate header
-      const resourceMetadataUrl = `${process.env.AUTH_BASE_URL || 'http://localhost:3000'}/oauth/.well-known/oauth_authorization_server`;
-      const wwwAuthValue = `Bearer error="${error.errorCode}", error_description="${error.message}", resource_metadata="${resourceMetadataUrl}"`;
+      // Send proper OAuth 401 response with WWW-Authenticate header according to RFC 6750
+      const wwwAuthValue = `Bearer realm="mcp", error="invalid_token", error_description="${error.message}", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource"`;
       
       res.set('WWW-Authenticate', wwwAuthValue);
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
       res.status(401).json(error.toResponseObject());
       return;
     }
@@ -153,7 +155,10 @@ export async function handleSessionRequest(req, res) {
       console.log('No valid auth found for GET request - triggering re-authentication');
       return res
         .status(401)
-        .header('WWW-Authenticate', 'Bearer realm="mcp", error="invalid_token"')
+        .header('WWW-Authenticate', `Bearer realm="mcp", error="invalid_token", error_description="Authentication required", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource"`)
+        .header('Cache-Control', 'no-cache, no-store, must-revalidate')
+        .header('Pragma', 'no-cache')
+        .header('Expires', '0')
         .end();
     }
   }
@@ -237,12 +242,15 @@ function getAuthInfoFromQueryToken(req, res) {
 
 function send401(res, jsonResponse, includeInvalidToken = false) {
   const wwwAuthHeader = includeInvalidToken 
-    ? `Bearer realm="mcp", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource", error="invalid_token"`
+    ? `Bearer realm="mcp", error="invalid_token", error_description="Token expired - please re-authenticate", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource"`
     : `Bearer realm="mcp", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource"`;
     
   return res
       .status(401)
       .header('WWW-Authenticate', wwwAuthHeader)
+      .header('Cache-Control', 'no-cache, no-store, must-revalidate')
+      .header('Pragma', 'no-cache')
+      .header('Expires', '0')
       .json({ error: 'Invalid or missing token' });
 }
 
@@ -251,7 +259,10 @@ function sendMissingAtlassianAccessToken(res, req, where = 'bearer header') {
   console.log(message);
   return res
       .status(401)
-      .header('WWW-Authenticate', `Bearer realm="mcp", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource", error="invalid_token"`)
+      .header('WWW-Authenticate', `Bearer realm="mcp", error="invalid_token", error_description="${message}", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource"`)
+      .header('Cache-Control', 'no-cache, no-store, must-revalidate')
+      .header('Pragma', 'no-cache')
+      .header('Expires', '0')
       .json({
         jsonrpc: '2.0',
         error: {
@@ -265,10 +276,22 @@ function sendMissingAtlassianAccessToken(res, req, where = 'bearer header') {
 function formatTokenWithExpiration(token, maxLength = 20) {
   try {
     const payload = parseJWT(token);
+    const truncatedToken = token.substring(0, maxLength) + '...';
+    
+    // Check if we have a valid expiration timestamp
+    if (!payload.exp || typeof payload.exp !== 'number') {
+      return `${truncatedToken} (no expiration info)`;
+    }
+    
     const expTimestamp = payload.exp;
     const now = Math.floor(Date.now() / 1000);
     const diffSeconds = expTimestamp - now;
-    const truncatedToken = token.substring(0, maxLength) + '...';
+    
+    // Sanity check - if the difference is more than 10 years, something is wrong
+    const tenYearsInSeconds = 10 * 365 * 24 * 60 * 60;
+    if (Math.abs(diffSeconds) > tenYearsInSeconds) {
+      return `${truncatedToken} (invalid expiration: ${expTimestamp})`;
+    }
     
     let timeMessage;
     if (diffSeconds > 0) {

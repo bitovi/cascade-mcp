@@ -9,7 +9,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { logger } from '../logger.js';
 
 // Import auth helpers
-import { setAuthContext, clearAuthContext } from './auth-helpers.js';
+import { setAuthContext, clearAuthContext, getAuthContext } from './auth-helpers.js';
 
 // Import tool registration functions
 import { registerUpdateIssueDescriptionTool } from './tool-update-issue-description.js';
@@ -41,4 +41,4 @@ registerGetJiraAttachmentsTool(mcp);
 logger.info('All MCP tools registered successfully');
 
 // Export the MCP server instance and auth functions for use in server.js
-export { mcp, setAuthContext, clearAuthContext };
+export { mcp, setAuthContext, clearAuthContext, getAuthContext };
