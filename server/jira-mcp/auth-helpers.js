@@ -35,6 +35,36 @@ setTimeout(() => {
 }, 10000); // Enable after 10 seconds for testing purposes
 */
 
+let testForcingTokenExpired = false;
+/*
+setTimeout(() => {
+  testForcingTokenExpired = true;
+  logger.info('Test forcing token expired enabled');
+}, 15000); // Enable after 15 seconds for testing purposes
+*/
+
+/**
+ * Check if a JWT token is expired
+ * @param {Object} authInfo - Authentication info object containing exp field
+ * @returns {boolean} True if token is expired, false otherwise
+ */
+function isTokenExpired(authInfo) {
+  // Test mechanism to force token expiration
+  if (testForcingTokenExpired) {
+    logger.info('Test mechanism: forcing token expired');
+    return true;
+  }
+  
+  if (!authInfo?.exp) {
+    // If no expiration field, assume it's expired for safety
+    return true;
+  }
+  
+  // JWT exp field is in seconds, Date.now() is in milliseconds
+  const now = Math.floor(Date.now() / 1000);
+  return now >= authInfo.exp;
+}
+
 /**
  * Helper function to handle 401 responses from Jira API
  * @param {Response} response - Fetch response object
@@ -97,69 +127,63 @@ export function getAuthInfo(context) {
 
   // First try to get from context if it's directly available
   if (context?.authInfo?.atlassian_access_token) {
-    const authInfo = context.authInfo;
-    
-    // Check if token is expired
-    if (isTokenExpired(authInfo)) {
-      logger.warn('Direct context token is expired, skipping', {
-        source: 'direct_context',
-        exp: authInfo.exp,
-        iss: authInfo.iss,
-      });
-    } else {
-      const token = authInfo.atlassian_access_token;
-      logger.info('Found valid auth token from direct context', {
-        source: 'direct_context',
-        ...getTokenLogInfo(token, 'atlassianToken'),
-        hasRefreshToken: !!authInfo.refresh_token,
-        scope: authInfo.scope,
-        issuer: authInfo.iss,
-        audience: authInfo.aud,
-        exp: authInfo.exp,
-        expiresIn: authInfo.exp - Math.floor(Date.now() / 1000),
-      });
-      return authInfo;
+    if (isTokenExpired(context.authInfo)) {
+      logger.info('Auth token from context is expired - triggering re-authentication');
+      throw new InvalidTokenError('The access token expired and re-authentication is needed.');
     }
+    return context.authInfo;
   }
 
-  // Try to get from the stored auth context using any available session identifier
-  for (const [sessionId, authInfo] of authContextStore.entries()) {
+  // Try to get session ID from context to safely retrieve auth info
+  const sessionId = context?.sessionId || context?.transport?.sessionId;
+  if (sessionId) {
+    const authInfo = authContextStore.get(sessionId);
     if (authInfo?.atlassian_access_token) {
-      // Check if stored token is expired
       if (isTokenExpired(authInfo)) {
-        logger.warn('Stored context token is expired, removing from store', {
-          source: 'auth_context_store',
-          sessionId,
-          exp: authInfo.exp,
-          iss: authInfo.iss,
-        });
-        // Remove expired token from store
-        authContextStore.delete(sessionId);
-        continue;
+        logger.info('Auth token from session context is expired - triggering re-authentication');
+        throw new InvalidTokenError('The access token expired and re-authentication is needed.');
       }
-      
-      const token = authInfo.atlassian_access_token;
-      logger.info('Found valid auth token from stored context', {
-        source: 'auth_context_store',
-        sessionId,
-        ...getTokenLogInfo(token, 'atlassianToken'),
-        hasRefreshToken: !!authInfo.refresh_token,
-        scope: authInfo.scope,
-        issuer: authInfo.iss,
-        audience: authInfo.aud,
-        exp: authInfo.exp,
-        expiresIn: authInfo.exp - Math.floor(Date.now() / 1000),
-      });
       return authInfo;
     }
   }
 
-  logger.warn('No auth token found in any context', {
-    checkedDirectContext: !!context?.authInfo,
-    checkedStoredContexts: authContextStore.size,
-    availableSessionIds: Array.from(authContextStore.keys()),
+  // No auth found in context
+  logger.error('No auth context found', { 
+    hasDirectAuthInfo: !!context?.authInfo,
+    contextSessionId: context?.sessionId || context?.transport?.sessionId,
+    totalAuthContexts: authContextStore.size
   });
   return null;
+}
+
+/**
+ * Safe wrapper for getAuthInfo with consistent error handling
+ * @param {Object} context - MCP context object
+ * @param {string} toolName - Name of the tool calling this function for logging
+ * @returns {Object} Auth info object
+ * @throws {InvalidTokenError} When token is expired (to trigger OAuth re-authentication)
+ * @throws {Object} When other errors occur (MCP tool error response format)
+ */
+export function getAuthInfoSafe(context, toolName = 'unknown-tool') {
+  try {
+    return getAuthInfo(context);
+  } catch (error) {
+    // If it's an InvalidTokenError, re-throw it to trigger OAuth re-authentication
+    if (error.constructor.name === 'InvalidTokenError') {
+      logger.info(`Token expired in ${toolName}, re-throwing for OAuth re-auth`);
+      throw error;
+    }
+    // For other errors, log and throw a tool error response
+    logger.error(`Unexpected error getting auth info in ${toolName}:`, error);
+    throw {
+      content: [
+        {
+          type: 'text',
+          text: `Error: Failed to get authentication info - ${error.message}`,
+        },
+      ],
+    };
+  }
 }
 
 /**
@@ -218,31 +242,12 @@ export function clearAuthContext(transportId) {
 }
 
 /**
- * Cleanup expired tokens from the auth context store
- * This can be called periodically to prevent accumulation of expired tokens
+ * Function to get auth context for a transport
+ * @param {string} transportId - Transport identifier
+ * @returns {Object|undefined} Auth info object or undefined if not found
  */
-export function cleanupExpiredTokens() {
-  const expiredSessions = [];
-  
-  for (const [sessionId, authInfo] of authContextStore.entries()) {
-    if (isTokenExpired(authInfo)) {
-      expiredSessions.push(sessionId);
-    }
-  }
-  
-  if (expiredSessions.length > 0) {
-    logger.info('Cleaning up expired tokens from auth store', {
-      expiredCount: expiredSessions.length,
-      totalSessions: authContextStore.size,
-      expiredSessions,
-    });
-    
-    expiredSessions.forEach(sessionId => {
-      authContextStore.delete(sessionId);
-    });
-  }
-  
-  return expiredSessions.length;
+export function getAuthContext(transportId) {
+  return authContextStore.get(transportId);
 }
 
 /**

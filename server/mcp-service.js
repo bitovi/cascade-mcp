@@ -41,7 +41,7 @@ export async function handleMcpPost(req, res) {
   console.log('=== MCP POST REQUEST ===');
   console.log("Transport keys: ",Object.keys(transports).length);
   console.log('Body:', JSON.stringify(req.body, null, 2));
-  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  console.log('Headers:', JSON.stringify(sanitizeHeaders(req.headers), null, 2));
   console.log('========================');
 
   // Check for existing session ID
@@ -117,11 +117,13 @@ export async function handleMcpPost(req, res) {
     if (error instanceof InvalidTokenError) {
       console.log('MCP OAuth authentication expired - sending proper OAuth 401 response');
       
-      // Send proper OAuth 401 response with WWW-Authenticate header
-      const resourceMetadataUrl = `${process.env.AUTH_BASE_URL || 'http://localhost:3000'}/oauth/.well-known/oauth_authorization_server`;
-      const wwwAuthValue = `Bearer error="${error.errorCode}", error_description="${error.message}", resource_metadata="${resourceMetadataUrl}"`;
+      // Send proper OAuth 401 response with WWW-Authenticate header according to RFC 6750
+      const wwwAuthValue = `Bearer realm="mcp", error="invalid_token", error_description="${error.message}", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource"`;
       
       res.set('WWW-Authenticate', wwwAuthValue);
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
       res.status(401).json(error.toResponseObject());
       return;
     }
@@ -154,7 +156,10 @@ export async function handleSessionRequest(req, res) {
       console.log('No valid auth found for GET request - triggering re-authentication');
       return res
         .status(401)
-        .header('WWW-Authenticate', 'Bearer realm="mcp", error="invalid_token"')
+        .header('WWW-Authenticate', `Bearer realm="mcp", error="invalid_token", error_description="Authentication required", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource"`)
+        .header('Cache-Control', 'no-cache, no-store, must-revalidate')
+        .header('Pragma', 'no-cache')
+        .header('Expires', '0')
         .end();
     }
   }
@@ -186,21 +191,9 @@ async function getAuthInfoFromBearer(req, res) {
   }
 
   try {
-    const payload = await jwtVerify(auth.slice('Bearer '.length));
-    const token = payload.atlassian_access_token;
-    console.log('Successfully verified JWT payload from bearer token:', {
-      sub: payload.sub,
-      iss: payload.iss,
-      aud: payload.aud,
-      scope: payload.scope,
-      exp: payload.exp,
-      iat: payload.iat,
-      hasAtlassianToken: !!token,
-      atlassianTokenPrefix: token ? token.substring(0, 20) + '...' : null,
-      atlassianTokenLength: token ? token.length : 0,
-      hasRefreshToken: !!payload.refresh_token,
-    });
-    
+    const payload = parseJWT(auth.slice('Bearer '.length));
+    console.log('Successfully parsed JWT payload from bearer token:', JSON.stringify(sanitizeJwtPayload(payload), null, 2));
+
     // Validate that we have an Atlassian access token
     if (!payload.atlassian_access_token) {
       console.log('JWT payload missing atlassian_access_token');
@@ -230,20 +223,8 @@ async function getAuthInfoFromQueryToken(req, res) {
   }
 
   try {
-    const payload = await jwtVerify(tokenFromQuery);
-    const token = payload.atlassian_access_token;
-    console.log('Successfully verified JWT payload from query:', {
-      sub: payload.sub,
-      iss: payload.iss,
-      aud: payload.aud,
-      scope: payload.scope,
-      exp: payload.exp,
-      iat: payload.iat,
-      hasAtlassianToken: !!token,
-      atlassianTokenPrefix: token ? token.substring(0, 20) + '...' : null,
-      atlassianTokenLength: token ? token.length : 0,
-      hasRefreshToken: !!payload.refresh_token,
-    });
+    const payload = parseJWT(tokenFromQuery);
+    console.log('Successfully parsed JWT payload from query:', JSON.stringify(sanitizeJwtPayload(payload), null, 2));
 
     // Validate that we have an Atlassian access token
     if (!payload.atlassian_access_token) {
@@ -262,12 +243,15 @@ async function getAuthInfoFromQueryToken(req, res) {
 
 function send401(res, jsonResponse, includeInvalidToken = false) {
   const wwwAuthHeader = includeInvalidToken 
-    ? `Bearer realm="mcp", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource", error="invalid_token"`
+    ? `Bearer realm="mcp", error="invalid_token", error_description="Token expired - please re-authenticate", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource"`
     : `Bearer realm="mcp", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource"`;
     
   return res
       .status(401)
       .header('WWW-Authenticate', wwwAuthHeader)
+      .header('Cache-Control', 'no-cache, no-store, must-revalidate')
+      .header('Pragma', 'no-cache')
+      .header('Expires', '0')
       .json({ error: 'Invalid or missing token' });
 }
 
@@ -276,7 +260,10 @@ function sendMissingAtlassianAccessToken(res, req, where = 'bearer header') {
   console.log(message);
   return res
       .status(401)
-      .header('WWW-Authenticate', `Bearer realm="mcp", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource", error="invalid_token"`)
+      .header('WWW-Authenticate', `Bearer realm="mcp", error="invalid_token", error_description="${message}", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource"`)
+      .header('Cache-Control', 'no-cache, no-store, must-revalidate')
+      .header('Pragma', 'no-cache')
+      .header('Expires', '0')
       .json({
         jsonrpc: '2.0',
         error: {
@@ -285,4 +272,86 @@ function sendMissingAtlassianAccessToken(res, req, where = 'bearer header') {
         },
         id: req.body.id || null,
       });
+}
+
+function formatTokenWithExpiration(token, maxLength = 20) {
+  try {
+    const payload = parseJWT(token);
+    const truncatedToken = token.substring(0, maxLength) + '...';
+    
+    // Check if we have a valid expiration timestamp
+    if (!payload.exp || typeof payload.exp !== 'number') {
+      return `${truncatedToken} (no expiration info)`;
+    }
+    
+    const expTimestamp = payload.exp;
+    const now = Math.floor(Date.now() / 1000);
+    const diffSeconds = expTimestamp - now;
+    
+    // Sanity check - if the difference is more than 10 years, something is wrong
+    const tenYearsInSeconds = 10 * 365 * 24 * 60 * 60;
+    if (Math.abs(diffSeconds) > tenYearsInSeconds) {
+      return `${truncatedToken} (invalid expiration: ${expTimestamp})`;
+    }
+    
+    let timeMessage;
+    if (diffSeconds > 0) {
+      // Token hasn't expired yet
+      const hours = Math.floor(diffSeconds / 3600);
+      const minutes = Math.floor((diffSeconds % 3600) / 60);
+      
+      if (hours > 0) {
+        timeMessage = `expires in ${hours}h ${minutes}m`;
+      } else if (minutes > 0) {
+        timeMessage = `expires in ${minutes}m`;
+      } else {
+        timeMessage = `expires in ${diffSeconds}s`;
+      }
+    } else {
+      // Token has expired
+      const expiredSeconds = Math.abs(diffSeconds);
+      const hours = Math.floor(expiredSeconds / 3600);
+      const minutes = Math.floor((expiredSeconds % 3600) / 60);
+      
+      if (hours > 0) {
+        timeMessage = `expired ${hours}h ${minutes}m ago`;
+      } else if (minutes > 0) {
+        timeMessage = `expired ${minutes}m ago`;
+      } else {
+        timeMessage = `expired ${expiredSeconds}s ago`;
+      }
+    }
+    
+    return `${truncatedToken} (${timeMessage})`;
+  } catch (err) {
+    // If we can't parse the token, just truncate it
+    const truncatedToken = token.substring(0, maxLength) + '...';
+    return `${truncatedToken} (could not parse expiration)`;
+  }
+}
+
+function sanitizeHeaders(headers) {
+  const sanitized = { ...headers };
+  
+  if (sanitized.authorization && sanitized.authorization.startsWith('Bearer ')) {
+    const token = sanitized.authorization.slice('Bearer '.length);
+    sanitized.authorization = `Bearer ${formatTokenWithExpiration(token, 20)}`;
+  }
+  
+  return sanitized;
+}
+
+function sanitizeJwtPayload(payload) {
+  const sanitized = { ...payload };
+  
+  // Truncate the atlassian_access_token and add expiration info
+  if (sanitized.atlassian_access_token) {
+    sanitized.atlassian_access_token = formatTokenWithExpiration(sanitized.atlassian_access_token, 30);
+  }
+  
+  return sanitized;
+}
+
+function parseJWT(token) {
+  return JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString())
 }

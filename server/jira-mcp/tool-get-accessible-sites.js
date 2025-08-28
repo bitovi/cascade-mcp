@@ -3,7 +3,7 @@
  */
 
 import { logger } from '../logger.js';
-import { getAuthInfo, handleJiraAuthError } from './auth-helpers.js';
+import { getAuthInfoSafe, handleJiraAuthError } from './auth-helpers.js';
 
 /**
  * Register the get-accessible-sites tool with the MCP server
@@ -18,7 +18,8 @@ export function registerGetAccessibleSitesTool(mcp) {
       inputSchema: {},
     },
     async (_, context) => {
-      const authInfo = getAuthInfo(context);
+      // Get auth info with proper error handling
+      const authInfo = getAuthInfoSafe(context, 'get-accessible-sites');
       const token = authInfo?.atlassian_access_token;
 
       if (!token) {

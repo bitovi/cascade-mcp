@@ -13,14 +13,18 @@ const key = createSecretKey(Buffer.from(process.env.JWT_SECRET || 'devsecret'));
 /**
  * Sign a JWT token with the provided payload
  * @param {object} payload - The payload to include in the JWT
+ * @param {string|number|Date} payload.exp - Optional expiration time for the JWT
  * @returns {Promise<string>} The signed JWT token
  */
 export async function jwtSign(payload) {
-  return await new SignJWT(payload)
+  const { exp, ...jwtPayload } = payload;
+  
+  const jwt = new SignJWT(jwtPayload)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime('15m')
-    .sign(key);
+    .setExpirationTime(exp || '2m');
+
+  return await jwt.sign(key);
 }
 
 /**

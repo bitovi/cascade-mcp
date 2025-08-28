@@ -83,6 +83,11 @@ export async function handleManualFlowCallback(req, res, { code, normalizedState
     // Get config for creating JWT
     const ATLASSIAN_CONFIG = getAtlassianConfig();
 
+    // Calculate JWT expiration (1 minute before Atlassian token expires)
+    const atlassianExpiresIn = tokenData.expires_in || 3600;
+    const jwtExpiresIn = Math.max(60, atlassianExpiresIn - 60);
+    const jwtExpirationTime = Math.floor(Date.now() / 1000) + jwtExpiresIn;
+
     // Create JWT with embedded Atlassian token
     const jwt = await jwtSign({
       sub: 'user-' + randomUUID(),
@@ -91,13 +96,25 @@ export async function handleManualFlowCallback(req, res, { code, normalizedState
       scope: ATLASSIAN_CONFIG.scopes,
       atlassian_access_token: tokenData.access_token,
       refresh_token: tokenData.refresh_token,
+      exp: jwtExpirationTime
+    });
+
+    // Create a refresh token for manual flow
+    const refreshToken = await jwtSign({
+      type: 'refresh_token',
+      sub: 'user-' + randomUUID(),
+      iss: process.env.VITE_AUTH_SERVER_URL,
+      aud: process.env.VITE_AUTH_SERVER_URL,
+      scope: ATLASSIAN_CONFIG.scopes,
+      atlassian_refresh_token: tokenData.refresh_token,
+      exp: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60) // 30 days
     });
 
     // Clear manual flow session data
     delete req.session.manualFlow;
 
-    // Display success page with token
-    return res.send(generateSuccessPageHtml(jwt));
+    // Display success page with both tokens
+    return res.send(generateSuccessPageHtml(jwt, refreshToken));
     
   } catch (error) {
     console.error('Manual flow token exchange failed:', error.message);
@@ -198,9 +215,9 @@ function generateInitialPageHtml(authUrl) {
 }
 
 /**
- * Generates the success page HTML with the access token
+ * Generates the success page HTML with the access token and refresh token
  */
-function generateSuccessPageHtml(jwt) {
+function generateSuccessPageHtml(jwt, refreshToken = null) {
   return `
     <!DOCTYPE html>
     <html>
@@ -264,23 +281,33 @@ function generateSuccessPageHtml(jwt) {
         
         <h3>Your Access Token:</h3>
         <div class="token-container">
-          <div id="token">${jwt}</div>
-          <button class="copy-button" onclick="copyToken()">Copy Token</button>
+          <div id="access-token">${jwt}</div>
+          <button class="copy-button" onclick="copyToken('access-token')">Copy Access Token</button>
         </div>
+        
+        ${refreshToken ? `
+        <h3>Your Refresh Token:</h3>
+        <div class="token-container">
+          <div id="refresh-token">${refreshToken}</div>
+          <button class="copy-button" onclick="copyToken('refresh-token')">Copy Refresh Token</button>
+        </div>
+        ` : ''}
         
         <div class="instructions">
           <h3>Security Notes:</h3>
           <ul>
-            <li>This token expires in 1 hour</li>
-            <li>Keep this token secure and don't share it</li>
-            <li>You can generate a new token anytime by visiting <a href="/get-access-token">/get-access-token</a></li>
+            <li>Access token expires in ~1 hour</li>
+            ${refreshToken ? '<li>Refresh token expires in 30 days</li>' : ''}
+            <li>Keep these tokens secure and don't share them</li>
+            <li>You can generate new tokens anytime by visiting <a href="/get-access-token">/get-access-token</a></li>
+            ${refreshToken ? '<li>Use the refresh token to get new access tokens when they expire</li>' : ''}
           </ul>
         </div>
       </div>
       
       <script>
-        function copyToken() {
-          const tokenElement = document.getElementById('token');
+        function copyToken(elementId) {
+          const tokenElement = document.getElementById(elementId);
           const textArea = document.createElement('textarea');
           textArea.value = tokenElement.textContent;
           document.body.appendChild(textArea);
@@ -288,7 +315,7 @@ function generateSuccessPageHtml(jwt) {
           document.execCommand('copy');
           document.body.removeChild(textArea);
           
-          const button = document.querySelector('.copy-button');
+          const button = tokenElement.nextElementSibling;
           const originalText = button.textContent;
           button.textContent = 'Copied!';
           button.style.background = '#218838';

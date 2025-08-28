@@ -6,7 +6,7 @@ import express from 'express';
 import session from 'express-session';
 import dotenv from 'dotenv';
 import morgan from 'morgan';
-import { oauthMetadata, oauthProtectedResourceMetadata, authorize, callback, register, accessToken } from './pkce.js';
+import { oauthMetadata, oauthProtectedResourceMetadata, authorize, callback, register, accessToken, refreshToken } from './pkce.js';
 import { handleMcpPost, handleSessionRequest } from './mcp-service.js';
 import { renderManualTokenPage } from './manual-token-flow.js';
 import cors from 'cors';
@@ -105,6 +105,9 @@ app.post('/domain', async (req, res) => {
 
 // OAuth token endpoint for MCP clients (POST)
 app.post('/access-token', accessToken);
+
+// OAuth refresh token endpoint (POST)
+app.post('/refresh-token', refreshToken);
 
 // Start server
 app.listen(port, () => console.log(`Server is listening on port ${port}!`));

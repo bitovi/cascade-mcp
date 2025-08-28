@@ -1,0 +1,205 @@
+{"level":"info","message":"Registering MCP tools..."}
+{"level":"info","message":"All MCP tools registered successfully"}
+STARTING 0
+Server is listening on port 3000!
+=== MCP POST REQUEST ===
+Transport keys:  0
+Body: {
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "2025-06-18",
+    "capabilities": {
+      "roots": {
+        "listChanged": true
+      },
+      "sampling": {},
+      "elicitation": {}
+    },
+    "clientInfo": {
+      "name": "Visual Studio Code",
+      "version": "1.103.2"
+    }
+  }
+}
+Headers: {
+  "host": "localhost:3000",
+  "connection": "keep-alive",
+  "content-type": "application/json",
+  "accept": "text/event-stream, application/json",
+  "accept-language": "*",
+  "sec-fetch-mode": "cors",
+  "user-agent": "node",
+  "accept-encoding": "gzip, deflate",
+  "content-length": "228"
+}
+========================
+New MCP initialization request
+Authentication token missing Atlassian access token in anywhere.
+{"level":"info","message":"::ffff:127.0.0.1 - - [28/Aug/2025:20:59:25 +0000] \"POST /mcp HTTP/1.1\" 401 125"}
+Received request for OAuth metadata
+{"level":"info","message":"::ffff:127.0.0.1 - - [28/Aug/2025:20:59:25 +0000] \"GET /.well-known/oauth-authorization-server HTTP/1.1\" 200 456"}
+GET /authorize request from MCP client: {
+  mcpClientId: 'mcp_8167e66d-cd92-4c5f-b5e2-3aa095375830',
+  mcpRedirectUri: 'http://127.0.0.1:33418',
+  mcpScope: 'read:jira-work offline_access',
+  responseType: 'code',
+  mcpState: 'FN8XGsXU+UE4RKetD4XXEg==',
+  mcpCodeChallenge: 'ZkyTjdKcgw_cOhHJKBEMoG4EOhTXreHUKaAsIb6eogs',
+  mcpCodeChallengeMethod: 'S256',
+  mcpResource: undefined,
+  queryParams: {
+    client_id: 'mcp_8167e66d-cd92-4c5f-b5e2-3aa095375830',
+    response_type: 'code',
+    code_challenge: 'ZkyTjdKcgw_cOhHJKBEMoG4EOhTXreHUKaAsIb6eogs',
+    code_challenge_method: 'S256',
+    scope: 'read:jira-work offline_access',
+    redirect_uri: 'http://127.0.0.1:33418',
+    state: 'FN8XGsXU+UE4RKetD4XXEg=='
+  }
+}
+Using MCP client PKCE parameters
+Storing in session: {
+  state: 'FN8XGsXU+UE4RKetD4XXEg==',
+  codeVerifier: 'null (using MCP PKCE)',
+  mcpClientId: 'mcp_8167e66d-cd92-4c5f-b5e2-3aa095375830',
+  mcpRedirectUri: 'http://127.0.0.1:33418',
+  mcpResource: undefined,
+  usingMcpPkce: true
+}
+Redirecting to Atlassian: https://auth.atlassian.com/authorize?client_id=oTiTX14cj8k9wappSMewlLpfEXgWDEOo&response_type=code&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fcallback&scope=read%3Ajira-work+write%3Ajira-work&code_challenge=ZkyTjdKcgw_cOhHJKBEMoG4EOhTXreHUKaAsIb6eogs&code_challenge_method=S256&state=FN8XGsXU%2BUE4RKetD4XXEg%3D%3D
+{"level":"info","message":"::1 - - [28/Aug/2025:20:59:29 +0000] \"GET /authorize?client_id=mcp_8167e66d-cd92-4c5f-b5e2-3aa095375830&response_type=code&code_challenge=ZkyTjdKcgw_cOhHJKBEMoG4EOhTXreHUKaAsIb6eogs&code_challenge_method=S256&scope=read%3Ajira-work+offline_access&redirect_uri=http%3A%2F%2F127.0.0.1%3A33418&state=FN8XGsXU%2BUE4RKetD4XXEg%3D%3D HTTP/1.1\" 302 369"}
+OAuth callback received: {
+  code: 'present',
+  state: 'FN8XGsXU UE4RKetD4XXEg==',
+  sessionState: 'FN8XGsXU+UE4RKetD4XXEg==',
+  sessionData: {
+    codeVerifier: 'missing',
+    mcpClientId: 'mcp_8167e66d-cd92-4c5f-b5e2-3aa095375830',
+    mcpRedirectUri: 'http://127.0.0.1:33418',
+    manualFlow: 'missing'
+  }
+}
+Using MCP PKCE - redirecting code back to MCP client
+Redirecting to MCP client with auth code: http://127.0.0.1:33418?code=eyJhbGciOiJIUzI1NiJ9.eyJqdGkiOiI4NDE4OWE5OS1kOGU0LTQ2ZjctYTMwZi03NzdlNjYwOWRjMzAiLCJzdWIiOiI1Y2FiNmJhNjVkM2E0YzA5NmJjNDdlODgiLCJuYmYiOjE3NTY0MTQ3NzQsImlzcyI6ImF1dGguYXRsYXNzaWFuLmNvbSIsImlhdCI6MTc1NjQxNDc3NCwiZXhwIjoxNzU2NDE1MDc0LCJhdWQiOiJvVGlUWDE0Y2o4azl3YXBwU01ld2xMcGZFWGdXREVPbyIsImNsaWVudF9hdXRoX3R5cGUiOiJOT05FIiwiaHR0cHM6Ly9pZC5hdGxhc3NpYW4uY29tL3BrY2UiOiI1Vk1qNzh6UVI4eHZMaGJEbkwxSU5XUkZCN0h2emI2VGlEWXZPLzBBZnhkaE9DRUV2LzNpb2RTY3o0WmUvOVZTSWdjbERBay93dlJRV2hoclVDQ3FuR3QyVFdxT3A0S1hMckgvSlF2YWRVNW1STEV5SWhtR1JzRVRSUGR0TS9mK3lYczNMUXRUY0I5dDhyQ1l5TStKSmFlbi9UdDgrMFdvVUZvVWg0ZmQrM2pHWlA0PSIsImh0dHBzOi8vaWQuYXRsYXNzaWFuLmNvbS9pdiI6ImRQT21WcTRDaEVRVFc5cksiLCJodHRwczovL2lkLmF0bGFzc2lhbi5jb20vdmVyaWZpZWQiOnRydWUsImh0dHBzOi8vaWQuYXRsYXNzaWFuLmNvbS91anQiOiI4NDE4OWE5OS1kOGU0LTQ2ZjctYTMwZi03NzdlNjYwOWRjMzAiLCJzY29wZSI6WyJyZWFkOmppcmEtd29yayIsIndyaXRlOmppcmEtd29yayJdLCJodHRwczovL2lkLmF0bGFzc2lhbi5jb20vYXRsX3Rva2VuX3R5cGUiOiJBVVRIX0NPREUiLCJodHRwczovL2lkLmF0bGFzc2lhbi5jb20vaGFzUmVkaXJlY3RVcmkiOnRydWUsImh0dHBzOi8vaWQuYXRsYXNzaWFuLmNvbS9zZXNzaW9uX2lkIjoiYzc0YTA2OTgtMWUxZC00NzViLTkzZGItZThmZWQ0MzRhOTU2IiwiaHR0cHM6Ly9pZC5hdGxhc3NpYW4uY29tL3Byb2Nlc3NSZWdpb24iOiJ1cy1lYXN0LTEifQ.D6KGG-KqdhzLY-r4D3yPQ2Sbq_DnIcj-f84vVMy8lm4&state=FN8XGsXU%2BUE4RKetD4XXEg%3D%3D
+{"level":"info","message":"::1 - - [28/Aug/2025:20:59:34 +0000] \"GET /callback?state=FN8XGsXU+UE4RKetD4XXEg%3D%3D&code=eyJhbGciOiJIUzI1NiJ9.eyJqdGkiOiI4NDE4OWE5OS1kOGU0LTQ2ZjctYTMwZi03NzdlNjYwOWRjMzAiLCJzdWIiOiI1Y2FiNmJhNjVkM2E0YzA5NmJjNDdlODgiLCJuYmYiOjE3NTY0MTQ3NzQsImlzcyI6ImF1dGguYXRsYXNzaWFuLmNvbSIsImlhdCI6MTc1NjQxNDc3NCwiZXhwIjoxNzU2NDE1MDc0LCJhdWQiOiJvVGlUWDE0Y2o4azl3YXBwU01ld2xMcGZFWGdXREVPbyIsImNsaWVudF9hdXRoX3R5cGUiOiJOT05FIiwiaHR0cHM6Ly9pZC5hdGxhc3NpYW4uY29tL3BrY2UiOiI1Vk1qNzh6UVI4eHZMaGJEbkwxSU5XUkZCN0h2emI2VGlEWXZPLzBBZnhkaE9DRUV2LzNpb2RTY3o0WmUvOVZTSWdjbERBay93dlJRV2hoclVDQ3FuR3QyVFdxT3A0S1hMckgvSlF2YWRVNW1STEV5SWhtR1JzRVRSUGR0TS9mK3lYczNMUXRUY0I5dDhyQ1l5TStKSmFlbi9UdDgrMFdvVUZvVWg0ZmQrM2pHWlA0PSIsImh0dHBzOi8vaWQuYXRsYXNzaWFuLmNvbS9pdiI6ImRQT21WcTRDaEVRVFc5cksiLCJodHRwczovL2lkLmF0bGFzc2lhbi5jb20vdmVyaWZpZWQiOnRydWUsImh0dHBzOi8vaWQuYXRsYXNzaWFuLmNvbS91anQiOiI4NDE4OWE5OS1kOGU0LTQ2ZjctYTMwZi03NzdlNjYwOWRjMzAiLCJzY29wZSI6WyJyZWFkOmppcmEtd29yayIsIndyaXRlOmppcmEtd29yayJdLCJodHRwczovL2lkLmF0bGFzc2lhbi5jb20vYXRsX3Rva2VuX3R5cGUiOiJBVVRIX0NPREUiLCJodHRwczovL2lkLmF0bGFzc2lhbi5jb20vaGFzUmVkaXJlY3RVcmkiOnRydWUsImh0dHBzOi8vaWQuYXRsYXNzaWFuLmNvbS9zZXNzaW9uX2lkIjoiYzc0YTA2OTgtMWUxZC00NzViLTkzZGItZThmZWQ0MzRhOTU2IiwiaHR0cHM6Ly9pZC5hdGxhc3NpYW4uY29tL3Byb2Nlc3NSZWdpb24iOiJ1cy1lYXN0LTEifQ.D6KGG-KqdhzLY-r4D3yPQ2Sbq_DnIcj-f84vVMy8lm4 HTTP/1.1\" 302 1325"}
+OAuth token exchange request: {
+  body: [Object: null prototype] {
+    client_id: 'mcp_8167e66d-cd92-4c5f-b5e2-3aa095375830',
+    grant_type: 'authorization_code',
+    code: 'eyJhbGciOiJIUzI1NiJ9.eyJqdGkiOiI4NDE4OWE5OS1kOGU0LTQ2ZjctYTMwZi03NzdlNjYwOWRjMzAiLCJzdWIiOiI1Y2FiNmJhNjVkM2E0YzA5NmJjNDdlODgiLCJuYmYiOjE3NTY0MTQ3NzQsImlzcyI6ImF1dGguYXRsYXNzaWFuLmNvbSIsImlhdCI6MTc1NjQxNDc3NCwiZXhwIjoxNzU2NDE1MDc0LCJhdWQiOiJvVGlUWDE0Y2o4azl3YXBwU01ld2xMcGZFWGdXREVPbyIsImNsaWVudF9hdXRoX3R5cGUiOiJOT05FIiwiaHR0cHM6Ly9pZC5hdGxhc3NpYW4uY29tL3BrY2UiOiI1Vk1qNzh6UVI4eHZMaGJEbkwxSU5XUkZCN0h2emI2VGlEWXZPLzBBZnhkaE9DRUV2LzNpb2RTY3o0WmUvOVZTSWdjbERBay93dlJRV2hoclVDQ3FuR3QyVFdxT3A0S1hMckgvSlF2YWRVNW1STEV5SWhtR1JzRVRSUGR0TS9mK3lYczNMUXRUY0I5dDhyQ1l5TStKSmFlbi9UdDgrMFdvVUZvVWg0ZmQrM2pHWlA0PSIsImh0dHBzOi8vaWQuYXRsYXNzaWFuLmNvbS9pdiI6ImRQT21WcTRDaEVRVFc5cksiLCJodHRwczovL2lkLmF0bGFzc2lhbi5jb20vdmVyaWZpZWQiOnRydWUsImh0dHBzOi8vaWQuYXRsYXNzaWFuLmNvbS91anQiOiI4NDE4OWE5OS1kOGU0LTQ2ZjctYTMwZi03NzdlNjYwOWRjMzAiLCJzY29wZSI6WyJyZWFkOmppcmEtd29yayIsIndyaXRlOmppcmEtd29yayJdLCJodHRwczovL2lkLmF0bGFzc2lhbi5jb20vYXRsX3Rva2VuX3R5cGUiOiJBVVRIX0NPREUiLCJodHRwczovL2lkLmF0bGFzc2lhbi5jb20vaGFzUmVkaXJlY3RVcmkiOnRydWUsImh0dHBzOi8vaWQuYXRsYXNzaWFuLmNvbS9zZXNzaW9uX2lkIjoiYzc0YTA2OTgtMWUxZC00NzViLTkzZGItZThmZWQ0MzRhOTU2IiwiaHR0cHM6Ly9pZC5hdGxhc3NpYW4uY29tL3Byb2Nlc3NSZWdpb24iOiJ1cy1lYXN0LTEifQ.D6KGG-KqdhzLY-r4D3yPQ2Sbq_DnIcj-f84vVMy8lm4',
+    redirect_uri: 'http://127.0.0.1:33418',
+    code_verifier: '3db88bcdf61ba8f76a1fcd56e9d48d22d0a775ab865bebaec2eb50cb945db6dc'
+  },
+  contentType: 'application/x-www-form-urlencoded'
+}
+OAuth token exchange successful for client: mcp_8167e66d-cd92-4c5f-b5e2-3aa095375830
+{"level":"info","message":"::ffff:127.0.0.1 - - [28/Aug/2025:20:59:35 +0000] \"POST /access-token HTTP/1.1\" 200 3115"}
+=== MCP POST REQUEST ===
+Transport keys:  0
+Body: {
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "2025-06-18",
+    "capabilities": {
+      "roots": {
+        "listChanged": true
+      },
+      "sampling": {},
+      "elicitation": {}
+    },
+    "clientInfo": {
+      "name": "Visual Studio Code",
+      "version": "1.103.2"
+    }
+  }
+}
+Headers: {
+  "host": "localhost:3000",
+  "connection": "keep-alive",
+  "content-type": "application/json",
+  "accept": "text/event-stream, application/json",
+  "authorization": "Bearer eyJhbGciOiJIUzI1NiJ9... (expires in 15m)",
+  "accept-language": "*",
+  "sec-fetch-mode": "cors",
+  "user-agent": "node",
+  "accept-encoding": "gzip, deflate",
+  "content-length": "228"
+}
+========================
+New MCP initialization request
+Successfully parsed JWT payload from bearer token: {
+  "sub": "user-a2ad3251-6fea-4346-8a27-bca1bfbc6cd2",
+  "iss": "http://localhost:3000",
+  "aud": "http://localhost:3000",
+  "scope": "read:jira-work write:jira-work",
+  "atlassian_access_token": "eyJraWQiOiJhdXRoLmF0bGFzc2lhbi... (expires in 1h 0m)",
+  "iat": 1756414775,
+  "exp": 1756415675
+}
+MCP server connected to new transport
+Storing transport for new session: a7c30892-e87b-409e-92cf-db83f3d8e632
+Transport stored for session: a7c30892-e87b-409e-92cf-db83f3d8e632
+{"level":"info","message":"::ffff:127.0.0.1 - - [28/Aug/2025:20:59:35 +0000] \"POST /mcp HTTP/1.1\" 200 -"}
+=== MCP POST REQUEST ===
+Transport keys:  1
+Body: {
+  "method": "notifications/initialized",
+  "jsonrpc": "2.0"
+}
+Headers: {
+  "host": "localhost:3000",
+  "connection": "keep-alive",
+  "content-type": "application/json",
+  "accept": "text/event-stream, application/json",
+  "mcp-session-id": "a7c30892-e87b-409e-92cf-db83f3d8e632",
+  "authorization": "Bearer eyJhbGciOiJIUzI1NiJ9... (expires in 15m)",
+  "accept-language": "*",
+  "sec-fetch-mode": "cors",
+  "user-agent": "node",
+  "accept-encoding": "gzip, deflate",
+  "content-length": "54"
+}
+========================
+transport type object
+Reusing existing transport for session: a7c30892-e87b-409e-92cf-db83f3d8e632
+{"level":"info","message":"::ffff:127.0.0.1 - - [28/Aug/2025:20:59:35 +0000] \"POST /mcp HTTP/1.1\" 202 -"}
+=== MCP POST REQUEST ===
+Transport keys:  1
+Body: {
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/list",
+  "params": {}
+}
+Headers: {
+  "host": "localhost:3000",
+  "connection": "keep-alive",
+  "content-type": "application/json",
+  "accept": "text/event-stream, application/json",
+  "mcp-session-id": "a7c30892-e87b-409e-92cf-db83f3d8e632",
+  "authorization": "Bearer eyJhbGciOiJIUzI1NiJ9... (expires in 15m)",
+  "accept-language": "*",
+  "sec-fetch-mode": "cors",
+  "user-agent": "node",
+  "accept-encoding": "gzip, deflate",
+  "content-length": "58"
+}
+========================
+transport type object
+Reusing existing transport for session: a7c30892-e87b-409e-92cf-db83f3d8e632
+{"level":"info","message":"::ffff:127.0.0.1 - - [28/Aug/2025:20:59:35 +0000] \"POST /mcp HTTP/1.1\" 200 -"}
+=== MCP SESSION REQUEST ===
+GET
+Successfully parsed JWT payload from bearer token: {
+  "sub": "user-a2ad3251-6fea-4346-8a27-bca1bfbc6cd2",
+  "iss": "http://localhost:3000",
+  "aud": "http://localhost:3000",
+  "scope": "read:jira-work write:jira-work",
+  "atlassian_access_token": "eyJraWQiOiJhdXRoLmF0bGFzc2lhbi... (expires in 1h 0m)",
+  "iat": 1756414775,
+  "exp": 1756415675
+}

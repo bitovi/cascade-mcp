@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 import { logger } from '../logger.js';
-import { getAuthInfo, handleJiraAuthError, resolveCloudId } from './auth-helpers.js';
+import { getAuthInfoSafe, handleJiraAuthError, resolveCloudId } from './auth-helpers.js';
 
 /**
  * Helper function to safely log token information without exposing sensitive data
@@ -50,7 +50,8 @@ export function registerGetJiraIssueTool(mcp) {
         fields 
       });
 
-      const authInfo = getAuthInfo(context);
+      // Get auth info with proper error handling
+      const authInfo = getAuthInfoSafe(context, 'get-jira-issue');
       const token = authInfo?.atlassian_access_token;
 
       if (!token) {
