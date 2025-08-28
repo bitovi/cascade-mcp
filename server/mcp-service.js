@@ -25,6 +25,7 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { InvalidTokenError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 import { randomUUID } from 'node:crypto';
 import { logger } from './logger.js';
+import { jwtVerify } from './tokens.js';
 
 // Map to store transports by session ID
 const transports = {};
@@ -58,11 +59,11 @@ export async function handleMcpPost(req, res) {
     console.log('New MCP initialization request');
 
     // Extract and validate auth info
-    let { authInfo, errored } = getAuthInfoFromBearer(req, res);
+    let { authInfo, errored } = await getAuthInfoFromBearer(req, res);
     if (errored) { return; }
 
     if (!authInfo) {
-      ({ authInfo, errored } = getAuthInfoFromQueryToken(req, res));
+      ({ authInfo, errored } = await getAuthInfoFromQueryToken(req, res));
     }
     if (errored) { return; }
     
@@ -140,11 +141,11 @@ export async function handleSessionRequest(req, res) {
   // For GET requests (SSE streams), validate authentication first
   if (req.method === 'GET') {
     // Extract and validate auth info
-    let { authInfo, errored } = getAuthInfoFromBearer(req, res);
+    let { authInfo, errored } = await getAuthInfoFromBearer(req, res);
     if (errored) { return; }
 
     if (!authInfo) {
-      ({ authInfo, errored } = getAuthInfoFromQueryToken(req, res));
+      ({ authInfo, errored } = await getAuthInfoFromQueryToken(req, res));
     }
     if (errored) { return; }
     
@@ -175,9 +176,9 @@ export async function handleSessionRequest(req, res) {
  * Extract and validate auth info from Authorization Bearer header
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
- * @returns {Object} - {authInfo, errored} where authInfo is the parsed JWT payload or null, errored is boolean
+ * @returns {Promise<Object>} - {authInfo, errored} where authInfo is the parsed JWT payload or null, errored is boolean
  */
-function getAuthInfoFromBearer(req, res) {
+async function getAuthInfoFromBearer(req, res) {
   const auth = req.headers.authorization;
   
   if (!auth || !auth.startsWith('Bearer ')) {
@@ -185,8 +186,20 @@ function getAuthInfoFromBearer(req, res) {
   }
 
   try {
-    const payload = parseJWT(auth.slice('Bearer '.length));
-    console.log('Successfully parsed JWT payload from bearer token:', payload);
+    const payload = await jwtVerify(auth.slice('Bearer '.length));
+    const token = payload.atlassian_access_token;
+    console.log('Successfully verified JWT payload from bearer token:', {
+      sub: payload.sub,
+      iss: payload.iss,
+      aud: payload.aud,
+      scope: payload.scope,
+      exp: payload.exp,
+      iat: payload.iat,
+      hasAtlassianToken: !!token,
+      atlassianTokenPrefix: token ? token.substring(0, 20) + '...' : null,
+      atlassianTokenLength: token ? token.length : 0,
+      hasRefreshToken: !!payload.refresh_token,
+    });
     
     // Validate that we have an Atlassian access token
     if (!payload.atlassian_access_token) {
@@ -197,8 +210,8 @@ function getAuthInfoFromBearer(req, res) {
     
     return { authInfo: payload, errored: false };
   } catch (err) {
-    logger.error('Error parsing JWT token from header:', err);
-    send401(res, { error: 'Invalid token' }, true); // Trigger re-auth for invalid tokens
+    logger.error('Error verifying JWT token from header:', err);
+    send401(res, { error: 'Invalid or expired token' }, true); // Trigger re-auth for invalid/expired tokens
     return { authInfo: null, errored: true };
   }
 }
@@ -207,9 +220,9 @@ function getAuthInfoFromBearer(req, res) {
  * Extract and validate auth info from query token parameter
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
- * @returns {Object} - {authInfo, errored} where authInfo is the parsed JWT payload or null, errored is boolean
+ * @returns {Promise<Object>} - {authInfo, errored} where authInfo is the parsed JWT payload or null, errored is boolean
  */
-function getAuthInfoFromQueryToken(req, res) {
+async function getAuthInfoFromQueryToken(req, res) {
   const tokenFromQuery = req.query.token;
   
   if (!tokenFromQuery) {
@@ -217,8 +230,20 @@ function getAuthInfoFromQueryToken(req, res) {
   }
 
   try {
-    const payload = parseJWT(tokenFromQuery);
-    console.log('Successfully parsed JWT payload from query:', payload);
+    const payload = await jwtVerify(tokenFromQuery);
+    const token = payload.atlassian_access_token;
+    console.log('Successfully verified JWT payload from query:', {
+      sub: payload.sub,
+      iss: payload.iss,
+      aud: payload.aud,
+      scope: payload.scope,
+      exp: payload.exp,
+      iat: payload.iat,
+      hasAtlassianToken: !!token,
+      atlassianTokenPrefix: token ? token.substring(0, 20) + '...' : null,
+      atlassianTokenLength: token ? token.length : 0,
+      hasRefreshToken: !!payload.refresh_token,
+    });
 
     // Validate that we have an Atlassian access token
     if (!payload.atlassian_access_token) {
@@ -229,8 +254,8 @@ function getAuthInfoFromQueryToken(req, res) {
     
     return { authInfo: payload, errored: false };
   } catch (err) {
-    logger.error('Error parsing JWT token from query:', err);
-    send401(res, { error: 'Invalid token' }, true); // Trigger re-auth for invalid tokens
+    logger.error('Error verifying JWT token from query:', err);
+    send401(res, { error: 'Invalid or expired token' }, true); // Trigger re-auth for invalid/expired tokens
     return { authInfo: null, errored: true };
   }
 }
@@ -260,8 +285,4 @@ function sendMissingAtlassianAccessToken(res, req, where = 'bearer header') {
         },
         id: req.body.id || null,
       });
-}
-
-function parseJWT(token) {
-  return JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString())
 }
