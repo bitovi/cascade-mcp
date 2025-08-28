@@ -117,7 +117,7 @@ export function register(req, res) {
     }
 
     // Return client registration response
-    res.json({
+    res.status(201).json({
       client_id: clientId,
       client_name,
       redirect_uris: validRedirectUris,
