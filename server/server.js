@@ -11,7 +11,6 @@ import { handleMcpPost, handleSessionRequest } from './mcp-service.js';
 import { renderManualTokenPage } from './manual-token-flow.js';
 import cors from 'cors';
 import { logger } from './logger.js';
-import { jiraIssues } from './jira-mcp.js';
 
 // configurations
 dotenv.config();
@@ -89,7 +88,6 @@ app.get('/get-access-token', renderManualTokenPage);
 app.get('/authorize', authorize);
 app.post('/register', express.json(), register);
 app.get('/callback', callback);
-app.get('/jira-issues', jiraIssues);
 
 // --- MCP HTTP Endpoints ---
 // Handle POST requests for client-to-server communication

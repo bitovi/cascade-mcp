@@ -19,7 +19,7 @@
  * - Error response utilities: Standardized 401 and error response functions
  */
 
-import { mcp, setAuthContext, clearAuthContext } from './jira-mcp.js';
+import { mcp, setAuthContext, clearAuthContext } from './jira-mcp/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { InvalidTokenError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
