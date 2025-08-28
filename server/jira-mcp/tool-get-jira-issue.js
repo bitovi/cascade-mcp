@@ -7,6 +7,25 @@ import { logger } from '../logger.js';
 import { getAuthInfoSafe, handleJiraAuthError, resolveCloudId } from './auth-helpers.js';
 
 /**
+ * Helper function to safely log token information without exposing sensitive data
+ * @param {string} token - The token to log info about
+ * @param {string} [prefix='Token'] - Prefix for the log entry
+ * @returns {Object} Safe token info for logging
+ */
+function getTokenLogInfo(token, prefix = 'Token') {
+  if (!token) {
+    return { [`${prefix.toLowerCase()}Available`]: false };
+  }
+  
+  return {
+    [`${prefix.toLowerCase()}Available`]: true,
+    [`${prefix.toLowerCase()}Prefix`]: token.substring(0, 20) + '...',
+    [`${prefix.toLowerCase()}Length`]: token.length,
+    [`${prefix.toLowerCase()}LastFour`]: '...' + token.slice(-4),
+  };
+}
+
+/**
  * Register the get-jira-issue tool with the MCP server
  * @param {McpServer} mcp - MCP server instance
  */
@@ -47,7 +66,15 @@ export function registerGetJiraIssueTool(mcp) {
         };
       }
 
-      logger.info('Found valid auth token, proceeding with issue fetch');
+      logger.info('Found valid auth token for issue fetch', {
+        ...getTokenLogInfo(token, 'atlassianToken'),
+        hasRefreshToken: !!authInfo.refresh_token,
+        scope: authInfo.scope,
+        issuer: authInfo.iss,
+        audience: authInfo.aud,
+        operation: 'get-jira-issue',
+        issueKey,
+      });
 
       try {
         // Resolve the target cloud ID using the utility function
@@ -75,10 +102,15 @@ export function registerGetJiraIssueTool(mcp) {
           issueUrl += `?${params.toString()}`;
         }
 
-        logger.info('Fetching issue details', { 
+        logger.info('Making Jira API request for issue details', { 
           issueKey, 
           cloudId: targetCloudId,
-          fetchUrl: issueUrl 
+          fetchUrl: issueUrl,
+          ...getTokenLogInfo(token, 'requestToken'),
+          headers: {
+            'Authorization': `Bearer ${token.substring(0, 20)}...`,
+            'Accept': 'application/json'
+          }
         });
 
         // Get issue details using direct fetch API
