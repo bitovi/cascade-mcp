@@ -40,7 +40,7 @@ export async function handleMcpPost(req, res) {
   console.log('=== MCP POST REQUEST ===');
   console.log("Transport keys: ",Object.keys(transports).length);
   console.log('Body:', JSON.stringify(req.body, null, 2));
-  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  console.log('Headers:', JSON.stringify(sanitizeHeaders(req.headers), null, 2));
   console.log('========================');
 
   // Check for existing session ID
@@ -186,7 +186,7 @@ function getAuthInfoFromBearer(req, res) {
 
   try {
     const payload = parseJWT(auth.slice('Bearer '.length));
-    console.log('Successfully parsed JWT payload from bearer token:', payload);
+    console.log('Successfully parsed JWT payload from bearer token:', JSON.stringify(sanitizeJwtPayload(payload), null, 2));
     
     // Validate that we have an Atlassian access token
     if (!payload.atlassian_access_token) {
@@ -218,7 +218,7 @@ function getAuthInfoFromQueryToken(req, res) {
 
   try {
     const payload = parseJWT(tokenFromQuery);
-    console.log('Successfully parsed JWT payload from query:', payload);
+    console.log('Successfully parsed JWT payload from query:', JSON.stringify(sanitizeJwtPayload(payload), null, 2));
 
     // Validate that we have an Atlassian access token
     if (!payload.atlassian_access_token) {
@@ -260,6 +260,72 @@ function sendMissingAtlassianAccessToken(res, req, where = 'bearer header') {
         },
         id: req.body.id || null,
       });
+}
+
+function formatTokenWithExpiration(token, maxLength = 20) {
+  try {
+    const payload = parseJWT(token);
+    const expTimestamp = payload.exp;
+    const now = Math.floor(Date.now() / 1000);
+    const diffSeconds = expTimestamp - now;
+    const truncatedToken = token.substring(0, maxLength) + '...';
+    
+    let timeMessage;
+    if (diffSeconds > 0) {
+      // Token hasn't expired yet
+      const hours = Math.floor(diffSeconds / 3600);
+      const minutes = Math.floor((diffSeconds % 3600) / 60);
+      
+      if (hours > 0) {
+        timeMessage = `expires in ${hours}h ${minutes}m`;
+      } else if (minutes > 0) {
+        timeMessage = `expires in ${minutes}m`;
+      } else {
+        timeMessage = `expires in ${diffSeconds}s`;
+      }
+    } else {
+      // Token has expired
+      const expiredSeconds = Math.abs(diffSeconds);
+      const hours = Math.floor(expiredSeconds / 3600);
+      const minutes = Math.floor((expiredSeconds % 3600) / 60);
+      
+      if (hours > 0) {
+        timeMessage = `expired ${hours}h ${minutes}m ago`;
+      } else if (minutes > 0) {
+        timeMessage = `expired ${minutes}m ago`;
+      } else {
+        timeMessage = `expired ${expiredSeconds}s ago`;
+      }
+    }
+    
+    return `${truncatedToken} (${timeMessage})`;
+  } catch (err) {
+    // If we can't parse the token, just truncate it
+    const truncatedToken = token.substring(0, maxLength) + '...';
+    return `${truncatedToken} (could not parse expiration)`;
+  }
+}
+
+function sanitizeHeaders(headers) {
+  const sanitized = { ...headers };
+  
+  if (sanitized.authorization && sanitized.authorization.startsWith('Bearer ')) {
+    const token = sanitized.authorization.slice('Bearer '.length);
+    sanitized.authorization = `Bearer ${formatTokenWithExpiration(token, 20)}`;
+  }
+  
+  return sanitized;
+}
+
+function sanitizeJwtPayload(payload) {
+  const sanitized = { ...payload };
+  
+  // Truncate the atlassian_access_token and add expiration info
+  if (sanitized.atlassian_access_token) {
+    sanitized.atlassian_access_token = formatTokenWithExpiration(sanitized.atlassian_access_token, 30);
+  }
+  
+  return sanitized;
 }
 
 function parseJWT(token) {
