@@ -349,7 +349,7 @@ export async function accessToken(req, res) {
       scope: ATLASSIAN_CONFIG.scopes,
       atlassian_access_token: tokenData.access_token,
       refresh_token: tokenData.refresh_token,
-      exp: jwtExpirationTime
+      exp: "30s"||jwtExpirationTime
     });
 
     // Create a refresh token (longer-lived, contains Atlassian refresh token)
