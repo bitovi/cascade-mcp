@@ -33,6 +33,19 @@ Add `bitovi-jira-mcp` as the name and hit enter:
 
 > <img width="866" height="124" alt="image" src="https://github.com/user-attachments/assets/6bb9be89-8521-48e1-97e5-8f0fc51b240f" />
 
+You can use the following JSON too if the `Add Server` button did not work for you:
+
+```json
+{
+    "servers": {
+        "bitovi-jira-mcp": {
+            "url": "https://jira-mcp-auth-bridge.bitovi.com/mcp"
+        }
+    }
+}
+```
+
+
 This will kick off the authentication:
 
 > <img width="259" height="230" alt="image" src="https://github.com/user-attachments/assets/9bbfb5f3-6a0d-433c-921d-970b352a4806" />
