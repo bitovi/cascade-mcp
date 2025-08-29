@@ -25,11 +25,10 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { InvalidTokenError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 import { randomUUID } from 'node:crypto';
 import { logger } from './logger.js';
-import { jwtVerify } from './tokens.js';
+import { jwtVerify, sanitizeJwtPayload, formatTokenWithExpiration, parseJWT } from './tokens.js';
 
 // Map to store transports by session ID
 const transports = {};
-console.log("STARTING",Object.keys(transports).length);
 
 /**
  * Handle POST requests for client-to-server communication
@@ -38,11 +37,11 @@ console.log("STARTING",Object.keys(transports).length);
  * and then another with its last authorization header.
  */
 export async function handleMcpPost(req, res) {
-  console.log('=== MCP POST REQUEST ===');
-  console.log("Transport keys: ",Object.keys(transports).length);
-  console.log('Body:', JSON.stringify(req.body, null, 2));
-  console.log('Headers:', JSON.stringify(sanitizeHeaders(req.headers), null, 2));
-  console.log('========================');
+  console.log('======= POST /mcp =======');
+  console.log('Headers:', JSON.stringify(sanitizeHeaders(req.headers)));
+  console.log('Body:', JSON.stringify(req.body));
+  console.log('mcp-session-id:', req.headers['mcp-session-id']);
+  console.log('--------------------------------');
 
   // Check for existing session ID
   const sessionId = req.headers['mcp-session-id'];
@@ -51,12 +50,11 @@ export async function handleMcpPost(req, res) {
   if (sessionId && transports[sessionId]) {
     // Reuse existing transport
     transport = transports[sessionId];
-    console.log("transport type", typeof transport);
-    console.log(`Reusing existing transport for session: ${sessionId}`);
+    console.log(`  ♻️ Reusing existing transport for session: ${sessionId}`);
   } 
   else if (!sessionId && isInitializeRequest(req.body)) {
     // New initialization request
-    console.log('New MCP initialization request. POST /mcp');
+    console.log('  🥚 New MCP initialization request.');
 
     // Extract and validate auth info
     let { authInfo, errored } = await getAuthInfoFromBearer(req, res);
@@ -70,14 +68,13 @@ export async function handleMcpPost(req, res) {
     if (!authInfo) {
       return sendMissingAtlassianAccessToken(res, req, 'anywhere');
     }
-
+    console.log('    Has valid token, creating streamable transport');
     transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
       onsessioninitialized: (newSessionId) => {
         // Store the transport by session ID
-        console.log(`Storing transport for new session: ${newSessionId}`);
+        console.log(`    Storing transport for new session: ${newSessionId}`);
         transports[newSessionId] = transport;
-        console.log(`Transport stored for session: ${newSessionId}`);
         // Store auth context for this session
         setAuthContext(newSessionId, authInfo);
       },
@@ -86,7 +83,7 @@ export async function handleMcpPost(req, res) {
     // Clean up transport when closed
     transport.onclose = () => {
       if (transport.sessionId) {
-        console.log(`Cleaning up session: ${transport.sessionId}`);
+        console.log(`.   Cleaning up session: ${transport.sessionId}`);
         delete transports[transport.sessionId];
         clearAuthContext(transport.sessionId);
       }
@@ -94,10 +91,10 @@ export async function handleMcpPost(req, res) {
 
     // Connect the MCP server to this transport
     await mcp.connect(transport);
-    console.log('MCP server connected to new transport');
+    console.log('    MCP server connected to new transport');
   } else {
     // Invalid request
-    console.log('Invalid MCP request - no session ID and not an initialize request');
+    console.log('  ❌ Invalid MCP request - no session ID and not an initialize request');
     res.status(400).json({
       jsonrpc: '2.0',
       error: {
@@ -131,6 +128,7 @@ export async function handleMcpPost(req, res) {
     // Re-throw other errors
     throw error;
   }
+  console.log('  ✅ MCP POST request handled successfully');
 }
 
 /**
@@ -160,7 +158,10 @@ export async function handleSessionRequest(req, res) {
         .header('Cache-Control', 'no-cache, no-store, must-revalidate')
         .header('Pragma', 'no-cache')
         .header('Expires', '0')
-        .end();
+        .json({
+          error: "invalid_token",
+          error_description: "Missing or invalid access token"
+        });
     }
   }
   
@@ -252,7 +253,7 @@ function send401(res, jsonResponse, includeInvalidToken = false) {
 
 function sendMissingAtlassianAccessToken(res, req, where = 'bearer header') {
   const message = `Authentication token missing Atlassian access token in ${where}.`;
-  console.log(message);
+  console.log(`❌🔑 ${message}`);
   return res
       .status(401)
       .header('WWW-Authenticate', `Bearer realm="mcp", error="invalid_token", error_description="${message}", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource"`)
@@ -269,62 +270,6 @@ function sendMissingAtlassianAccessToken(res, req, where = 'bearer header') {
       });
 }
 
-function formatTokenWithExpiration(token, maxLength = 20) {
-  try {
-    const payload = parseJWT(token);
-    const truncatedToken = token.substring(0, maxLength) + '...';
-    
-    // Check if we have a valid expiration timestamp
-    if (!payload.exp || typeof payload.exp !== 'number') {
-      return `${truncatedToken} (no expiration info)`;
-    }
-    
-    const expTimestamp = payload.exp;
-    const now = Math.floor(Date.now() / 1000);
-    const diffSeconds = expTimestamp - now;
-    
-    // Sanity check - if the difference is more than 10 years, something is wrong
-    const tenYearsInSeconds = 10 * 365 * 24 * 60 * 60;
-    if (Math.abs(diffSeconds) > tenYearsInSeconds) {
-      return `${truncatedToken} (invalid expiration: ${expTimestamp})`;
-    }
-    
-    let timeMessage;
-    if (diffSeconds > 0) {
-      // Token hasn't expired yet
-      const hours = Math.floor(diffSeconds / 3600);
-      const minutes = Math.floor((diffSeconds % 3600) / 60);
-      
-      if (hours > 0) {
-        timeMessage = `expires in ${hours}h ${minutes}m`;
-      } else if (minutes > 0) {
-        timeMessage = `expires in ${minutes}m`;
-      } else {
-        timeMessage = `expires in ${diffSeconds}s`;
-      }
-    } else {
-      // Token has expired
-      const expiredSeconds = Math.abs(diffSeconds);
-      const hours = Math.floor(expiredSeconds / 3600);
-      const minutes = Math.floor((expiredSeconds % 3600) / 60);
-      
-      if (hours > 0) {
-        timeMessage = `expired ${hours}h ${minutes}m ago`;
-      } else if (minutes > 0) {
-        timeMessage = `expired ${minutes}m ago`;
-      } else {
-        timeMessage = `expired ${expiredSeconds}s ago`;
-      }
-    }
-    
-    return `${truncatedToken} (${timeMessage})`;
-  } catch (err) {
-    // If we can't parse the token, just truncate it
-    const truncatedToken = token.substring(0, maxLength) + '...';
-    return `${truncatedToken} (could not parse expiration)`;
-  }
-}
-
 function sanitizeHeaders(headers) {
   const sanitized = { ...headers };
   
@@ -334,19 +279,4 @@ function sanitizeHeaders(headers) {
   }
   
   return sanitized;
-}
-
-function sanitizeJwtPayload(payload) {
-  const sanitized = { ...payload };
-  
-  // Truncate the atlassian_access_token and add expiration info
-  if (sanitized.atlassian_access_token) {
-    sanitized.atlassian_access_token = formatTokenWithExpiration(sanitized.atlassian_access_token, 30);
-  }
-  
-  return sanitized;
-}
-
-function parseJWT(token) {
-  return JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString())
 }

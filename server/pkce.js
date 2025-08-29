@@ -30,18 +30,20 @@
  * Functions are ordered by their usage in the flow
  */
 import crypto from 'crypto';
-import { jwtSign, jwtVerify } from './tokens.js';
+import { jwtSign, jwtVerify, generateCodeVerifier, generateCodeChallenge, sanitizeJwtPayload, parseJWT, sanitizeObjectWithJWTs } from './tokens.js';
 import { logger } from './logger.js';
 import { randomUUID } from 'crypto';
 import { createAtlassianAuthUrl, getAtlassianConfig, extractAtlassianCallbackParams, exchangeCodeForAtlassianTokens } from './atlassian-auth-code-flow.js';
 import { isManualFlow, handleManualFlowCallback } from './manual-token-flow.js';
+
+
 
 /**
  * OAuth Metadata Endpoint
  * Provides OAuth server configuration for clients
  */
 export function oauthMetadata(req, res) {
-  console.log('Received request for OAuth metadata');
+  console.log('↔️ Received request for OAuth metadata');
   res.json({
     issuer: process.env.VITE_AUTH_SERVER_URL,
     authorization_endpoint: process.env.VITE_AUTH_SERVER_URL + '/authorize',
@@ -60,7 +62,7 @@ export function oauthMetadata(req, res) {
  * Provides metadata about the protected resource for OAuth clients
  */
 export function oauthProtectedResourceMetadata(req, res) {
-  console.log('🔍 OAuth Protected Resource Metadata requested!', {
+  console.log('↔️ OAuth Protected Resource Metadata requested!', {
     headers: req.headers,
     query: req.query,
   });
@@ -84,7 +86,7 @@ export function oauthProtectedResourceMetadata(req, res) {
  * Allows MCP clients to register themselves dynamically
  */
 export function register(req, res) {
-  console.log('Received dynamic client registration request:', req.body);
+  console.log('↔️ Received dynamic client registration request');
 
   try {
     const {
@@ -128,9 +130,9 @@ export function register(req, res) {
       // For public clients (like VS Code), no client_secret is issued
     });
 
-    logger.info(`Dynamic client registered: ${clientId} for ${client_name}`);
+    logger.info(`  Dynamic client registered: ${clientId} for ${client_name}`);
   } catch (error) {
-    logger.error('Client registration error:', error);
+    logger.error('  Client registration error:', error);
     res.status(500).json({
       error: 'server_error',
       error_description: 'Failed to register client',
@@ -153,7 +155,7 @@ export function authorize(req, res) {
   const mcpCodeChallengeMethod = req.query.code_challenge_method;
   const mcpResource = req.query.resource; // MCP resource parameter (RFC 8707)
 
-  console.log('GET /authorize request from MCP client:', {
+  console.log('↔️ GET /authorize request from MCP client:', {
     mcpClientId,
     mcpRedirectUri,
     mcpScope,
@@ -173,13 +175,13 @@ export function authorize(req, res) {
     // Use the MCP client's PKCE parameters
     codeChallenge = mcpCodeChallenge;
     codeChallengeMethod = mcpCodeChallengeMethod;
-    console.log('Using MCP client PKCE parameters');
+    console.log('  Using MCP client PKCE parameters');
   } else {
     // Generate our own PKCE parameters (fallback for non-MCP clients)
     codeVerifier = generateCodeVerifier();
     codeChallenge = generateCodeChallenge(codeVerifier);
     codeChallengeMethod = 'S256';
-    console.log('Generated our own PKCE parameters');
+    console.log('  Generated our own PKCE parameters');
   }
 
   // Store MCP client info in session for later use in callback
@@ -191,7 +193,7 @@ export function authorize(req, res) {
   req.session.mcpResource = mcpResource; // Store the resource parameter
   req.session.usingMcpPkce = !codeVerifier; // Flag to indicate if we're using MCP's PKCE
 
-  console.log('Storing in session:', {
+  console.log('  Saved in session:', {
     state: mcpState,
     codeVerifier: codeVerifier ? 'present' : 'null (using MCP PKCE)',
     mcpClientId,
@@ -208,7 +210,7 @@ export function authorize(req, res) {
     responseType,
   });
 
-  console.log('Redirecting to Atlassian:', url);
+  console.log('  Redirecting to Atlassian:', url);
   res.redirect(url);
 }
 
@@ -219,7 +221,7 @@ export function authorize(req, res) {
 export async function callback(req, res) {
   const { code, state, normalizedState } = extractAtlassianCallbackParams(req);
 
-  console.log('OAuth callback received:', {
+  console.log('↔️ OAuth callback received:', {
     code: code ? 'present' : 'missing',
     state,
     sessionState: req.session.state,
@@ -240,7 +242,7 @@ export async function callback(req, res) {
   const stateMatches = normalizedState === req.session.state;
 
   if (!code || !stateMatches) {
-    console.error('State or code validation failed:', {
+    console.error('  State or code validation failed:', {
       hasCode: !!code,
       stateMatch: stateMatches,
       receivedState: state,
@@ -256,7 +258,7 @@ export async function callback(req, res) {
   // because we don't have the code verifier. Instead, we need to pass
   // the authorization code back to the MCP client so it can complete the exchange.
   if (usingMcpPkce && mcpRedirectUri) {
-    console.log('Using MCP PKCE - redirecting code back to MCP client');
+    console.log(' Using MCP PKCE - redirecting code back to MCP client');
 
     // Clear session data
     delete req.session.codeVerifier;
@@ -269,14 +271,14 @@ export async function callback(req, res) {
 
     // Redirect back to MCP client with the authorization code
     const redirectUrl = `${mcpRedirectUri}?code=${encodeURIComponent(code)}&state=${encodeURIComponent(normalizedState)}`;
-    console.log('Redirecting to MCP client with auth code:', redirectUrl);
+    console.log(' Redirecting to MCP client with auth code:', redirectUrl);
     return res.redirect(redirectUrl);
   }
 
   // If we reach here, it means we have an invalid state:
   // - No MCP redirect URI, or
   // - Not using MCP PKCE (which shouldn't happen with MCP clients)
-  console.error('Invalid callback state:', {
+  console.error('  Invalid callback state:', {
     usingMcpPkce,
     mcpRedirectUri: mcpRedirectUri ? 'present' : 'missing',
   });
@@ -289,8 +291,8 @@ export async function callback(req, res) {
  * Handles the token exchange for authorization code grant type
  */
 export async function accessToken(req, res) {
-  console.log('OAuth token exchange request:', {
-    body: req.body,
+  console.log('↔️ OAuth token exchange request:', {
+    body: sanitizeObjectWithJWTs(req.body),
     contentType: req.headers['content-type'],
   });
 
@@ -325,6 +327,8 @@ export async function accessToken(req, res) {
         code, 
         codeVerifier: code_verifier 
       });
+      
+      console.log('  🔑 Atlassian token exchange successful:', sanitizeObjectWithJWTs(tokenData));
     } catch (error) {
       console.error('Atlassian token exchange failed:', error.message);
       return res.status(400).json({
@@ -333,48 +337,28 @@ export async function accessToken(req, res) {
       });
     }
 
-    // Get config for creating JWT
-    const ATLASSIAN_CONFIG = getAtlassianConfig();
-
-    // Calculate JWT expiration: 1 minute before Atlassian token expires
-    const atlassianExpiresIn = tokenData.expires_in || 3600; // Default to 1 hour if not provided
-    const jwtExpiresIn = Math.max(60, atlassianExpiresIn - 60); // At least 60 seconds, but 1 minute less than Atlassian
-    const jwtExpirationTime = Math.floor(Date.now() / 1000) + jwtExpiresIn;
-
-    // Create JWT with embedded Atlassian token
-    const jwt = await jwtSign({
-      sub: 'user-' + randomUUID(),
-      iss: process.env.VITE_AUTH_SERVER_URL,
-      aud: resource || process.env.VITE_AUTH_SERVER_URL, // Use resource parameter if provided
-      scope: ATLASSIAN_CONFIG.scopes,
-      atlassian_access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token,
-      exp: "30s"||jwtExpirationTime
+    // Create JWT access token with embedded Atlassian token
+    const jwt = await createJiraMCPAuthToken(tokenData, {
+      resource: resource || process.env.VITE_AUTH_SERVER_URL
     });
 
-    // Create a refresh token (longer-lived, contains Atlassian refresh token)
-    const refreshToken = await jwtSign({
-      type: 'refresh_token',
-      sub: 'user-' + randomUUID(),
-      iss: process.env.VITE_AUTH_SERVER_URL,
-      aud: resource || process.env.VITE_AUTH_SERVER_URL,
-      scope: ATLASSIAN_CONFIG.scopes,
-      atlassian_refresh_token: tokenData.refresh_token,
-      exp: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60) // 30 days
+    // Create refresh token
+    const { refreshToken } = await createJiraMCPRefreshToken(tokenData, {
+      resource: resource || process.env.VITE_AUTH_SERVER_URL
     });
 
-    console.log('OAuth token exchange successful for client:', client_id);
 
     // Return OAuth-compliant response with actual JWT expiration time
+    const jwtExpiresIn = Math.max(60, (tokenData.expires_in || 3600) - 60);
     return res.json({
       access_token: jwt,
       token_type: 'Bearer',
-      expires_in: jwtExpiresIn, // Use actual JWT expiration time
-      refresh_token: refreshToken, // Include refresh token
-      scope: ATLASSIAN_CONFIG.scopes,
+      expires_in: jwtExpiresIn,
+      refresh_token: refreshToken,
+      scope: getAtlassianConfig().scopes,
     });
   } catch (error) {
-    console.error('OAuth token exchange error:', error);
+    console.error('  OAuth token exchange error:', error);
     res.status(500).json({
       error: 'server_error',
       error_description: 'Internal server error during token exchange',
@@ -387,8 +371,8 @@ export async function accessToken(req, res) {
  * Handles refresh token grant type to get new access tokens
  */
 export async function refreshToken(req, res) {
-  console.log('OAuth refresh token request:', {
-    body: req.body,
+  console.log('↔️ OAuth refresh token request:', {
+    body: sanitizeObjectWithJWTs(req.body),
     contentType: req.headers['content-type'],
   });
 
@@ -442,7 +426,7 @@ export async function refreshToken(req, res) {
     let newAtlassianTokens;
     try {
       const ATLASSIAN_CONFIG = getAtlassianConfig();
-      
+      console.log('  Using Atlassian refresh token to get new access token');
       const tokenRes = await fetch(ATLASSIAN_CONFIG.tokenUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -459,44 +443,36 @@ export async function refreshToken(req, res) {
       if (!newAtlassianTokens.access_token) {
         throw new Error(`Atlassian refresh failed: ${JSON.stringify(newAtlassianTokens)}`);
       }
+      
+      console.log('  🔑 Atlassian refresh token exchange successful:', sanitizeObjectWithJWTs(newAtlassianTokens));
     } catch (error) {
-      console.error('Atlassian refresh token exchange failed:', error.message);
+      console.error('  Atlassian refresh token exchange failed:', error.message);
       return res.status(400).json({
         error: 'invalid_grant',
         error_description: 'Failed to refresh Atlassian access token',
       });
     }
 
-    // Calculate new JWT expiration (1 minute before Atlassian token expires)
-    const atlassianExpiresIn = newAtlassianTokens.expires_in || 3600;
-    const jwtExpiresIn = Math.max(60, atlassianExpiresIn - 60);
-    const jwtExpirationTime = Math.floor(Date.now() / 1000) + jwtExpiresIn;
-
     // Create new access token with new Atlassian tokens
-    const newAccessToken = await jwtSign({
-      sub: refreshPayload.sub,
-      iss: refreshPayload.iss,
-      aud: refreshPayload.aud,
+    const newAccessToken = await createJiraMCPAuthToken(newAtlassianTokens, {
+      resource: refreshPayload.aud,
       scope: refreshPayload.scope,
-      atlassian_access_token: newAtlassianTokens.access_token,
-      refresh_token: newAtlassianTokens.refresh_token || refreshPayload.atlassian_refresh_token,
-      exp: jwtExpirationTime
+      sub: refreshPayload.sub,
+      iss: refreshPayload.iss
     });
 
-    // Create new refresh token (if Atlassian provided a new one)
-    const newRefreshToken = await jwtSign({
-      type: 'refresh_token',
-      sub: refreshPayload.sub,
-      iss: refreshPayload.iss,
-      aud: refreshPayload.aud,
+    // Create new refresh token (Atlassian always provides a new rotating refresh token)
+    const { refreshToken: newRefreshToken } = await createJiraMCPRefreshToken(newAtlassianTokens, {
+      resource: refreshPayload.aud,
       scope: refreshPayload.scope,
-      atlassian_refresh_token: newAtlassianTokens.refresh_token || refreshPayload.atlassian_refresh_token,
-      exp: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60) // 30 days
+      sub: refreshPayload.sub,
+      iss: refreshPayload.iss
     });
 
     console.log('OAuth refresh token exchange successful for client:', client_id);
 
     // Return new tokens
+    const jwtExpiresIn = Math.max(60, (newAtlassianTokens.expires_in || 3600) - 60);
     return res.json({
       access_token: newAccessToken,
       token_type: 'Bearer',
@@ -514,22 +490,116 @@ export async function refreshToken(req, res) {
   }
 }
 
-// === Helper Functions ===
 
 /**
- * Generate a cryptographically secure code verifier for PKCE
- * @returns {string} Base64URL-encoded code verifier
+ * Helper function to decode Atlassian JWT refresh token and extract expiration
+ * @param {string} refreshToken - The JWT refresh token from Atlassian
+ * @returns {number|null} - The expiration timestamp or null if can't decode
  */
-export function generateCodeVerifier() {
-  return crypto.randomBytes(32).toString('base64url');
+function extractAtlassianRefreshTokenExpiration(refreshToken) {
+  try {
+    // Decode the JWT refresh token from Atlassian (don't verify signature, just extract payload)
+    const refreshTokenParts = refreshToken.split('.');
+    if (refreshTokenParts.length === 3) {
+      const payload = JSON.parse(Buffer.from(refreshTokenParts[1], 'base64').toString());
+      if (payload.exp) {
+        console.log('  Using Atlassian JWT refresh token expiration with 1-day buffer');
+        console.log('  Atlassian refresh token expires:', new Date(payload.exp * 1000).toISOString());
+        return payload.exp - 86400; // 1 day buffer
+      }
+    }
+  } catch (error) {
+    console.log('  Could not decode Atlassian refresh token JWT:', error.message);
+  }
+  return null;
 }
 
 /**
- * Generate a code challenge from a code verifier using SHA256
- * @param {string} codeVerifier - The code verifier to hash
- * @returns {string} Base64URL-encoded code challenge
+ * Creates a Jira MCP access token (JWT) with embedded Atlassian credentials
+ * @param {Object} atlassianTokens - Token data from Atlassian
+ * @param {Object} [options] - Optional overrides
+ * @param {string} [options.resource] - The resource parameter (audience) 
+ * @param {string} [options.scope] - The token scope
+ * @param {string} [options.sub] - Subject (user ID)
+ * @param {string} [options.iss] - Issuer
+ * @returns {Promise<string>} - The signed JWT access token
  */
-export function generateCodeChallenge(codeVerifier) {
-  const hash = crypto.createHash('sha256').update(codeVerifier).digest();
-  return Buffer.from(hash).toString('base64url');
+async function createJiraMCPAuthToken(atlassianTokens, options = {}) {
+  const ATLASSIAN_CONFIG = getAtlassianConfig();
+  
+  // Calculate JWT expiration: 1 minute before Atlassian token expires
+  const atlassianExpiresIn = atlassianTokens.expires_in || 3600;
+  const jwtExpiresIn = process.env.TEST_SHORT_AUTH_TOKEN_EXP ? 
+    parseInt(process.env.TEST_SHORT_AUTH_TOKEN_EXP) : 
+    Math.max(60, atlassianExpiresIn - 60);
+    
+  const jwtExpirationTime = Math.floor(Date.now() / 1000) + jwtExpiresIn;
+  
+  if (process.env.TEST_SHORT_AUTH_TOKEN_EXP) {
+    console.log(`🧪 TEST MODE: Creating JWT token with ${jwtExpiresIn}s expiration (expires at ${new Date(jwtExpirationTime * 1000).toISOString()})`);
+  }
+
+  // Create JWT with embedded Atlassian token
+  const jwt = await jwtSign({
+    sub: options.sub || ('user-' + randomUUID()),
+    iss: options.iss || process.env.VITE_AUTH_SERVER_URL,
+    aud: options.resource || process.env.VITE_AUTH_SERVER_URL,
+    scope: options.scope || ATLASSIAN_CONFIG.scopes,
+    atlassian_access_token: atlassianTokens.access_token,
+    refresh_token: atlassianTokens.refresh_token,
+    exp: jwtExpirationTime
+  });
+
+  return jwt;
+}
+
+/**
+ * Creates a Jira MCP refresh token (JWT) with embedded Atlassian refresh token
+ * @param {Object} atlassianTokens - Token data from Atlassian
+ * @param {Object} [options] - Optional overrides
+ * @param {string} [options.resource] - The resource parameter (audience)
+ * @param {string} [options.scope] - The token scope
+ * @param {string} [options.sub] - Subject (user ID)
+ * @param {string} [options.iss] - Issuer
+ * @returns {Promise<Object>} - Object with refreshToken and expiresIn
+ */
+async function createJiraMCPRefreshToken(atlassianTokens, options = {}) {
+  const ATLASSIAN_CONFIG = getAtlassianConfig();
+  
+  // Calculate refresh token expiration to match Atlassian's refresh token lifetime
+  let refreshTokenExp;
+  
+  // Try to decode Atlassian's JWT refresh token to get actual expiration
+  if (atlassianTokens.refresh_token) {
+    refreshTokenExp = extractAtlassianRefreshTokenExpiration(atlassianTokens.refresh_token);
+  }
+  
+  // Fallback if we couldn't decode the JWT or no refresh token
+  if (!refreshTokenExp) {
+    if (atlassianTokens.refresh_expires_in) {
+      // Use refresh_expires_in if provided
+      refreshTokenExp = Math.floor(Date.now() / 1000) + atlassianTokens.refresh_expires_in - 86400; // 1 day buffer
+      console.log('  Using Atlassian refresh_expires_in with 1-day buffer');
+    } else {
+      // Fallback to 90 days (common for Atlassian refresh tokens)
+      refreshTokenExp = Math.floor(Date.now() / 1000) + (90 * 24 * 60 * 60);
+      console.log('  Using 90-day fallback for refresh token expiration');
+    }
+  }
+
+  // Create a refresh token (longer-lived, contains Atlassian refresh token)
+  const refreshToken = await jwtSign({
+    type: 'refresh_token',
+    sub: options.sub || ('user-' + randomUUID()),
+    iss: options.iss || process.env.VITE_AUTH_SERVER_URL,
+    aud: options.resource || process.env.VITE_AUTH_SERVER_URL,
+    scope: options.scope || ATLASSIAN_CONFIG.scopes,
+    atlassian_refresh_token: atlassianTokens.refresh_token,
+    exp: refreshTokenExp
+  });
+
+  return {
+    refreshToken,
+    expiresIn: refreshTokenExp - Math.floor(Date.now() / 1000)
+  };
 }

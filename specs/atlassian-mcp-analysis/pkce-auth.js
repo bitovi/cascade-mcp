@@ -21,7 +21,8 @@ const DEFAULT_SCOPE = 'read:jira-work';
 function getPortFromRedirectUri(redirectUri) {
   try {
     const url = new URL(redirectUri);
-    return url.port ? parseInt(url.port) : (url.protocol === 'https:' ? 443 : 80);
+    const originalPort = url.port ? parseInt(url.port) : (url.protocol === 'https:' ? 443 : 80);
+    return originalPort;
   } catch (error) {
     console.warn('⚠️  Could not parse redirect URI, using default port 3000:', error.message);
     return 3000;
@@ -83,50 +84,126 @@ async function getAuthorizationServerDiscoveryUrl(mcpUrl) {
 }
 
 /**
- * Gets a PKCE access token from an MCP endpoint
+ * Gets a PKCE access token from an MCP endpoint or OAuth issuer
+ * 
+ * @param {string|Object} mcpUrlOrConfig - Either MCP URL string or config object with issuer, clientId, etc.
+ * @param {Object} options - Additional options (legacy parameter support)
  */
-export async function getPkceAccessToken(mcpUrl, options = {}) {
+export async function getPkceAccessToken(mcpUrlOrConfig, options = {}) {
+  // Support both legacy (mcpUrl, options) and new (config) parameter styles
+  let config;
+  
+  if (typeof mcpUrlOrConfig === 'string') {
+    // Legacy style: first parameter is mcpUrl
+    config = {
+      mcpUrl: mcpUrlOrConfig,
+      redirectUri: options.redirectUri || DEFAULT_REDIRECT_URI,
+      scope: options.scope || DEFAULT_SCOPE,
+      openBrowser: options.openBrowser !== false,
+      ...options
+    };
+  } else {
+    // New style: first parameter is config object
+    config = {
+      redirectUri: DEFAULT_REDIRECT_URI,
+      scope: DEFAULT_SCOPE,
+      openBrowser: true,
+      callbackUrl: DEFAULT_REDIRECT_URI, // Support both naming conventions
+      ...mcpUrlOrConfig,
+      ...options
+    };
+    
+    // Normalize naming
+    if (config.callbackUrl && !config.redirectUri) {
+      config.redirectUri = config.callbackUrl;
+    }
+  }
+  
   const {
-    redirectUri = DEFAULT_REDIRECT_URI,
-    port = getPortFromRedirectUri(options.redirectUri || DEFAULT_REDIRECT_URI),
-    scope = DEFAULT_SCOPE,
-    openBrowser = true
-  } = options;
+    mcpUrl,
+    issuer: explicitIssuer,
+    clientId,
+    clientSecret,
+    redirectUri,
+    scope,
+    openBrowser,
+    resource
+  } = config;
+  
+  // Determine the port for the callback server
+  const port = getPortFromRedirectUri(redirectUri);
 
   try {
-    // Step 1: Get OAuth authorization server discovery URL
-    console.log('🔍 Getting OAuth authorization server discovery URL...');
-    const discoveryUrl = await getAuthorizationServerDiscoveryUrl(mcpUrl);
-    console.log('✅ Discovery URL:', discoveryUrl);
-
-    // Step 2: Discover the OAuth issuer
-    console.log('🔍 Discovering OAuth issuer...');
-    const issuer = await Issuer.discover(discoveryUrl);
+    let issuer;
+    
+    // Step 1: Get the OAuth issuer
+    if (explicitIssuer) {
+      // Use explicitly provided issuer
+      console.log('🔍 Using explicit issuer:', explicitIssuer);
+      issuer = await Issuer.discover(explicitIssuer);
+    } else if (mcpUrl) {
+      // Discover issuer from MCP URL
+      console.log('🔍 Getting OAuth authorization server discovery URL...');
+      const discoveryUrl = await getAuthorizationServerDiscoveryUrl(mcpUrl);
+      console.log('✅ Discovery URL:', discoveryUrl);
+      
+      console.log('🔍 Discovering OAuth issuer...');
+      issuer = await Issuer.discover(discoveryUrl);
+    } else {
+      throw new Error('Either mcpUrl or issuer must be provided');
+    }
+    
     console.log('✅ Discovered issuer:', issuer.issuer);
 
-    // Step 3: Dynamic client registration
-    console.log('🔍 Registering OAuth client...');
-    const client = await issuer.Client.register({
-      client_name: 'MCP OAuth Client',
-      redirect_uris: [redirectUri],
-      grant_types: ['authorization_code'],
-      response_types: ['code'],
-      token_endpoint_auth_method: 'none', // public client
-    });
+    // Step 2: Create or register OAuth client
+    let client;
+    
+    if (clientId) {
+      // Use provided client credentials
+      console.log('🔍 Using provided client credentials...');
+      client = new issuer.Client({
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uris: [redirectUri],
+        response_types: ['code'],
+        grant_types: ['authorization_code'],
+        token_endpoint_auth_method: clientSecret ? 'client_secret_basic' : 'none'
+      });
+      console.log('✅ Created client with provided credentials:', clientId);
+    } else {
+      // Dynamic client registration
+      console.log('🔍 Registering OAuth client...');
+      client = await issuer.Client.register({
+        client_name: 'MCP OAuth Client',
+        redirect_uris: [redirectUri],
+        grant_types: ['authorization_code'],
+        response_types: ['code'],
+        token_endpoint_auth_method: 'none', // public client
+      });
+      console.log('✅ Registered client:', client.client_id);
+    }
 
-    console.log('✅ Registered client:', client.client_id);
-
-    // Step 4: PKCE generation
+    // Step 3: PKCE generation
     const code_verifier = generators.codeVerifier();
     const code_challenge = generators.codeChallenge(code_verifier);
 
-    // Step 5: Generate authorization URL
-    const authorizationUrl = client.authorizationUrl({
+    // Step 4: Generate authorization URL (optionally with resource parameter per RFC 8707)
+    const authParams = {
       scope,
       code_challenge,
       code_challenge_method: 'S256',
       redirect_uri: redirectUri,
-    });
+    };
+    
+    // Add resource parameter if provided (RFC 8707 Resource Indicators)
+    if (resource) {
+      authParams.resource = resource;
+      console.log('📋 Including resource parameter:', resource);
+    } else {
+      console.log('📋 Standard PKCE flow (no resource parameter)');
+    }
+    
+    const authorizationUrl = client.authorizationUrl(authParams);
 
     console.log('🌐 Authorization URL generated:', authorizationUrl);
     
@@ -135,7 +212,7 @@ export async function getPkceAccessToken(mcpUrl, options = {}) {
       await open(authorizationUrl);
     }
 
-    // Step 6: Handle redirect via local server
+    // Step 5: Handle redirect via local server
     console.log(`🚪 Starting callback server on port ${port}...`);
     
     return new Promise((resolve, reject) => {
@@ -153,20 +230,30 @@ export async function getPkceAccessToken(mcpUrl, options = {}) {
             throw new Error('Authorization code not received');
           }
           
-          // Manual token exchange for pure OAuth 2.0
+          // Manual token exchange for pure OAuth 2.0 (optionally with resource parameter per RFC 8707)
+          const tokenParams = {
+            grant_type: 'authorization_code',
+            code: params.code,
+            redirect_uri: redirectUri,
+            client_id: client.client_id,
+            code_verifier: code_verifier
+          };
+          
+          // Add resource parameter to token request if provided (RFC 8707)
+          if (resource) {
+            tokenParams.resource = resource;
+            console.log('📋 Including resource parameter in token request:', resource);
+          } else {
+            console.log('📋 Standard token exchange (no resource parameter)');
+          }
+          
           const tokenResponse = await fetch(issuer.token_endpoint, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/x-www-form-urlencoded',
               'Accept': 'application/json'
             },
-            body: new URLSearchParams({
-              grant_type: 'authorization_code',
-              code: params.code,
-              redirect_uri: redirectUri,
-              client_id: client.client_id,
-              code_verifier: code_verifier
-            })
+            body: new URLSearchParams(tokenParams)
           });
           
           if (!tokenResponse.ok) {
@@ -175,6 +262,9 @@ export async function getPkceAccessToken(mcpUrl, options = {}) {
           }
           
           const tokenSet = await tokenResponse.json();
+          
+          // Add the client_id to the tokenSet for refresh token usage
+          tokenSet.client_id = client.client_id;
 
           console.log('\n🎉 Authentication successful!');
           console.log('✅ Access Token received');

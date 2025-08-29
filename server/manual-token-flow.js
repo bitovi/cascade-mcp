@@ -16,7 +16,7 @@
  */
 
 import crypto from 'crypto';
-import { generateCodeVerifier, generateCodeChallenge } from './pkce.js';
+import { generateCodeVerifier, generateCodeChallenge } from './tokens.js';
 import { createAtlassianAuthUrl, getAtlassianConfig, exchangeCodeForAtlassianTokens } from './atlassian-auth-code-flow.js';
 import { jwtSign } from './tokens.js';
 import { randomUUID } from 'crypto';

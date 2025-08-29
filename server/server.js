@@ -32,7 +32,13 @@ app.use(
   }),
 );
 
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'OPTIONS', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'mcp-session-id', 'Authorization'],
+  exposedHeaders: ['mcp-session-id'],
+  maxAge: 86400
+}));
 
 // HTTP request logging middleware
 app.use(morgan('common', {

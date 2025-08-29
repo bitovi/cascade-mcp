@@ -87,31 +87,6 @@ export function handleJiraAuthError(response, operation = 'Jira API request') {
   }
 }
 
-/**
- * Helper function to check if a JWT token is expired
- * @param {Object} authInfo - Auth info object containing JWT claims
- * @returns {boolean} True if token is expired
- */
-function isTokenExpired(authInfo) {
-  if (!authInfo?.exp) {
-    logger.warn('No expiration time found in auth info');
-    return true; // Assume expired if no exp claim
-  }
-  
-  const now = Math.floor(Date.now() / 1000);
-  const isExpired = now >= authInfo.exp;
-  
-  if (isExpired) {
-    logger.warn('Token is expired', {
-      exp: authInfo.exp,
-      now,
-      expiredBy: now - authInfo.exp,
-      expiredDate: new Date(authInfo.exp * 1000).toISOString(),
-    });
-  }
-  
-  return isExpired;
-}
 
 /**
  * Helper function to get auth info from context
@@ -349,6 +324,29 @@ export async function resolveCloudId(token, cloudId, siteName) {
       siteUrl: firstSite.url
     };
   }
+}
+
+/**
+ * Function to clean up expired tokens from the auth context store
+ * @returns {number} Number of expired tokens cleaned up
+ */
+function cleanupExpiredTokens() {
+  let cleanedCount = 0;
+  const now = Math.floor(Date.now() / 1000);
+  
+  for (const [transportId, authInfo] of authContextStore.entries()) {
+    if (isTokenExpired(authInfo)) {
+      logger.info('Cleaning up expired token for transport', { 
+        transportId,
+        exp: authInfo?.exp,
+        expiredBy: authInfo?.exp ? now - authInfo.exp : 'unknown'
+      });
+      authContextStore.delete(transportId);
+      cleanedCount++;
+    }
+  }
+  
+  return cleanedCount;
 }
 
 // Set up periodic cleanup of expired tokens (every 5 minutes)
