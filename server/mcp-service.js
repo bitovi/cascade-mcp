@@ -25,10 +25,10 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { InvalidTokenError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 import { randomUUID } from 'node:crypto';
 import { logger } from './logger.js';
+import { jwtVerify, sanitizeJwtPayload, formatTokenWithExpiration, parseJWT } from './tokens.js';
 
 // Map to store transports by session ID
 const transports = {};
-console.log("STARTING",Object.keys(transports).length);
 
 /**
  * Handle POST requests for client-to-server communication
@@ -37,11 +37,11 @@ console.log("STARTING",Object.keys(transports).length);
  * and then another with its last authorization header.
  */
 export async function handleMcpPost(req, res) {
-  console.log('=== MCP POST REQUEST ===');
-  console.log("Transport keys: ",Object.keys(transports).length);
-  console.log('Body:', JSON.stringify(req.body, null, 2));
-  console.log('Headers:', JSON.stringify(req.headers, null, 2));
-  console.log('========================');
+  console.log('======= POST /mcp =======');
+  console.log('Headers:', JSON.stringify(sanitizeHeaders(req.headers)));
+  console.log('Body:', JSON.stringify(req.body));
+  console.log('mcp-session-id:', req.headers['mcp-session-id']);
+  console.log('--------------------------------');
 
   // Check for existing session ID
   const sessionId = req.headers['mcp-session-id'];
@@ -50,33 +50,31 @@ export async function handleMcpPost(req, res) {
   if (sessionId && transports[sessionId]) {
     // Reuse existing transport
     transport = transports[sessionId];
-    console.log("transport type", typeof transport);
-    console.log(`Reusing existing transport for session: ${sessionId}`);
+    console.log(`  ♻️ Reusing existing transport for session: ${sessionId}`);
   } 
   else if (!sessionId && isInitializeRequest(req.body)) {
     // New initialization request
-    console.log('New MCP initialization request');
+    console.log('  🥚 New MCP initialization request.');
 
     // Extract and validate auth info
-    let { authInfo, errored } = getAuthInfoFromBearer(req, res);
+    let { authInfo, errored } = await getAuthInfoFromBearer(req, res);
     if (errored) { return; }
 
     if (!authInfo) {
-      ({ authInfo, errored } = getAuthInfoFromQueryToken(req, res));
+      ({ authInfo, errored } = await getAuthInfoFromQueryToken(req, res));
     }
     if (errored) { return; }
     
     if (!authInfo) {
       return sendMissingAtlassianAccessToken(res, req, 'anywhere');
     }
-
+    console.log('    Has valid token, creating streamable transport');
     transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
       onsessioninitialized: (newSessionId) => {
         // Store the transport by session ID
-        console.log(`Storing transport for new session: ${newSessionId}`);
+        console.log(`    Storing transport for new session: ${newSessionId}`);
         transports[newSessionId] = transport;
-        console.log(`Transport stored for session: ${newSessionId}`);
         // Store auth context for this session
         setAuthContext(newSessionId, authInfo);
       },
@@ -85,7 +83,7 @@ export async function handleMcpPost(req, res) {
     // Clean up transport when closed
     transport.onclose = () => {
       if (transport.sessionId) {
-        console.log(`Cleaning up session: ${transport.sessionId}`);
+        console.log(`.   Cleaning up session: ${transport.sessionId}`);
         delete transports[transport.sessionId];
         clearAuthContext(transport.sessionId);
       }
@@ -93,10 +91,10 @@ export async function handleMcpPost(req, res) {
 
     // Connect the MCP server to this transport
     await mcp.connect(transport);
-    console.log('MCP server connected to new transport');
+    console.log('    MCP server connected to new transport');
   } else {
     // Invalid request
-    console.log('Invalid MCP request - no session ID and not an initialize request');
+    console.log('  ❌ Invalid MCP request - no session ID and not an initialize request');
     res.status(400).json({
       jsonrpc: '2.0',
       error: {
@@ -116,11 +114,13 @@ export async function handleMcpPost(req, res) {
     if (error instanceof InvalidTokenError) {
       console.log('MCP OAuth authentication expired - sending proper OAuth 401 response');
       
-      // Send proper OAuth 401 response with WWW-Authenticate header
-      const resourceMetadataUrl = `${process.env.AUTH_BASE_URL || 'http://localhost:3000'}/oauth/.well-known/oauth_authorization_server`;
-      const wwwAuthValue = `Bearer error="${error.errorCode}", error_description="${error.message}", resource_metadata="${resourceMetadataUrl}"`;
+      // Send proper OAuth 401 response with WWW-Authenticate header according to RFC 6750
+      const wwwAuthValue = `Bearer realm="mcp", error="invalid_token", error_description="${error.message}", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource"`;
       
       res.set('WWW-Authenticate', wwwAuthValue);
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
       res.status(401).json(error.toResponseObject());
       return;
     }
@@ -128,6 +128,7 @@ export async function handleMcpPost(req, res) {
     // Re-throw other errors
     throw error;
   }
+  console.log('  ✅ MCP POST request handled successfully');
 }
 
 /**
@@ -140,11 +141,11 @@ export async function handleSessionRequest(req, res) {
   // For GET requests (SSE streams), validate authentication first
   if (req.method === 'GET') {
     // Extract and validate auth info
-    let { authInfo, errored } = getAuthInfoFromBearer(req, res);
+    let { authInfo, errored } = await getAuthInfoFromBearer(req, res);
     if (errored) { return; }
 
     if (!authInfo) {
-      ({ authInfo, errored } = getAuthInfoFromQueryToken(req, res));
+      ({ authInfo, errored } = await getAuthInfoFromQueryToken(req, res));
     }
     if (errored) { return; }
     
@@ -153,8 +154,14 @@ export async function handleSessionRequest(req, res) {
       console.log('No valid auth found for GET request - triggering re-authentication');
       return res
         .status(401)
-        .header('WWW-Authenticate', 'Bearer realm="mcp", error="invalid_token"')
-        .end();
+        .header('WWW-Authenticate', `Bearer realm="mcp", error="invalid_token", error_description="Authentication required", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource"`)
+        .header('Cache-Control', 'no-cache, no-store, must-revalidate')
+        .header('Pragma', 'no-cache')
+        .header('Expires', '0')
+        .json({
+          error: "invalid_token",
+          error_description: "Missing or invalid access token"
+        });
     }
   }
   
@@ -175,61 +182,56 @@ export async function handleSessionRequest(req, res) {
  * Extract and validate auth info from Authorization Bearer header
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
- * @returns {Object} - {authInfo, errored} where authInfo is the parsed JWT payload or null, errored is boolean
+ * @returns {Promise<Object>} - {authInfo, errored} where authInfo is the parsed JWT payload or null, errored is boolean
  */
-function getAuthInfoFromBearer(req, res) {
+async function getAuthInfoFromBearer(req, res) {
   const auth = req.headers.authorization;
-  
   if (!auth || !auth.startsWith('Bearer ')) {
     return { authInfo: null, errored: false };
   }
-
-  try {
-    const payload = parseJWT(auth.slice('Bearer '.length));
-    console.log('Successfully parsed JWT payload from bearer token:', payload);
-    
-    // Validate that we have an Atlassian access token
-    if (!payload.atlassian_access_token) {
-      console.log('JWT payload missing atlassian_access_token');
-      sendMissingAtlassianAccessToken(res, req, 'authorization bearer token');
-      return { authInfo: null, errored: true };
-    }
-    
-    return { authInfo: payload, errored: false };
-  } catch (err) {
-    logger.error('Error parsing JWT token from header:', err);
-    send401(res, { error: 'Invalid token' }, true); // Trigger re-auth for invalid tokens
-    return { authInfo: null, errored: true };
-  }
+  return validateAndExtractJwt(auth.slice('Bearer '.length), req, res, 'authorization bearer token', 'strict mode');
 }
 
 /**
  * Extract and validate auth info from query token parameter
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
- * @returns {Object} - {authInfo, errored} where authInfo is the parsed JWT payload or null, errored is boolean
+ * @returns {Promise<Object>} - {authInfo, errored} where authInfo is the parsed JWT payload or null, errored is boolean
  */
-function getAuthInfoFromQueryToken(req, res) {
+async function getAuthInfoFromQueryToken(req, res) {
   const tokenFromQuery = req.query.token;
-  
   if (!tokenFromQuery) {
     return { authInfo: null, errored: false };
   }
-
+  return validateAndExtractJwt(tokenFromQuery, req, res, 'query parameter', 'strict mode, query param');
+}
+// Shared helper for JWT validation and extraction
+function validateAndExtractJwt(token, req, res, source, strictLabel) {
   try {
-    const payload = parseJWT(tokenFromQuery);
-    console.log('Successfully parsed JWT payload from query:', payload);
+    const payload = parseJWT(token);
+    console.log(`Successfully parsed JWT payload from ${source}:`, JSON.stringify(sanitizeJwtPayload(payload), null, 2));
 
     // Validate that we have an Atlassian access token
     if (!payload.atlassian_access_token) {
-      console.log('JWT payload from query missing atlassian_access_token');
-      sendMissingAtlassianAccessToken(res, req, 'query parameter');
+      console.log(`JWT payload missing atlassian_access_token (${source})`);
+      sendMissingAtlassianAccessToken(res, req, source);
       return { authInfo: null, errored: true };
     }
-    
+
+    // Conditionally check expiration if env var is set
+    const checkExpiration = String(process.env.CHECK_JWT_EXPIRATION).toLowerCase() === 'true';
+    if (checkExpiration) {
+      const now = Math.floor(Date.now() / 1000);
+      if (typeof payload.exp === 'number' && payload.exp < now) {
+        console.log(`JWT token expired (${strictLabel})`);
+        send401(res, { error: 'Token expired' }, true);
+        return { authInfo: null, errored: true };
+      }
+    }
+
     return { authInfo: payload, errored: false };
   } catch (err) {
-    logger.error('Error parsing JWT token from query:', err);
+    logger.error(`Error parsing JWT token from ${source}:`, err);
     send401(res, { error: 'Invalid token' }, true); // Trigger re-auth for invalid tokens
     return { authInfo: null, errored: true };
   }
@@ -237,21 +239,27 @@ function getAuthInfoFromQueryToken(req, res) {
 
 function send401(res, jsonResponse, includeInvalidToken = false) {
   const wwwAuthHeader = includeInvalidToken 
-    ? `Bearer realm="mcp", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource", error="invalid_token"`
+    ? `Bearer realm="mcp", error="invalid_token", error_description="Token expired - please re-authenticate", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource"`
     : `Bearer realm="mcp", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource"`;
     
   return res
       .status(401)
       .header('WWW-Authenticate', wwwAuthHeader)
+      .header('Cache-Control', 'no-cache, no-store, must-revalidate')
+      .header('Pragma', 'no-cache')
+      .header('Expires', '0')
       .json({ error: 'Invalid or missing token' });
 }
 
 function sendMissingAtlassianAccessToken(res, req, where = 'bearer header') {
   const message = `Authentication token missing Atlassian access token in ${where}.`;
-  console.log(message);
+  console.log(`❌🔑 ${message}`);
   return res
       .status(401)
-      .header('WWW-Authenticate', `Bearer realm="mcp", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource", error="invalid_token"`)
+      .header('WWW-Authenticate', `Bearer realm="mcp", error="invalid_token", error_description="${message}", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource"`)
+      .header('Cache-Control', 'no-cache, no-store, must-revalidate')
+      .header('Pragma', 'no-cache')
+      .header('Expires', '0')
       .json({
         jsonrpc: '2.0',
         error: {
@@ -262,6 +270,13 @@ function sendMissingAtlassianAccessToken(res, req, where = 'bearer header') {
       });
 }
 
-function parseJWT(token) {
-  return JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString())
+function sanitizeHeaders(headers) {
+  const sanitized = { ...headers };
+  
+  if (sanitized.authorization && sanitized.authorization.startsWith('Bearer ')) {
+    const token = sanitized.authorization.slice('Bearer '.length);
+    sanitized.authorization = `Bearer ${formatTokenWithExpiration(token, 20)}`;
+  }
+  
+  return sanitized;
 }

@@ -5,7 +5,7 @@
 
 import { z } from 'zod';
 import { logger } from '../logger.js';
-import { getAuthInfo, handleJiraAuthError, resolveCloudId } from './auth-helpers.js';
+import { getAuthInfoSafe, handleJiraAuthError, resolveCloudId } from './auth-helpers.js';
 import { convertMarkdownToAdf, validateAdf } from './markdown-converter.js';
 
 /**
@@ -35,7 +35,8 @@ export function registerUpdateIssueDescriptionTool(mcp) {
         notifyUsers
       });
 
-      const authInfo = getAuthInfo(context);
+      // Get auth info with proper error handling
+      const authInfo = getAuthInfoSafe(context, 'update-issue-description');
       const token = authInfo?.atlassian_access_token;
 
       if (!token) {
