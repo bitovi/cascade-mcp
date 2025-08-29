@@ -55,7 +55,7 @@ export async function handleMcpPost(req, res) {
   } 
   else if (!sessionId && isInitializeRequest(req.body)) {
     // New initialization request
-    console.log('New MCP initialization request');
+    console.log('New MCP initialization request. POST /mcp');
 
     // Extract and validate auth info
     let { authInfo, errored } = getAuthInfoFromBearer(req, res);
@@ -184,28 +184,10 @@ export async function handleSessionRequest(req, res) {
  */
 function getAuthInfoFromBearer(req, res) {
   const auth = req.headers.authorization;
-  
   if (!auth || !auth.startsWith('Bearer ')) {
     return { authInfo: null, errored: false };
   }
-
-  try {
-    const payload = parseJWT(auth.slice('Bearer '.length));
-    console.log('Successfully parsed JWT payload from bearer token:', JSON.stringify(sanitizeJwtPayload(payload), null, 2));
-    
-    // Validate that we have an Atlassian access token
-    if (!payload.atlassian_access_token) {
-      console.log('JWT payload missing atlassian_access_token');
-      sendMissingAtlassianAccessToken(res, req, 'authorization bearer token');
-      return { authInfo: null, errored: true };
-    }
-    
-    return { authInfo: payload, errored: false };
-  } catch (err) {
-    logger.error('Error parsing JWT token from header:', err);
-    send401(res, { error: 'Invalid token' }, true); // Trigger re-auth for invalid tokens
-    return { authInfo: null, errored: true };
-  }
+  return validateAndExtractJwt(auth.slice('Bearer '.length), req, res, 'authorization bearer token', 'strict mode');
 }
 
 /**
@@ -216,25 +198,38 @@ function getAuthInfoFromBearer(req, res) {
  */
 function getAuthInfoFromQueryToken(req, res) {
   const tokenFromQuery = req.query.token;
-  
   if (!tokenFromQuery) {
     return { authInfo: null, errored: false };
   }
-
+  return validateAndExtractJwt(tokenFromQuery, req, res, 'query parameter', 'strict mode, query param');
+}
+// Shared helper for JWT validation and extraction
+function validateAndExtractJwt(token, req, res, source, strictLabel) {
   try {
-    const payload = parseJWT(tokenFromQuery);
-    console.log('Successfully parsed JWT payload from query:', JSON.stringify(sanitizeJwtPayload(payload), null, 2));
+    const payload = parseJWT(token);
+    console.log(`Successfully parsed JWT payload from ${source}:`, JSON.stringify(sanitizeJwtPayload(payload), null, 2));
 
     // Validate that we have an Atlassian access token
     if (!payload.atlassian_access_token) {
-      console.log('JWT payload from query missing atlassian_access_token');
-      sendMissingAtlassianAccessToken(res, req, 'query parameter');
+      console.log(`JWT payload missing atlassian_access_token (${source})`);
+      sendMissingAtlassianAccessToken(res, req, source);
       return { authInfo: null, errored: true };
     }
-    
+
+    // Conditionally check expiration if env var is set
+    const checkExpiration = String(process.env.CHECK_JWT_EXPIRATION).toLowerCase() === 'true';
+    if (checkExpiration) {
+      const now = Math.floor(Date.now() / 1000);
+      if (typeof payload.exp === 'number' && payload.exp < now) {
+        console.log(`JWT token expired (${strictLabel})`);
+        send401(res, { error: 'Token expired' }, true);
+        return { authInfo: null, errored: true };
+      }
+    }
+
     return { authInfo: payload, errored: false };
   } catch (err) {
-    logger.error('Error parsing JWT token from query:', err);
+    logger.error(`Error parsing JWT token from ${source}:`, err);
     send401(res, { error: 'Invalid token' }, true); // Trigger re-auth for invalid tokens
     return { authInfo: null, errored: true };
   }
