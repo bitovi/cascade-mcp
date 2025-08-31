@@ -5,35 +5,13 @@
 import { logger } from '../observability/logger.ts';
 import { getAuthInfoSafe, handleJiraAuthError } from './auth-helpers.ts';
 import type { AtlassianSite } from './atlassian-helpers.ts';
-
-// MCP tool content interface
-interface MCPToolContent {
-  type: 'text';
-  text: string;
-}
-
-interface MCPToolResponse {
-  content: MCPToolContent[];
-}
-
-// MCP server interface (simplified)
-interface MCPServer {
-  registerTool(
-    name: string,
-    definition: {
-      title: string;
-      description: string;
-      inputSchema: Record<string, any>;
-    },
-    handler: (args: any, context: any) => Promise<MCPToolResponse>
-  ): void;
-}
+import type { McpServer } from './mcp-types.ts';
 
 /**
  * Register the get-accessible-sites tool with the MCP server
  * @param mcp - MCP server instance
  */
-export function registerGetAccessibleSitesTool(mcp: MCPServer): void {
+export function registerGetAccessibleSitesTool(mcp: McpServer): void {
   mcp.registerTool(
     'get-accessible-sites',
     {
@@ -41,7 +19,7 @@ export function registerGetAccessibleSitesTool(mcp: MCPServer): void {
       description: 'Get list of accessible Jira sites for the authenticated user',
       inputSchema: {},
     },
-    async (_, context): Promise<MCPToolResponse> => {
+    async (_, context) => {
       // Get auth info with proper error handling
       const authInfo = getAuthInfoSafe(context, 'get-accessible-sites');
       const token = authInfo?.atlassian_access_token;

@@ -6,6 +6,8 @@ import { z } from 'zod';
 import { logger } from '../observability/logger.ts';
 import { getAuthInfoSafe, handleJiraAuthError } from './auth-helpers.ts';
 import { resolveCloudId } from './atlassian-helpers.ts';
+import { sanitizeObjectWithJWTs } from '../tokens.ts';
+import type { McpServer } from './mcp-types.ts';
 
 // Tool parameters interface
 interface GetJiraIssueParams {
@@ -13,29 +15,6 @@ interface GetJiraIssueParams {
   cloudId?: string;
   siteName?: string;
   fields?: string;
-}
-
-// MCP tool content interface
-interface MCPToolContent {
-  type: 'text';
-  text: string;
-}
-
-interface MCPToolResponse {
-  content: MCPToolContent[];
-}
-
-// MCP server interface (simplified)
-interface MCPServer {
-  registerTool(
-    name: string,
-    definition: {
-      title: string;
-      description: string;
-      inputSchema: Record<string, any>;
-    },
-    handler: (args: any, context: any) => Promise<MCPToolResponse>
-  ): void;
 }
 
 // Jira issue interfaces (basic structure)
@@ -57,29 +36,10 @@ interface JiraIssue {
 }
 
 /**
- * Helper function to safely log token information without exposing sensitive data
- * @param token - The token to log info about
- * @param prefix - Prefix for the log entry
- * @returns Safe token info for logging
- */
-function getTokenLogInfo(token?: string, prefix: string = 'Token'): Record<string, any> {
-  if (!token) {
-    return { [`${prefix.toLowerCase()}Available`]: false };
-  }
-  
-  return {
-    [`${prefix.toLowerCase()}Available`]: true,
-    [`${prefix.toLowerCase()}Prefix`]: token.substring(0, 20) + '...',
-    [`${prefix.toLowerCase()}Length`]: token.length,
-    [`${prefix.toLowerCase()}LastFour`]: '...' + token.slice(-4),
-  };
-}
-
-/**
  * Register the get-jira-issue tool with the MCP server
  * @param mcp - MCP server instance
  */
-export function registerGetJiraIssueTool(mcp: MCPServer): void {
+export function registerGetJiraIssueTool(mcp: McpServer): void {
   mcp.registerTool(
     'get-jira-issue',
     {
@@ -92,7 +52,7 @@ export function registerGetJiraIssueTool(mcp: MCPServer): void {
         fields: z.string().optional().describe('Comma-separated list of fields to return. If not specified, returns all fields.'),
       },
     },
-    async ({ issueKey, cloudId, siteName, fields }: GetJiraIssueParams, context): Promise<MCPToolResponse> => {
+    async ({ issueKey, cloudId, siteName, fields }: GetJiraIssueParams, context) => {
       logger.info('get-jira-issue called', { 
         issueKey, 
         cloudId, 
@@ -116,15 +76,15 @@ export function registerGetJiraIssueTool(mcp: MCPServer): void {
         };
       }
 
-      logger.info('Found valid auth token for issue fetch', {
-        ...getTokenLogInfo(token, 'atlassianToken'),
+      logger.info('Found valid auth token for issue fetch', sanitizeObjectWithJWTs({
+        atlassianToken: token,
         hasRefreshToken: !!authInfo.refresh_token,
         scope: authInfo.scope,
         issuer: authInfo.iss,
         audience: authInfo.aud,
         operation: 'get-jira-issue',
         issueKey,
-      });
+      }));
 
       try {
         // Resolve the target cloud ID using the utility function
@@ -152,16 +112,16 @@ export function registerGetJiraIssueTool(mcp: MCPServer): void {
           issueUrl += `?${params.toString()}`;
         }
 
-        logger.info('Making Jira API request for issue details', { 
+        logger.info('Making Jira API request for issue details', sanitizeObjectWithJWTs({ 
           issueKey, 
           cloudId: targetCloudId,
           fetchUrl: issueUrl,
-          ...getTokenLogInfo(token, 'requestToken'),
+          requestToken: token,
           headers: {
-            'Authorization': `Bearer ${token.substring(0, 20)}...`,
+            'Authorization': `Bearer ${token}`,
             'Accept': 'application/json'
           }
-        });
+        }));
 
         // Get issue details using direct fetch API
         const issueRes = await fetch(issueUrl, {

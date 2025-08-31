@@ -34,16 +34,10 @@ const mcp = new McpServer(
 // Register all tools
 logger.info('Registering MCP tools...');
 
-// Note: Using 'as any' here because the tool registration functions were converted
-// to TypeScript with simplified interfaces that don't exactly match the complex
-// MCP SDK types. The runtime behavior is correct, but TypeScript needs the cast
-// to allow the type mismatch. This could be fixed in a future refactor by either:
-// 1. Using the exact MCP SDK types throughout, or
-// 2. Creating wrapper functions that properly bridge the type differences
-registerUpdateIssueDescriptionTool(mcp as any);
-registerGetAccessibleSitesTool(mcp as any);
-registerGetJiraIssueTool(mcp as any);
-registerGetJiraAttachmentsTool(mcp as any);
+registerUpdateIssueDescriptionTool(mcp);
+registerGetAccessibleSitesTool(mcp);
+registerGetJiraIssueTool(mcp);
+registerGetJiraAttachmentsTool(mcp);
 
 logger.info('All MCP tools registered successfully');
 

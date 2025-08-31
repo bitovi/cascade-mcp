@@ -6,43 +6,13 @@ import { z } from 'zod';
 import { logger } from '../observability/logger.ts';
 import { getAuthInfoSafe, handleJiraAuthError } from './auth-helpers.ts';
 import { resolveCloudId } from './atlassian-helpers.ts';
+import type { McpServer } from './mcp-types.ts';
 
 // Tool parameters interface
 interface GetJiraAttachmentsParams {
   attachmentIds: string[];
   cloudId?: string;
   siteName?: string;
-}
-
-// MCP content types
-interface MCPTextContent {
-  type: 'text';
-  text: string;
-}
-
-interface MCPImageContent {
-  type: 'image';
-  mimeType: string;
-  data: string;
-}
-
-type MCPToolContent = MCPTextContent | MCPImageContent;
-
-interface MCPToolResponse {
-  content: MCPToolContent[];
-}
-
-// MCP server interface (simplified)
-interface MCPServer {
-  registerTool(
-    name: string,
-    definition: {
-      title: string;
-      description: string;
-      inputSchema: Record<string, any>;
-    },
-    handler: (args: any, context: any) => Promise<MCPToolResponse>
-  ): void;
 }
 
 // Attachment response interface
@@ -85,7 +55,7 @@ async function blobToBase64(blob: Blob): Promise<string> {
  * Register the get-jira-attachments tool with the MCP server
  * @param mcp - MCP server instance
  */
-export function registerGetJiraAttachmentsTool(mcp: MCPServer): void {
+export function registerGetJiraAttachmentsTool(mcp: McpServer): void {
   mcp.registerTool(
     'get-jira-attachments',
     {
@@ -97,7 +67,7 @@ export function registerGetJiraAttachmentsTool(mcp: MCPServer): void {
         siteName: z.string().optional().describe('The name of the Jira site to use (alternative to cloudId). Will search for a site with this name.'),
       },
     },
-    async ({ attachmentIds, cloudId, siteName }: GetJiraAttachmentsParams, context): Promise<MCPToolResponse> => {
+    async ({ attachmentIds, cloudId, siteName }: GetJiraAttachmentsParams, context) => {
       logger.info('get-jira-attachments called', { 
         attachmentIds, 
         cloudId, 
@@ -217,7 +187,7 @@ export function registerGetJiraAttachmentsTool(mcp: MCPServer): void {
           errorCount: errors.length
         });
 
-        const content: MCPToolContent[] = [];
+        const content: Array<{ type: 'text'; text: string } | { type: 'image'; mimeType: string; data: string }> = [];
         
         // Add any errors as text content first
         if (errors.length > 0) {
