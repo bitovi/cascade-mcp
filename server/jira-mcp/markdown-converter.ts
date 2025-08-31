@@ -3,15 +3,37 @@
  * Uses marklassian for lightweight, reliable conversion
  */
 
-import { logger } from '../logger.js';
+import { marked } from 'marked';
 import { markdownToAdf } from 'marklassian';
+import { logger } from '../observability/logger.ts';
+
+// ADF (Atlassian Document Format) interfaces
+export interface ADFTextNode {
+  type: 'text';
+  text: string;
+  marks?: Array<{
+    type: string;
+    attrs?: Record<string, any>;
+  }>;
+}
+
+export interface ADFParagraph {
+  type: 'paragraph';
+  content: ADFTextNode[];
+}
+
+export interface ADFDocument {
+  version: number;
+  type: 'doc';
+  content: ADFParagraph[];
+}
 
 /**
  * Convert markdown text to ADF format
- * @param {string} markdown - Markdown text to convert
- * @returns {Promise<Object>} ADF document object
+ * @param markdown - Markdown text to convert
+ * @returns ADF document object
  */
-export async function convertMarkdownToAdf(markdown) {
+export async function convertMarkdownToAdf(markdown: string): Promise<ADFDocument> {
   if (!markdown || typeof markdown !== 'string') {
     logger.warn('Invalid markdown input provided', { markdown });
     return createFallbackAdf(markdown || '');
@@ -24,7 +46,7 @@ export async function convertMarkdownToAdf(markdown) {
   });
 
   try {
-    const adf = markdownToAdf(markdown);
+    const adf = markdownToAdf(markdown) as ADFDocument;
     
     logger.info('Markdown converted to ADF successfully with marklassian', {
       adfVersion: adf.version,
@@ -33,7 +55,7 @@ export async function convertMarkdownToAdf(markdown) {
     });
 
     return adf;
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Marklassian conversion failed, using fallback', { 
       error: error.message,
       markdownLength: markdown.length 
@@ -45,10 +67,10 @@ export async function convertMarkdownToAdf(markdown) {
 
 /**
  * Create a simple ADF document for plain text fallback
- * @param {string} text - Plain text content
- * @returns {Object} Basic ADF document
+ * @param text - Plain text content
+ * @returns Basic ADF document
  */
-function createFallbackAdf(text) {
+function createFallbackAdf(text: string): ADFDocument {
   logger.info('Creating fallback ADF document', { textLength: text.length });
   
   // Split text into paragraphs on double newlines
@@ -66,7 +88,7 @@ function createFallbackAdf(text) {
     };
   }
 
-  const content = paragraphs.map(paragraph => ({
+  const content: ADFParagraph[] = paragraphs.map(paragraph => ({
     type: 'paragraph',
     content: [{
       type: 'text',
@@ -83,10 +105,10 @@ function createFallbackAdf(text) {
 
 /**
  * Validate ADF document structure
- * @param {Object} adf - ADF document to validate
- * @returns {boolean} True if valid ADF structure
+ * @param adf - ADF document to validate
+ * @returns True if valid ADF structure
  */
-export function validateAdf(adf) {
+export function validateAdf(adf: any): adf is ADFDocument {
   if (!adf || typeof adf !== 'object') {
     return false;
   }

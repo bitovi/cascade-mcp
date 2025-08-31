@@ -19,16 +19,24 @@
  * - Error response utilities: Standardized 401 and error response functions
  */
 
-import { mcp, setAuthContext, clearAuthContext } from './jira-mcp/index.js';
+import { Request, Response } from 'express';
+import { mcp, setAuthContext, clearAuthContext } from './jira-mcp/index.ts';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
+import { isInitializeRequest, type JSONRPCRequest } from '@modelcontextprotocol/sdk/types.js';
 import { InvalidTokenError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 import { randomUUID } from 'node:crypto';
-import { logger } from './logger.js';
-import { jwtVerify, sanitizeJwtPayload, formatTokenWithExpiration, parseJWT } from './tokens.js';
+import { logger } from './observability/logger.ts';
+import { jwtVerify, sanitizeJwtPayload, formatTokenWithExpiration, parseJWT, type JWTPayload } from './tokens.ts';
+import { type AuthContext } from './jira-mcp/auth-context-store.ts';
+
+// Validation result interface
+interface ValidationResult {
+  authInfo: AuthContext | null;
+  errored: boolean;
+}
 
 // Map to store transports by session ID
-const transports = {};
+const transports: Record<string, StreamableHTTPServerTransport> = {};
 
 /**
  * Handle POST requests for client-to-server communication
@@ -36,7 +44,7 @@ const transports = {};
  * Copilot's MCP client, upon restarting, will send a POST without an authorization header, 
  * and then another with its last authorization header.
  */
-export async function handleMcpPost(req, res) {
+export async function handleMcpPost(req: Request, res: Response): Promise<void> {
   console.log('======= POST /mcp =======');
   console.log('Headers:', JSON.stringify(sanitizeHeaders(req.headers)));
   console.log('Body:', JSON.stringify(req.body));
@@ -44,15 +52,15 @@ export async function handleMcpPost(req, res) {
   console.log('--------------------------------');
 
   // Check for existing session ID
-  const sessionId = req.headers['mcp-session-id'];
-  let transport;
+  const sessionId = req.headers['mcp-session-id'] as string | undefined;
+  let transport: StreamableHTTPServerTransport;
 
   if (sessionId && transports[sessionId]) {
     // Reuse existing transport
     transport = transports[sessionId];
     console.log(`  ♻️ Reusing existing transport for session: ${sessionId}`);
   } 
-  else if (!sessionId && isInitializeRequest(req.body)) {
+  else if (!sessionId && isInitializeRequest(req.body as JSONRPCRequest)) {
     // New initialization request
     console.log('  🥚 New MCP initialization request.');
 
@@ -66,17 +74,18 @@ export async function handleMcpPost(req, res) {
     if (errored) { return; }
     
     if (!authInfo) {
-      return sendMissingAtlassianAccessToken(res, req, 'anywhere');
+      sendMissingAtlassianAccessToken(res, req, 'anywhere');
+      return;
     }
     console.log('    Has valid token, creating streamable transport');
     transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
-      onsessioninitialized: (newSessionId) => {
+      onsessioninitialized: (newSessionId: string) => {
         // Store the transport by session ID
         console.log(`    Storing transport for new session: ${newSessionId}`);
         transports[newSessionId] = transport;
         // Store auth context for this session
-        setAuthContext(newSessionId, authInfo);
+        setAuthContext(newSessionId, authInfo!);
       },
     });
 
@@ -114,8 +123,7 @@ export async function handleMcpPost(req, res) {
     if (error instanceof InvalidTokenError) {
       console.log('MCP OAuth authentication expired - sending proper OAuth 401 response');
       
-      // Send proper OAuth 401 response with WWW-Authenticate header according to RFC 6750
-      const wwwAuthValue = `Bearer realm="mcp", error="invalid_token", error_description="${error.message}", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource"`;
+      const wwwAuthValue = createWwwAuthenticate(req, error.message);
       
       res.set('WWW-Authenticate', wwwAuthValue);
       res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -134,14 +142,17 @@ export async function handleMcpPost(req, res) {
 /**
  * Reusable handler for GET and DELETE requests
  */
-export async function handleSessionRequest(req, res) {
+export async function handleSessionRequest(req: Request, res: Response): Promise<void> {
   console.log('=== MCP SESSION REQUEST ===');
   console.log(req.method);
+  
+  let authInfo: AuthContext | null = null;
   
   // For GET requests (SSE streams), validate authentication first
   if (req.method === 'GET') {
     // Extract and validate auth info
-    let { authInfo, errored } = await getAuthInfoFromBearer(req, res);
+    let errored: boolean;
+    ({ authInfo, errored } = await getAuthInfoFromBearer(req, res));
     if (errored) { return; }
 
     if (!authInfo) {
@@ -152,9 +163,9 @@ export async function handleSessionRequest(req, res) {
     if (!authInfo) {
       // For GET requests, send 401 with invalid_token to trigger re-auth
       console.log('No valid auth found for GET request - triggering re-authentication');
-      return res
+      res
         .status(401)
-        .header('WWW-Authenticate', `Bearer realm="mcp", error="invalid_token", error_description="Authentication required", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource"`)
+        .header('WWW-Authenticate', createWwwAuthenticate(req, 'Authentication required'))
         .header('Cache-Control', 'no-cache, no-store, must-revalidate')
         .header('Pragma', 'no-cache')
         .header('Expires', '0')
@@ -162,14 +173,28 @@ export async function handleSessionRequest(req, res) {
           error: "invalid_token",
           error_description: "Missing or invalid access token"
         });
+      return;
     }
   }
   
-  const sessionId = req.headers['mcp-session-id'];
+  const sessionId = req.headers['mcp-session-id'] as string | undefined;
   if (!sessionId || !transports[sessionId]) {
     console.log(`Invalid or missing session ID: ${sessionId}`);
     res.status(400).send('Invalid or missing session ID');
     return;
+  }
+
+  // Update session context store with auth info from GET request
+  // This is crucial for refreshed tokens - the client sends new JWT via GET request
+  // and we need to update the session store so tool calls can access the auth context
+  // 
+  // Why we update here instead of during refresh flow:
+  // 1. Refresh flow happens at /access-token endpoint without session context
+  // 2. Periodic cleanup removes expired sessions before refresh can complete
+  // 3. This defensive approach catches any case where session exists but context is missing
+  // 4. Handles edge cases gracefully without interfering with cleanup logic
+  if (authInfo && sessionId) {
+    setAuthContext(sessionId, authInfo);
   }
 
   const transport = transports[sessionId];
@@ -179,12 +204,79 @@ export async function handleSessionRequest(req, res) {
 // === Helper Functions ===
 
 /**
- * Extract and validate auth info from Authorization Bearer header
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @returns {Promise<Object>} - {authInfo, errored} where authInfo is the parsed JWT payload or null, errored is boolean
+ * Detect if the client is VS Code based on User-Agent and MCP client info
+ * 
+ * @param req - Express request object
+ * @returns True if client is VS Code
  */
-async function getAuthInfoFromBearer(req, res) {
+function isVSCodeClient(req: Request): boolean {
+  // Check User-Agent header - VS Code sends "node"
+  const userAgent = req.headers['user-agent'];
+  if (userAgent === 'node') {
+    return true;
+  }
+  
+  // Check MCP initialize request clientInfo
+  if (req.body && req.body.method === 'initialize' && req.body.params && req.body.params.clientInfo) {
+    const clientName = req.body.params.clientInfo.name;
+    if (clientName === 'Visual Studio Code') {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+/**
+ * Generate WWW-Authenticate header value according to RFC 6750 and RFC 9728
+ * with VS Code Copilot compatibility handling
+ * 
+ * @param req - Express request object (used for client detection)
+ * @param errorDescription - Optional error description for invalid_token errors
+ * @param errorCode - Optional error code (defaults to "invalid_token" when errorDescription provided)
+ * @returns Complete WWW-Authenticate header value
+ * 
+ * Specifications:
+ * - RFC 6750 Section 3: WWW-Authenticate Response Header Field
+ * - RFC 9728 Section 5.1: WWW-Authenticate Resource Metadata Parameter (resource_metadata)
+ * - VS Code Copilot Extension: Non-standard resource_metadata_url parameter
+ * 
+ * Implementation Note:
+ * VS Code breaks when it sees both resource_metadata and resource_metadata_url parameters.
+ * We detect VS Code clients and only send the parameter they expect:
+ * - VS Code: Only resource_metadata_url (their non-standard parameter)
+ * - Other clients: Only resource_metadata (RFC 9728 standard)
+ * See specs/vs-code-copilot/readme.md for details.
+ */
+function createWwwAuthenticate(req: Request, errorDescription: string | null = null, errorCode: string = 'invalid_token'): string {
+  const metadataUrl = `${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource`;
+  
+  let authValue = `Bearer realm="mcp"`;
+  
+  // Add error parameters if provided (RFC 6750 Section 3.1)
+  if (errorDescription) {
+    authValue += `, error="${errorCode}", error_description="${errorDescription}"`;
+  }
+  
+  // Add appropriate resource metadata parameter based on client type
+  if (isVSCodeClient(req)) {
+    // VS Code Copilot expects resource_metadata_url (non-standard)
+    authValue += `, resource_metadata_url="${metadataUrl}"`;
+  } else {
+    // Standard RFC 9728 parameter for other clients
+    authValue += `, resource_metadata="${metadataUrl}"`;
+  }
+  
+  return authValue;
+}
+
+/**
+ * Extract and validate auth info from Authorization Bearer header
+ * @param req - Express request object
+ * @param res - Express response object
+ * @returns {authInfo, errored} where authInfo is the parsed JWT payload or null, errored is boolean
+ */
+async function getAuthInfoFromBearer(req: Request, res: Response): Promise<ValidationResult> {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) {
     return { authInfo: null, errored: false };
@@ -194,21 +286,22 @@ async function getAuthInfoFromBearer(req, res) {
 
 /**
  * Extract and validate auth info from query token parameter
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @returns {Promise<Object>} - {authInfo, errored} where authInfo is the parsed JWT payload or null, errored is boolean
+ * @param req - Express request object
+ * @param res - Express response object
+ * @returns {authInfo, errored} where authInfo is the parsed JWT payload or null, errored is boolean
  */
-async function getAuthInfoFromQueryToken(req, res) {
-  const tokenFromQuery = req.query.token;
+async function getAuthInfoFromQueryToken(req: Request, res: Response): Promise<ValidationResult> {
+  const tokenFromQuery = req.query.token as string | undefined;
   if (!tokenFromQuery) {
     return { authInfo: null, errored: false };
   }
   return validateAndExtractJwt(tokenFromQuery, req, res, 'query parameter', 'strict mode, query param');
 }
+
 // Shared helper for JWT validation and extraction
-function validateAndExtractJwt(token, req, res, source, strictLabel) {
+function validateAndExtractJwt(token: string, req: Request, res: Response, source: string, strictLabel: string): ValidationResult {
   try {
-    const payload = parseJWT(token);
+    const payload = parseJWT(token) as JWTPayload & Partial<AuthContext>;
     console.log(`Successfully parsed JWT payload from ${source}:`, JSON.stringify(sanitizeJwtPayload(payload), null, 2));
 
     // Validate that we have an Atlassian access token
@@ -224,23 +317,23 @@ function validateAndExtractJwt(token, req, res, source, strictLabel) {
       const now = Math.floor(Date.now() / 1000);
       if (typeof payload.exp === 'number' && payload.exp < now) {
         console.log(`JWT token expired (${strictLabel})`);
-        send401(res, { error: 'Token expired' }, true);
+        send401(res, { error: 'Token expired' }, true, req);
         return { authInfo: null, errored: true };
       }
     }
 
-    return { authInfo: payload, errored: false };
+    return { authInfo: payload as AuthContext, errored: false };
   } catch (err) {
     logger.error(`Error parsing JWT token from ${source}:`, err);
-    send401(res, { error: 'Invalid token' }, true); // Trigger re-auth for invalid tokens
+    send401(res, { error: 'Invalid token' }, true, req); // Trigger re-auth for invalid tokens
     return { authInfo: null, errored: true };
   }
 }
 
-function send401(res, jsonResponse, includeInvalidToken = false) {
+function send401(res: Response, jsonResponse: { error: string }, includeInvalidToken: boolean = false, req: Request | null = null): Response {
   const wwwAuthHeader = includeInvalidToken 
-    ? `Bearer realm="mcp", error="invalid_token", error_description="Token expired - please re-authenticate", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource"`
-    : `Bearer realm="mcp", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource"`;
+    ? createWwwAuthenticate(req!, 'Token expired - please re-authenticate')
+    : createWwwAuthenticate(req!); // No error description for general auth required
     
   return res
       .status(401)
@@ -251,12 +344,12 @@ function send401(res, jsonResponse, includeInvalidToken = false) {
       .json({ error: 'Invalid or missing token' });
 }
 
-function sendMissingAtlassianAccessToken(res, req, where = 'bearer header') {
+function sendMissingAtlassianAccessToken(res: Response, req: Request, where: string = 'bearer header'): Response {
   const message = `Authentication token missing Atlassian access token in ${where}.`;
   console.log(`❌🔑 ${message}`);
   return res
       .status(401)
-      .header('WWW-Authenticate', `Bearer realm="mcp", error="invalid_token", error_description="${message}", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource"`)
+      .header('WWW-Authenticate', createWwwAuthenticate(req, message))
       .header('Cache-Control', 'no-cache, no-store, must-revalidate')
       .header('Pragma', 'no-cache')
       .header('Expires', '0')
@@ -266,11 +359,11 @@ function sendMissingAtlassianAccessToken(res, req, where = 'bearer header') {
           code: -32001,
           message: message,
         },
-        id: req.body.id || null,
+        id: req.body?.id || null,
       });
 }
 
-function sanitizeHeaders(headers) {
+function sanitizeHeaders(headers: Record<string, any>): Record<string, any> {
   const sanitized = { ...headers };
   
   if (sanitized.authorization && sanitized.authorization.startsWith('Bearer ')) {

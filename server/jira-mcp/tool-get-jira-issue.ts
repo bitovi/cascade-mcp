@@ -3,33 +3,43 @@
  */
 
 import { z } from 'zod';
-import { logger } from '../logger.js';
-import { getAuthInfoSafe, handleJiraAuthError, resolveCloudId } from './auth-helpers.js';
+import { logger } from '../observability/logger.ts';
+import { getAuthInfoSafe, handleJiraAuthError } from './auth-helpers.ts';
+import { resolveCloudId } from './atlassian-helpers.ts';
+import { sanitizeObjectWithJWTs } from '../tokens.ts';
+import type { McpServer } from './mcp-types.ts';
 
-/**
- * Helper function to safely log token information without exposing sensitive data
- * @param {string} token - The token to log info about
- * @param {string} [prefix='Token'] - Prefix for the log entry
- * @returns {Object} Safe token info for logging
- */
-function getTokenLogInfo(token, prefix = 'Token') {
-  if (!token) {
-    return { [`${prefix.toLowerCase()}Available`]: false };
-  }
-  
-  return {
-    [`${prefix.toLowerCase()}Available`]: true,
-    [`${prefix.toLowerCase()}Prefix`]: token.substring(0, 20) + '...',
-    [`${prefix.toLowerCase()}Length`]: token.length,
-    [`${prefix.toLowerCase()}LastFour`]: '...' + token.slice(-4),
+// Tool parameters interface
+interface GetJiraIssueParams {
+  issueKey: string;
+  cloudId?: string;
+  siteName?: string;
+  fields?: string;
+}
+
+// Jira issue interfaces (basic structure)
+interface JiraIssue {
+  id: string;
+  key: string;
+  fields: {
+    summary: string;
+    description?: any;
+    status: {
+      name: string;
+    };
+    attachment?: any[];
+    comment?: {
+      total: number;
+    };
+    [key: string]: any;
   };
 }
 
 /**
  * Register the get-jira-issue tool with the MCP server
- * @param {McpServer} mcp - MCP server instance
+ * @param mcp - MCP server instance
  */
-export function registerGetJiraIssueTool(mcp) {
+export function registerGetJiraIssueTool(mcp: McpServer): void {
   mcp.registerTool(
     'get-jira-issue',
     {
@@ -42,7 +52,7 @@ export function registerGetJiraIssueTool(mcp) {
         fields: z.string().optional().describe('Comma-separated list of fields to return. If not specified, returns all fields.'),
       },
     },
-    async ({ issueKey, cloudId, siteName, fields }, context) => {
+    async ({ issueKey, cloudId, siteName, fields }: GetJiraIssueParams, context) => {
       logger.info('get-jira-issue called', { 
         issueKey, 
         cloudId, 
@@ -66,22 +76,22 @@ export function registerGetJiraIssueTool(mcp) {
         };
       }
 
-      logger.info('Found valid auth token for issue fetch', {
-        ...getTokenLogInfo(token, 'atlassianToken'),
+      logger.info('Found valid auth token for issue fetch', sanitizeObjectWithJWTs({
+        atlassianToken: token,
         hasRefreshToken: !!authInfo.refresh_token,
         scope: authInfo.scope,
         issuer: authInfo.iss,
         audience: authInfo.aud,
         operation: 'get-jira-issue',
         issueKey,
-      });
+      }));
 
       try {
         // Resolve the target cloud ID using the utility function
         let siteInfo;
         try {
           siteInfo = await resolveCloudId(token, cloudId, siteName);
-        } catch (error) {
+        } catch (error: any) {
           logger.error('Failed to resolve cloud ID:', error);
           return { 
             content: [{ 
@@ -102,16 +112,16 @@ export function registerGetJiraIssueTool(mcp) {
           issueUrl += `?${params.toString()}`;
         }
 
-        logger.info('Making Jira API request for issue details', { 
+        logger.info('Making Jira API request for issue details', sanitizeObjectWithJWTs({ 
           issueKey, 
           cloudId: targetCloudId,
           fetchUrl: issueUrl,
-          ...getTokenLogInfo(token, 'requestToken'),
+          requestToken: token,
           headers: {
-            'Authorization': `Bearer ${token.substring(0, 20)}...`,
+            'Authorization': `Bearer ${token}`,
             'Accept': 'application/json'
           }
-        });
+        }));
 
         // Get issue details using direct fetch API
         const issueRes = await fetch(issueUrl, {
@@ -139,7 +149,7 @@ export function registerGetJiraIssueTool(mcp) {
 
         handleJiraAuthError(issueRes, `Fetch issue ${issueKey}`);
 
-        const issue = await issueRes.json();
+        const issue = await issueRes.json() as JiraIssue;
 
         logger.info('Issue fetched successfully', {
           issueKey: issue.key,
@@ -161,7 +171,7 @@ export function registerGetJiraIssueTool(mcp) {
           ],
         };
 
-      } catch (err) {
+      } catch (err: any) {
         logger.error('Error fetching Jira issue:', err);
         return { 
           content: [{ 

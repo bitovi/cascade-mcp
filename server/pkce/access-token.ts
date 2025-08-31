@@ -1,0 +1,173 @@
+/**
+ * OAuth 2.0 Token Exchange Endpoint
+ * 
+ * This module implements the OAuth 2.0 token endpoint that handles token exchange
+ * for both authorization code and refresh token grant types. It coordinates with
+ * Atlassian's token endpoint and creates JWT tokens for MCP clients.
+ * 
+ * Specifications Implemented:
+ * - RFC 6749 Section 3.2 - Token Endpoint (POST /access-token)
+ * - RFC 6749 Section 4.1.3 - Access Token Request (authorization_code grant)
+ * - RFC 6749 Section 6 - Refreshing an Access Token (refresh_token grant)
+ * - RFC 7636 - PKCE verification with code_verifier parameter
+ * - RFC 6750 - OAuth 2.0 Bearer Token Usage (error responses)
+ * 
+ * Key Responsibilities:
+ * - Handle authorization_code grant type with PKCE verification
+ * - Handle refresh_token grant type by delegating to refresh module
+ * - Exchange authorization codes with Atlassian for access tokens
+ * - Create JWT access tokens embedding Atlassian credentials
+ * - Create JWT refresh tokens for token rotation
+ * - Return OAuth-compliant token responses with proper expiration
+ * 
+ * OAuth Flow Step: 5. Token Exchange
+ * MCP clients call this endpoint to exchange authorization codes for access tokens.
+ */
+
+import { Request, Response } from 'express';
+import { 
+  sanitizeObjectWithJWTs,
+} from '../tokens.ts';
+import { 
+  createJiraMCPAuthToken,
+  createJiraMCPRefreshToken,
+} from './token-helpers.ts';
+import { refreshToken } from './refresh-token.ts';
+import { 
+  exchangeCodeForAtlassianTokens,
+  getAtlassianConfig,
+  type AtlassianTokenResponse 
+} from '../atlassian-auth-code-flow.ts';
+import type { 
+  OAuthHandler, 
+  OAuthRequest, 
+  AuthorizationCodeGrantParams, 
+  RefreshTokenGrantParams,
+  OAuthErrorResponse 
+} from './types.ts';
+
+/**
+ * Send error response with proper typing
+ */
+function sendErrorResponse(res: Response, error: string, description: string, statusCode = 400): void {
+  const errorResponse: OAuthErrorResponse = {
+    error,
+    error_description: description,
+  };
+  res.status(statusCode).json(errorResponse);
+}
+
+/**
+ * Internal function to handle authorization code grant
+ */
+async function handleAuthorizationCodeGrant(
+  req: Request, 
+  res: Response, 
+  params: Partial<AuthorizationCodeGrantParams>
+): Promise<void> {
+  const { code, client_id, code_verifier, resource } = params;
+
+  if (!code) {
+    sendErrorResponse(res, 'invalid_request', 'Missing authorization code');
+    return;
+  }
+
+  if (!code_verifier) {
+    sendErrorResponse(res, 'invalid_request', 'Missing code_verifier for PKCE');
+    return;
+  }
+
+  // Exchange the authorization code for Atlassian tokens
+  let tokenData: AtlassianTokenResponse;
+  try {
+    tokenData = await exchangeCodeForAtlassianTokens({ 
+      code, 
+      codeVerifier: code_verifier 
+    });
+    
+    console.log('  🔑 Atlassian token exchange successful:', sanitizeObjectWithJWTs(tokenData));
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Atlassian token exchange failed:', errorMessage);
+    sendErrorResponse(res, 'invalid_grant', 'Authorization code is invalid or expired');
+    return;
+  }
+
+  // Create JWT access token with embedded Atlassian token
+  const jwt = await createJiraMCPAuthToken(tokenData, {
+    resource: resource || process.env.VITE_AUTH_SERVER_URL
+  });
+
+  // Create refresh token
+  const { refreshToken } = await createJiraMCPRefreshToken(tokenData, {
+    resource: resource || process.env.VITE_AUTH_SERVER_URL
+  });
+
+  // Return OAuth-compliant response with actual JWT expiration time
+  const jwtExpiresIn = Math.max(60, (tokenData.expires_in || 3600) - 60);
+  res.json({
+    access_token: jwt,
+    token_type: 'Bearer',
+    expires_in: jwtExpiresIn,
+    refresh_token: refreshToken,
+    scope: getAtlassianConfig().scopes,
+  });
+}
+
+/**
+ * Internal function to handle refresh token grant
+ */
+async function handleRefreshTokenGrant(
+  req: Request,
+  res: Response,
+  params: Partial<RefreshTokenGrantParams>
+): Promise<void> {
+  const { refresh_token, client_id, resource } = params;
+  
+  console.log('🔄 REFRESH TOKEN FLOW - Routing refresh token request from /access-token to refresh handler');
+  
+  // Reconstruct the request object for the refresh token handler
+  const refreshReq = {
+    ...req,
+    body: {
+      grant_type: 'refresh_token',
+      refresh_token,
+      client_id,
+      scope: req.body.scope,
+    },
+  } as OAuthRequest;
+
+  // Import and call the refresh token handler
+  await refreshToken(refreshReq, res);
+}
+
+/**
+ * Token Exchange Endpoint
+ * Exchanges authorization code for access tokens
+ */
+export const accessToken: OAuthHandler = async (req: Request, res: Response): Promise<void> => {
+  console.log('↔️ OAuth token exchange request:', {
+    body: sanitizeObjectWithJWTs(req.body),
+    contentType: req.headers['content-type'],
+  });
+
+  try {
+    const { grant_type, code, client_id, code_verifier, resource, refresh_token } = req.body;
+
+    // Handle different grant types
+    if (grant_type === 'authorization_code') {
+      await handleAuthorizationCodeGrant(req, res, { code, client_id, code_verifier, resource });
+    } else if (grant_type === 'refresh_token') {
+      await handleRefreshTokenGrant(req, res, { refresh_token, client_id, resource });
+    } else {
+      sendErrorResponse(res, 'unsupported_grant_type', 'Only authorization_code and refresh_token grant types are supported');
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('OAuth token error:', errorMessage);
+    res.status(500).json({
+      error: 'server_error',
+      error_description: 'Internal server error during token exchange',
+    });
+  }
+};

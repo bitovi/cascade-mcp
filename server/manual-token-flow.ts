@@ -16,16 +16,34 @@
  */
 
 import crypto from 'crypto';
-import { generateCodeVerifier, generateCodeChallenge } from './tokens.js';
-import { createAtlassianAuthUrl, getAtlassianConfig, exchangeCodeForAtlassianTokens } from './atlassian-auth-code-flow.js';
-import { jwtSign } from './tokens.js';
+import { Request, Response } from 'express';
+import { generateCodeVerifier, generateCodeChallenge } from './tokens.ts';
+import { createAtlassianAuthUrl, getAtlassianConfig, exchangeCodeForAtlassianTokens } from './atlassian-auth-code-flow.ts';
+import { jwtSign } from './tokens.ts';
 import { randomUUID } from 'crypto';
+
+// Extend Express session interface for manual flow data
+declare module 'express-session' {
+  interface SessionData {
+    manualFlow?: {
+      codeVerifier: string;
+      state: string;
+      isManualFlow: boolean;
+    };
+  }
+}
+
+// Manual flow callback parameters interface
+interface ManualFlowCallbackParams {
+  code: string;
+  normalizedState: string;
+}
 
 /**
  * Renders the initial manual token retrieval page
  * Generates PKCE parameters and shows authorization button
  */
-export function renderManualTokenPage(req, res) {
+export function renderManualTokenPage(req: Request, res: Response): void {
   // Generate PKCE parameters
   const codeVerifier = generateCodeVerifier();
   const codeChallenge = generateCodeChallenge(codeVerifier);
@@ -54,18 +72,29 @@ export function renderManualTokenPage(req, res) {
  * Handles the OAuth callback for manual token flow
  * Exchanges authorization code for tokens and displays result
  */
-export async function handleManualFlowCallback(req, res, { code, normalizedState }) {
+export async function handleManualFlowCallback(req: Request, res: Response, params?: ManualFlowCallbackParams): Promise<Response> {
   console.log('Processing manual flow callback');
   
+  // If params not provided, extract from request
+  let code: string;
+  let normalizedState: string;
+  
+  if (params) {
+    ({ code, normalizedState } = params);
+  } else {
+    code = req.query.code as string;
+    normalizedState = req.query.state as string;
+  }
+  
   // State validation for manual flow
-  const manualStateMatches = normalizedState === req.session.manualFlow.state;
+  const manualStateMatches = normalizedState === req.session.manualFlow?.state;
   
   if (!code || !manualStateMatches) {
     console.error('Manual flow validation failed:', {
       hasCode: !!code,
       stateMatch: manualStateMatches,
       receivedState: normalizedState,
-      expectedState: req.session.manualFlow.state,
+      expectedState: req.session.manualFlow?.state,
     });
     
     // Clear session data
@@ -77,7 +106,7 @@ export async function handleManualFlowCallback(req, res, { code, normalizedState
   try {
     const tokenData = await exchangeCodeForAtlassianTokens({ 
       code, 
-      codeVerifier: req.session.manualFlow.codeVerifier 
+      codeVerifier: req.session.manualFlow!.codeVerifier 
     });
 
     // Get config for creating JWT
@@ -117,7 +146,7 @@ export async function handleManualFlowCallback(req, res, { code, normalizedState
     return res.send(generateSuccessPageHtml(jwt, refreshToken));
     
   } catch (error) {
-    console.error('Manual flow token exchange failed:', error.message);
+    console.error('Manual flow token exchange failed:', (error as Error).message);
     
     // Clear manual flow session data
     delete req.session.manualFlow;
@@ -136,8 +165,8 @@ export async function handleManualFlowCallback(req, res, { code, normalizedState
 /**
  * Checks if the current session is a manual flow
  */
-export function isManualFlow(req) {
-  return req.session.manualFlow && req.session.manualFlow.isManualFlow;
+export function isManualFlow(req: Request): boolean {
+  return !!req.session.manualFlow?.isManualFlow;
 }
 
 // === HTML Generation Functions ===
@@ -145,7 +174,7 @@ export function isManualFlow(req) {
 /**
  * Generates the initial page HTML with authorization button
  */
-function generateInitialPageHtml(authUrl) {
+function generateInitialPageHtml(authUrl: string): string {
   return `
     <!DOCTYPE html>
     <html>
@@ -217,7 +246,7 @@ function generateInitialPageHtml(authUrl) {
 /**
  * Generates the success page HTML with the access token and refresh token
  */
-function generateSuccessPageHtml(jwt, refreshToken = null) {
+function generateSuccessPageHtml(jwt: string, refreshToken: string | null = null): string {
   return `
     <!DOCTYPE html>
     <html>
@@ -333,7 +362,7 @@ function generateSuccessPageHtml(jwt, refreshToken = null) {
 /**
  * Generates the error page HTML
  */
-function generateErrorPageHtml(errorMessage, possibleCauses = []) {
+function generateErrorPageHtml(errorMessage: string, possibleCauses: string[] = []): string {
   const causesHtml = possibleCauses.length > 0 
     ? `<br><br>This could be due to:<ul>${possibleCauses.map(cause => `<li>${cause}</li>`).join('')}</ul>`
     : '';
@@ -372,7 +401,7 @@ function generateErrorPageHtml(errorMessage, possibleCauses = []) {
 /**
  * Common CSS styles used across all pages
  */
-function getCommonStyles() {
+function getCommonStyles(): string {
   return `
     body { 
       font-family: Arial, sans-serif; 

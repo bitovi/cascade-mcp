@@ -2,14 +2,16 @@
  * Get Accessible Jira Sites Tool
  */
 
-import { logger } from '../logger.js';
-import { getAuthInfoSafe, handleJiraAuthError } from './auth-helpers.js';
+import { logger } from '../observability/logger.ts';
+import { getAuthInfoSafe, handleJiraAuthError } from './auth-helpers.ts';
+import type { AtlassianSite } from './atlassian-helpers.ts';
+import type { McpServer } from './mcp-types.ts';
 
 /**
  * Register the get-accessible-sites tool with the MCP server
- * @param {McpServer} mcp - MCP server instance
+ * @param mcp - MCP server instance
  */
-export function registerGetAccessibleSitesTool(mcp) {
+export function registerGetAccessibleSitesTool(mcp: McpServer): void {
   mcp.registerTool(
     'get-accessible-sites',
     {
@@ -43,7 +45,7 @@ export function registerGetAccessibleSitesTool(mcp) {
 
         handleJiraAuthError(response, 'Fetch accessible sites');
 
-        const sites = await response.json();
+        const sites = await response.json() as AtlassianSite[];
 
         if (!sites.length) {
           return { content: [{ type: 'text', text: 'No accessible Jira sites found.' }] };
@@ -59,7 +61,7 @@ export function registerGetAccessibleSitesTool(mcp) {
             },
           ],
         };
-      } catch (err) {
+      } catch (err: any) {
         logger.error('Error fetching accessible sites:', err);
         return { content: [{ type: 'text', text: `Error fetching accessible sites: ${err.message}` }] };
       }

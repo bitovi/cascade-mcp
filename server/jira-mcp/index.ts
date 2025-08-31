@@ -6,16 +6,17 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { logger } from '../logger.js';
+import { logger } from '../observability/logger.ts';
 
-// Import auth helpers
-import { setAuthContext, clearAuthContext, getAuthContext } from './auth-helpers.js';
+// Import auth helpers and types
+import { setAuthContext, clearAuthContext, getAuthContext } from './auth-helpers.ts';
+import type { AuthContext } from './auth-context-store.ts';
 
 // Import tool registration functions
-import { registerUpdateIssueDescriptionTool } from './tool-update-issue-description.js';
-import { registerGetAccessibleSitesTool } from './tool-get-accessible-sites.js';
-import { registerGetJiraIssueTool } from './tool-get-jira-issue.js';
-import { registerGetJiraAttachmentsTool } from './tool-get-jira-attachments.js';
+import { registerUpdateIssueDescriptionTool } from './tool-update-issue-description.ts';
+import { registerGetAccessibleSitesTool } from './tool-get-accessible-sites.ts';
+import { registerGetJiraIssueTool } from './tool-get-jira-issue.ts';
+import { registerGetJiraAttachmentsTool } from './tool-get-jira-attachments.ts';
 
 // Create MCP server instance
 const mcp = new McpServer(
@@ -42,3 +43,4 @@ logger.info('All MCP tools registered successfully');
 
 // Export the MCP server instance and auth functions for use in server.js
 export { mcp, setAuthContext, clearAuthContext, getAuthContext };
+export type { AuthContext };

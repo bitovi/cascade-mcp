@@ -1,26 +1,27 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
+    "target": "ES2022",
     "module": "ESNext",
-    "lib": ["ESNext", "DOM", "DOM.Iterable"],
-    "jsx": "react",
+    "lib": ["ESNext"],
     "outDir": "./dist",
-    "rootDir": "./src",
+    "rootDir": "./",
     "strict": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "downlevelIteration": true,
     "allowJs": true,
     "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
     "paths": {
       "undici-types": ["./node_modules/undici/types"]
     },
-    "sourceMap": false,
-    "types": ["vitest/globals", "@testing-library/jest-dom"]
+    "sourceMap": true,
+    "types": ["node"]
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
-  "exclude": ["node_modules", "**/*.js", "**/*.test.ts"]
+  "include": ["server/**/*", "specs/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.test.js"]
 }
