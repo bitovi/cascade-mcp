@@ -288,7 +288,16 @@ export async function callback(req, res) {
 
 /**
  * OAuth token endpoint for MCP clients (POST)
- * Handles the token exchange for authorization code grant type
+ * Handles token exchange for both authorization_code and refresh_token grant types
+ * 
+ * Per RFC 6749 Section 3.2, the token endpoint is used by the client to obtain an access token
+ * by presenting its authorization grant or refresh token. This implementation supports:
+ * - authorization_code grant (RFC 6749 Section 4.1.3)
+ * - refresh_token grant (RFC 6749 Section 6)
+ * 
+ * @see https://tools.ietf.org/html/rfc6749#section-3.2
+ * @see https://tools.ietf.org/html/rfc6749#section-4.1.3
+ * @see https://tools.ietf.org/html/rfc6749#section-6
  */
 export async function accessToken(req, res) {
   console.log('↔️ OAuth token exchange request:', {
@@ -297,73 +306,105 @@ export async function accessToken(req, res) {
   });
 
   try {
-    const { grant_type, code, client_id, code_verifier, resource } = req.body;
+    const { grant_type, code, client_id, code_verifier, resource, refresh_token } = req.body;
 
-    if (grant_type !== 'authorization_code') {
+    // Handle different grant types
+    if (grant_type === 'authorization_code') {
+      return await handleAuthorizationCodeGrant(req, res, { code, client_id, code_verifier, resource });
+    } else if (grant_type === 'refresh_token') {
+      return await handleRefreshTokenGrant(req, res, { refresh_token, client_id, resource });
+    } else {
       return res.status(400).json({
         error: 'unsupported_grant_type',
-        error_description: 'Only authorization_code grant type is supported',
+        error_description: 'Only authorization_code and refresh_token grant types are supported',
       });
     }
-
-    if (!code) {
-      return res.status(400).json({
-        error: 'invalid_request',
-        error_description: 'Missing authorization code',
-      });
-    }
-
-    if (!code_verifier) {
-      return res.status(400).json({
-        error: 'invalid_request',
-        error_description: 'Missing code_verifier for PKCE',
-      });
-    }
-
-    // Exchange the authorization code for Atlassian tokens
-    let tokenData;
-    try {
-      tokenData = await exchangeCodeForAtlassianTokens({ 
-        code, 
-        codeVerifier: code_verifier 
-      });
-      
-      console.log('  🔑 Atlassian token exchange successful:', sanitizeObjectWithJWTs(tokenData));
-    } catch (error) {
-      console.error('Atlassian token exchange failed:', error.message);
-      return res.status(400).json({
-        error: 'invalid_grant',
-        error_description: 'Authorization code is invalid or expired',
-      });
-    }
-
-    // Create JWT access token with embedded Atlassian token
-    const jwt = await createJiraMCPAuthToken(tokenData, {
-      resource: resource || process.env.VITE_AUTH_SERVER_URL
-    });
-
-    // Create refresh token
-    const { refreshToken } = await createJiraMCPRefreshToken(tokenData, {
-      resource: resource || process.env.VITE_AUTH_SERVER_URL
-    });
-
-
-    // Return OAuth-compliant response with actual JWT expiration time
-    const jwtExpiresIn = Math.max(60, (tokenData.expires_in || 3600) - 60);
-    return res.json({
-      access_token: jwt,
-      token_type: 'Bearer',
-      expires_in: jwtExpiresIn,
-      refresh_token: refreshToken,
-      scope: getAtlassianConfig().scopes,
-    });
   } catch (error) {
-    console.error('  OAuth token exchange error:', error);
+    console.error('OAuth token error:', error);
     res.status(500).json({
       error: 'server_error',
       error_description: 'Internal server error during token exchange',
     });
   }
+}
+
+/**
+ * Handle authorization code grant type
+ */
+async function handleAuthorizationCodeGrant(req, res, { code, client_id, code_verifier, resource }) {
+  if (!code) {
+    return res.status(400).json({
+      error: 'invalid_request',
+      error_description: 'Missing authorization code',
+    });
+  }
+
+  if (!code_verifier) {
+    return res.status(400).json({
+      error: 'invalid_request',
+      error_description: 'Missing code_verifier for PKCE',
+    });
+  }
+
+  // Exchange the authorization code for Atlassian tokens
+  let tokenData;
+  try {
+    tokenData = await exchangeCodeForAtlassianTokens({ 
+      code, 
+      codeVerifier: code_verifier 
+    });
+    
+    console.log('  🔑 Atlassian token exchange successful:', sanitizeObjectWithJWTs(tokenData));
+  } catch (error) {
+    console.error('Atlassian token exchange failed:', error.message);
+    return res.status(400).json({
+      error: 'invalid_grant',
+      error_description: 'Authorization code is invalid or expired',
+    });
+  }
+
+  // Create JWT access token with embedded Atlassian token
+  const jwt = await createJiraMCPAuthToken(tokenData, {
+    resource: resource || process.env.VITE_AUTH_SERVER_URL
+  });
+
+  // Create refresh token
+  const { refreshToken } = await createJiraMCPRefreshToken(tokenData, {
+    resource: resource || process.env.VITE_AUTH_SERVER_URL
+  });
+
+  // Return OAuth-compliant response with actual JWT expiration time
+  const jwtExpiresIn = Math.max(60, (tokenData.expires_in || 3600) - 60);
+  return res.json({
+    access_token: jwt,
+    token_type: 'Bearer',
+    expires_in: jwtExpiresIn,
+    refresh_token: refreshToken,
+    scope: getAtlassianConfig().scopes,
+  });
+}
+
+/**
+ * Handle refresh token grant type by calling the existing refresh token logic
+ */
+async function handleRefreshTokenGrant(req, res, { refresh_token, client_id, resource }) {
+  console.log('🔄 REFRESH TOKEN FLOW - Routing refresh token request from /access-token to refresh handler');
+  
+  // Reconstruct the request object for the refresh token handler
+  // We need to preserve the original request structure but modify the body
+  const refreshReq = {
+    ...req,
+    body: {
+      grant_type: 'refresh_token',
+      refresh_token,
+      client_id,
+      scope: req.body.scope
+    },
+    headers: req.headers || {} // Ensure headers exist
+  };
+  
+  // Call the existing refresh token logic
+  return await refreshToken(refreshReq, res);
 }
 
 /**
@@ -378,8 +419,19 @@ export async function refreshToken(req, res) {
 
   try {
     const { grant_type, refresh_token, client_id, scope } = req.body;
+    
+    console.log('🔄 REFRESH TOKEN FLOW - Starting validation:', {
+      grant_type,
+      has_refresh_token: !!refresh_token,
+      refresh_token_length: refresh_token?.length,
+      refresh_token_prefix: refresh_token ? refresh_token.substring(0, 20) + '...' : 'none',
+      client_id,
+      scope,
+      request_headers: Object.keys(req.headers),
+    });
 
     if (grant_type !== 'refresh_token') {
+      console.log('🔄 REFRESH TOKEN FLOW - ERROR: Unsupported grant type:', grant_type);
       return res.status(400).json({
         error: 'unsupported_grant_type',
         error_description: 'Only refresh_token grant type is supported',
@@ -387,6 +439,7 @@ export async function refreshToken(req, res) {
     }
 
     if (!refresh_token) {
+      console.log('🔄 REFRESH TOKEN FLOW - ERROR: Missing refresh token in request body');
       return res.status(400).json({
         error: 'invalid_request',
         error_description: 'Missing refresh_token',
@@ -395,10 +448,29 @@ export async function refreshToken(req, res) {
 
     // Verify and decode the refresh token
     let refreshPayload;
+    console.log('🔄 REFRESH TOKEN FLOW - Attempting to verify JWT refresh token');
     try {
       refreshPayload = await jwtVerify(refresh_token);
+      console.log('🔄 REFRESH TOKEN FLOW - JWT verification successful:', {
+        type: refreshPayload.type,
+        sub: refreshPayload.sub,
+        exp: refreshPayload.exp,
+        iss: refreshPayload.iss,
+        aud: refreshPayload.aud,
+        scope: refreshPayload.scope,
+        has_atlassian_refresh_token: !!refreshPayload.atlassian_refresh_token,
+        atlassian_refresh_token_length: refreshPayload.atlassian_refresh_token?.length,
+        atlassian_refresh_token_prefix: refreshPayload.atlassian_refresh_token ? 
+          refreshPayload.atlassian_refresh_token.substring(0, 20) + '...' : 'none',
+        payload_keys: Object.keys(refreshPayload),
+      });
     } catch (error) {
-      console.error('Invalid refresh token:', error.message);
+      console.error('🔄 REFRESH TOKEN FLOW - ERROR: JWT verification failed:', {
+        error_name: error.constructor.name,
+        error_message: error.message,
+        error_stack: error.stack,
+        refresh_token_sample: refresh_token ? refresh_token.substring(0, 50) + '...' : 'none',
+      });
       return res.status(400).json({
         error: 'invalid_grant',
         error_description: 'Invalid or expired refresh token',
@@ -406,7 +478,17 @@ export async function refreshToken(req, res) {
     }
 
     // Validate it's actually a refresh token
+    console.log('🔄 REFRESH TOKEN FLOW - Validating token type:', {
+      expected_type: 'refresh_token',
+      actual_type: refreshPayload.type,
+      type_match: refreshPayload.type === 'refresh_token',
+    });
+    
     if (refreshPayload.type !== 'refresh_token') {
+      console.log('🔄 REFRESH TOKEN FLOW - ERROR: Token is not a refresh token:', {
+        type: refreshPayload.type,
+        expected: 'refresh_token',
+      });
       return res.status(400).json({
         error: 'invalid_grant',
         error_description: 'Token is not a refresh token',
@@ -415,7 +497,17 @@ export async function refreshToken(req, res) {
 
     // Check if refresh token is expired
     const now = Math.floor(Date.now() / 1000);
+    const timeUntilExp = refreshPayload.exp ? refreshPayload.exp - now : null;
+    console.log('🔄 REFRESH TOKEN FLOW - Checking expiration:', {
+      current_timestamp: now,
+      token_exp: refreshPayload.exp,
+      time_until_expiration_seconds: timeUntilExp,
+      time_until_expiration_minutes: timeUntilExp ? Math.round(timeUntilExp / 60) : null,
+      is_expired: refreshPayload.exp && now >= refreshPayload.exp,
+    });
+    
     if (refreshPayload.exp && now >= refreshPayload.exp) {
+      console.log('🔄 REFRESH TOKEN FLOW - ERROR: Refresh token has expired');
       return res.status(400).json({
         error: 'invalid_grant',
         error_description: 'Refresh token has expired',
@@ -426,27 +518,78 @@ export async function refreshToken(req, res) {
     let newAtlassianTokens;
     try {
       const ATLASSIAN_CONFIG = getAtlassianConfig();
+      console.log('🔄 REFRESH TOKEN FLOW - Making request to Atlassian token endpoint:', {
+        atlassian_token_url: ATLASSIAN_CONFIG.tokenUrl,
+        atlassian_client_id: ATLASSIAN_CONFIG.clientId,
+        has_client_secret: !!ATLASSIAN_CONFIG.clientSecret,
+        client_secret_length: ATLASSIAN_CONFIG.clientSecret?.length,
+        atlassian_refresh_token_length: refreshPayload.atlassian_refresh_token?.length,
+        atlassian_refresh_token_prefix: refreshPayload.atlassian_refresh_token ? 
+          refreshPayload.atlassian_refresh_token.substring(0, 20) + '...' : 'none',
+      });
+      
+      const atlassianRequestBody = {
+        grant_type: 'refresh_token',
+        client_id: ATLASSIAN_CONFIG.clientId,
+        client_secret: ATLASSIAN_CONFIG.clientSecret,
+        refresh_token: refreshPayload.atlassian_refresh_token,
+      };
+      
+      console.log('🔄 REFRESH TOKEN FLOW - Atlassian request body:', {
+        grant_type: atlassianRequestBody.grant_type,
+        client_id: atlassianRequestBody.client_id,
+        has_client_secret: !!atlassianRequestBody.client_secret,
+        has_refresh_token: !!atlassianRequestBody.refresh_token,
+        refresh_token_sample: atlassianRequestBody.refresh_token ? 
+          atlassianRequestBody.refresh_token.substring(0, 30) + '...' : 'none',
+      });
+      
       console.log('  Using Atlassian refresh token to get new access token');
       const tokenRes = await fetch(ATLASSIAN_CONFIG.tokenUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          grant_type: 'refresh_token',
-          client_id: ATLASSIAN_CONFIG.clientId,
-          client_secret: ATLASSIAN_CONFIG.clientSecret,
-          refresh_token: refreshPayload.atlassian_refresh_token,
-        }),
+        body: JSON.stringify(atlassianRequestBody),
+      });
+
+      console.log('🔄 REFRESH TOKEN FLOW - Atlassian response received:', {
+        status: tokenRes.status,
+        status_text: tokenRes.statusText,
+        ok: tokenRes.ok,
+        headers: Object.fromEntries(tokenRes.headers.entries()),
       });
 
       newAtlassianTokens = await tokenRes.json();
       
+      console.log('🔄 REFRESH TOKEN FLOW - Atlassian response body:', {
+        has_access_token: !!newAtlassianTokens.access_token,
+        has_refresh_token: !!newAtlassianTokens.refresh_token,
+        expires_in: newAtlassianTokens.expires_in,
+        token_type: newAtlassianTokens.token_type,
+        scope: newAtlassianTokens.scope,
+        error: newAtlassianTokens.error,
+        error_description: newAtlassianTokens.error_description,
+        response_keys: Object.keys(newAtlassianTokens),
+      });
+      
       if (!newAtlassianTokens.access_token) {
-        throw new Error(`Atlassian refresh failed: ${JSON.stringify(newAtlassianTokens)}`);
+        const errorDetails = {
+          atlassian_error: newAtlassianTokens.error,
+          atlassian_error_description: newAtlassianTokens.error_description,
+          full_response: newAtlassianTokens,
+          http_status: tokenRes.status,
+        };
+        console.error('🔄 REFRESH TOKEN FLOW - ERROR: No access token in Atlassian response:', errorDetails);
+        throw new Error(`Atlassian refresh failed: ${JSON.stringify(errorDetails)}`);
       }
       
       console.log('  🔑 Atlassian refresh token exchange successful:', sanitizeObjectWithJWTs(newAtlassianTokens));
     } catch (error) {
-      console.error('  Atlassian refresh token exchange failed:', error.message);
+      console.error('🔄 REFRESH TOKEN FLOW - ERROR: Atlassian refresh token exchange failed:', {
+        error_name: error.constructor.name,
+        error_message: error.message,
+        error_stack: error.stack,
+        is_fetch_error: error.name === 'FetchError' || error.code === 'FETCH_ERROR',
+      });
       return res.status(400).json({
         error: 'invalid_grant',
         error_description: 'Failed to refresh Atlassian access token',
@@ -454,35 +597,59 @@ export async function refreshToken(req, res) {
     }
 
     // Create new access token with new Atlassian tokens
+    console.log('🔄 REFRESH TOKEN FLOW - Creating new JWT access token');
     const newAccessToken = await createJiraMCPAuthToken(newAtlassianTokens, {
       resource: refreshPayload.aud,
       scope: refreshPayload.scope,
       sub: refreshPayload.sub,
       iss: refreshPayload.iss
     });
+    console.log('🔄 REFRESH TOKEN FLOW - New JWT access token created:', {
+      token_length: newAccessToken?.length,
+      token_prefix: newAccessToken ? newAccessToken.substring(0, 20) + '...' : 'none',
+    });
 
     // Create new refresh token (Atlassian always provides a new rotating refresh token)
+    console.log('🔄 REFRESH TOKEN FLOW - Creating new JWT refresh token');
     const { refreshToken: newRefreshToken } = await createJiraMCPRefreshToken(newAtlassianTokens, {
       resource: refreshPayload.aud,
       scope: refreshPayload.scope,
       sub: refreshPayload.sub,
       iss: refreshPayload.iss
     });
+    console.log('🔄 REFRESH TOKEN FLOW - New JWT refresh token created:', {
+      token_length: newRefreshToken?.length,
+      token_prefix: newRefreshToken ? newRefreshToken.substring(0, 20) + '...' : 'none',
+    });
 
-    console.log('OAuth refresh token exchange successful for client:', client_id);
+    console.log('🔄 REFRESH TOKEN FLOW - SUCCESS: OAuth refresh token exchange successful for client:', client_id);
 
     // Return new tokens
     const jwtExpiresIn = Math.max(60, (newAtlassianTokens.expires_in || 3600) - 60);
-    return res.json({
+    const responsePayload = {
       access_token: newAccessToken,
       token_type: 'Bearer',
       expires_in: jwtExpiresIn,
       refresh_token: newRefreshToken,
       scope: refreshPayload.scope,
+    };
+    
+    console.log('🔄 REFRESH TOKEN FLOW - Final response:', {
+      has_access_token: !!responsePayload.access_token,
+      has_refresh_token: !!responsePayload.refresh_token,
+      expires_in: responsePayload.expires_in,
+      token_type: responsePayload.token_type,
+      scope: responsePayload.scope,
     });
+    
+    return res.json(responsePayload);
 
   } catch (error) {
-    console.error('OAuth refresh token error:', error);
+    console.error('🔄 REFRESH TOKEN FLOW - FATAL ERROR: Unexpected error during refresh flow:', {
+      error_name: error.constructor.name,
+      error_message: error.message,
+      error_stack: error.stack,
+    });
     res.status(500).json({
       error: 'server_error',
       error_description: 'Internal server error during token refresh',

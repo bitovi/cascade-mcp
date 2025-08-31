@@ -114,8 +114,7 @@ export async function handleMcpPost(req, res) {
     if (error instanceof InvalidTokenError) {
       console.log('MCP OAuth authentication expired - sending proper OAuth 401 response');
       
-      // Send proper OAuth 401 response with WWW-Authenticate header according to RFC 6750
-      const wwwAuthValue = `Bearer realm="mcp", error="invalid_token", error_description="${error.message}", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource"`;
+      const wwwAuthValue = createWwwAuthenticate(req, error.message);
       
       res.set('WWW-Authenticate', wwwAuthValue);
       res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -138,10 +137,13 @@ export async function handleSessionRequest(req, res) {
   console.log('=== MCP SESSION REQUEST ===');
   console.log(req.method);
   
+  let authInfo = null;
+  
   // For GET requests (SSE streams), validate authentication first
   if (req.method === 'GET') {
     // Extract and validate auth info
-    let { authInfo, errored } = await getAuthInfoFromBearer(req, res);
+    let errored;
+    ({ authInfo, errored } = await getAuthInfoFromBearer(req, res));
     if (errored) { return; }
 
     if (!authInfo) {
@@ -154,7 +156,7 @@ export async function handleSessionRequest(req, res) {
       console.log('No valid auth found for GET request - triggering re-authentication');
       return res
         .status(401)
-        .header('WWW-Authenticate', `Bearer realm="mcp", error="invalid_token", error_description="Authentication required", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource"`)
+        .header('WWW-Authenticate', createWwwAuthenticate(req, 'Authentication required'))
         .header('Cache-Control', 'no-cache, no-store, must-revalidate')
         .header('Pragma', 'no-cache')
         .header('Expires', '0')
@@ -172,11 +174,92 @@ export async function handleSessionRequest(req, res) {
     return;
   }
 
+  // Update session context store with auth info from GET request
+  // This is crucial for refreshed tokens - the client sends new JWT via GET request
+  // and we need to update the session store so tool calls can access the auth context
+  // 
+  // Why we update here instead of during refresh flow:
+  // 1. Refresh flow happens at /access-token endpoint without session context
+  // 2. Periodic cleanup removes expired sessions before refresh can complete
+  // 3. This defensive approach catches any case where session exists but context is missing
+  // 4. Handles edge cases gracefully without interfering with cleanup logic
+  if (authInfo && sessionId) {
+    console.log(`🔄 Updating session context store for session ${sessionId} with refreshed auth info`);
+    setAuthContext(sessionId, authInfo);
+  }
+
   const transport = transports[sessionId];
   await transport.handleRequest(req, res);
 }
 
 // === Helper Functions ===
+
+/**
+ * Detect if the client is VS Code based on User-Agent and MCP client info
+ * 
+ * @param {Object} req - Express request object
+ * @returns {boolean} True if client is VS Code
+ */
+function isVSCodeClient(req) {
+  // Check User-Agent header - VS Code sends "node"
+  const userAgent = req.headers['user-agent'];
+  if (userAgent === 'node') {
+    return true;
+  }
+  
+  // Check MCP initialize request clientInfo
+  if (req.body && req.body.method === 'initialize' && req.body.params && req.body.params.clientInfo) {
+    const clientName = req.body.params.clientInfo.name;
+    if (clientName === 'Visual Studio Code') {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+/**
+ * Generate WWW-Authenticate header value according to RFC 6750 and RFC 9728
+ * with VS Code Copilot compatibility handling
+ * 
+ * @param {Object} req - Express request object (used for client detection)
+ * @param {string} [errorDescription] - Optional error description for invalid_token errors
+ * @param {string} [errorCode] - Optional error code (defaults to "invalid_token" when errorDescription provided)
+ * @returns {string} Complete WWW-Authenticate header value
+ * 
+ * Specifications:
+ * - RFC 6750 Section 3: WWW-Authenticate Response Header Field
+ * - RFC 9728 Section 5.1: WWW-Authenticate Resource Metadata Parameter (resource_metadata)
+ * - VS Code Copilot Extension: Non-standard resource_metadata_url parameter
+ * 
+ * Implementation Note:
+ * VS Code breaks when it sees both resource_metadata and resource_metadata_url parameters.
+ * We detect VS Code clients and only send the parameter they expect:
+ * - VS Code: Only resource_metadata_url (their non-standard parameter)
+ * - Other clients: Only resource_metadata (RFC 9728 standard)
+ * See specs/vs-code-copilot/readme.md for details.
+ */
+function createWwwAuthenticate(req, errorDescription = null, errorCode = 'invalid_token') {
+  const metadataUrl = `${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource`;
+  
+  let authValue = `Bearer realm="mcp"`;
+  
+  // Add error parameters if provided (RFC 6750 Section 3.1)
+  if (errorDescription) {
+    authValue += `, error="${errorCode}", error_description="${errorDescription}"`;
+  }
+  
+  // Add appropriate resource metadata parameter based on client type
+  if (isVSCodeClient(req)) {
+    // VS Code Copilot expects resource_metadata_url (non-standard)
+    authValue += `, resource_metadata_url="${metadataUrl}"`;
+  } else {
+    // Standard RFC 9728 parameter for other clients
+    authValue += `, resource_metadata="${metadataUrl}"`;
+  }
+  
+  return authValue;
+}
 
 /**
  * Extract and validate auth info from Authorization Bearer header
@@ -224,7 +307,7 @@ function validateAndExtractJwt(token, req, res, source, strictLabel) {
       const now = Math.floor(Date.now() / 1000);
       if (typeof payload.exp === 'number' && payload.exp < now) {
         console.log(`JWT token expired (${strictLabel})`);
-        send401(res, { error: 'Token expired' }, true);
+        send401(res, { error: 'Token expired' }, true, req);
         return { authInfo: null, errored: true };
       }
     }
@@ -232,15 +315,15 @@ function validateAndExtractJwt(token, req, res, source, strictLabel) {
     return { authInfo: payload, errored: false };
   } catch (err) {
     logger.error(`Error parsing JWT token from ${source}:`, err);
-    send401(res, { error: 'Invalid token' }, true); // Trigger re-auth for invalid tokens
+    send401(res, { error: 'Invalid token' }, true, req); // Trigger re-auth for invalid tokens
     return { authInfo: null, errored: true };
   }
 }
 
-function send401(res, jsonResponse, includeInvalidToken = false) {
+function send401(res, jsonResponse, includeInvalidToken = false, req = null) {
   const wwwAuthHeader = includeInvalidToken 
-    ? `Bearer realm="mcp", error="invalid_token", error_description="Token expired - please re-authenticate", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource"`
-    : `Bearer realm="mcp", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource"`;
+    ? createWwwAuthenticate(req, 'Token expired - please re-authenticate')
+    : createWwwAuthenticate(req); // No error description for general auth required
     
   return res
       .status(401)
@@ -256,7 +339,7 @@ function sendMissingAtlassianAccessToken(res, req, where = 'bearer header') {
   console.log(`❌🔑 ${message}`);
   return res
       .status(401)
-      .header('WWW-Authenticate', `Bearer realm="mcp", error="invalid_token", error_description="${message}", resource_metadata_url="${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource"`)
+      .header('WWW-Authenticate', createWwwAuthenticate(req, message))
       .header('Cache-Control', 'no-cache, no-store, must-revalidate')
       .header('Pragma', 'no-cache')
       .header('Expires', '0')

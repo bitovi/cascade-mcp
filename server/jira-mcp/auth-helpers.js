@@ -55,14 +55,42 @@ function isTokenExpired(authInfo) {
     return true;
   }
   
+  const now = Math.floor(Date.now() / 1000);
+  
+  logger.info('🕐 TOKEN EXPIRATION CHECK:', {
+    has_authInfo: !!authInfo,
+    has_exp_field: !!authInfo?.exp,
+    authInfo_keys: authInfo ? Object.keys(authInfo) : [],
+    exp_value: authInfo?.exp,
+    exp_type: typeof authInfo?.exp,
+    current_timestamp: now,
+    time_until_expiration_seconds: authInfo?.exp ? authInfo.exp - now : null,
+    time_until_expiration_minutes: authInfo?.exp ? Math.round((authInfo.exp - now) / 60) : null,
+    is_expired_calculation: authInfo?.exp ? now >= authInfo.exp : 'no_exp_field',
+  });
+  
   if (!authInfo?.exp) {
     // If no expiration field, assume it's expired for safety
+    logger.warn('🕐 TOKEN EXPIRATION CHECK - No exp field found, assuming expired for safety');
     return true;
   }
   
   // JWT exp field is in seconds, Date.now() is in milliseconds
-  const now = Math.floor(Date.now() / 1000);
-  return now >= authInfo.exp;
+  const isExpired = now >= authInfo.exp;
+  
+  if (isExpired) {
+    logger.warn('🕐 TOKEN EXPIRATION CHECK - Token is EXPIRED:', {
+      expired_by_seconds: now - authInfo.exp,
+      expired_by_minutes: Math.round((now - authInfo.exp) / 60),
+    });
+  } else {
+    logger.info('🕐 TOKEN EXPIRATION CHECK - Token is VALID:', {
+      valid_for_seconds: authInfo.exp - now,
+      valid_for_minutes: Math.round((authInfo.exp - now) / 60),
+    });
+  }
+  
+  return isExpired;
 }
 
 /**
@@ -94,16 +122,27 @@ export function handleJiraAuthError(response, operation = 'Jira API request') {
  * @returns {Object|null} Auth info object or null if not found
  */
 export function getAuthInfo(context) {
-  logger.info('Getting auth info from context', {
+  logger.info('🔍 AUTH CONTEXT RETRIEVAL - Getting auth info from context:', {
     hasDirectAuthInfo: !!context?.authInfo?.atlassian_access_token,
     authContextStoreSize: authContextStore.size,
     contextKeys: Object.keys(context || {}),
+    context_authInfo_keys: context?.authInfo ? Object.keys(context.authInfo) : [],
+    context_sessionId: context?.sessionId,
+    context_transport_sessionId: context?.transport?.sessionId,
   });
 
   // First try to get from context if it's directly available
   if (context?.authInfo?.atlassian_access_token) {
+    logger.info('🔍 AUTH CONTEXT RETRIEVAL - Found direct authInfo in context:', {
+      has_atlassian_access_token: !!context.authInfo.atlassian_access_token,
+      has_refresh_token: !!context.authInfo.refresh_token,
+      has_exp: !!context.authInfo.exp,
+      exp_value: context.authInfo.exp,
+      authInfo_keys: Object.keys(context.authInfo),
+    });
+    
     if (isTokenExpired(context.authInfo)) {
-      logger.info('Auth token from context is expired - triggering re-authentication');
+      logger.info('🔍 AUTH CONTEXT RETRIEVAL - Auth token from context is expired - triggering re-authentication');
       throw new InvalidTokenError('The access token expired and re-authentication is needed.');
     }
     return context.authInfo;
@@ -111,11 +150,28 @@ export function getAuthInfo(context) {
 
   // Try to get session ID from context to safely retrieve auth info
   const sessionId = context?.sessionId || context?.transport?.sessionId;
+  logger.info('🔍 AUTH CONTEXT RETRIEVAL - Looking up auth by session ID:', {
+    sessionId,
+    found_sessionId: !!sessionId,
+    authContextStore_has_session: sessionId ? authContextStore.has(sessionId) : false,
+    authContextStore_keys: Array.from(authContextStore.keys()),
+  });
+  
   if (sessionId) {
     const authInfo = authContextStore.get(sessionId);
+    logger.info('🔍 AUTH CONTEXT RETRIEVAL - Retrieved authInfo from session store:', {
+      sessionId,
+      found_authInfo: !!authInfo,
+      has_atlassian_access_token: !!authInfo?.atlassian_access_token,
+      has_refresh_token: !!authInfo?.refresh_token,
+      has_exp: !!authInfo?.exp,
+      exp_value: authInfo?.exp,
+      authInfo_keys: authInfo ? Object.keys(authInfo) : [],
+    });
+    
     if (authInfo?.atlassian_access_token) {
       if (isTokenExpired(authInfo)) {
-        logger.info('Auth token from session context is expired - triggering re-authentication');
+        logger.info('🔍 AUTH CONTEXT RETRIEVAL - Auth token from session context is expired - triggering re-authentication');
         throw new InvalidTokenError('The access token expired and re-authentication is needed.');
       }
       return authInfo;
@@ -123,10 +179,11 @@ export function getAuthInfo(context) {
   }
 
   // No auth found in context
-  logger.error('No auth context found', { 
+  logger.error('🔍 AUTH CONTEXT RETRIEVAL - No auth context found:', { 
     hasDirectAuthInfo: !!context?.authInfo,
     contextSessionId: context?.sessionId || context?.transport?.sessionId,
-    totalAuthContexts: authContextStore.size
+    totalAuthContexts: authContextStore.size,
+    available_sessions: Array.from(authContextStore.keys()),
   });
   return null;
 }

@@ -5,8 +5,8 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "start-local": "node server/server.js",
-    "typecheck": "tsc",
+    "start-local": "node --loader ./loader.mjs server/server.js",
+    "typecheck": "tsc --noEmit",
     "prepare": "husky",
     "atlassian-mcp-test": "node specs/atlassian-mcp-analysis/run-test.js",
     "atlassian-mcp-test-quick": "node specs/atlassian-mcp-analysis/run-test.js --duration 10 --interval 10"
@@ -42,13 +42,20 @@
     "winston-cloudwatch": "^6.3.0"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/express-session": "^1.18.2",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/morgan": "^1.9.10",
     "@types/node": "^22.14.0",
+    "@types/uuid": "^10.0.0",
     "commander": "^12.1.0",
     "husky": "^9.1.4",
     "open": "^10.2.0",
     "openid-client": "^5.7.1",
     "prettier": "3.5.3",
     "semver": "^7.6.3",
-    "typescript": "^5.5.4"
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
   }
 }
