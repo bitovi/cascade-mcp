@@ -3,15 +3,62 @@
  */
 
 import { z } from 'zod';
-import { logger } from '../logger.js';
-import { getAuthInfoSafe, handleJiraAuthError, resolveCloudId } from './auth-helpers.js';
+import { logger } from '../observability/logger.ts';
+import { getAuthInfoSafe, handleJiraAuthError } from './auth-helpers.ts';
+import { resolveCloudId } from './atlassian-helpers.ts';
+
+// Tool parameters interface
+interface GetJiraAttachmentsParams {
+  attachmentIds: string[];
+  cloudId?: string;
+  siteName?: string;
+}
+
+// MCP content types
+interface MCPTextContent {
+  type: 'text';
+  text: string;
+}
+
+interface MCPImageContent {
+  type: 'image';
+  mimeType: string;
+  data: string;
+}
+
+type MCPToolContent = MCPTextContent | MCPImageContent;
+
+interface MCPToolResponse {
+  content: MCPToolContent[];
+}
+
+// MCP server interface (simplified)
+interface MCPServer {
+  registerTool(
+    name: string,
+    definition: {
+      title: string;
+      description: string;
+      inputSchema: Record<string, any>;
+    },
+    handler: (args: any, context: any) => Promise<MCPToolResponse>
+  ): void;
+}
+
+// Attachment response interface
+interface AttachmentResponse {
+  id: string;
+  encoded: string;
+  mimeType: string;
+  size: number;
+}
 
 /**
  * Convert a blob to base64 string
- * @param {Blob} blob - The blob to convert
- * @returns {Promise<string>} Base64 encoded string
+ * @param blob - The blob to convert
+ * @returns Base64 encoded string
  */
-async function blobToBase64(blob) {
+async function blobToBase64(blob: Blob): Promise<string> {
   try {
     logger.debug('Converting blob to base64', { 
       blobSize: blob.size, 
@@ -28,7 +75,7 @@ async function blobToBase64(blob) {
     logger.debug('Base64 conversion complete', { base64Length: base64String.length });
     
     return base64String;
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Failed to convert blob to base64:', error);
     throw new Error(`Failed to convert blob to base64: ${error.message}`);
   }
@@ -36,9 +83,9 @@ async function blobToBase64(blob) {
 
 /**
  * Register the get-jira-attachments tool with the MCP server
- * @param {McpServer} mcp - MCP server instance
+ * @param mcp - MCP server instance
  */
-export function registerGetJiraAttachmentsTool(mcp) {
+export function registerGetJiraAttachmentsTool(mcp: MCPServer): void {
   mcp.registerTool(
     'get-jira-attachments',
     {
@@ -50,7 +97,7 @@ export function registerGetJiraAttachmentsTool(mcp) {
         siteName: z.string().optional().describe('The name of the Jira site to use (alternative to cloudId). Will search for a site with this name.'),
       },
     },
-    async ({ attachmentIds, cloudId, siteName }, context) => {
+    async ({ attachmentIds, cloudId, siteName }: GetJiraAttachmentsParams, context): Promise<MCPToolResponse> => {
       logger.info('get-jira-attachments called', { 
         attachmentIds, 
         cloudId, 
@@ -81,7 +128,7 @@ export function registerGetJiraAttachmentsTool(mcp) {
         let siteInfo;
         try {
           siteInfo = await resolveCloudId(token, cloudId, siteName);
-        } catch (error) {
+        } catch (error: any) {
           logger.error('Failed to resolve cloud ID:', error);
           return { 
             content: [{ 
@@ -99,100 +146,78 @@ export function registerGetJiraAttachmentsTool(mcp) {
           fetchUrl: `https://api.atlassian.com/ex/jira/${targetCloudId}/rest/api/3/attachment/content/` 
         });
 
-        const responses = await Promise.allSettled(
-          attachmentIds.map(async (id) => {
-            logger.info(`Fetching attachment ${id}`);
-            try {
-              const fetchUrl = `https://api.atlassian.com/ex/jira/${targetCloudId}/rest/api/3/attachment/content/${id}`;
-              logger.debug(`Making request to: ${fetchUrl}`);
-              
-              const response = await fetch(fetchUrl, {
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                  // Don't specify Accept header for binary content
-                },
-              });
-
-              logger.info(`Response for attachment ${id}:`, {
-                status: response.status,
-                statusText: response.statusText,
-                contentType: response.headers.get('content-type'),
-                contentLength: response.headers.get('content-length')
-              });
-
-              handleJiraAuthError(response, `Fetch attachment ${id}`);
-
-              logger.info(`Converting response to blob for attachment ${id}`);
-              const blob = await response.blob();
-              
-              logger.info(`Blob created for attachment ${id}:`, {
-                size: blob.size,
-                type: blob.type
-              });
-              
-              // Check blob size to prevent memory issues
-              if (blob.size > 10 * 1024 * 1024) { // 10MB limit
-                throw new Error(`Attachment ${id} is too large (${Math.round(blob.size / 1024 / 1024)}MB)`);
-              }
-
-              logger.info(`Converting blob to base64 for attachment ${id}`);
-              const base64Data = await blobToBase64(blob);
-              logger.info(`Base64 conversion complete for attachment ${id}`, {
-                base64Length: base64Data.length
-              });
-              
-              return {
-                id,
-                mimeType: blob.type || 'application/octet-stream',
-                encoded: base64Data,
-                size: blob.size,
-              };
-            } catch (error) {
-              logger.error(`Error fetching attachment ${id}:`, error);
-              throw error;
-            }
-          }),
-        );
-
-        // Filter successful responses and handle failures
-        logger.info('Processing attachment fetch results', {
-          totalResponses: responses.length,
-          fulfilled: responses.filter(r => r.status === 'fulfilled').length,
-          rejected: responses.filter(r => r.status === 'rejected').length
-        });
-
-        const successfulResponses = [];
-        const errors = [];
-
-        responses.forEach((result, index) => {
-          if (result.status === 'fulfilled') {
-            logger.info(`Attachment ${attachmentIds[index]} fetched successfully`, {
-              size: result.value.size,
-              mimeType: result.value.mimeType
+        // Fetch all attachments in parallel
+        const attachmentPromises = attachmentIds.map(async (id): Promise<AttachmentResponse | { error: string; id: string }> => {
+          try {
+            logger.info(`Fetching attachment ${id}`, { 
+              attachmentId: id,
+              cloudId: targetCloudId 
             });
-            successfulResponses.push(result.value);
-          } else {
-            logger.error(`Attachment ${attachmentIds[index]} failed:`, result.reason);
-            errors.push(`Attachment ${attachmentIds[index]}: ${result.reason.message}`);
+
+            const attachmentUrl = `https://api.atlassian.com/ex/jira/${targetCloudId}/rest/api/3/attachment/content/${id}`;
+            const attachmentRes = await fetch(attachmentUrl, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            });
+
+            logger.info(`Attachment ${id} fetch response`, {
+              status: attachmentRes.status,
+              statusText: attachmentRes.statusText,
+              contentType: attachmentRes.headers.get('content-type'),
+              contentLength: attachmentRes.headers.get('content-length')
+            });
+
+            if (attachmentRes.status === 404) {
+              logger.warn(`Attachment ${id} not found`);
+              return { error: `Attachment ${id} not found`, id };
+            }
+
+            handleJiraAuthError(attachmentRes, `Fetch attachment ${id}`);
+
+            const blob = await attachmentRes.blob();
+            logger.info(`Attachment ${id} blob received`, {
+              blobSize: blob.size,
+              blobType: blob.type
+            });
+
+            const encoded = await blobToBase64(blob);
+            logger.info(`Attachment ${id} encoded to base64`, {
+              encodedLength: encoded.length
+            });
+
+            return {
+              id,
+              encoded,
+              mimeType: blob.type,
+              size: blob.size,
+            };
+          } catch (error: any) {
+            logger.error(`Error fetching attachment ${id}:`, error);
+            return { error: `Error fetching attachment ${id}: ${error.message}`, id };
           }
         });
 
-        if (successfulResponses.length === 0) {
-          logger.warn('No attachments could be fetched', { errors });
-          return { 
-            content: [{ 
-              type: 'text', 
-              text: `No attachments could be fetched. Errors:\n${errors.join('\n')}` 
-            }] 
-          };
-        }
+        const results = await Promise.all(attachmentPromises);
+
+        // Separate successful responses from errors
+        const successfulResponses: AttachmentResponse[] = [];
+        const errors: string[] = [];
+
+        results.forEach(result => {
+          if ('error' in result) {
+            errors.push(result.error);
+          } else {
+            successfulResponses.push(result);
+          }
+        });
 
         logger.info('Building response content', {
           successfulCount: successfulResponses.length,
           errorCount: errors.length
         });
 
-        const content = [];
+        const content: MCPToolContent[] = [];
         
         // Add any errors as text content first
         if (errors.length > 0) {
@@ -233,7 +258,7 @@ export function registerGetJiraAttachmentsTool(mcp) {
         });
 
         return { content };
-      } catch (err) {
+      } catch (err: any) {
         logger.error('Error fetching attachments from Jira:', err);
         return { content: [{ type: 'text', text: `Error fetching attachments from Jira: ${err.message}` }] };
       }

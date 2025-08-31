@@ -3,7 +3,7 @@
 
 ## Development Standards
 
-- With all api changes, keep the documentation in `server/api-flow.md` up to date.
+- With all api changes or file changes, keep the documentation in `server/readme.md` up to date.
 
 ## Architecture Overview
 
@@ -29,13 +29,13 @@ This project implements several key specifications. Always refer to these when m
 - **[RFC 7519 - JSON Web Token (JWT)](https://tools.ietf.org/html/rfc7519)** - Token format we use to wrap Atlassian credentials
 - **[RFC 7515 - JSON Web Signature (JWS)](https://tools.ietf.org/html/rfc7515)** - Signature verification
 
-### 1. OAuth 2.0 Authorization Server (`server/pkce.js`)
+### 1. OAuth 2.0 Authorization Server (`server/pkce.ts`)
 - Implements RFC 7636 (PKCE) for secure public client authentication
 - Bridges MCP client OAuth with Atlassian's OAuth flow
 - Creates JWT tokens embedding Atlassian access tokens for downstream use
 - **Key Pattern**: Uses environment variable `TEST_SHORT_AUTH_TOKEN_EXP=60` to force 1-minute token expiration for testing refresh flows
 
-### 2. MCP HTTP Transport Layer (`server/mcp-service.js`)
+### 2. MCP HTTP Transport Layer (`server/mcp-service.ts`)
 - Manages session-based MCP connections using `StreamableHTTPServerTransport`
 - Associates authentication context with transport sessions via `mcp-session-id` headers
 - **Critical Pattern**: Session lifecycle tied to transport cleanup - always use `setAuthContext(sessionId, authInfo)` when creating sessions
@@ -79,6 +79,21 @@ Required environment variables (see `scripts/generate-build-env.sh`):
 
 ## Critical Patterns & Conventions
 
+### Console Logging Format
+- **First console.log in a function**: No additional indentation (aligned with function body)
+- **Subsequent console.logs in the same function**: Message content should have 2 additional spaces
+
+```javascript
+export function myFunction() {
+  console.log('First message'); // No extra indentation
+  
+  if (condition) {
+    console.log('  Second message'); // Content has 2 extra spaces
+    console.log('  Third message');  // Content has 2 extra spaces
+  }
+}
+```
+
 ### JWT Token Structure
 - **Access tokens**: Embed Atlassian access tokens in JWT payload as `atlassian_access_token`
 - **Refresh tokens**: Embed Atlassian refresh tokens as `atlassian_refresh_token` with `type: 'refresh_token'`
@@ -105,7 +120,7 @@ try {
 
 ### Authentication Context Flow
 1. MCP client sends JWT in `Authorization: Bearer <token>` header
-2. `mcp-service.js` validates JWT and extracts Atlassian credentials
+2. `mcp-service.ts` validates JWT and extracts Atlassian credentials
 3. Auth context stored per session: `authContextStore.set(sessionId, authInfo)`
 4. Tools retrieve context: `getAuthInfo(context)` → uses session ID to lookup stored auth
 
@@ -129,9 +144,9 @@ try {
 - **Token Format**: Atlassian uses colon-separated opaque tokens (74 chars), we wrap them in JWTs
 
 ### File Structure Significance
-- `server/jira-mcp/tool-*.js` - Individual MCP tool implementations (register with `mcp.addTool()`)
-- `server/atlassian-auth-code-flow.js` - Atlassian-specific OAuth utilities
-- `server/tokens.js` - JWT utilities with token sanitization for logging
+- `server/jira-mcp/tool-*.ts` - Individual MCP tool implementations (register with `mcp.addTool()`)
+- `server/atlassian-auth-code-flow.ts` - Atlassian-specific OAuth utilities
+- `server/tokens.ts` - JWT utilities with token sanitization for logging
 - `specs/atlassian-mcp-analysis/` - Integration tests against **official Atlassian MCP service** (`https://mcp.atlassian.com/v1/sse`) for token lifecycle validation
 - `specs/atlassian-mcp-analysis/analysis.md` - Comprehensive analysis of Atlassian's MCP implementation including refresh tokens, CORS requirements, and compliance details
 

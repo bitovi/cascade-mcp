@@ -4,15 +4,55 @@
  */
 
 import { z } from 'zod';
-import { logger } from '../logger.js';
-import { getAuthInfoSafe, handleJiraAuthError, resolveCloudId } from './auth-helpers.js';
-import { convertMarkdownToAdf, validateAdf } from './markdown-converter.js';
+import { logger } from '../observability/logger.ts';
+import { getAuthInfoSafe, handleJiraAuthError } from './auth-helpers.ts';
+import { resolveCloudId } from './atlassian-helpers.ts';
+import { convertMarkdownToAdf, validateAdf, type ADFDocument } from './markdown-converter.ts';
+
+// Tool parameters interface
+interface UpdateIssueDescriptionParams {
+  issueKey: string;
+  description: string;
+  cloudId?: string;
+  siteName?: string;
+  notifyUsers?: boolean;
+}
+
+// MCP tool content interface
+interface MCPToolContent {
+  type: 'text';
+  text: string;
+}
+
+interface MCPToolResponse {
+  content: MCPToolContent[];
+}
+
+// MCP server interface (simplified)
+interface MCPServer {
+  registerTool(
+    name: string,
+    definition: {
+      title: string;
+      description: string;
+      inputSchema: Record<string, any>;
+    },
+    handler: (args: any, context: any) => Promise<MCPToolResponse>
+  ): void;
+}
+
+// Jira update payload interface
+interface JiraUpdatePayload {
+  fields: {
+    description: ADFDocument;
+  };
+}
 
 /**
  * Register the update-issue-description tool with the MCP server
- * @param {McpServer} mcp - MCP server instance
+ * @param mcp - MCP server instance
  */
-export function registerUpdateIssueDescriptionTool(mcp) {
+export function registerUpdateIssueDescriptionTool(mcp: MCPServer): void {
   mcp.registerTool(
     'update-issue-description',
     {
@@ -26,7 +66,13 @@ export function registerUpdateIssueDescriptionTool(mcp) {
         notifyUsers: z.boolean().optional().default(true).describe('Whether to send notifications to users (default: true)'),
       },
     },
-    async ({ issueKey, description, cloudId, siteName, notifyUsers = true }, context) => {
+    async ({ 
+      issueKey, 
+      description, 
+      cloudId, 
+      siteName, 
+      notifyUsers = true 
+    }: UpdateIssueDescriptionParams, context): Promise<MCPToolResponse> => {
       logger.info('update-issue-description called', { 
         issueKey, 
         cloudId, 
@@ -77,7 +123,7 @@ export function registerUpdateIssueDescriptionTool(mcp) {
         let siteInfo;
         try {
           siteInfo = await resolveCloudId(token, cloudId, siteName);
-        } catch (error) {
+        } catch (error: any) {
           logger.error('Failed to resolve cloud ID:', error);
           return { 
             content: [{ 
@@ -115,7 +161,7 @@ export function registerUpdateIssueDescriptionTool(mcp) {
         }
 
         // Prepare the update payload
-        const updatePayload = {
+        const updatePayload: JiraUpdatePayload = {
           fields: {
             description: adfDescription
           }
@@ -187,7 +233,7 @@ export function registerUpdateIssueDescriptionTool(mcp) {
           ],
         };
 
-      } catch (err) {
+      } catch (err: any) {
         logger.error('Error updating Jira issue description:', err);
         
         // Provide helpful error messages for common scenarios

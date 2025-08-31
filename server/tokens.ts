@@ -7,16 +7,22 @@ if (!globalThis.crypto) {
   globalThis.crypto = webcrypto;
 }
 
+// Generic JWT payload structure
+export interface JWTPayload {
+  [key: string]: any;
+  exp?: number | string | Date;
+  iat?: number;
+}
+
 // Create a secret key for JWT signing
 const key = createSecretKey(Buffer.from(process.env.JWT_SECRET || 'devsecret'));
 
 /**
  * Sign a JWT token with the provided payload
- * @param {object} payload - The payload to include in the JWT
- * @param {string|number|Date} payload.exp - Optional expiration time for the JWT
- * @returns {Promise<string>} The signed JWT token
+ * @param payload - The payload to include in the JWT
+ * @returns The signed JWT token
  */
-export async function jwtSign(payload) {
+export async function jwtSign(payload: JWTPayload): Promise<string> {
   const { exp, ...jwtPayload } = payload;
   
   const jwt = new SignJWT(jwtPayload)
@@ -29,10 +35,10 @@ export async function jwtSign(payload) {
 
 /**
  * Verify and decode a JWT token
- * @param {string} token - The JWT token to verify
- * @returns {Promise<object>} The decoded payload
+ * @param token - The JWT token to verify
+ * @returns The decoded payload
  */
-export async function jwtVerify(token) {
+export async function jwtVerify(token: string): Promise<any> {
   const { payload } = await joseVerify(token, key);
   return payload;
 }
@@ -41,18 +47,18 @@ export async function jwtVerify(token) {
 
 /**
  * Generate a cryptographically secure code verifier for PKCE
- * @returns {string} Base64URL-encoded code verifier
+ * @returns Base64URL-encoded code verifier
  */
-export function generateCodeVerifier() {
+export function generateCodeVerifier(): string {
   return randomBytes(32).toString('base64url');
 }
 
 /**
  * Generate a code challenge from a code verifier using SHA256
- * @param {string} codeVerifier - The code verifier to hash
- * @returns {string} Base64URL-encoded code challenge
+ * @param codeVerifier - The code verifier to hash
+ * @returns Base64URL-encoded code challenge
  */
-export function generateCodeChallenge(codeVerifier) {
+export function generateCodeChallenge(codeVerifier: string): string {
   const hash = createHash('sha256').update(codeVerifier).digest();
   return Buffer.from(hash).toString('base64url');
 }
@@ -61,20 +67,20 @@ export function generateCodeChallenge(codeVerifier) {
 
 /**
  * Parse a JWT token and extract the payload
- * @param {string} token - The JWT token to parse
- * @returns {object} The decoded payload
+ * @param token - The JWT token to parse
+ * @returns The decoded payload
  */
-export function parseJWT(token) {
+export function parseJWT(token: string): any {
   return JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString());
 }
 
 /**
  * Format a token with truncation and expiration information
- * @param {string} token - The JWT token to format
- * @param {number} maxLength - Maximum length for the truncated token
- * @returns {string} Formatted token string with expiration info
+ * @param token - The JWT token to format
+ * @param maxLength - Maximum length for the truncated token
+ * @returns Formatted token string with expiration info
  */
-export function formatTokenWithExpiration(token, maxLength = 20) {
+export function formatTokenWithExpiration(token: string, maxLength: number = 20): string {
   try {
     const payload = parseJWT(token);
     const truncatedToken = token.substring(0, maxLength) + '...';
@@ -94,7 +100,7 @@ export function formatTokenWithExpiration(token, maxLength = 20) {
       return `${truncatedToken} (invalid expiration: ${expTimestamp})`;
     }
     
-    let timeMessage;
+    let timeMessage: string;
     if (diffSeconds > 0) {
       // Token hasn't expired yet
       const hours = Math.floor(diffSeconds / 3600);
@@ -132,20 +138,20 @@ export function formatTokenWithExpiration(token, maxLength = 20) {
 
 /**
  * Sanitize a JWT payload for logging by truncating sensitive tokens and adding expiration info
- * @param {object} payload - The JWT payload to sanitize
- * @returns {object} Sanitized payload safe for logging
+ * @param payload - The JWT payload to sanitize
+ * @returns Sanitized payload safe for logging
  */
-export function sanitizeJwtPayload(payload) {
+export function sanitizeJwtPayload(payload: any): any {
   return sanitizeObjectWithJWTs(payload, 30);
 }
 
 /**
  * Sanitize an object by detecting and sanitizing any JWT tokens it contains
- * @param {object} obj - The object to sanitize
- * @param {number} maxTokenLength - Maximum length for truncated tokens
- * @returns {object} Sanitized object safe for logging
+ * @param obj - The object to sanitize
+ * @param maxTokenLength - Maximum length for truncated tokens
+ * @returns Sanitized object safe for logging
  */
-export function sanitizeObjectWithJWTs(obj, maxTokenLength = 30) {
+export function sanitizeObjectWithJWTs(obj: any, maxTokenLength: number = 30): any {
   const sanitized = { ...obj };
   
   for (const [key, value] of Object.entries(sanitized)) {

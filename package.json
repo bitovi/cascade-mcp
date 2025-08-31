@@ -5,11 +5,11 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "start-local": "node --loader ./loader.mjs server/server.js",
+    "start-local": "node --import ./loader.mjs server/server.ts",
     "typecheck": "tsc --noEmit",
     "prepare": "husky",
-    "atlassian-mcp-test": "node specs/atlassian-mcp-analysis/run-test.js",
-    "atlassian-mcp-test-quick": "node specs/atlassian-mcp-analysis/run-test.js --duration 10 --interval 10"
+    "atlassian-mcp-test": "node --import ./loader.mjs specs/atlassian-mcp-analysis/run-test.js",
+    "atlassian-mcp-test-quick": "node --import ./loader.mjs specs/atlassian-mcp-analysis/run-test.js --duration 10 --interval 10"
   },
   "lint-staged": {
     "**/*": "prettier --write --ignore-unknown"

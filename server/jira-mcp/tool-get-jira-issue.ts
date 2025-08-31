@@ -3,16 +3,66 @@
  */
 
 import { z } from 'zod';
-import { logger } from '../logger.js';
-import { getAuthInfoSafe, handleJiraAuthError, resolveCloudId } from './auth-helpers.js';
+import { logger } from '../observability/logger.ts';
+import { getAuthInfoSafe, handleJiraAuthError } from './auth-helpers.ts';
+import { resolveCloudId } from './atlassian-helpers.ts';
+
+// Tool parameters interface
+interface GetJiraIssueParams {
+  issueKey: string;
+  cloudId?: string;
+  siteName?: string;
+  fields?: string;
+}
+
+// MCP tool content interface
+interface MCPToolContent {
+  type: 'text';
+  text: string;
+}
+
+interface MCPToolResponse {
+  content: MCPToolContent[];
+}
+
+// MCP server interface (simplified)
+interface MCPServer {
+  registerTool(
+    name: string,
+    definition: {
+      title: string;
+      description: string;
+      inputSchema: Record<string, any>;
+    },
+    handler: (args: any, context: any) => Promise<MCPToolResponse>
+  ): void;
+}
+
+// Jira issue interfaces (basic structure)
+interface JiraIssue {
+  id: string;
+  key: string;
+  fields: {
+    summary: string;
+    description?: any;
+    status: {
+      name: string;
+    };
+    attachment?: any[];
+    comment?: {
+      total: number;
+    };
+    [key: string]: any;
+  };
+}
 
 /**
  * Helper function to safely log token information without exposing sensitive data
- * @param {string} token - The token to log info about
- * @param {string} [prefix='Token'] - Prefix for the log entry
- * @returns {Object} Safe token info for logging
+ * @param token - The token to log info about
+ * @param prefix - Prefix for the log entry
+ * @returns Safe token info for logging
  */
-function getTokenLogInfo(token, prefix = 'Token') {
+function getTokenLogInfo(token?: string, prefix: string = 'Token'): Record<string, any> {
   if (!token) {
     return { [`${prefix.toLowerCase()}Available`]: false };
   }
@@ -27,9 +77,9 @@ function getTokenLogInfo(token, prefix = 'Token') {
 
 /**
  * Register the get-jira-issue tool with the MCP server
- * @param {McpServer} mcp - MCP server instance
+ * @param mcp - MCP server instance
  */
-export function registerGetJiraIssueTool(mcp) {
+export function registerGetJiraIssueTool(mcp: MCPServer): void {
   mcp.registerTool(
     'get-jira-issue',
     {
@@ -42,7 +92,7 @@ export function registerGetJiraIssueTool(mcp) {
         fields: z.string().optional().describe('Comma-separated list of fields to return. If not specified, returns all fields.'),
       },
     },
-    async ({ issueKey, cloudId, siteName, fields }, context) => {
+    async ({ issueKey, cloudId, siteName, fields }: GetJiraIssueParams, context): Promise<MCPToolResponse> => {
       logger.info('get-jira-issue called', { 
         issueKey, 
         cloudId, 
@@ -81,7 +131,7 @@ export function registerGetJiraIssueTool(mcp) {
         let siteInfo;
         try {
           siteInfo = await resolveCloudId(token, cloudId, siteName);
-        } catch (error) {
+        } catch (error: any) {
           logger.error('Failed to resolve cloud ID:', error);
           return { 
             content: [{ 
@@ -139,7 +189,7 @@ export function registerGetJiraIssueTool(mcp) {
 
         handleJiraAuthError(issueRes, `Fetch issue ${issueKey}`);
 
-        const issue = await issueRes.json();
+        const issue = await issueRes.json() as JiraIssue;
 
         logger.info('Issue fetched successfully', {
           issueKey: issue.key,
@@ -161,7 +211,7 @@ export function registerGetJiraIssueTool(mcp) {
           ],
         };
 
-      } catch (err) {
+      } catch (err: any) {
         logger.error('Error fetching Jira issue:', err);
         return { 
           content: [{ 

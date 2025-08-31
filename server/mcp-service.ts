@@ -19,16 +19,24 @@
  * - Error response utilities: Standardized 401 and error response functions
  */
 
-import { mcp, setAuthContext, clearAuthContext } from './jira-mcp/index.js';
+import { Request, Response } from 'express';
+import { mcp, setAuthContext, clearAuthContext } from './jira-mcp/index.ts';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
+import { isInitializeRequest, type JSONRPCRequest } from '@modelcontextprotocol/sdk/types.js';
 import { InvalidTokenError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 import { randomUUID } from 'node:crypto';
-import { logger } from './logger.js';
-import { jwtVerify, sanitizeJwtPayload, formatTokenWithExpiration, parseJWT } from './tokens.js';
+import { logger } from './observability/logger.ts';
+import { jwtVerify, sanitizeJwtPayload, formatTokenWithExpiration, parseJWT, type JWTPayload } from './tokens.ts';
+import { type AuthContext } from './jira-mcp/auth-context-store.ts';
+
+// Validation result interface
+interface ValidationResult {
+  authInfo: AuthContext | null;
+  errored: boolean;
+}
 
 // Map to store transports by session ID
-const transports = {};
+const transports: Record<string, StreamableHTTPServerTransport> = {};
 
 /**
  * Handle POST requests for client-to-server communication
@@ -36,7 +44,7 @@ const transports = {};
  * Copilot's MCP client, upon restarting, will send a POST without an authorization header, 
  * and then another with its last authorization header.
  */
-export async function handleMcpPost(req, res) {
+export async function handleMcpPost(req: Request, res: Response): Promise<void> {
   console.log('======= POST /mcp =======');
   console.log('Headers:', JSON.stringify(sanitizeHeaders(req.headers)));
   console.log('Body:', JSON.stringify(req.body));
@@ -44,15 +52,15 @@ export async function handleMcpPost(req, res) {
   console.log('--------------------------------');
 
   // Check for existing session ID
-  const sessionId = req.headers['mcp-session-id'];
-  let transport;
+  const sessionId = req.headers['mcp-session-id'] as string | undefined;
+  let transport: StreamableHTTPServerTransport;
 
   if (sessionId && transports[sessionId]) {
     // Reuse existing transport
     transport = transports[sessionId];
     console.log(`  ♻️ Reusing existing transport for session: ${sessionId}`);
   } 
-  else if (!sessionId && isInitializeRequest(req.body)) {
+  else if (!sessionId && isInitializeRequest(req.body as JSONRPCRequest)) {
     // New initialization request
     console.log('  🥚 New MCP initialization request.');
 
@@ -66,17 +74,18 @@ export async function handleMcpPost(req, res) {
     if (errored) { return; }
     
     if (!authInfo) {
-      return sendMissingAtlassianAccessToken(res, req, 'anywhere');
+      sendMissingAtlassianAccessToken(res, req, 'anywhere');
+      return;
     }
     console.log('    Has valid token, creating streamable transport');
     transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
-      onsessioninitialized: (newSessionId) => {
+      onsessioninitialized: (newSessionId: string) => {
         // Store the transport by session ID
         console.log(`    Storing transport for new session: ${newSessionId}`);
         transports[newSessionId] = transport;
         // Store auth context for this session
-        setAuthContext(newSessionId, authInfo);
+        setAuthContext(newSessionId, authInfo!);
       },
     });
 
@@ -133,16 +142,16 @@ export async function handleMcpPost(req, res) {
 /**
  * Reusable handler for GET and DELETE requests
  */
-export async function handleSessionRequest(req, res) {
+export async function handleSessionRequest(req: Request, res: Response): Promise<void> {
   console.log('=== MCP SESSION REQUEST ===');
   console.log(req.method);
   
-  let authInfo = null;
+  let authInfo: AuthContext | null = null;
   
   // For GET requests (SSE streams), validate authentication first
   if (req.method === 'GET') {
     // Extract and validate auth info
-    let errored;
+    let errored: boolean;
     ({ authInfo, errored } = await getAuthInfoFromBearer(req, res));
     if (errored) { return; }
 
@@ -154,7 +163,7 @@ export async function handleSessionRequest(req, res) {
     if (!authInfo) {
       // For GET requests, send 401 with invalid_token to trigger re-auth
       console.log('No valid auth found for GET request - triggering re-authentication');
-      return res
+      res
         .status(401)
         .header('WWW-Authenticate', createWwwAuthenticate(req, 'Authentication required'))
         .header('Cache-Control', 'no-cache, no-store, must-revalidate')
@@ -164,10 +173,11 @@ export async function handleSessionRequest(req, res) {
           error: "invalid_token",
           error_description: "Missing or invalid access token"
         });
+      return;
     }
   }
   
-  const sessionId = req.headers['mcp-session-id'];
+  const sessionId = req.headers['mcp-session-id'] as string | undefined;
   if (!sessionId || !transports[sessionId]) {
     console.log(`Invalid or missing session ID: ${sessionId}`);
     res.status(400).send('Invalid or missing session ID');
@@ -184,7 +194,6 @@ export async function handleSessionRequest(req, res) {
   // 3. This defensive approach catches any case where session exists but context is missing
   // 4. Handles edge cases gracefully without interfering with cleanup logic
   if (authInfo && sessionId) {
-    console.log(`🔄 Updating session context store for session ${sessionId} with refreshed auth info`);
     setAuthContext(sessionId, authInfo);
   }
 
@@ -197,10 +206,10 @@ export async function handleSessionRequest(req, res) {
 /**
  * Detect if the client is VS Code based on User-Agent and MCP client info
  * 
- * @param {Object} req - Express request object
- * @returns {boolean} True if client is VS Code
+ * @param req - Express request object
+ * @returns True if client is VS Code
  */
-function isVSCodeClient(req) {
+function isVSCodeClient(req: Request): boolean {
   // Check User-Agent header - VS Code sends "node"
   const userAgent = req.headers['user-agent'];
   if (userAgent === 'node') {
@@ -222,10 +231,10 @@ function isVSCodeClient(req) {
  * Generate WWW-Authenticate header value according to RFC 6750 and RFC 9728
  * with VS Code Copilot compatibility handling
  * 
- * @param {Object} req - Express request object (used for client detection)
- * @param {string} [errorDescription] - Optional error description for invalid_token errors
- * @param {string} [errorCode] - Optional error code (defaults to "invalid_token" when errorDescription provided)
- * @returns {string} Complete WWW-Authenticate header value
+ * @param req - Express request object (used for client detection)
+ * @param errorDescription - Optional error description for invalid_token errors
+ * @param errorCode - Optional error code (defaults to "invalid_token" when errorDescription provided)
+ * @returns Complete WWW-Authenticate header value
  * 
  * Specifications:
  * - RFC 6750 Section 3: WWW-Authenticate Response Header Field
@@ -239,7 +248,7 @@ function isVSCodeClient(req) {
  * - Other clients: Only resource_metadata (RFC 9728 standard)
  * See specs/vs-code-copilot/readme.md for details.
  */
-function createWwwAuthenticate(req, errorDescription = null, errorCode = 'invalid_token') {
+function createWwwAuthenticate(req: Request, errorDescription: string | null = null, errorCode: string = 'invalid_token'): string {
   const metadataUrl = `${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource`;
   
   let authValue = `Bearer realm="mcp"`;
@@ -263,11 +272,11 @@ function createWwwAuthenticate(req, errorDescription = null, errorCode = 'invali
 
 /**
  * Extract and validate auth info from Authorization Bearer header
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @returns {Promise<Object>} - {authInfo, errored} where authInfo is the parsed JWT payload or null, errored is boolean
+ * @param req - Express request object
+ * @param res - Express response object
+ * @returns {authInfo, errored} where authInfo is the parsed JWT payload or null, errored is boolean
  */
-async function getAuthInfoFromBearer(req, res) {
+async function getAuthInfoFromBearer(req: Request, res: Response): Promise<ValidationResult> {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) {
     return { authInfo: null, errored: false };
@@ -277,21 +286,22 @@ async function getAuthInfoFromBearer(req, res) {
 
 /**
  * Extract and validate auth info from query token parameter
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @returns {Promise<Object>} - {authInfo, errored} where authInfo is the parsed JWT payload or null, errored is boolean
+ * @param req - Express request object
+ * @param res - Express response object
+ * @returns {authInfo, errored} where authInfo is the parsed JWT payload or null, errored is boolean
  */
-async function getAuthInfoFromQueryToken(req, res) {
-  const tokenFromQuery = req.query.token;
+async function getAuthInfoFromQueryToken(req: Request, res: Response): Promise<ValidationResult> {
+  const tokenFromQuery = req.query.token as string | undefined;
   if (!tokenFromQuery) {
     return { authInfo: null, errored: false };
   }
   return validateAndExtractJwt(tokenFromQuery, req, res, 'query parameter', 'strict mode, query param');
 }
+
 // Shared helper for JWT validation and extraction
-function validateAndExtractJwt(token, req, res, source, strictLabel) {
+function validateAndExtractJwt(token: string, req: Request, res: Response, source: string, strictLabel: string): ValidationResult {
   try {
-    const payload = parseJWT(token);
+    const payload = parseJWT(token) as JWTPayload & Partial<AuthContext>;
     console.log(`Successfully parsed JWT payload from ${source}:`, JSON.stringify(sanitizeJwtPayload(payload), null, 2));
 
     // Validate that we have an Atlassian access token
@@ -312,7 +322,7 @@ function validateAndExtractJwt(token, req, res, source, strictLabel) {
       }
     }
 
-    return { authInfo: payload, errored: false };
+    return { authInfo: payload as AuthContext, errored: false };
   } catch (err) {
     logger.error(`Error parsing JWT token from ${source}:`, err);
     send401(res, { error: 'Invalid token' }, true, req); // Trigger re-auth for invalid tokens
@@ -320,10 +330,10 @@ function validateAndExtractJwt(token, req, res, source, strictLabel) {
   }
 }
 
-function send401(res, jsonResponse, includeInvalidToken = false, req = null) {
+function send401(res: Response, jsonResponse: { error: string }, includeInvalidToken: boolean = false, req: Request | null = null): Response {
   const wwwAuthHeader = includeInvalidToken 
-    ? createWwwAuthenticate(req, 'Token expired - please re-authenticate')
-    : createWwwAuthenticate(req); // No error description for general auth required
+    ? createWwwAuthenticate(req!, 'Token expired - please re-authenticate')
+    : createWwwAuthenticate(req!); // No error description for general auth required
     
   return res
       .status(401)
@@ -334,7 +344,7 @@ function send401(res, jsonResponse, includeInvalidToken = false, req = null) {
       .json({ error: 'Invalid or missing token' });
 }
 
-function sendMissingAtlassianAccessToken(res, req, where = 'bearer header') {
+function sendMissingAtlassianAccessToken(res: Response, req: Request, where: string = 'bearer header'): Response {
   const message = `Authentication token missing Atlassian access token in ${where}.`;
   console.log(`❌🔑 ${message}`);
   return res
@@ -349,11 +359,11 @@ function sendMissingAtlassianAccessToken(res, req, where = 'bearer header') {
           code: -32001,
           message: message,
         },
-        id: req.body.id || null,
+        id: req.body?.id || null,
       });
 }
 
-function sanitizeHeaders(headers) {
+function sanitizeHeaders(headers: Record<string, any>): Record<string, any> {
   const sanitized = { ...headers };
   
   if (sanitized.authorization && sanitized.authorization.startsWith('Bearer ')) {

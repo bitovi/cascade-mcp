@@ -14,6 +14,8 @@
     "downlevelIteration": true,
     "allowJs": true,
     "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
     "paths": {
       "undici-types": ["./node_modules/undici/types"]
     },

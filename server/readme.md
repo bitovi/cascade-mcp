@@ -1,44 +1,41 @@
-# Jira MCP Auth Bridge - End-to-End API Flow
-
-## Overview
-This document describes the complete flow from initial MCP client connection through OAuth authentication to tool execution, showing which modules and functions handle each step.
-
-For detailed phase-by-phase analysis and flow diagrams, see [specs/standards/connecting-to-tool-use/readme.md](../specs/standards/connecting-to-tool-use/readme.md).
-
-
 ## Module Responsibilities
 
-- **server.js** - Application Bootstrap  
+- **server.ts** - Application Bootstrap  
   Express app setup with middleware configuration and route registration.  
-  *Example*: Route registration for `/mcp` endpoints
+  *Example*: Route registration for `/mcp` endpoints and direct imports from PKCE modules
 
-- **mcp-service.js** - MCP Transport Layer  
+- **mcp-service.ts** - MCP Transport Layer  
   Manages MCP HTTP transport, authentication extraction, and session lifecycle.  
   *Example*: `handleMcpPost()` - Main MCP request handler
 
-- **pkce.js** - OAuth 2.0 Server Implementation  
-  Implements OAuth 2.0 authorization server with PKCE support for secure client authentication.  
-  *Example*: `authorize()` - OAuth authorization endpoint with PKCE handling
+- **pkce/** - OAuth 2.0 Server Implementation (Modular)  
+  Modular OAuth 2.0 authorization server with PKCE support split across specialized modules:
+  - **pkce/discovery.ts** - OAuth metadata endpoints and dynamic client registration
+  - **pkce/authorize.ts** - Authorization endpoint with PKCE parameter handling
+  - **pkce/callback.ts** - OAuth callback handler for authorization code processing
+  - **pkce/access-token.ts** - Token exchange endpoint for authorization and refresh grants
+  - **pkce/refresh-token.ts** - Refresh token grant handler with Atlassian token refresh
+  - **pkce/token-helpers.ts** - JWT token creation utilities for MCP-compatible tokens
 
-- **atlassian-auth-code-flow.js** - Atlassian OAuth Integration  
+- **atlassian-auth-code-flow.ts** - Atlassian OAuth Integration  
   HTTP client for Atlassian OAuth API calls and token management.  
   *Example*: `exchangeCodeForTokens()` - Exchange auth code for access tokens
 
-- **tokens.js** - JWT Token Management  
+- **tokens.ts** - JWT Token Management  
   Creates and validates JWT tokens that wrap Atlassian credentials for bridge authentication.  
   *Example*: `createJWT()` - Create JWT wrapper for Atlassian tokens
 
-- **jira-mcp/index.js** - MCP Server Core  
+- **jira-mcp/index.ts** - MCP Server Core  
   Initializes MCP server with tools and manages authentication context per session.  
   *Example*: `setAuthContext()` - Store auth info per session
 
-- **jira-mcp/auth-helpers.js** - Tool Authentication  
+- **jira-mcp/auth-helpers.ts** - Tool Authentication  
   Provides safe authentication retrieval for tools with automatic re-auth on token expiration.  
   *Example*: `getAuthInfoSafe()` - Safe auth retrieval that throws `InvalidTokenError`
 
-- **jira-mcp/tool-*.js** - Individual Tool Handlers  
+- **jira-mcp/tool-*.ts** - Individual Tool Handlers  
   Implements specific Jira operations like fetching issues, sites, and updating descriptions.  
-  *Example*: `tool-get-accessible-sites.js::handler()` - Fetch Atlassian sites
+  *Example*: `tool-get-accessible-sites.ts::handler()` - Fetch Atlassian sites
 
 ## Key Authentication Patterns
 

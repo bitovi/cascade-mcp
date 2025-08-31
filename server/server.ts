@@ -1,16 +1,23 @@
-import './instruments.js';
+import './observability/instruments.ts';
 
 import * as Sentry from '@sentry/node';
 
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import session from 'express-session';
 import dotenv from 'dotenv';
 import morgan from 'morgan';
-import { oauthMetadata, oauthProtectedResourceMetadata, authorize, callback, register, accessToken, refreshToken } from './pkce.js';
-import { handleMcpPost, handleSessionRequest } from './mcp-service.js';
-import { renderManualTokenPage } from './manual-token-flow.js';
+import { 
+  oauthMetadata, 
+  oauthProtectedResourceMetadata, 
+  dynamicClientRegistration as clientRegistration
+} from './pkce/discovery.ts';
+import { authorize } from './pkce/authorize.ts';
+import { callback } from './pkce/callback.ts';
+import { accessToken } from './pkce/access-token.ts';
+import { handleMcpPost, handleSessionRequest } from './mcp-service.ts';
+import { renderManualTokenPage } from './manual-token-flow.ts';
 import cors from 'cors';
-import { logger } from './logger.js';
+import { logger } from './observability/logger.ts';
 
 // configurations
 dotenv.config();
@@ -43,7 +50,7 @@ app.use(cors({
 // HTTP request logging middleware
 app.use(morgan('common', {
   stream: {
-    write: (message) => logger.info(message.trim())
+    write: (message: string) => logger.info(message.trim())
   }
 }));
 
@@ -52,35 +59,33 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 // Error handler middleware
-app.use(function onError(err, req, res, next) {
+app.use(function onError(err: Error, req: Request, res: Response, next: NextFunction) {
   // Todo: do we want a page for this?
   res.statusCode = 500;
-  res.end(res.sentry + '\n');
+  res.end((res as any).sentry + '\n');
 });
 
 // --- OAuth Endpoints ---
 // Root endpoint for service discovery
 app.get('/', (req, res) => {
-  res.json({
-    name: 'Jira MCP Auth Bridge',
-    description: 'OAuth 2.0 bridge for MCP clients to access Jira services',
-    version: '1.0.0',
-    endpoints: {
-      oauth_metadata: '/.well-known/oauth-authorization-server',
-      protected_resource_metadata: '/.well-known/oauth-protected-resource',
-      authorization: '/authorize',
-      token: '/access-token',
-      registration: '/register',
-      mcp: '/mcp',
-      manual_token: '/get-access-token'
-    },
-    supported_grant_types: ['authorization_code'],
-    supported_response_types: ['code'],
-    pkce_supported: true,
-    client_id: process.env.VITE_JIRA_CLIENT_ID,
-    scopes: process.env.VITE_JIRA_SCOPE,
-    redirect_uri: process.env.VITE_JIRA_CALLBACK_URL,
-  });
+  const baseUrl = process.env.VITE_AUTH_SERVER_URL || `http://localhost:${process.env.PORT || 3000}`;
+  
+  res.send(`
+    <h1>Jira MCP Auth Bridge</h1>
+    <p>OAuth 2.0 authorization server for Jira MCP clients</p>
+    <h2>Available Endpoints</h2>
+    <ul>
+      <li><a href="/.well-known/oauth-authorization-server">OAuth Server Metadata</a></li>
+      <li><a href="/.well-known/oauth-protected-resource">Protected Resource Metadata</a></li>
+      <li><a href="/get-access-token">Manual Token Retrieval</a></li>
+    </ul>
+    <h2>OAuth Flow</h2>
+    <ol>
+      <li>Client registration: POST /register</li>
+      <li>Authorization: GET /authorize</li>
+      <li>Token exchange: POST /access-token</li>
+    </ol>
+  `);
 });
 
 app.get('/.well-known/oauth-authorization-server', oauthMetadata);
@@ -92,7 +97,7 @@ app.get('/.well-known/oauth-protected-resource', oauthProtectedResourceMetadata)
 app.get('/get-access-token', renderManualTokenPage);
 
 app.get('/authorize', authorize);
-app.post('/register', express.json(), register);
+app.post('/register', express.json(), clientRegistration);
 app.get('/callback', callback);
 
 // --- MCP HTTP Endpoints ---
@@ -103,28 +108,27 @@ app.get('/mcp', handleSessionRequest);
 // Handle DELETE requests for session termination
 app.delete('/mcp', handleSessionRequest);
 
-app.post('/domain', async (req, res) => {
+app.post('/domain', async (req: Request, res: Response) => {
   logger.info(`[domain] - ${req.body.domain}`);
-
   res.status(204).send();
 });
 
 // OAuth token endpoint for MCP clients (POST)
 app.post('/access-token', accessToken);
 
-// OAuth refresh token endpoint (POST)
-app.post('/refresh-token', refreshToken);
+// OAuth refresh token endpoint (kept for backwards compatibility)
+app.post('/refresh-token', accessToken);
 
 // Start server
 app.listen(port, () => console.log(`Server is listening on port ${port}!`));
 
 // Handle unhandled promise rejections and exceptions
-process.on('unhandledRejection', (err) => {
+process.on('unhandledRejection', (err: Error) => {
   console.log(err);
   Sentry.captureException(err);
 });
 
-process.on('uncaughtException', (err) => {
+process.on('uncaughtException', (err: Error) => {
   console.log(err.message);
   Sentry.captureException(err);
 });

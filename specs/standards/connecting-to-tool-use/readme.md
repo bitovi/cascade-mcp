@@ -20,11 +20,11 @@ sequenceDiagram
 
     Note over VSCode,Atlassian: Phase 2: OAuth Discovery & Authorization
     VSCode->>Bridge: GET /.well-known/oauth-authorization-server
-    Note over Bridge: pkce.js::oauthMetadata()
+    Note over Bridge: pkce/discovery.ts::oauthMetadata()
     Bridge->>VSCode: OAuth server metadata
 
     VSCode->>Bridge: GET /authorize (PKCE params)
-    Note over Bridge: pkce.js::authorize()
+    Note over Bridge: pkce/authorize.ts::authorize()
     Note over Bridge: → Store PKCE state in session
     Bridge->>VSCode: 302 → Atlassian OAuth URL
 
@@ -34,18 +34,18 @@ sequenceDiagram
     Note over Browser,Atlassian: User sees Atlassian login page<br/>Grants permissions to app
     Atlassian->>Browser: 302 → Bridge callback URL + auth code
     Browser->>Bridge: GET /callback?code=...&state=...
-    Note over Bridge: pkce.js::callback()
+    Note over Bridge: pkce/callback.ts::callback()
     Note over Bridge: → Validate state, redirect to VS Code
     Bridge->>Browser: 302 → vscode://localhost:33418?code=...&state=...
     Browser->>VSCode: Redirect to VS Code with auth code
 
     Note over VSCode,Atlassian: Phase 3: Token Exchange
     VSCode->>Bridge: POST /access-token (PKCE + auth code)
-    Note over Bridge: pkce.js::accessToken()
+    Note over Bridge: pkce/access-token.ts::accessToken()
     Note over Bridge: → atlassian-auth-code-flow.js::exchangeCodeForTokens()
     Bridge->>Atlassian: POST /oauth/token (token exchange)
     Atlassian->>Bridge: Access + Refresh tokens
-    Note over Bridge: → tokens.js::createJWT() (wrap in JWT)
+    Note over Bridge: → pkce/token-helpers.ts::createJiraMCPAuthToken()
     Bridge->>VSCode: JWT containing Atlassian tokens
 
     Note over VSCode,Atlassian: Phase 4: MCP Session Establishment
@@ -117,16 +117,16 @@ sequenceDiagram
 - [RFC 6749 Section 10.12](https://tools.ietf.org/html/rfc6749#section-10.12) - Cross-Site Request Forgery (State Parameter)
 
 1. *Client* discovers OAuth endpoints → **`GET /.well-known/oauth-authorization-server`**
-2. **`pkce.js::oauthMetadata()`** provides OAuth endpoints and capabilities
+2. **`pkce/discovery.ts::oauthMetadata()`** provides OAuth endpoints and capabilities
 3. *Client* generates PKCE challenge for secure auth
 4. *Client* requests authorization → **`GET /authorize`** (PKCE params)
-5. **`pkce.js::authorize()`** handles authorization request
+5. **`pkce/authorize.ts::authorize()`** handles authorization request
 6. **Express session storage** saves PKCE state and MCP client info
 7. User browser opens `https://auth.atlassian.com/authorize/...`
 8. User grants permissions to the application
 9. Atlassian redirects to bridge → **`GET /callback?code=...&state=...`**
-10. **`pkce.js::callback()`** receives auth code from Atlassian
-11. **`pkce.js::callback()`** validates redirect and sends VS Code callback with auth code
+10. **`pkce/callback.ts::callback()`** receives auth code from Atlassian
+11. **`pkce/callback.ts::callback()`** validates redirect and sends VS Code callback with auth code
 
 **Outcome**: VS Code has authorization code to exchange for tokens
 
@@ -142,11 +142,11 @@ sequenceDiagram
 - [Atlassian OAuth 2.0 API](https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/) - Token Exchange
 
 1. *Client* requests token exchange → **`POST /access-token`** (PKCE + auth code)
-2. **`pkce.js::accessToken()`** handles token exchange request
-3. **`pkce.js::accessToken()`** validates code_verifier against stored challenge
+2. **`pkce/access-token.ts::accessToken()`** handles token exchange request
+3. **`pkce/access-token.ts::accessToken()`** validates code_verifier against stored challenge
 4. **`atlassian-auth-code-flow.js::exchangeCodeForTokens()`** calls Atlassian → **`POST https://auth.atlassian.com/oauth/token`**
 5. Receives Atlassian access + refresh tokens from OAuth API
-6. **`tokens.js::createJWT()`** wraps tokens in bridge-issued JWT
+6. **`pkce/token-helpers.ts::createJiraMCPAuthToken()`** wraps tokens in bridge-issued JWT
 
 **Outcome**: VS Code has JWT containing Atlassian tokens
 
@@ -223,4 +223,6 @@ This test suite ensures compliance with:
 
 ## Implementation Reference
 
-For detailed implementation information, see [server/api-flow.md](../../../server/api-flow.md) which documents the complete module responsibilities and integration points.
+For detailed implementation information, see [server/api-flow.md](../../../server/api-flow.md) which documents the complete modular PKCE structure, module responsibilities, and integration points.
+
+The OAuth 2.0 PKCE implementation has been refactored into a modular structure within `server/pkce/` for improved maintainability and type safety. See [server/pkce/README.md](../../../server/pkce/README.md) for comprehensive module documentation and specifications.
