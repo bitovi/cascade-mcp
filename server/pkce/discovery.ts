@@ -24,6 +24,7 @@
 
 import crypto from 'crypto';
 import { Request, Response } from 'express';
+import { OAuthClientMetadataSchema } from '@modelcontextprotocol/sdk/shared/auth.js';
 import type { OAuthHandler } from './types.ts';
 
 /**
@@ -77,24 +78,46 @@ export const dynamicClientRegistration: OAuthHandler = (req: Request, res: Respo
     headers: req.headers,
   });
 
-  // Generate a unique client ID for this MCP client
-  const clientId = `mcp_${crypto.randomUUID()}`;
-  
-  // MCP clients are public clients (no client secret)
-  const registrationResponse = {
-    client_id: clientId,
-    client_id_issued_at: Math.floor(Date.now() / 1000),
-    grant_types: ['authorization_code', 'refresh_token'],
-    response_types: ['code'],
-    token_endpoint_auth_method: 'none', // Public client
-    scope: 'read:jira-work write:jira-work offline_access',
-  };
+  try {
+    // Validate incoming request using MCP SDK schema
+    const clientMetadata = OAuthClientMetadataSchema.parse(req.body);
+    console.log('  ✅ Client metadata validation successful');
 
-  console.log('  Registered new MCP client:', {
-    client_id: clientId,
-    auth_method: 'none',
-    grant_types: registrationResponse.grant_types,
-  });
+    // Generate a unique client ID for this MCP client
+    const clientId = `mcp_${crypto.randomUUID()}`;
+    
+    // MCP clients are public clients (no client secret)
+    const registrationResponse = {
+      client_id: clientId,
+      client_id_issued_at: Math.floor(Date.now() / 1000),
+      // Return the validated redirect_uris from the request (RFC 7591 requirement)
+      redirect_uris: clientMetadata.redirect_uris,
+      grant_types: ['authorization_code', 'refresh_token'], // Always OAuth code flow + refresh
+      response_types: ['code'], // Always authorization code flow
+      token_endpoint_auth_method: 'none', // Always public client for MCP
+      scope: 'read:jira-work write:jira-work offline_access', // Always return our supported scopes
+      // Include optional metadata if provided
+      ...(clientMetadata.client_name && { client_name: clientMetadata.client_name }),
+      ...(clientMetadata.client_uri && { client_uri: clientMetadata.client_uri }),
+      ...(clientMetadata.logo_uri && { logo_uri: clientMetadata.logo_uri }),
+    };
 
-  res.status(201).json(registrationResponse);
+    console.log('  Registered new MCP client:', {
+      client_id: clientId,
+      redirect_uris: clientMetadata.redirect_uris,
+      scope: 'read:jira-work write:jira-work offline_access',
+      auth_method: 'none',
+      grant_types: registrationResponse.grant_types,
+    });
+
+    res.status(201).json(registrationResponse);
+  } catch (error) {
+    console.error('  ❌ Client registration validation failed:', error);
+    
+    // Return RFC 7591 compliant error response
+    res.status(400).json({
+      error: 'invalid_client_metadata',
+      error_description: error instanceof Error ? error.message : 'Invalid client metadata',
+    });
+  }
 };
