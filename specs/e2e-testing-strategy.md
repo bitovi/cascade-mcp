@@ -14,16 +14,54 @@ Tests are organized in a two-tier hierarchy:
 specs/{client}/{use-case}/
 ```
 
-- **Client**: `standards` (RFC-compliant) or `vs-code-copilot` (VS Code Copilot specific deviations)
+- **Client**: `standards` (Direct HTTP/RFC compliance), `mcp-sdk` (MCP SDK-based clients), or `vs-code-copilot` (VS Code Copilot specific deviations)
 - **Use Case**: High-level scenarios like `connecting-to-tool-use`, `refresh`, `error-handling`
 
 Each test file includes an easy-to-digest summary at the top explaining what it tests and which specifications it validates.
+
+### Test Implementation Strategy: Dual Approach
+
+**Use both direct HTTP and MCP SDK testing** for comprehensive coverage:
+
+#### `standards/` - Direct HTTP Protocol Testing
+- ✅ **Educational value** - Clear examples of raw OAuth/MCP HTTP requests
+- ✅ **RFC compliance validation** - Direct testing of specification adherence
+- ✅ **Edge case testing** - Fine-grained control over malformed requests
+- ✅ **Documentation** - Shows developers exactly what HTTP calls to make
+
+#### `mcp-sdk/` - Real Client Integration Testing  
+- ✅ **Real MCP client behavior** - Tests exactly how actual MCP clients interact with our server
+- ✅ **Built-in validation** - MCP SDK includes schema validation (like the `redirect_uris` requirement)
+- ✅ **OAuth integration** - SDK handles OAuth flows, client registration, and token management
+- ✅ **Specification compliance** - SDK enforces MCP protocol and JSON-RPC 2.0 standards
+- ✅ **Cursor IDE validation** - Our tests will behave identically to real clients like Cursor
+
+**Implementation Approach**:
+```javascript
+// standards/ - Manual HTTP requests
+const response = await fetch('/register', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    redirect_uris: ['cursor://anysphere.cursor-retrieval/oauth/callback'],
+    client_name: 'Test Client'
+  })
+});
+
+// mcp-sdk/ - Real MCP SDK client
+import { MCPClient } from '@modelcontextprotocol/sdk/client/index.js';
+const client = new MCPClient({
+  transport: new HTTPClientTransport({
+    baseUrl: 'http://localhost:3000/mcp',
+  })
+});
+```
 
 ### Directory Structure
 
 ```
 specs/
-├── standards/                          # RFC-compliant OAuth/MCP clients
+├── standards/                          # Direct HTTP/RFC compliance testing
 │   ├── connecting-to-tool-use/         # Main happy path flow (API Flow Phases 1-5)
 │   │   ├── initial-connection.test.js
 │   │   ├── oauth-discovery.test.js
@@ -49,6 +87,23 @@ specs/
 │       ├── concurrent-sessions.test.js
 │       ├── session-cleanup.test.js
 │       └── transport-lifecycle.test.js
+│
+├── mcp-sdk/                            # MCP SDK-based client testing
+│   ├── connecting-to-tool-use/         # Real MCP client integration
+│   │   ├── sdk-initialization.test.js
+│   │   ├── automatic-oauth-flow.test.js
+│   │   ├── tool-discovery.test.js
+│   │   └── tool-execution.test.js
+│   │
+│   ├── client-compatibility/           # Real client testing
+│   │   ├── cursor-ide.test.js
+│   │   ├── multiple-clients.test.js
+│   │   └── concurrent-sdk-sessions.test.js
+│   │
+│   └── error-recovery/                 # SDK error handling
+│       ├── token-refresh.test.js
+│       ├── network-failures.test.js
+│       └── server-restart.test.js
 │
 ├── vs-code-copilot/                    # VS Code Copilot specific deviations only
 │   └── connecting-to-tool-use/         # Only tests that deviate from standards
@@ -90,7 +145,7 @@ Each test file corresponds to specific phases in the [API Flow](../server/api-fl
 
 ## VS Code Copilot Deviation Strategy
 
-**Principle**: VS Code Copilot tests only include test files where behavior deviates from RFC standards.
+**Principle**: VS Code Copilot tests only include test files where behavior deviates from both standards and MCP SDK approaches.
 
 ### Deviations Documented
 
@@ -98,11 +153,12 @@ Each test file corresponds to specific phases in the [API Flow](../server/api-fl
 2. **`session-establishment.test.js`**: Client detection via User-Agent `"node"` and MCP clientInfo `"Visual Studio Code"`
 
 ### Standard Tests NOT Included in VS Code Copilot
-- `oauth-discovery.test.js`: Same as standards
-- `authorization.test.js`: Same as standards  
-- `token-exchange.test.js`: Same as standards
-- `tool-discovery.test.js`: Same as standards
-- `tool-execution.test.js`: Same as standards
+VS Code Copilot behavior aligns with both `standards/` and `mcp-sdk/` test suites for most scenarios:
+- OAuth discovery, authorization, token exchange
+- Tool discovery and execution  
+- Session management and error handling
+
+Only the `resource_metadata_url` parameter deviation requires special testing.
 
 ## Test Environment Setup
 
@@ -170,25 +226,30 @@ TEST_USE_PAT_BYPASS=true                           # Enable PAT bypass mode
 
 **Test Implementation**:
 ```javascript
+import { MCPClient } from '@modelcontextprotocol/sdk/client/index.js';
+import { HTTPClientTransport } from '@modelcontextprotocol/sdk/client/http.js';
+
 describe('OAuth Flow - Happy Path', () => {
-  test('complete OAuth flow with PKCE', async () => {
-    // Skip OAuth discovery in PAT bypass mode
-    if (process.env.TEST_USE_PAT_BYPASS === 'true') {
-      console.log('🔧 PAT bypass mode: skipping OAuth discovery tests');
-      
-      // In PAT mode, test JWT creation and MCP session establishment
-      const tokens = await completePkceFlow({}); // Empty metadata in PAT mode
-      expect(tokens.access_token).toBeDefined();
-      
-      // Test that MCP session works with PAT-based JWT
-      const authenticatedMcp = await fetch('/mcp', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${tokens.access_token}` },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 1,
-          method: 'initialize',
-          params: { protocolVersion: '2025-06-18' }
+  test('complete OAuth flow with PKCE using MCP SDK', async () => {
+    // Use real MCP SDK client - this will automatically trigger OAuth flow
+    const client = new MCPClient({
+      transport: new HTTPClientTransport({
+        baseUrl: 'http://localhost:3000/mcp',
+      })
+    });
+    
+    // MCP SDK automatically handles:
+    // 1. Dynamic client registration (POST /register)
+    // 2. OAuth discovery (/.well-known/oauth-authorization-server)
+    // 3. PKCE authorization flow
+    // 4. Token exchange and storage
+    // 5. MCP session initialization
+    await client.initialize();
+    
+    // Verify we can call tools through the authenticated session
+    const tools = await client.listTools();
+    expect(tools.tools).toContain('get-accessible-sites');
+  });
         })
       });
       
@@ -861,7 +922,7 @@ describe('Performance - Session Management', () => {
 
 ### Test Utilities
 
-#### Authentication Helper
+#### Authentication Helper - Standards (Direct HTTP)
 ```javascript
 async function establishAuthenticatedSession() {
   // RFC 6749 + RFC 7636: Complete OAuth PKCE flow
@@ -879,44 +940,64 @@ async function establishAuthenticatedSession() {
     })
   });
   
-  // MCP HTTP Transport: Establish SSE for async responses
-  const sseStream = await establishSSEConnection(tokens.access_token);
-  
   return {
     token: tokens.access_token,
-    refreshToken: tokens.refresh_token,
-    sessionId: mcpResponse.headers.get('mcp-session-id'), // MCP Session Management
-    sseStream
+    sessionId: mcpResponse.headers.get('mcp-session-id')
   };
 }
 ```
 
-#### Tool Call Helper
+#### Authentication Helper - MCP SDK
 ```javascript
-async function callTool(session, toolName, params) {
-  // MCP Tools API Section 4.1 https://modelcontextprotocol.io/docs/specification/tools#tool-execution
-  // tools/call method
-  const response = await fetch('/mcp', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${session.token}`,   // RFC 6750 Section 2.1 https://tools.ietf.org/html/rfc6750#section-2.1
-      'mcp-session-id': session.sessionId          // MCP Session Management
-    },
-    body: JSON.stringify({
-      jsonrpc: '2.0',     // JSON-RPC 2.0 Section 4.1 https://www.jsonrpc.org/specification#request_object
-      id: Date.now(),     // JSON-RPC 2.0: Unique request identifier
-      method: 'tools/call',
-      params: { name: toolName, arguments: params } // MCP Tools API Section 4.1
+import { MCPClient } from '@modelcontextprotocol/sdk/client/index.js';
+import { HTTPClientTransport } from '@modelcontextprotocol/sdk/client/http.js';
+
+async function establishAuthenticatedSession() {
+  // Use real MCP SDK client - automatically handles OAuth flow
+  const client = new MCPClient({
+    transport: new HTTPClientTransport({
+      baseUrl: 'http://localhost:3000/mcp',
     })
   });
   
-  // MCP HTTP Transport https://modelcontextprotocol.io/docs/specification/transport#http
-  // 202 indicates async processing via SSE
-  if (response.status === 202) {
-    return await waitForSSEResponse(session.sseStream, `tools/call/${toolName}`);
-  }
+  // MCP SDK handles OAuth discovery, registration, and authentication automatically
+  await client.initialize();
+  return client;
+}
+```
+
+#### Tool Call Helper - Standards (Direct HTTP)
+```javascript
+async function callTool(session, toolName, params) {
+  // MCP Tools API Section 4.1 - Manual JSON-RPC request
+  const response = await fetch('/mcp', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${session.token}`,
+      'mcp-session-id': session.sessionId,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: Date.now(),
+      method: 'tools/call',
+      params: { name: toolName, arguments: params }
+    })
+  });
   
   return await response.json();
+}
+```
+
+#### Tool Call Helper - MCP SDK  
+```javascript
+async function callTool(client, toolName, params) {
+  // Use MCP SDK's built-in tool calling
+  const result = await client.callTool({
+    name: toolName,
+    arguments: params
+  });
+  return result;
 }
 ```
 
@@ -1028,14 +1109,13 @@ TEST_USE_PAT_BYPASS=false npm run test:e2e:dev
 TEST_SHORT_AUTH_TOKEN_EXP=30 TEST_USE_PAT_BYPASS=true TEST_ATLASSIAN_PAT=your_pat_token npm run test:e2e:dev
 
 # Run specific test suite with PAT bypass
-TEST_USE_PAT_BYPASS=true TEST_ATLASSIAN_PAT=your_pat_token npm run test:e2e:oauth
-TEST_USE_PAT_BYPASS=true TEST_ATLASSIAN_PAT=your_pat_token npm run test:e2e:tools
-TEST_USE_PAT_BYPASS=true TEST_ATLASSIAN_PAT=your_pat_token npm run test:e2e:lifecycle
+TEST_USE_PAT_BYPASS=true TEST_ATLASSIAN_PAT=your_pat_token npm run test:e2e:standards
+TEST_USE_PAT_BYPASS=true TEST_ATLASSIAN_PAT=your_pat_token npm run test:e2e:mcp-sdk  
 TEST_USE_PAT_BYPASS=true TEST_ATLASSIAN_PAT=your_pat_token npm run test:e2e:vs-code-copilot
 
 # Manual OAuth testing (comprehensive but requires user interaction)
-npm run test:e2e:oauth:manual
-npm run test:e2e:tools:manual
+npm run test:e2e:standards:manual
+npm run test:e2e:mcp-sdk:manual
 npm run test:e2e:vs-code-copilot:manual
 ```
 

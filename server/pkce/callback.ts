@@ -58,16 +58,22 @@ export const callback: OAuthHandler = async (req: Request, res: Response): Promi
 
   // State validation: both should be undefined or both should match
   const stateMatches = normalizedState === req.session.state;
+  
+  // For MCP clients using their own PKCE, state parameter is optional
+  const isMcpPkceFlow = req.session.usingMcpPkce;
+  const stateValidationPassed = isMcpPkceFlow ? true : stateMatches;
 
-  if (!code || !stateMatches) {
+  if (!code || !stateValidationPassed) {
     console.error('  State or code validation failed:', {
       hasCode: !!code,
       stateMatch: stateMatches,
+      isMcpPkceFlow,
+      stateValidationPassed,
       receivedState: state,
       normalizedState,
       expectedState: req.session.state,
     });
-    res.status(400).send('Invalid state or code');
+    res.status(400).send('Invalid OAuth callback state - missing redirect URI or invalid PKCE configuration');
     return;
   }
   
@@ -77,8 +83,8 @@ export const callback: OAuthHandler = async (req: Request, res: Response): Promi
   // If we're using MCP's PKCE, we can't do the token exchange here
   // because we don't have the code verifier. Instead, we need to pass
   // the authorization code back to the MCP client so it can complete the exchange.
-  if (usingMcpPkce && mcpRedirectUri && normalizedState) {
-    console.log(' Using MCP PKCE - redirecting code back to MCP client');
+  if (usingMcpPkce && mcpRedirectUri) {
+    console.log('  Using MCP PKCE - redirecting code back to MCP client');
 
     // Clear session data
     delete req.session.codeVerifier;
@@ -90,8 +96,12 @@ export const callback: OAuthHandler = async (req: Request, res: Response): Promi
     delete req.session.usingMcpPkce;
 
     // Redirect back to MCP client with the authorization code
-    const redirectUrl = `${mcpRedirectUri}?code=${encodeURIComponent(code)}&state=${encodeURIComponent(normalizedState)}`;
-    console.log(' Redirecting to MCP client with auth code:', redirectUrl);
+    // Include state only if it was provided
+    let redirectUrl = `${mcpRedirectUri}?code=${encodeURIComponent(code)}`;
+    if (normalizedState) {
+      redirectUrl += `&state=${encodeURIComponent(normalizedState)}`;
+    }
+    console.log('  Redirecting to MCP client with auth code:', redirectUrl);
     res.redirect(redirectUrl);
     return;
   }
