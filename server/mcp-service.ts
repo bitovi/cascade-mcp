@@ -179,7 +179,7 @@ export async function handleSessionRequest(req: Request, res: Response): Promise
   
   const sessionId = req.headers['mcp-session-id'] as string | undefined;
   if (!sessionId || !transports[sessionId]) {
-    console.log(`Invalid or missing session ID: ${sessionId}`);
+    console.log(`❌ Session ID issue - sessionId: ${sessionId}, available sessions: [${Object.keys(transports).join(', ')}]`);
     res.status(400).send('Invalid or missing session ID');
     return;
   }
