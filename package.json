@@ -8,8 +8,7 @@
     "start-local": "node --import ./loader.mjs server/server.ts",
     "typecheck": "tsc --noEmit",
     "prepare": "husky",
-    "atlassian-mcp-test": "node --import ./loader.mjs specs/atlassian-mcp-analysis/run-test.js",
-    "atlassian-mcp-test-quick": "node --import ./loader.mjs specs/atlassian-mcp-analysis/run-test.js --duration 10 --interval 10"
+    "test:e2e:mcp-sdk:mock": "TEST_USE_MOCK_ATLASSIAN=true jest specs/mcp-sdk --testTimeout=30000 --runInBand"
   },
   "lint-staged": {
     "**/*": "prettier --write --ignore-unknown"
@@ -42,6 +41,7 @@
     "winston-cloudwatch": "^6.3.0"
   },
   "devDependencies": {
+    "@jest/globals": "^30.1.2",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/express-session": "^1.18.2",
@@ -51,11 +51,52 @@
     "@types/uuid": "^10.0.0",
     "commander": "^12.1.0",
     "husky": "^9.1.4",
+    "jest": "^30.1.2",
     "open": "^10.2.0",
     "openid-client": "^5.7.1",
     "prettier": "3.5.3",
     "semver": "^7.6.3",
+    "ts-jest": "^29.4.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.2"
+  },
+  "jest": {
+    "preset": "ts-jest/presets/default-esm",
+    "extensionsToTreatAsEsm": [
+      ".ts"
+    ],
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/specs/**/*.test.js",
+      "**/specs/**/*.test.ts"
+    ],
+    "transform": {
+      "^.+\\.ts$": [
+        "ts-jest",
+        {
+          "useESM": true
+        }
+      ],
+      "^.+\\.js$": [
+        "ts-jest",
+        {
+          "useESM": true
+        }
+      ]
+    },
+    "transformIgnorePatterns": [
+      "node_modules/(?!(@modelcontextprotocol|node-fetch)/)"
+    ],
+    "moduleNameMapper": {
+      "^(\\.{1,2}/.*)\\.js$": "$1"
+    },
+    "collectCoverageFrom": [
+      "server/**/*.{js,ts}",
+      "!server/**/*.d.ts",
+      "!server/**/*.test.{js,ts}"
+    ],
+    "setupFilesAfterEnv": [
+      "<rootDir>/specs/shared/config/jest-setup.js"
+    ]
   }
 }

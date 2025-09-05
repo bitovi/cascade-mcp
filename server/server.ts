@@ -66,6 +66,11 @@ app.use(function onError(err: Error, req: Request, res: Response, next: NextFunc
 });
 
 // --- OAuth Endpoints ---
+// Health check endpoint for tests
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // Root endpoint for service discovery
 app.get('/', (req, res) => {
   const baseUrl = process.env.VITE_AUTH_SERVER_URL || `http://localhost:${process.env.PORT || 3000}`;

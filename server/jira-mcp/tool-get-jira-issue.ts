@@ -9,6 +9,31 @@ import { resolveCloudId } from './atlassian-helpers.ts';
 import { sanitizeObjectWithJWTs } from '../tokens.ts';
 import type { McpServer } from './mcp-types.ts';
 
+/**
+ * Determine if we should use PAT (Personal Access Token) authentication
+ * and format the appropriate Authorization header
+ * @param token - The token to analyze
+ * @returns Object with authType and Authorization header value
+ */
+function getAuthHeader(token: string): { authType: 'PAT' | 'Bearer', authorization: string } {
+  // Use PAT format when TEST_USE_MOCK_ATLASSIAN is true (indicates test mode with PATs)
+  const usePAT = process.env.TEST_USE_MOCK_ATLASSIAN === 'true';
+  
+  if (usePAT) {
+    // Token is already base64-encoded for Basic auth
+    return {
+      authType: 'PAT',
+      authorization: `Basic ${token}`
+    };
+  }
+  
+  // Default to Bearer token (OAuth)
+  return {
+    authType: 'Bearer',
+    authorization: `Bearer ${token}`
+  };
+}
+
 // Tool parameters interface
 interface GetJiraIssueParams {
   issueKey: string;
@@ -112,21 +137,21 @@ export function registerGetJiraIssueTool(mcp: McpServer): void {
           issueUrl += `?${params.toString()}`;
         }
 
+        // Determine the appropriate authentication method
+        const { authType, authorization } = getAuthHeader(token);
+
         logger.info('Making Jira API request for issue details', sanitizeObjectWithJWTs({ 
           issueKey, 
           cloudId: targetCloudId,
           fetchUrl: issueUrl,
-          requestToken: token,
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json'
-          }
+          authType,
+          requestToken: token
         }));
 
         // Get issue details using direct fetch API
         const issueRes = await fetch(issueUrl, {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: authorization,
             Accept: 'application/json',
           },
         });
