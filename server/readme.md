@@ -65,6 +65,77 @@
 - **Token Expiration**: Tools throw `InvalidTokenError` for automatic refresh
 - **Session Management**: Proper cleanup prevents memory leaks
 
+## Available MCP Tools
+
+### fetch
+**Purpose**: Fetch Jira issue details by issue key/ID for ChatGPT MCP clients  
+**Parameters**: 
+- `id` (string): The Jira issue key or ID (e.g., "USER-10", "PROJ-123")
+
+**Returns**: OpenAI MCP fetch tool specification format:
+```json
+{
+  "id": "PROJ-123",
+  "title": "PROJ-123: Issue summary",
+  "text": "Issue description or 'No description available'",
+  "url": "https://yoursite.atlassian.net/browse/PROJ-123",
+  "metadata": {
+    "status": "To Do",
+    "assignee": "John Doe",
+    "priority": "High",
+    "issueType": "Bug",
+    "project": "My Project",
+    "cloudId": "...",
+    "siteName": "yoursite"
+  }
+}
+```
+
+### get-jira-issue  
+**Purpose**: Retrieve complete Jira issue details with full API response  
+**Parameters**:
+- `issueKey` (string): Jira issue key or ID
+- `cloudId` (optional): Specific cloud ID
+- `siteName` (optional): Site name for cloud ID resolution
+- `fields` (optional): Comma-separated field list
+
+### search
+**Purpose**: Search for Jira issues by query string (ChatGPT compatible)  
+**Parameters**:
+- `query` (string): Search query to find relevant Jira issues
+
+**Returns**: OpenAI MCP format with JSON-encoded results array
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\"results\":[{\"id\":\"PROJ-123\",\"title\":\"Issue Summary\",\"url\":\"https://yoursite.atlassian.net/browse/PROJ-123\"}]}"
+    }
+  ]
+}
+```
+
+### get-accessible-sites
+**Purpose**: List all accessible Atlassian sites for the authenticated user  
+**Parameters**: None
+
+### get-jira-attachments
+**Purpose**: Fetch Jira issue attachments by attachment IDs  
+**Parameters**:
+- `attachmentIds` (array): Array of attachment IDs to fetch
+- `cloudId` (optional): Specific cloud ID  
+- `siteName` (optional): Site name for cloud ID resolution
+
+### update-issue-description
+**Purpose**: Update a Jira issue's description with markdown content  
+**Parameters**:
+- `issueKey` (string): Jira issue key or ID
+- `description` (string): New description in markdown format
+- `cloudId` (optional): Specific cloud ID
+- `siteName` (optional): Site name for cloud ID resolution
+- `notifyUsers` (boolean, default: true): Whether to send notifications
+
 ## Integration Points
 
 ### External APIs
