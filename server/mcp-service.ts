@@ -311,7 +311,11 @@ function validateAndExtractJwt(token: string, req: Request, res: Response, sourc
       return { authInfo: null, errored: true };
     }
 
-    // Conditionally check expiration if env var is set
+    // Only enforce JWT expiration if CHECK_JWT_EXPIRATION is set to 'true'.
+    // This is intentional: strict expiration is NOT the default, because some MCP clients (like VS Code)
+    // may get stuck and not refresh tokens properly if they receive a 401 for an expired token.
+    // By default (unset or any value except 'true'), expiration is NOT checked, which is safer for production.
+    // Set CHECK_JWT_EXPIRATION=true to enable strict mode for testing refresh flows.
     const checkExpiration = String(process.env.CHECK_JWT_EXPIRATION).toLowerCase() === 'true';
     if (checkExpiration) {
       const now = Math.floor(Date.now() / 1000);
