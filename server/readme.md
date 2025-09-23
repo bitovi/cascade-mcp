@@ -65,6 +65,44 @@
 - **Token Expiration**: Tools throw `InvalidTokenError` for automatic refresh
 - **Session Management**: Proper cleanup prevents memory leaks
 
+## Available MCP Tools
+
+### Core Jira Tools
+- **`get-accessible-sites`** - Retrieves all Jira sites accessible to the authenticated user
+- **`get-jira-issue`** - Fetches detailed information about a specific Jira issue 
+- **`get-jira-attachments`** - Downloads and returns attachments from a Jira issue as base64-encoded content
+- **`update-issue-description`** - Updates a Jira issue description with markdown content, with optional attachment upload support
+
+### Enhanced Attachment Support
+The `update-issue-description` tool now supports simultaneous description updates and attachment uploads:
+
+```typescript
+// Example usage with attachments
+{
+  "issueKey": "PROJ-123",
+  "description": "## Bug Report\n\nScreenshot: ![Error Screenshot](./error.png)",
+  "attachments": [
+    {
+      "filename": "error.png",
+      "content": "iVBORw0KGgoAAAANSUhEUgAAAA...", // base64
+      "mimeType": "image/png", 
+      "markdownRef": "./error.png"
+    }
+  ]
+}
+```
+
+**Workflow:**
+1. Uploads attachments to Jira first
+2. Replaces markdown image references with Jira URLs
+3. Converts updated markdown to ADF format
+4. Updates the issue description
+
+**Benefits:**
+- Atomic operation (description + attachments)
+- Automatic URL replacement in markdown
+- Comprehensive success reporting with attachment details
+
 ## Integration Points
 
 ### External APIs

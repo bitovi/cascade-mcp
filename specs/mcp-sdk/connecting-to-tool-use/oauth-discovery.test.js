@@ -238,6 +238,7 @@ describe('MCP SDK: OAuth Flow to Token', () => {
         // Initialize - MCP SDK should handle OAuth automatically
         await client.initialize();
         
+        // a 
         console.log('✅ MCP SDK completed OAuth and initialized successfully');
         
       } catch (error) {
