@@ -28,7 +28,7 @@ import { randomUUID } from 'node:crypto';
 import { logger } from './observability/logger.ts';
 import { jwtVerify, sanitizeJwtPayload, formatTokenWithExpiration, parseJWT, type JWTPayload } from './tokens.ts';
 import { type AuthContext } from './jira-mcp/auth-context-store.ts';
-
+import { serverInstanceScope, serverStartTime } from './pkce/discovery.ts';
 // Validation result interface
 interface ValidationResult {
   authInfo: AuthContext | null;
@@ -251,7 +251,7 @@ function isVSCodeClient(req: Request): boolean {
 function createWwwAuthenticate(req: Request, errorDescription: string | null = null, errorCode: string = 'invalid_token'): string {
   const metadataUrl = `${process.env.VITE_AUTH_SERVER_URL}/.well-known/oauth-protected-resource`;
   
-  let authValue = `Bearer realm="mcp"`;
+  let authValue = `Bearer realm="mcp", scope="${serverInstanceScope}"`;
   
   // Add error parameters if provided (RFC 6750 Section 3.1)
   if (errorDescription) {

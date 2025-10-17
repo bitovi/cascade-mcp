@@ -26,6 +26,14 @@ import crypto from 'crypto';
 import { Request, Response } from 'express';
 import { OAuthClientMetadataSchema } from '@modelcontextprotocol/sdk/shared/auth.js';
 import type { OAuthHandler } from './types.ts';
+// Track server startup time for restart detection
+const serverStartTime = new Date();
+// 🔑 FIX: Include server instance in scopes to force VS Code to refresh tokens
+// This must match the scope in the WWW-Authenticate header
+// https://github.com/microsoft/vscode/issues/270383
+const serverInstanceScope = `server-instance-${serverStartTime.getTime()}`;
+
+export { serverStartTime, serverInstanceScope };
 
 /**
  * OAuth Metadata Endpoint
@@ -42,7 +50,7 @@ export const oauthMetadata: OAuthHandler = (req: Request, res: Response): void =
     response_types_supported: ['code'],
     grant_types_supported: ['authorization_code', 'refresh_token'],
     token_endpoint_auth_methods_supported: ['none', 'client_secret_post'],
-    scopes_supported: ['read:jira-work', 'offline_access'],
+    scopes_supported: ['read:jira-work', 'offline_access', serverInstanceScope],
   });
 };
 
@@ -60,7 +68,7 @@ export const oauthProtectedResourceMetadata: OAuthHandler = (req: Request, res: 
   const metadata = {
     resource: baseUrl,
     authorization_servers: [baseUrl],
-    scopes_supported: ['read:jira-work', 'write:jira-work', 'offline_access'],
+    scopes_supported: ['read:jira-work', 'write:jira-work', 'offline_access', serverInstanceScope],
     bearer_methods_supported: ['header', 'body'],
     resource_documentation: `${baseUrl}/docs`,
   };
@@ -81,7 +89,6 @@ export const dynamicClientRegistration: OAuthHandler = (req: Request, res: Respo
   try {
     // Validate incoming request using MCP SDK schema
     const clientMetadata = OAuthClientMetadataSchema.parse(req.body);
-    console.log('  ✅ Client metadata validation successful');
 
     // Generate a unique client ID for this MCP client
     const clientId = `mcp_${crypto.randomUUID()}`;
@@ -101,14 +108,6 @@ export const dynamicClientRegistration: OAuthHandler = (req: Request, res: Respo
       ...(clientMetadata.client_uri && { client_uri: clientMetadata.client_uri }),
       ...(clientMetadata.logo_uri && { logo_uri: clientMetadata.logo_uri }),
     };
-
-    console.log('  Registered new MCP client:', {
-      client_id: clientId,
-      redirect_uris: clientMetadata.redirect_uris,
-      scope: 'read:jira-work write:jira-work offline_access',
-      auth_method: 'none',
-      grant_types: registrationResponse.grant_types,
-    });
 
     res.status(201).json(registrationResponse);
   } catch (error) {
