@@ -8,31 +8,7 @@ import { getAuthInfoSafe, handleJiraAuthError } from './auth-helpers.ts';
 import { resolveCloudId } from './atlassian-helpers.ts';
 import { sanitizeObjectWithJWTs } from '../tokens.ts';
 import type { McpServer } from './mcp-types.ts';
-
-/**
- * Determine if we should use PAT (Personal Access Token) authentication
- * and format the appropriate Authorization header
- * @param token - The token to analyze
- * @returns Object with authType and Authorization header value
- */
-function getAuthHeader(token: string): { authType: 'PAT' | 'Bearer', authorization: string } {
-  // Use PAT format when TEST_USE_MOCK_ATLASSIAN is true (indicates test mode with PATs)
-  const usePAT = process.env.TEST_USE_MOCK_ATLASSIAN === 'true';
-  
-  if (usePAT) {
-    // Token is already base64-encoded for Basic auth
-    return {
-      authType: 'PAT',
-      authorization: `Basic ${token}`
-    };
-  }
-  
-  // Default to Bearer token (OAuth)
-  return {
-    authType: 'Bearer',
-    authorization: `Bearer ${token}`
-  };
-}
+import { getJiraIssue } from './atlassian-helpers.ts';
 
 // Tool parameters interface
 interface GetJiraIssueParams {
@@ -129,38 +105,7 @@ export function registerGetJiraIssueTool(mcp: McpServer): void {
         const targetCloudId = siteInfo.cloudId;
 
         // Build the API URL
-        let issueUrl = `https://api.atlassian.com/ex/jira/${targetCloudId}/rest/api/3/issue/${issueKey}`;
-        
-        // Add fields parameter if specified
-        if (fields) {
-          const params = new URLSearchParams({ fields });
-          issueUrl += `?${params.toString()}`;
-        }
-
-        // Determine the appropriate authentication method
-        const { authType, authorization } = getAuthHeader(token);
-
-        logger.info('Making Jira API request for issue details', sanitizeObjectWithJWTs({ 
-          issueKey, 
-          cloudId: targetCloudId,
-          fetchUrl: issueUrl,
-          authType,
-          requestToken: token
-        }));
-
-        // Get issue details using direct fetch API
-        const issueRes = await fetch(issueUrl, {
-          headers: {
-            Authorization: authorization,
-            Accept: 'application/json',
-          },
-        });
-
-        logger.info('Issue fetch response', {
-          status: issueRes.status,
-          statusText: issueRes.statusText,
-          contentType: issueRes.headers.get('content-type')
-        });
+        const issueRes = await getJiraIssue(targetCloudId, issueKey, fields, token);
 
         if (issueRes.status === 404) {
           logger.warn('Issue not found', { issueKey });
@@ -208,3 +153,4 @@ export function registerGetJiraIssueTool(mcp: McpServer): void {
     },
   );
 }
+
