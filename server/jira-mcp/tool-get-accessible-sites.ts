@@ -22,7 +22,7 @@ export function registerGetAccessibleSitesTool(mcp: McpServer): void {
     async (_, context) => {
       // Get auth info with proper error handling
       const authInfo = getAuthInfoSafe(context, 'get-accessible-sites');
-      const token = authInfo?.atlassian_access_token;
+      const token = authInfo?.atlassian?.access_token;
 
       if (!token) {
         return {

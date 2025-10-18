@@ -18,6 +18,9 @@ import { handleMcpPost, handleSessionRequest } from './mcp-service.ts';
 import { renderManualTokenPage } from './manual-token-flow.ts';
 import cors from 'cors';
 import { logger } from './observability/logger.ts';
+import { makeAuthorize, makeCallback, hubCallbackHandler } from './auth/oauth-factories.js';
+import { renderConnectionHub, handleConnectionDone } from './auth/consent-page.js';
+import { atlassianProvider } from './providers/atlassian/index.js';
 
 // configurations
 dotenv.config();
@@ -104,6 +107,16 @@ app.get('/get-access-token', renderManualTokenPage);
 app.get('/authorize', authorize);
 app.post('/register', express.json(), clientRegistration);
 app.get('/callback', callback);
+
+// --- Connection Hub Routes (Phase 1.3) ---
+// Per Q25: Static routes with factory functions
+app.get('/auth/connect', renderConnectionHub);
+app.get('/auth/connect/atlassian', makeAuthorize(atlassianProvider));
+app.get('/auth/callback/atlassian', makeCallback(atlassianProvider, { onSuccess: hubCallbackHandler }));
+app.get('/auth/done', handleConnectionDone);
+// Figma routes will be added in Phase 1.4:
+// app.get('/auth/connect/figma', makeAuthorize(figmaProvider));
+// app.get('/auth/callback/figma', makeCallback(figmaProvider, { onSuccess: hubCallbackHandler }));
 
 // --- MCP HTTP Endpoints ---
 // Handle POST requests for client-to-server communication

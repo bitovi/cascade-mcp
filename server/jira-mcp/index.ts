@@ -18,6 +18,7 @@ import { registerGetAccessibleSitesTool } from './tool-get-accessible-sites.ts';
 import { registerGetJiraIssueTool } from './tool-get-jira-issue.ts';
 import { registerGetJiraAttachmentsTool } from './tool-get-jira-attachments.ts';
 import { registerCreateShellStoriesTool } from './tool-create-shell-stories.ts';
+import { registerSampleTestingTool } from './tool-sample-testing.ts';
 
 // Create MCP server instance
 const mcp = new McpServer(
@@ -28,6 +29,7 @@ const mcp = new McpServer(
   {
     capabilities: {
       tools: {},
+      logging: {},
     },
   },
 );
@@ -39,7 +41,8 @@ registerUpdateIssueDescriptionTool(mcp);
 registerGetAccessibleSitesTool(mcp);
 registerGetJiraIssueTool(mcp);
 registerGetJiraAttachmentsTool(mcp);
-registerCreateShellStoriesTool(mcp);
+registerSampleTestingTool(mcp);
+//registerCreateShellStoriesTool(mcp);
 
 logger.info('All MCP tools registered successfully');
 

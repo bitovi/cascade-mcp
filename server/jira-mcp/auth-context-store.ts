@@ -1,19 +1,36 @@
 /**
- * Authentication context store management for MCP Jira tools
- * Extracted from auth-helpers.js for better separation of concerns
+ * Authentication context store management for MCP tools
+ * Supports multi-provider OAuth with nested token structure
  */
 
 import { logger } from '../observability/logger.ts';
 
-// Define the AuthContext interface based on the Atlassian token structure
+/**
+ * Provider-specific authentication credentials
+ */
+export interface ProviderAuthInfo {
+  access_token: string;
+  refresh_token: string;
+  expires_at: number;
+  scope?: string;
+  // Provider-specific optional fields
+  cloudId?: string;  // Atlassian
+  user_id?: string;  // Figma
+}
+
+/**
+ * Multi-provider authentication context
+ * Uses nested structure for clean provider separation
+ * Example: authInfo.atlassian.access_token, authInfo.figma.access_token
+ */
 export interface AuthContext {
   sessionId?: string;
-  atlassian_access_token: string;
-  refresh_token: string;
-  exp: number;
-  scope: string;
-  iss: string;
-  aud: string;
+  // Multi-provider tokens (nested structure per Q21, Q22)
+  atlassian?: ProviderAuthInfo;
+  figma?: ProviderAuthInfo;
+  // JWT metadata (preserved for compatibility)
+  iss?: string;
+  aud?: string;
   sub?: string;
   iat?: number;
 }
@@ -49,34 +66,49 @@ function getTokenLogInfo(token?: string, prefix: string = 'Token'): Record<strin
  * @param authInfo - Authentication information
  */
 export function setAuthContext(transportId: string, authInfo: AuthContext): void {
-  const token = authInfo?.atlassian_access_token;
+  const atlassianToken = authInfo?.atlassian?.access_token;
+  const figmaToken = authInfo?.figma?.access_token;
   const now = Math.floor(Date.now() / 1000);
-  const expiresIn = authInfo?.exp ? authInfo.exp - now : null;
+  
+  // Calculate expiry for Atlassian tokens
+  const atlassianExpiresIn = authInfo?.atlassian?.expires_at 
+    ? authInfo.atlassian.expires_at - now 
+    : null;
   
   logger.info('Storing auth context for transport', {
     transportId,
-    ...getTokenLogInfo(token, 'atlassianToken'),
-    hasRefreshToken: !!authInfo?.refresh_token,
-    scope: authInfo?.scope,
+    providers: {
+      atlassian: authInfo?.atlassian ? {
+        ...getTokenLogInfo(atlassianToken, 'atlassianToken'),
+        hasRefreshToken: !!authInfo.atlassian.refresh_token,
+        scope: authInfo.atlassian.scope,
+        expiresIn: atlassianExpiresIn,
+        expiresAt: authInfo.atlassian.expires_at 
+          ? new Date(authInfo.atlassian.expires_at * 1000).toISOString() 
+          : null,
+      } : null,
+      figma: authInfo?.figma ? {
+        ...getTokenLogInfo(figmaToken, 'figmaToken'),
+        hasRefreshToken: !!authInfo.figma.refresh_token,
+        scope: authInfo.figma.scope,
+      } : null,
+    },
     issuer: authInfo?.iss,
     audience: authInfo?.aud,
-    exp: authInfo?.exp,
-    expiresIn,
-    expiresAt: authInfo?.exp ? new Date(authInfo.exp * 1000).toISOString() : null,
     authInfoKeys: Object.keys(authInfo || {}),
   });
   
-  // Warn if token is already expired or expires soon
-  if (expiresIn !== null) {
-    if (expiresIn <= 0) {
-      logger.warn('Storing already expired token!', {
+  // Warn if Atlassian token is already expired or expires soon
+  if (atlassianExpiresIn !== null && authInfo?.atlassian) {
+    if (atlassianExpiresIn <= 0) {
+      logger.warn('Storing already expired Atlassian token!', {
         transportId,
-        expiredBy: Math.abs(expiresIn),
+        expiredBy: Math.abs(atlassianExpiresIn),
       });
-    } else if (expiresIn < 300) { // Less than 5 minutes
-      logger.warn('Storing token that expires soon', {
+    } else if (atlassianExpiresIn < 300) { // Less than 5 minutes
+      logger.warn('Storing Atlassian token that expires soon', {
         transportId,
-        expiresInMinutes: Math.floor(expiresIn / 60),
+        expiresInMinutes: Math.floor(atlassianExpiresIn / 60),
       });
     }
   }
@@ -114,7 +146,7 @@ export function getAuthContext(transportId: string): AuthContext | undefined {
  */
 export function getAuthInfo(context: any): AuthContext | null {
   // First try to get from context if it's directly available
-  if (context?.authInfo?.atlassian_access_token) {
+  if (context?.authInfo && (context.authInfo.atlassian || context.authInfo.figma)) {
     return context.authInfo;
   }
 
@@ -124,7 +156,7 @@ export function getAuthInfo(context: any): AuthContext | null {
   if (sessionId) {
     const authInfo = authContextStore.get(sessionId);
     
-    if (authInfo?.atlassian_access_token) {
+    if (authInfo && (authInfo.atlassian || authInfo.figma)) {
       return authInfo;
     }
   }

@@ -43,7 +43,7 @@ export const oauthMetadata: OAuthHandler = (req: Request, res: Response): void =
   console.log('↔️ Received request for OAuth metadata');
   res.json({
     issuer: process.env.VITE_AUTH_SERVER_URL,
-    authorization_endpoint: process.env.VITE_AUTH_SERVER_URL + '/authorize',
+    authorization_endpoint: process.env.VITE_AUTH_SERVER_URL + '/auth/connect',
     token_endpoint: process.env.VITE_AUTH_SERVER_URL + '/access-token',
     registration_endpoint: process.env.VITE_AUTH_SERVER_URL + '/register',
     code_challenge_methods_supported: ['S256'],

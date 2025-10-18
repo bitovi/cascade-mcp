@@ -39,8 +39,9 @@ let testForcingTokenExpired = false;
 
 /**
  * Check if a JWT token is expired
- * @param authInfo - Authentication info object containing exp field
- * @returns True if token is expired, false otherwise
+ * For multi-provider auth, checks if all provider tokens are expired
+ * @param authInfo - Authentication info object containing provider tokens
+ * @returns True if all provider tokens are expired, false if at least one is valid
  */
 export function isTokenExpired(authInfo: AuthContext | null): boolean {
   // Test mechanism to force token expiration
@@ -49,17 +50,23 @@ export function isTokenExpired(authInfo: AuthContext | null): boolean {
     return true;
   }
   
-  const now = Math.floor(Date.now() / 1000);
-  
-  if (!authInfo?.exp) {
-    // If no expiration field, assume it's expired for safety
+  if (!authInfo) {
     return true;
   }
   
-  // JWT exp field is in seconds, Date.now() is in milliseconds
-  const isExpired = now >= authInfo.exp;
+  const now = Math.floor(Date.now() / 1000);
   
-  return isExpired;
+  // Check if at least one provider has a valid (non-expired) token
+  const hasValidAtlassianToken = authInfo.atlassian && 
+    authInfo.atlassian.expires_at > now;
+  
+  const hasValidFigmaToken = authInfo.figma && 
+    authInfo.figma.expires_at > now;
+  
+  // If at least one provider has a valid token, not expired
+  const hasAnyValidToken = hasValidAtlassianToken || hasValidFigmaToken;
+  
+  return !hasAnyValidToken;
 }
 
 /**

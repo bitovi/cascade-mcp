@@ -63,7 +63,7 @@ export function registerGetJiraIssueTool(mcp: McpServer): void {
 
       // Get auth info with proper error handling
       const authInfo = getAuthInfoSafe(context, 'get-jira-issue');
-      const token = authInfo?.atlassian_access_token;
+      const token = authInfo?.atlassian?.access_token;
 
       if (!token) {
         logger.error('No Atlassian access token found in auth context');
@@ -79,8 +79,8 @@ export function registerGetJiraIssueTool(mcp: McpServer): void {
 
       logger.info('Found valid auth token for issue fetch', sanitizeObjectWithJWTs({
         atlassianToken: token,
-        hasRefreshToken: !!authInfo.refresh_token,
-        scope: authInfo.scope,
+        hasRefreshToken: !!authInfo.atlassian?.refresh_token,
+        scope: authInfo.atlassian?.scope,
         issuer: authInfo.iss,
         audience: authInfo.aud,
         operation: 'get-jira-issue',

@@ -69,7 +69,7 @@ export function getAtlassianConfig(): AtlassianConfig {
       tokenUrl: process.env.TEST_ATLASSIAN_TOKEN_URL || `${baseUrl}/mock-atlassian/token`,
       clientId: process.env.TEST_ATLASSIAN_CLIENT_ID || 'mock-test-client-id',
       clientSecret: process.env.TEST_ATLASSIAN_CLIENT_SECRET || 'mock-test-client-secret',
-      redirectUri: `${baseUrl}/callback`, // Server callback for MCP
+      redirectUri: process.env.VITE_JIRA_CALLBACK_URL || `${baseUrl}/auth/callback/atlassian`, // Use env var or default
       scopes: process.env.VITE_JIRA_SCOPE || 'read:jira-work write:jira-work offline_access',
     };
   }
@@ -80,7 +80,7 @@ export function getAtlassianConfig(): AtlassianConfig {
     tokenUrl: process.env.TEST_ATLASSIAN_TOKEN_URL || 'https://auth.atlassian.com/oauth/token',
     clientId: process.env.VITE_JIRA_CLIENT_ID,
     clientSecret: process.env.JIRA_CLIENT_SECRET,
-    redirectUri: (process.env.VITE_AUTH_SERVER_URL || '') + '/callback', // Server callback for MCP
+    redirectUri: process.env.VITE_JIRA_CALLBACK_URL || `${baseUrl}/auth/callback/atlassian`, // Use env var or default
     scopes: process.env.VITE_JIRA_SCOPE,
   };
 }

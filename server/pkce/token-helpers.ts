@@ -2,25 +2,25 @@
  * JWT Token Creation and Management Utilities
  * 
  * This module provides utilities for creating JWT access and refresh tokens that
- * embed Atlassian credentials for MCP clients. It handles token expiration logic
- * and maintains compatibility with MCP authentication requirements.
+ * embed provider credentials (Atlassian, Figma, etc.) for MCP clients. It handles 
+ * token expiration logic and maintains compatibility with MCP authentication requirements.
  * 
  * Specifications Implemented:
  * - RFC 7519 - JSON Web Token (JWT) creation and signing
  * - RFC 6749 - OAuth 2.0 token response formats and expiration
  * - Model Context Protocol (MCP) authentication token requirements
- * - Atlassian token embedding patterns for credential passthrough
+ * - Multi-provider token embedding with nested structure
  * 
  * Key Responsibilities:
- * - Create JWT access tokens with embedded Atlassian access tokens
- * - Create JWT refresh tokens with embedded Atlassian refresh tokens
+ * - Create JWT access tokens with nested provider credentials
+ * - Create JWT refresh tokens with nested provider refresh tokens
  * - Calculate appropriate token expiration times (1 minute buffer)
  * - Handle test mode short expiration for refresh flow testing
  * - Maintain token audience and scope for proper authorization
  * 
- * Token Structure:
- * - Access Token JWT contains `atlassian_access_token` in payload
- * - Refresh Token JWT contains `atlassian_refresh_token` with type marker
+ * Token Structure (Per Q21, Q22):
+ * - Access Token JWT contains nested structure: { atlassian: { access_token, refresh_token, ... }, figma: { ... } }
+ * - Refresh Token JWT contains nested provider refresh tokens
  * - Both include proper OAuth claims (aud, iss, sub, exp, scope)
  */
 
@@ -58,7 +58,8 @@ export interface TokenCreationOptions {
 }
 
 /**
- * Creates a Jira MCP access token (JWT) with embedded Atlassian access token
+ * Creates a Jira MCP access token (JWT) with nested Atlassian credentials
+ * Per Q21, Q22: Uses nested structure { atlassian: { access_token, refresh_token, expires_at, ... } }
  */
 export async function createJiraMCPAuthToken(
   atlassianTokens: ExtendedAtlassianTokenResponse, 
@@ -73,19 +74,25 @@ export async function createJiraMCPAuthToken(
     Math.max(60, atlassianExpiresIn - 60);
     
   const jwtExpirationTime = Math.floor(Date.now() / 1000) + jwtExpiresIn;
+  const atlassianExpiresAt = Math.floor(Date.now() / 1000) + atlassianExpiresIn;
   
   if (process.env.TEST_SHORT_AUTH_TOKEN_EXP) {
     console.log(`🧪 TEST MODE: Creating JWT token with ${jwtExpiresIn}s expiration (expires at ${new Date(jwtExpirationTime * 1000).toISOString()})`);
   }
 
-  // Create JWT with embedded Atlassian token
+  // Create JWT with nested Atlassian credentials (Q21, Q22)
   const jwt = await jwtSign({
     sub: options.sub || ('user-' + randomUUID()),
     iss: options.iss || process.env.VITE_AUTH_SERVER_URL,
     aud: options.resource || process.env.VITE_AUTH_SERVER_URL,
     scope: options.scope || ATLASSIAN_CONFIG.scopes,
-    atlassian_access_token: atlassianTokens.access_token,
-    refresh_token: atlassianTokens.refresh_token,
+    // Nested provider structure (Q21)
+    atlassian: {
+      access_token: atlassianTokens.access_token,
+      refresh_token: atlassianTokens.refresh_token,
+      expires_at: atlassianExpiresAt,
+      scope: ATLASSIAN_CONFIG.scopes,
+    },
     exp: jwtExpirationTime
   });
 
@@ -93,7 +100,8 @@ export async function createJiraMCPAuthToken(
 }
 
 /**
- * Creates a Jira MCP refresh token (JWT) with embedded Atlassian refresh token
+ * Creates a Jira MCP refresh token (JWT) with nested Atlassian refresh token
+ * Per Q21: Uses nested structure { atlassian: { refresh_token, ... } }
  */
 export async function createJiraMCPRefreshToken(
   atlassianTokens: ExtendedAtlassianTokenResponse, 
@@ -122,14 +130,17 @@ export async function createJiraMCPRefreshToken(
     }
   }
 
-  // Create a refresh token (longer-lived, contains Atlassian refresh token)
+  // Create a refresh token with nested structure (Q21)
   const refreshToken = await jwtSign({
     type: 'refresh_token',
     sub: options.sub || ('user-' + randomUUID()),
     iss: options.iss || process.env.VITE_AUTH_SERVER_URL,
     aud: options.resource || process.env.VITE_AUTH_SERVER_URL,
     scope: options.scope || ATLASSIAN_CONFIG.scopes,
-    atlassian_refresh_token: atlassianTokens.refresh_token,
+    // Nested provider structure for refresh tokens
+    atlassian: {
+      refresh_token: atlassianTokens.refresh_token,
+    },
     exp: refreshTokenExp
   });
 

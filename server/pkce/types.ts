@@ -34,6 +34,23 @@ declare module 'express-session' {
     mcpResource?: string;
     usingMcpPkce?: boolean;
     manualFlow?: { codeVerifier: string; state: string; isManualFlow: boolean; };
+    
+    // Multi-provider session fields (Phase 1.3)
+    provider?: string;  // Current provider being authenticated
+    codeChallenge?: string;  // PKCE challenge for current provider
+    codeChallengeMethod?: string;  // PKCE challenge method
+    providerTokens?: Record<string, {
+      access_token: string;
+      refresh_token?: string;
+      expires_at: number;
+      scope?: string;
+    }>;  // Tokens keyed by provider name
+    connectedProviders?: string[];  // List of connected provider names
+    
+    // MCP client's original PKCE parameters (stored from connection hub)
+    mcpCodeChallenge?: string;  // Original PKCE challenge from MCP client
+    mcpCodeChallengeMethod?: string;  // Original PKCE method from MCP client
+    mcpState?: string;  // Original state from MCP client
   }
 }
 

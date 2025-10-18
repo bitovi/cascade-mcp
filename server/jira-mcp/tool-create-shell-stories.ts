@@ -112,7 +112,7 @@ export function registerCreateShellStoriesTool(mcp: McpServer): void {
 
       // Get auth info with proper error handling
       const authInfo = getAuthInfoSafe(context, 'create-shell-stories');
-      const token = authInfo?.atlassian_access_token;
+      const token = authInfo?.atlassian?.access_token;
 
       if (!token) {
         console.log('No Atlassian access token found in auth context');
@@ -128,8 +128,8 @@ export function registerCreateShellStoriesTool(mcp: McpServer): void {
 
       console.log('Found valid auth token for issue creation', sanitizeObjectWithJWTs({
         atlassianToken: token,
-        hasRefreshToken: !!authInfo.refresh_token,
-        scope: authInfo.scope,
+        hasRefreshToken: !!authInfo.atlassian?.refresh_token,
+        scope: authInfo.atlassian?.scope,
         issuer: authInfo.iss,
         audience: authInfo.aud,
         operation: 'create-jira-issue',

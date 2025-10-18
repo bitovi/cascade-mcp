@@ -56,7 +56,7 @@ export function registerUpdateIssueDescriptionTool(mcp: McpServer): void {
 
       // Get auth info with proper error handling
       const authInfo = getAuthInfoSafe(context, 'update-issue-description');
-      const token = authInfo?.atlassian_access_token;
+      const token = authInfo?.atlassian?.access_token;
 
       if (!token) {
         logger.error('No Atlassian access token found in auth context');

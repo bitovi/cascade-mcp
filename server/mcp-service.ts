@@ -304,9 +304,9 @@ function validateAndExtractJwt(token: string, req: Request, res: Response, sourc
     const payload = parseJWT(token) as JWTPayload & Partial<AuthContext>;
     console.log(`Successfully parsed JWT payload from ${source}:`, JSON.stringify(sanitizeJwtPayload(payload), null, 2));
 
-    // Validate that we have an Atlassian access token
-    if (!payload.atlassian_access_token) {
-      console.log(`JWT payload missing atlassian_access_token (${source})`);
+    // Validate that we have at least one provider's credentials (nested structure per Q21)
+    if (!payload.atlassian && !payload.figma) {
+      console.log(`JWT payload missing provider credentials (${source}) - expected 'atlassian' or 'figma' nested structure`);
       sendMissingAtlassianAccessToken(res, req, source);
       return { authInfo: null, errored: true };
     }
