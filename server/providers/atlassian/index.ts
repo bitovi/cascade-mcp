@@ -5,7 +5,7 @@
  * Handles OAuth 2.0 PKCE flow with Atlassian-specific quirks and requirements.
  */
 
-import type { Server as McpServer } from '@modelcontextprotocol/sdk/server/index.js';
+import type { McpServer } from '../../jira-mcp/mcp-types.js';
 import type { 
   OAuthProvider, 
   AuthUrlParams, 
@@ -13,6 +13,7 @@ import type {
   StandardTokenResponse, 
   CallbackParams 
 } from '../provider-interface.js';
+import { registerAtlassianTools } from './tools/index.js';
 
 /**
  * Atlassian Provider Object
@@ -121,8 +122,6 @@ export const atlassianProvider: OAuthProvider = {
    * @param authContext - Authentication context with Atlassian credentials
    */
   registerTools(mcp: McpServer, authContext: any): void {
-    // TODO: Will be implemented when tools are moved to providers/atlassian/tools/
-    // For now, tools are still in jira-mcp/ and registered globally
-    console.log('Atlassian provider: registerTools called (not yet implemented)');
+    registerAtlassianTools(mcp, authContext);
   },
 };
