@@ -1107,39 +1107,63 @@ export function createMcpServer(authContext: AuthContext): McpServer {
 
 ## Authentication Flows
 
+**CRITICAL ARCHITECTURE**: This system implements TWO SEPARATE OAuth flows that must NOT be confused:
+
+1. **MCP Client ↔ Bridge Server**: PKCE flow (RFC 7636) with code_challenge/code_verifier
+2. **Bridge Server ↔ Providers** (Atlassian/Figma): Traditional OAuth with client_secret (NO PKCE)
+
 ### Single Provider Flow
 ```
-1. Client → GET /authorize
-2. Server → Redirect to provider OAuth (Atlassian or Figma)
+1. MCP Client → GET /authorize (with PKCE code_challenge)
+2. Server → Redirect to provider OAuth (Atlassian or Figma) using client_secret
 3. Provider → Redirect to /callback?code=xxx&state=yyy
-4. Server → Exchange code for provider tokens
-5. Server → Create JWT with provider credentials
-6. Client → Use JWT for MCP requests
-7. MCP Server → Register only Atlassian tools
+4. Server → IMMEDIATELY exchange code for provider tokens using client_secret
+5. Server → Store provider tokens in session
+6. Server → Create JWT with provider credentials embedded
+7. Server → Generate authorization code for MCP PKCE flow
+8. Server → Store JWT associated with authorization code
+9. Server → Redirect to MCP client with authorization code
+10. MCP Client → POST /access-token (with code + code_verifier for PKCE validation)
+11. Server → Validate PKCE, return stored JWT
+12. MCP Client → Use JWT for MCP requests
+13. MCP Server → Register provider-specific tools
 ```
 
 ### Multi-Provider Flow (Connection Hub UI)
 ```
-1. Client → GET /authorize
+1. MCP Client → GET /authorize (with PKCE code_challenge)
 2. Server → Show connection hub page with buttons:
    - [Connect Atlassian] [Connect Figma] [Done]
 3. User → Clicks "Connect Atlassian"
-4. Server → Redirect to Atlassian OAuth
+4. Server → Redirect to Atlassian OAuth (using client_secret, NOT PKCE)
 5. Atlassian → Redirect to /callback?code=xxx&state=yyy&provider=atlassian
-6. Server → Store Atlassian tokens in session
-7. Server → Redirect back to connection hub (now showing ✓ Atlassian Connected)
-8. User → Clicks "Connect Figma"  
-9. Server → Redirect to Figma OAuth
-10. Figma → Redirect to /callback?code=zzz&state=yyy&provider=figma
-11. Server → Store Figma tokens in session
-12. Server → Redirect back to connection hub (now showing ✓ Figma Connected)
-13. User → Clicks "Done"
-14. Server → Create JWT with both atlassian and figma credentials
-15. Client → Use JWT for MCP requests
-16. MCP Server → Register Atlassian + Figma + Combined tools
+6. Server → IMMEDIATELY exchange code for Atlassian tokens using client_secret
+7. Server → Store Atlassian tokens in providerTokens session
+8. Server → Redirect back to connection hub (✓ Atlassian Connected)
+9. User → Clicks "Connect Figma"  
+10. Server → Redirect to Figma OAuth (using client_secret, NOT PKCE)
+11. Figma → Redirect to /callback?code=zzz&state=yyy&provider=figma
+12. Server → IMMEDIATELY exchange code for Figma tokens using client_secret
+13. Server → Store Figma tokens in providerTokens session
+14. Server → Redirect back to connection hub (✓ Figma Connected)
+15. User → Clicks "Done"
+16. Server → Create JWT with both Atlassian and Figma credentials embedded
+17. Server → Generate authorization code for MCP PKCE flow
+18. Server → Store JWT associated with authorization code
+19. Server → Redirect to MCP client with authorization code
+20. MCP Client → POST /access-token (with code + code_verifier for PKCE validation)
+21. Server → Validate PKCE, return stored JWT
+22. MCP Client → Use JWT for MCP requests
+23. MCP Server → Register Atlassian + Figma + Combined tools
 ```
 
-**Note**: User can connect providers in any order and can choose to connect only one provider before clicking "Done".
+**CRITICAL POINTS**:
+- MCP Client ALWAYS uses PKCE flow with the bridge server
+- Provider OAuth callbacks ALWAYS exchange tokens immediately (steps 6, 12)
+- Provider token exchange uses client_secret (traditional OAuth, NOT PKCE)
+- "Done" button triggers MCP PKCE flow completion (steps 16-21)
+- JWT contains embedded provider tokens and is returned to MCP client
+- User can connect providers in any order before clicking "Done"
 
 ### Incremental Authentication Flow
 ```
@@ -1197,7 +1221,10 @@ VITE_JIRA_SCOPE=...
 3. **Token Refresh**: Independent refresh logic per provider
 4. **Session Isolation**: Per-session MCP servers prevent cross-session data leaks
 5. **Provider Validation**: Validate provider names against whitelist
-6. **PKCE per Provider**: Separate PKCE challenges for each OAuth flow
+6. **PKCE for MCP Client**: MCP client uses PKCE (code_challenge/code_verifier) when communicating with bridge
+7. **Client Secret for Providers**: Bridge uses traditional OAuth (client_secret) when communicating with providers
+8. **Immediate Token Exchange**: Provider authorization codes are exchanged immediately in callbacks (not stored)
+9. **JWT Storage**: JWTs are temporarily stored (associated with MCP authorization codes) until PKCE validation completes
 7. **State Parameter**: Include provider ID in state to prevent callback confusion
 
 ## Performance Considerations
