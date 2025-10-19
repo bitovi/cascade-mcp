@@ -1109,61 +1109,151 @@ export function createMcpServer(authContext: AuthContext): McpServer {
 
 **CRITICAL ARCHITECTURE**: This system implements TWO SEPARATE OAuth flows that must NOT be confused:
 
-1. **MCP Client ↔ Bridge Server**: PKCE flow (RFC 7636) with code_challenge/code_verifier
-2. **Bridge Server ↔ Providers** (Atlassian/Figma): Traditional OAuth with client_secret (NO PKCE)
+1. **MCP Client ↔ Bridge Server**: **MCP PKCE flow** (RFC 7636) with code_challenge/code_verifier
+2. **Bridge Server ↔ Providers** (Atlassian/Figma): **Server-Side OAuth** with client_secret (NO PKCE)
 
 ### Single Provider Flow
 ```
-1. MCP Client → GET /authorize (with PKCE code_challenge)
-2. Server → Redirect to provider OAuth (Atlassian or Figma) using client_secret
-3. Provider → Redirect to /callback?code=xxx&state=yyy
-4. Server → IMMEDIATELY exchange code for provider tokens using client_secret
+1. MCP Client → GET /authorize (with PKCE code_challenge) [MCP PKCE flow]
+2. Server → Redirect to provider OAuth (Atlassian or Figma) using client_secret [Server-Side OAuth]
+3. Provider → Redirect to /callback?code=xxx&state=yyy [Server-Side OAuth]
+4. Server → IMMEDIATELY exchange code for provider tokens using client_secret [Server-Side OAuth]
 5. Server → Store provider tokens in session
 6. Server → Create JWT with provider credentials embedded
-7. Server → Generate authorization code for MCP PKCE flow
-8. Server → Store JWT associated with authorization code
-9. Server → Redirect to MCP client with authorization code
-10. MCP Client → POST /access-token (with code + code_verifier for PKCE validation)
-11. Server → Validate PKCE, return stored JWT
+7. Server → Generate authorization code for MCP PKCE flow [MCP PKCE flow]
+8. Server → Store JWT associated with authorization code [MCP PKCE flow]
+9. Server → Redirect to MCP client with authorization code [MCP PKCE flow]
+10. MCP Client → POST /access-token (with code + code_verifier for PKCE validation) [MCP PKCE flow]
+11. Server → Validate PKCE, return stored JWT [MCP PKCE flow]
 12. MCP Client → Use JWT for MCP requests
 13. MCP Server → Register provider-specific tools
 ```
 
 ### Multi-Provider Flow (Connection Hub UI)
 ```
-1. MCP Client → GET /authorize (with PKCE code_challenge)
+1. MCP Client → GET /authorize (with PKCE code_challenge) [MCP PKCE flow]
 2. Server → Show connection hub page with buttons:
    - [Connect Atlassian] [Connect Figma] [Done]
 3. User → Clicks "Connect Atlassian"
-4. Server → Redirect to Atlassian OAuth (using client_secret, NOT PKCE)
-5. Atlassian → Redirect to /callback?code=xxx&state=yyy&provider=atlassian
-6. Server → IMMEDIATELY exchange code for Atlassian tokens using client_secret
+4. Server → Redirect to Atlassian OAuth [Server-Side OAuth]
+5. Atlassian → Redirect to /callback?code=xxx&state=yyy&provider=atlassian [Server-Side OAuth]
+6. Server → IMMEDIATELY exchange code for Atlassian tokens using client_secret [Server-Side OAuth]
 7. Server → Store Atlassian tokens in providerTokens session
 8. Server → Redirect back to connection hub (✓ Atlassian Connected)
 9. User → Clicks "Connect Figma"  
-10. Server → Redirect to Figma OAuth (using client_secret, NOT PKCE)
-11. Figma → Redirect to /callback?code=zzz&state=yyy&provider=figma
-12. Server → IMMEDIATELY exchange code for Figma tokens using client_secret
+10. Server → Redirect to Figma OAuth [Server-Side OAuth]
+11. Figma → Redirect to /callback?code=zzz&state=yyy&provider=figma [Server-Side OAuth]
+12. Server → IMMEDIATELY exchange code for Figma tokens using client_secret [Server-Side OAuth]
 13. Server → Store Figma tokens in providerTokens session
 14. Server → Redirect back to connection hub (✓ Figma Connected)
 15. User → Clicks "Done"
 16. Server → Create JWT with both Atlassian and Figma credentials embedded
-17. Server → Generate authorization code for MCP PKCE flow
-18. Server → Store JWT associated with authorization code
-19. Server → Redirect to MCP client with authorization code
-20. MCP Client → POST /access-token (with code + code_verifier for PKCE validation)
-21. Server → Validate PKCE, return stored JWT
+17. Server → Generate authorization code for MCP PKCE flow [MCP PKCE flow]
+18. Server → Store JWT associated with authorization code [MCP PKCE flow]
+19. Server → Redirect to MCP client with authorization code [MCP PKCE flow]
+20. MCP Client → POST /access-token (with code + code_verifier for PKCE validation) [MCP PKCE flow]
+21. Server → Validate PKCE, return stored JWT [MCP PKCE flow]
 22. MCP Client → Use JWT for MCP requests
 23. MCP Server → Register Atlassian + Figma + Combined tools
 ```
 
 **CRITICAL POINTS**:
-- MCP Client ALWAYS uses PKCE flow with the bridge server
-- Provider OAuth callbacks ALWAYS exchange tokens immediately (steps 6, 12)
-- Provider token exchange uses client_secret (traditional OAuth, NOT PKCE)
-- "Done" button triggers MCP PKCE flow completion (steps 16-21)
+- MCP Client ALWAYS uses **MCP PKCE flow** with the bridge server
+- Provider OAuth callbacks ALWAYS exchange tokens immediately (steps 6, 12) using **Server-Side OAuth**
+- Provider token exchange uses `client_secret` (**Server-Side OAuth**, NOT PKCE)
+- "Done" button triggers **MCP PKCE flow** completion (steps 16-21)
 - JWT contains embedded provider tokens and is returned to MCP client
 - User can connect providers in any order before clicking "Done"
+
+### Implementation Pattern: Separation of Concerns
+
+**Problem**: Server-Side OAuth callbacks must NOT detect MCP PKCE flags and redirect immediately to MCP client. This breaks the connection hub flow.
+
+**Solution**: Clear separation between Server-Side OAuth and MCP PKCE flow completion:
+
+#### Server-Side OAuth Callbacks (`/auth/callback/atlassian`, `//auth/callback/figma`)
+**ALWAYS** perform these steps, regardless of whether it's part of an MCP PKCE flow:
+1. Extract authorization code from callback parameters
+2. **IMMEDIATELY exchange code for provider tokens** using `client_secret` (Server-Side OAuth)
+3. Store provider tokens in session (`req.session.providerTokens[providerName]`)
+4. Add provider to connected list (`req.session.connectedProviders.push(providerName)`)
+5. **ALWAYS redirect back to connection hub** (`/auth/connect`)
+
+#### Connection Hub "Done" Button (`/auth/done`)
+**ONLY** this handler completes the MCP PKCE flow:
+1. Collect all provider tokens from session (`req.session.providerTokens`)
+2. Create JWT with nested provider credentials (`{ atlassian: {...}, figma: {...} }`)
+3. Generate MCP authorization code
+4. Store JWT associated with authorization code (for PKCE validation)
+5. Redirect to MCP client with authorization code and state
+
+#### Key Principle
+- **Server-Side OAuth callbacks**: Server-Side OAuth token exchange + redirect to hub
+- **Done button**: MCP PKCE flow completion + redirect to MCP client
+- **NO mixing**: Server-Side OAuth callbacks should never directly redirect to MCP client
+
+#### Code Pattern
+
+```typescript
+// ❌ WRONG: Server-Side OAuth callback detects MCP PKCE flags and redirects to client
+export function makeCallback(provider: OAuthProvider, options) {
+  return async (req: Request, res: Response) => {
+    const code = provider.extractCallbackParams(req).code;
+    
+    // ❌ BAD: Checking if this is MCP PKCE flow
+    if (req.session.usingMcpPkce) {
+      // ❌ BAD: Redirecting directly to MCP client
+      res.redirect(`${req.session.mcpRedirectUri}?code=${code}`);
+      return;
+    }
+    
+    // Token exchange...
+  };
+}
+
+// ✅ CORRECT: Server-Side OAuth callback ALWAYS exchanges tokens and returns to hub
+export function makeCallback(provider: OAuthProvider, options) {
+  return async (req: Request, res: Response) => {
+    const code = provider.extractCallbackParams(req).code;
+    
+    // ✅ ALWAYS exchange provider's authorization code for tokens (Server-Side OAuth)
+    const tokens = await provider.exchangeCodeForTokens({
+      code,
+      codeVerifier: req.session.codeVerifier, // Our code_verifier for Server-Side OAuth
+    });
+    
+    // ✅ ALWAYS store tokens in session
+    await options.onSuccess(req, tokens, provider.name);
+    
+    // ✅ ALWAYS redirect back to connection hub
+    res.redirect('/auth/connect');
+  };
+}
+
+// ✅ CORRECT: Done button completes MCP PKCE flow
+export async function handleConnectionDone(req: Request, res: Response) {
+  const providerTokens = req.session.providerTokens || {};
+  
+  // Create JWT with all provider tokens
+  const jwt = createJWT({
+    atlassian: providerTokens.atlassian,
+    figma: providerTokens.figma,
+  });
+  
+  // Generate MCP authorization code (MCP PKCE flow)
+  const mcpAuthCode = generateAuthCode();
+  storeMcpAuthCode(mcpAuthCode, jwt); // For PKCE validation
+  
+  // Redirect to MCP client with authorization code (MCP PKCE flow)
+  res.redirect(`${req.session.mcpRedirectUri}?code=${mcpAuthCode}&state=${req.session.mcpState}`);
+}
+```
+
+This separation ensures:
+- ✅ Server-Side OAuth works independently (can test without MCP client)
+- ✅ Connection hub flow works correctly (Server-Side OAuth callbacks always return to hub)
+- ✅ MCP PKCE flow completes only when user clicks "Done"
+- ✅ Clean architecture with single responsibility per endpoint
 
 ### Incremental Authentication Flow
 ```

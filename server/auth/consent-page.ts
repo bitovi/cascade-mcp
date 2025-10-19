@@ -7,6 +7,7 @@
 
 import type { Request, Response } from 'express';
 import { createJiraMCPAuthToken } from '../pkce/token-helpers.js';
+import { generateAuthorizationCode, storeAuthorizationCode } from '../pkce/authorization-code-store.js';
 
 /**
  * Renders the connection hub UI
@@ -21,9 +22,10 @@ export function renderConnectionHub(req: Request, res: Response): void {
   const connectedProviders = req.session.connectedProviders || [];
   console.log(`  Currently connected providers: ${connectedProviders.join(', ') || 'none'}`);
   
-  // Store MCP client's PKCE parameters from query string
+  // Store MCP client's PKCE parameters from query string (only on first visit)
   // These were sent by the MCP client when initiating the OAuth flow
-  if (req.query.code_challenge) {
+  // On subsequent visits (after provider callbacks), preserve existing session values
+  if (req.query.code_challenge && !req.session.mcpCodeChallenge) {
     console.log('  Storing MCP client PKCE parameters from query');
     req.session.mcpCodeChallenge = req.query.code_challenge as string;
     req.session.mcpCodeChallengeMethod = req.query.code_challenge_method as string || 'S256';
@@ -38,12 +40,20 @@ export function renderConnectionHub(req: Request, res: Response): void {
     req.session.codeVerifier = null;
     req.session.usingMcpPkce = true;
     console.log('  Using MCP client PKCE (no server-side code_verifier)');
-  } else {
+  } else if (!req.query.code_challenge && !req.session.mcpCodeChallenge && !req.session.codeVerifier) {
     // For non-MCP flows (browser-based), generate our own PKCE code verifier
+    // Only if we haven't already set up either MCP PKCE or server-side PKCE
     const codeVerifier = generateCodeVerifier();
     req.session.codeVerifier = codeVerifier;
     req.session.usingMcpPkce = false;
     console.log('  Generated server-side PKCE code_verifier');
+  } else {
+    // Returning to connection hub after provider OAuth - preserve existing session
+    console.log('  Preserving existing session configuration:', {
+      usingMcpPkce: req.session.usingMcpPkce,
+      hasMcpRedirectUri: !!req.session.mcpRedirectUri,
+      hasCodeVerifier: !!req.session.codeVerifier,
+    });
   }
   
   const html = `
@@ -168,6 +178,13 @@ export function renderConnectionHub(req: Request, res: Response): void {
  */
 export async function handleConnectionDone(req: Request, res: Response): Promise<void> {
   console.log('Processing connection hub "Done" action');
+  console.log('  Session state:', {
+    mcpRedirectUri: req.session.mcpRedirectUri,
+    usingMcpPkce: req.session.usingMcpPkce,
+    mcpState: req.session.mcpState,
+    mcpClientId: req.session.mcpClientId,
+    connectedProviders: req.session.connectedProviders,
+  });
   
   const connectedProviders = req.session.connectedProviders || [];
   const providerTokens = req.session.providerTokens || {};
@@ -212,12 +229,36 @@ export async function handleConnectionDone(req: Request, res: Response): Promise
     delete req.session.codeVerifier;
     
     // Check if this was initiated by an MCP client (has redirect URI)
-    if (req.session.mcpRedirectUri) {
-      const redirectUrl = new URL(req.session.mcpRedirectUri);
-      redirectUrl.searchParams.set('access_token', jwt);
-      redirectUrl.searchParams.set('token_type', 'Bearer');
+    if (req.session.mcpRedirectUri && req.session.usingMcpPkce) {
+      // OAuth 2.0 Authorization Code Flow (RFC 6749 Section 4.1.2)
+      // Generate authorization code and store JWT mapping
+      const authCode = generateAuthorizationCode();
+      storeAuthorizationCode(
+        authCode,
+        jwt,
+        req.session.mcpClientId,
+        req.session.mcpRedirectUri
+      );
       
-      console.log(`  Redirecting to MCP client: ${redirectUrl.origin}`);
+      // Build redirect URL with code and state
+      const redirectUrl = new URL(req.session.mcpRedirectUri);
+      redirectUrl.searchParams.set('code', authCode);
+      
+      if (req.session.mcpState) {
+        redirectUrl.searchParams.set('state', req.session.mcpState);
+      }
+      
+      console.log(`  Redirecting to MCP client with authorization code: ${redirectUrl.origin}`);
+      
+      // Clear MCP session data
+      delete req.session.mcpRedirectUri;
+      delete req.session.mcpState;
+      delete req.session.mcpClientId;
+      delete req.session.mcpCodeChallenge;
+      delete req.session.mcpScope;
+      delete req.session.mcpResource;
+      delete req.session.usingMcpPkce;
+      
       res.redirect(redirectUrl.toString());
     } else {
       // Manual flow - display the token

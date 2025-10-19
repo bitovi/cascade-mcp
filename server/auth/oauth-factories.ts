@@ -1,41 +1,53 @@
 /**
  * OAuth Factory Functions for Multi-Provider Support
  * 
- * Creates reusable OAuth endpoints for any provider that implements the OAuthProvider interface.
+ * CRITICAL: This file handles Server-Side OAuth flows ONLY.
+ * 
+ * TWO SEPARATE OAuth FLOWS in this system:
+ * 1. MCP PKCE Flow (MCP Client ↔ Bridge): Handled in /server/pkce/*.ts
+ * 2. Server-Side OAuth (Bridge ↔ Providers): Handled HERE in oauth-factories.ts
+ * 
+ * This file creates reusable Server-Side OAuth endpoints for any provider 
+ * that implements the OAuthProvider interface.
+ * 
  * Per Q25: Static routes with factory functions for clean, explicit, type-safe routing.
  */
 
 import type { Request, Response } from 'express';
 import type { OAuthProvider, StandardTokenResponse } from '../providers/provider-interface.js';
+import { generateCodeVerifier, generateCodeChallenge } from '../tokens.js';
 
 /**
- * Creates an authorize endpoint for a specific provider
+ * Creates an authorize endpoint for a specific provider (Server-Side OAuth)
  * Per Q25: Static routes with factory functions
+ * 
+ * This initiates Server-Side OAuth with the provider (NOT MCP PKCE flow).
+ * It generates its OWN code_verifier/code_challenge for the provider OAuth flow.
  * 
  * Usage:
  *   app.get('/auth/connect/atlassian', makeAuthorize(atlassianProvider));
  */
 export function makeAuthorize(provider: OAuthProvider) {
   return async (req: Request, res: Response) => {
-    console.log(`Starting OAuth flow for provider: ${provider.name}`);
+    console.log(`Starting Server-Side OAuth flow for provider: ${provider.name}`);
     
-    // Use PKCE parameters stored in session from connection hub
-    // The MCP client sent these to /auth/connect, and we stored them
-    const codeChallenge = req.session.mcpCodeChallenge;
-    const codeChallengeMethod = req.session.mcpCodeChallengeMethod || 'S256';
-    const state = req.session.mcpState;
+    // Generate OUR code_verifier for Server-Side OAuth with this provider
+    // This is SEPARATE from the MCP client's code_verifier (which is for MCP PKCE flow)
+    const codeVerifier = generateCodeVerifier();
+    const codeChallenge = generateCodeChallenge(codeVerifier);
+    const codeChallengeMethod = 'S256';
     
-    if (!codeChallenge) {
-      console.error('  Error: No code_challenge found in session');
-      res.status(400).send('Missing PKCE parameters. Please restart the OAuth flow from /auth/connect');
-      return;
-    }
+    // Generate state for this provider's OAuth flow
+    const state = generateCodeVerifier(); // Random state value
     
-    // Store provider-specific OAuth state
+    // Store Server-Side OAuth parameters for callback validation
     req.session.provider = provider.name;
+    req.session.codeVerifier = codeVerifier; // OUR code_verifier for provider OAuth
     req.session.codeChallenge = codeChallenge;
     req.session.codeChallengeMethod = codeChallengeMethod;
     req.session.state = state;
+    
+    console.log(`  Generated code_verifier for Server-Side OAuth with ${provider.name}`);
     
     const baseUrl = process.env.VITE_AUTH_SERVER_URL || 'http://localhost:3000';
     const authUrl = provider.createAuthUrl({
@@ -54,6 +66,15 @@ export function makeAuthorize(provider: OAuthProvider) {
 /**
  * Creates a callback endpoint for a specific provider
  * Per Q26: Always returns to connection hub
+ * Per Implementation Pattern: ALWAYS exchanges tokens and redirects to hub
+ * 
+ * This function handles Server-Side OAuth callbacks (NOT MCP PKCE flow completion).
+ * It ALWAYS:
+ * 1. Exchanges provider authorization code for tokens (using client_secret)
+ * 2. Stores tokens in session via onSuccess handler
+ * 3. Redirects back to connection hub
+ * 
+ * The MCP PKCE flow is completed separately by the "Done" button handler.
  * 
  * Usage:
  *   app.get('/auth/callback/atlassian', makeCallback(atlassianProvider, { 
@@ -74,42 +95,20 @@ export function makeCallback(
         throw new Error('No authorization code received');
       }
       
-      // Check if this is an MCP client PKCE flow
-      const usingMcpPkce = req.session.usingMcpPkce;
-      const mcpRedirectUri = req.session.mcpRedirectUri;
-      
-      if (usingMcpPkce && mcpRedirectUri) {
-        // MCP PKCE Flow: We don't have the code_verifier, so we can't do token exchange
-        // Instead, redirect back to MCP client with the authorization code
-        // The MCP client will call /access-token with its code_verifier
-        console.log('  MCP PKCE flow detected - redirecting code back to MCP client');
-        
-        // Use the original MCP state from session, not the one from Atlassian callback
-        // This ensures we return exactly what the MCP client sent us
-        const mcpState = req.session.mcpState;
-        
-        // Build redirect URL with code and original state
-        let redirectUrl = `${mcpRedirectUri}?code=${encodeURIComponent(callbackParams.code)}`;
-        if (mcpState) {
-          redirectUrl += `&state=${encodeURIComponent(mcpState)}`;
-        }
-        
-        console.log(`  Redirecting to MCP client: ${redirectUrl}`);
-        console.log(`  Using original MCP state: ${mcpState}`);
-        res.redirect(redirectUrl);
-        return;
-      }
-      
-      // Browser/Server PKCE Flow: We have the code_verifier, so do token exchange
+      // Get the code_verifier we generated when initiating this provider's OAuth flow
+      // (This is OUR code_verifier for Server-Side OAuth, NOT the MCP client's code_verifier)
       const codeVerifier = req.session.codeVerifier;
       
       if (!codeVerifier) {
-        throw new Error('No code verifier found in session (not MCP PKCE flow)');
+        throw new Error('No code verifier found in session - OAuth flow not properly initiated');
       }
       
-      console.log(`  Exchanging code for ${provider.name} tokens`);
+      console.log(`  Exchanging ${provider.name} authorization code for tokens`);
       
       const baseUrl = process.env.VITE_AUTH_SERVER_URL || 'http://localhost:3000';
+      
+      // ALWAYS exchange the provider's authorization code for access/refresh tokens
+      // This uses Server-Side OAuth with client_secret (NOT MCP PKCE)
       const tokens = await provider.exchangeCodeForTokens({
         code: callbackParams.code,
         codeVerifier: codeVerifier,
@@ -118,10 +117,11 @@ export function makeCallback(
       
       console.log(`  Token exchange successful for ${provider.name}`);
       
-      // Call success handler (e.g., store tokens in session)
+      // Store tokens in session (called by hubCallbackHandler)
       await options.onSuccess(req, tokens, provider.name);
       
-      // Per Q26: Always redirect back to connection hub
+      // ALWAYS redirect back to connection hub to show "✓ Connected" status
+      // The hub will remain open until user clicks "Done"
       console.log(`  Redirecting back to connection hub`);
       res.redirect('/auth/connect');
       
