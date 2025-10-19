@@ -18,8 +18,13 @@ import { handleMcpPost, handleSessionRequest } from './mcp-service.ts';
 import { renderManualTokenPage } from './manual-token-flow.ts';
 import cors from 'cors';
 import { logger } from './observability/logger.ts';
-import { makeAuthorize, makeCallback, hubCallbackHandler } from './auth/oauth-factories.js';
-import { renderConnectionHub, handleConnectionDone } from './auth/consent-page.js';
+import { 
+  makeAuthorize, 
+  makeCallback, 
+  hubCallbackHandler,
+  renderConnectionHub,
+  handleConnectionDone 
+} from './provider-server-oauth/index.js';
 import { atlassianProvider } from './providers/atlassian/index.js';
 
 // configurations

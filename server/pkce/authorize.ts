@@ -32,7 +32,7 @@ import {
   getAtlassianConfig
 } from '../atlassian-auth-code-flow.ts';
 import type { OAuthHandler } from './types.ts';
-import { renderConnectionHub } from '../auth/consent-page.js';
+import { renderConnectionHub } from '../provider-server-oauth/index.js';
 
 /**
  * Type guard to ensure query parameter is a string

@@ -439,7 +439,7 @@ export interface AuthContext {
 Implement factory functions for OAuth endpoints (Q25):
 
 ```typescript
-// server/auth/oauth-factories.ts
+// server/provider-server-oauth/oauth-factories.ts
 import type { OAuthProvider } from '../providers/provider-interface';
 import { Request, Response } from 'express';
 
@@ -525,7 +525,7 @@ export async function hubCallbackHandler(req: Request, tokens: any): Promise<voi
 Implement connection hub UI:
 
 ```typescript
-// server/auth/consent-page.ts
+// server/provider-server-oauth/consent-page.ts
 export function renderConnectionHub(req: Request, res: Response): void {
   const connectedProviders = req.session.connectedProviders || [];
   
@@ -1610,7 +1610,7 @@ Support OAuth. We are transitioning away from PAT immediately.
     
     This aligns with Q21's nested JWT structure and keeps tool code clean.
 
-23. **Connection Hub Implementation Phase**: The target architecture shows `server/auth/consent-page.ts` for the connection hub UI, but no phase explicitly implements this. Should this be:
+23. **Connection Hub Implementation Phase**: The target architecture shows `server/provider-server-oauth/consent-page.ts` for the connection hub UI, but no phase explicitly implements this. Should this be:
     - Part of Phase 2 (OAuth infrastructure)?
     - A new Phase 2.5 (Multi-Provider UI & Flow)?
     - Deferred to later (start with single-provider only)?

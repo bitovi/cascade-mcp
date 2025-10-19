@@ -1,67 +1,24 @@
 /**
- * OAuth Factory Functions for Multi-Provider Support
+ * Server-Side OAuth Callback Endpoint Factory
  * 
- * CRITICAL: This file handles Server-Side OAuth flows ONLY.
+ * Handles OAuth callbacks from providers after user authorization.
+ * This is SEPARATE from the MCP PKCE flow - it handles the bridge server
+ * receiving access tokens from providers (Atlassian, Figma, etc.).
  * 
- * TWO SEPARATE OAuth FLOWS in this system:
- * 1. MCP PKCE Flow (MCP Client ↔ Bridge): Handled in /server/pkce/*.ts
- * 2. Server-Side OAuth (Bridge ↔ Providers): Handled HERE in oauth-factories.ts
+ * Key Responsibilities:
+ * - Validate callback parameters and state
+ * - Exchange authorization code for access/refresh tokens
+ * - Store provider tokens in session
+ * - Redirect back to connection hub
  * 
- * This file creates reusable Server-Side OAuth endpoints for any provider 
- * that implements the OAuthProvider interface.
- * 
- * Per Q25: Static routes with factory functions for clean, explicit, type-safe routing.
+ * Usage:
+ *   app.get('/auth/callback/atlassian', makeCallback(atlassianProvider, { 
+ *     onSuccess: hubCallbackHandler 
+ *   }));
  */
 
 import type { Request, Response } from 'express';
 import type { OAuthProvider, StandardTokenResponse } from '../providers/provider-interface.js';
-import { generateCodeVerifier, generateCodeChallenge } from '../tokens.js';
-
-/**
- * Creates an authorize endpoint for a specific provider (Server-Side OAuth)
- * Per Q25: Static routes with factory functions
- * 
- * This initiates Server-Side OAuth with the provider (NOT MCP PKCE flow).
- * It generates its OWN code_verifier/code_challenge for the provider OAuth flow.
- * 
- * Usage:
- *   app.get('/auth/connect/atlassian', makeAuthorize(atlassianProvider));
- */
-export function makeAuthorize(provider: OAuthProvider) {
-  return async (req: Request, res: Response) => {
-    console.log(`Starting Server-Side OAuth flow for provider: ${provider.name}`);
-    
-    // Generate OUR code_verifier for Server-Side OAuth with this provider
-    // This is SEPARATE from the MCP client's code_verifier (which is for MCP PKCE flow)
-    const codeVerifier = generateCodeVerifier();
-    const codeChallenge = generateCodeChallenge(codeVerifier);
-    const codeChallengeMethod = 'S256';
-    
-    // Generate state for this provider's OAuth flow
-    const state = generateCodeVerifier(); // Random state value
-    
-    // Store Server-Side OAuth parameters for callback validation
-    req.session.provider = provider.name;
-    req.session.codeVerifier = codeVerifier; // OUR code_verifier for provider OAuth
-    req.session.codeChallenge = codeChallenge;
-    req.session.codeChallengeMethod = codeChallengeMethod;
-    req.session.state = state;
-    
-    console.log(`  Generated code_verifier for Server-Side OAuth with ${provider.name}`);
-    
-    const baseUrl = process.env.VITE_AUTH_SERVER_URL || 'http://localhost:3000';
-    const authUrl = provider.createAuthUrl({
-      redirectUri: `${baseUrl}/auth/callback/${provider.name}`, // Per Q26: Provider-specific callback
-      codeChallenge: codeChallenge,
-      codeChallengeMethod: codeChallengeMethod,
-      state: state,
-      responseType: 'code',
-    });
-    
-    console.log(`  Redirecting to ${provider.name} OAuth URL`);
-    res.redirect(authUrl);
-  };
-}
 
 /**
  * Creates a callback endpoint for a specific provider
@@ -76,10 +33,9 @@ export function makeAuthorize(provider: OAuthProvider) {
  * 
  * The MCP PKCE flow is completed separately by the "Done" button handler.
  * 
- * Usage:
- *   app.get('/auth/callback/atlassian', makeCallback(atlassianProvider, { 
- *     onSuccess: hubCallbackHandler 
- *   }));
+ * @param provider - The OAuth provider configuration
+ * @param options - Callback options including success handler
+ * @returns Express route handler
  */
 export function makeCallback(
   provider: OAuthProvider, 
@@ -137,6 +93,10 @@ export function makeCallback(
  * Stores tokens in session and updates connected providers list
  * 
  * Called by makeCallback after successful token exchange
+ * 
+ * @param req - Express request with session
+ * @param tokens - Standard token response from provider
+ * @param providerName - Name of the provider (e.g., 'atlassian', 'figma')
  */
 export async function hubCallbackHandler(
   req: Request, 
