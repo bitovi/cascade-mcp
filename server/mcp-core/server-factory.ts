@@ -16,6 +16,7 @@ import type { AuthContext } from './auth-context-store.ts';
 import { atlassianProvider } from '../providers/atlassian/index.js';
 import { figmaProvider } from '../providers/figma/index.js';
 import { utilityProvider } from '../providers/utility/index.js';
+import { combinedProvider } from '../providers/combined/index.js';
 
 /**
  * Creates a fresh MCP server instance for a session

@@ -1,6 +1,8 @@
 import type { McpServer } from '../../../mcp-core/mcp-types.js';
 import { registerFigmaGetUserTool } from './figma-get-user.js';
 import { registerFigmaGetMetadataForLayerTool } from './figma-get-metadata-for-layer.js';
+import { registerFigmaGetImageDownloadTool } from './figma-get-image-download.js';
+import { registerFigmaGetLayersForPageTool } from './figma-get-layers-for-page.js';
 
 /**
  * Register all Figma-specific tools with the MCP server
@@ -10,8 +12,17 @@ import { registerFigmaGetMetadataForLayerTool } from './figma-get-metadata-for-l
 export function registerFigmaTools(mcp: McpServer, authContext: any): void {
   console.log('Registering Figma tools...');
   
+  // Authentication test tool
   registerFigmaGetUserTool(mcp);
+  
+  // Layer metadata tool
   registerFigmaGetMetadataForLayerTool(mcp);
   
-  console.log('  All Figma tools registered');
+  // Image download tool (ported from figma-downloadable-image-mcp)
+  registerFigmaGetImageDownloadTool(mcp);
+  
+  // Page layers discovery tool (ported from figma-downloadable-image-mcp)
+  registerFigmaGetLayersForPageTool(mcp);
+  
+  console.log('  All Figma tools registered (4 tools)');
 }
