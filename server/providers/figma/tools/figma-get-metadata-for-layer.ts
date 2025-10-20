@@ -5,8 +5,8 @@
 
 import { z } from 'zod';
 import { logger } from '../../../observability/logger.js';
-import { getAuthInfoSafe } from '../../../jira-mcp/auth-helpers.js';
-import type { McpServer } from '../../../jira-mcp/mcp-types.js';
+import { getAuthInfoSafe } from '../../../mcp-core/auth-helpers.js';
+import type { McpServer } from '../../../mcp-core/mcp-types.js';
 
 // Tool parameters interface
 interface GetMetadataForLayerParams {

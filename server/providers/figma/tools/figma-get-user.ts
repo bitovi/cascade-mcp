@@ -4,8 +4,8 @@
  */
 
 import { logger } from '../../../observability/logger.js';
-import { getAuthInfoSafe } from '../../../jira-mcp/auth-helpers.js';
-import type { McpServer } from '../../../jira-mcp/mcp-types.js';
+import { getAuthInfoSafe } from '../../../mcp-core/auth-helpers.js';
+import type { McpServer } from '../../../mcp-core/mcp-types.js';
 
 /**
  * Register the figma-get-user tool with the MCP server

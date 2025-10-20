@@ -3,9 +3,9 @@
  */
 
 import { logger } from '../../../observability/logger.ts';
-import { getAuthInfoSafe, handleJiraAuthError } from '../../../jira-mcp/auth-helpers.ts';
-import type { AtlassianSite } from '../../../jira-mcp/atlassian-helpers.ts';
-import type { McpServer } from '../../../jira-mcp/mcp-types.ts';
+import { getAuthInfoSafe, handleJiraAuthError } from '../../../mcp-core/auth-helpers.ts';
+import type { AtlassianSite } from '../atlassian-helpers.ts';
+import type { McpServer } from '../../../mcp-core/mcp-types.ts';
 
 /**
  * Register the atlassian-get-sites tool with the MCP server

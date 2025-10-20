@@ -6,7 +6,7 @@
  * Bridge generates its own code_verifier for provider authentication.
  */
 
-import type { McpServer } from '../../jira-mcp/mcp-types.js';
+import type { McpServer } from '../../mcp-core/mcp-types.js';
 import type { 
   OAuthProvider, 
   AuthUrlParams, 

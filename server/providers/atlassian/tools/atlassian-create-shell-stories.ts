@@ -4,15 +4,15 @@
 
 import { z } from 'zod';
 import { logger } from '../../../observability/logger.ts';
-import { getAuthInfoSafe, handleJiraAuthError } from '../../../jira-mcp/auth-helpers.ts';
-import { resolveCloudId } from '../../../jira-mcp/atlassian-helpers.ts';
-import { convertMarkdownToAdf, validateAdf } from '../../../jira-mcp/markdown-converter.ts';
+import { getAuthInfoSafe, handleJiraAuthError } from '../../../mcp-core/auth-helpers.ts';
+import { resolveCloudId } from '../atlassian-helpers.ts';
+import { convertMarkdownToAdf, validateAdf } from '../markdown-converter.ts';
 import { sanitizeObjectWithJWTs } from '../../../tokens.ts';
-import type { McpServer } from '../../../jira-mcp/mcp-types.ts';
+import type { McpServer } from '../../../mcp-core/mcp-types.ts';
 import {
   CreateMessageResultSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { createJiraIssue, getJiraIssue, JiraIssuePayload } from '../../../jira-mcp/atlassian-helpers.ts';
+import { createJiraIssue, getJiraIssue, JiraIssuePayload } from '../atlassian-helpers.ts';
 
 /**
  * Determine if we should use PAT (Personal Access Token) authentication

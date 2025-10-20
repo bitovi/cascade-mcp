@@ -1,4 +1,4 @@
-import type { McpServer } from '../../../jira-mcp/mcp-types.js';
+import type { McpServer } from '../../../mcp-core/mcp-types.js';
 import { registerAtlassianGetSitesTool } from './atlassian-get-sites.js';
 import { registerAtlassianGetIssueTool } from './atlassian-get-issue.js';
 import { registerAtlassianGetAttachmentsTool } from './atlassian-get-attachments.js';

@@ -1,4 +1,4 @@
-import type { McpServer } from '../../../jira-mcp/mcp-types.js';
+import type { McpServer } from '../../../mcp-core/mcp-types.js';
 import { registerFigmaGetUserTool } from './figma-get-user.js';
 import { registerFigmaGetMetadataForLayerTool } from './figma-get-metadata-for-layer.js';
 

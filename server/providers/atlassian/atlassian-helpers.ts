@@ -3,8 +3,8 @@
  * Extracted from auth-helpers.js for better separation of concerns
  */
 
-import { logger } from '../observability/logger.ts';
-import { sanitizeObjectWithJWTs } from '../tokens.ts';
+import { logger } from '../../observability/logger.ts';
+import { sanitizeObjectWithJWTs } from '../../tokens.ts';
 import type { ADFDocument } from './markdown-converter.ts';
 
 // Atlassian site information structure

@@ -20,14 +20,14 @@
  */
 
 import { Request, Response } from 'express';
-import { mcp, setAuthContext, clearAuthContext } from './jira-mcp/index.ts';
+import { mcp, setAuthContext, clearAuthContext } from './mcp-core/index.ts';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { isInitializeRequest, type JSONRPCRequest } from '@modelcontextprotocol/sdk/types.js';
 import { InvalidTokenError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 import { randomUUID } from 'node:crypto';
 import { logger } from './observability/logger.ts';
 import { jwtVerify, sanitizeJwtPayload, formatTokenWithExpiration, parseJWT, type JWTPayload } from './tokens.ts';
-import { type AuthContext } from './jira-mcp/auth-context-store.ts';
+import { type AuthContext } from './mcp-core/auth-context-store.ts';
 import { serverInstanceScope, serverStartTime } from './pkce/discovery.ts';
 // Validation result interface
 interface ValidationResult {

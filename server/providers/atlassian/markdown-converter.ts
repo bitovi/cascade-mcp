@@ -5,7 +5,7 @@
 
 import { marked } from 'marked';
 import { markdownToAdf } from 'marklassian';
-import { logger } from '../observability/logger.ts';
+import { logger } from '../../observability/logger.ts';
 
 // ADF (Atlassian Document Format) interfaces
 export interface ADFTextNode {

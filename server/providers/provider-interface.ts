@@ -5,7 +5,7 @@
  * Uses a functional approach with simple objects instead of classes.
  */
 
-import type { McpServer } from '../jira-mcp/mcp-types.js';
+import type { McpServer } from '../mcp-core/mcp-types.js';
 
 // Standard token response structure used by all providers
 export interface StandardTokenResponse {

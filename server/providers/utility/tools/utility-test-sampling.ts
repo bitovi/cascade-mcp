@@ -8,8 +8,8 @@
 
 import { z } from 'zod';
 import { CreateMessageResultSchema } from "@modelcontextprotocol/sdk/types.js";
-import type { McpServer } from './mcp-types.ts';
-import { getAuthInfoSafe } from './auth-helpers.ts';
+import type { McpServer } from '../../../mcp-core/mcp-types.ts';
+import { getAuthInfoSafe } from '../../../mcp-core/auth-helpers.ts';
 
 /**
  * Tool parameters interface
@@ -21,12 +21,12 @@ interface SampleTestingParams {
 }
 
 /**
- * Register the test-sampling tool with the MCP server
+ * Register the utility-test-sampling tool with the MCP server
  * @param mcp - MCP server instance
  */
-export function registerSampleTestingTool(mcp: McpServer): void {
+export function registerUtilityTestSamplingTool(mcp: McpServer): void {
   mcp.registerTool(
-    'test-sampling',
+    'utility-test-sampling',
     {
       title: 'Test Sampling',
       description: 'Test sampling functionality by sending prompts to the agent and logging the interaction. Enables testing of basic agent capabilities and inter-MCP tool communication.',
@@ -42,7 +42,7 @@ export function registerSampleTestingTool(mcp: McpServer): void {
       },
     },
     async ({ samplePrompt, systemPrompt, maxTokens }: SampleTestingParams, extra) => {
-      console.log('test-sampling called', { 
+      console.log('utility-test-sampling called', { 
         promptLength: samplePrompt.length,
         hasSystemPrompt: !!systemPrompt,
         maxTokens: maxTokens || 10000

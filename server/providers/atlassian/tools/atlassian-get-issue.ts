@@ -4,11 +4,11 @@
 
 import { z } from 'zod';
 import { logger } from '../../../observability/logger.ts';
-import { getAuthInfoSafe, handleJiraAuthError } from '../../../jira-mcp/auth-helpers.ts';
-import { resolveCloudId } from '../../../jira-mcp/atlassian-helpers.ts';
+import { getAuthInfoSafe, handleJiraAuthError } from '../../../mcp-core/auth-helpers.ts';
+import { resolveCloudId } from '../atlassian-helpers.ts';
 import { sanitizeObjectWithJWTs } from '../../../tokens.ts';
-import type { McpServer } from '../../../jira-mcp/mcp-types.ts';
-import { getJiraIssue } from '../../../jira-mcp/atlassian-helpers.ts';
+import type { McpServer } from '../../../mcp-core/mcp-types.ts';
+import { getJiraIssue } from '../atlassian-helpers.ts';
 
 // Tool parameters interface
 interface GetJiraIssueParams {
