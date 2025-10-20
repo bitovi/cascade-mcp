@@ -1,53 +1,23 @@
 /**
- * MCP (Model Context Protocol) Tool Endpoints
+ * MCP Core Module
  *
- * This module provides MCP-compatible endpoints for interacting with Jira
- * through the OAuth-secured authentication server using the official MCP SDK.
+ * This module provides core MCP (Model Context Protocol) infrastructure:
+ * - Authentication context management (setAuthContext, clearAuthContext, getAuthContext)
+ * - Type exports for AuthContext
+ * 
+ * Note: MCP server instances are now created per-session via server-factory.ts
+ * instead of using a global singleton. This enables dynamic tool registration
+ * based on authenticated providers.
  */
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { logger } from '../observability/logger.ts';
 
-// Import auth helpers and types
+// Import and re-export auth helpers and types
 import { setAuthContext, clearAuthContext, getAuthContext } from './auth-helpers.ts';
 import type { AuthContext } from './auth-context-store.ts';
 
-// Import provider tools
-import { atlassianProvider } from '../providers/atlassian/index.js';
-import { figmaProvider } from '../providers/figma/index.js';
-import { utilityProvider } from '../providers/utility/index.js';
+logger.info('MCP core module loaded (per-session servers via server-factory.ts)');
 
-// Create MCP server instance
-const mcp = new McpServer(
-  {
-    name: 'jira-tool-server',
-    version: '1.0.0',
-  },
-  {
-    capabilities: {
-      tools: {},
-      logging: {},
-    },
-  },
-);
-
-// Register all tools
-logger.info('Registering MCP tools...');
-
-// Register Atlassian/Jira tools via provider
-logger.info('Registering Atlassian tools...');
-atlassianProvider.registerTools(mcp, null); // authContext not needed for registration, only for execution
-
-// Register Figma tools via provider
-logger.info('Registering Figma tools...');
-figmaProvider.registerTools(mcp, null); // authContext not needed for registration, only for execution
-
-// Register utility tools via provider
-logger.info('Registering utility tools...');
-utilityProvider.registerTools(mcp, null); // No auth needed for utility tools
-
-logger.info('All MCP tools registered successfully');
-
-// Export the MCP server instance and auth functions for use in server.js
-export { mcp, setAuthContext, clearAuthContext, getAuthContext };
+// Export auth functions and types for use throughout the application
+export { setAuthContext, clearAuthContext, getAuthContext };
 export type { AuthContext };

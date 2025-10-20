@@ -20,7 +20,8 @@
  */
 
 import { Request, Response } from 'express';
-import { mcp, setAuthContext, clearAuthContext } from './mcp-core/index.ts';
+import { setAuthContext, clearAuthContext } from './mcp-core/index.ts';
+import { createMcpServer } from './mcp-core/server-factory.ts';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { isInitializeRequest, type JSONRPCRequest } from '@modelcontextprotocol/sdk/types.js';
 import { InvalidTokenError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
@@ -29,14 +30,22 @@ import { logger } from './observability/logger.ts';
 import { jwtVerify, sanitizeJwtPayload, formatTokenWithExpiration, parseJWT, type JWTPayload } from './tokens.ts';
 import { type AuthContext } from './mcp-core/auth-context-store.ts';
 import { serverInstanceScope, serverStartTime } from './pkce/discovery.ts';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+
 // Validation result interface
 interface ValidationResult {
   authInfo: AuthContext | null;
   errored: boolean;
 }
 
-// Map to store transports by session ID
-const transports: Record<string, StreamableHTTPServerTransport> = {};
+// Interface for session data
+interface SessionData {
+  transport: StreamableHTTPServerTransport;
+  mcpServer: McpServer;
+}
+
+// Map to store session data (transport + MCP server) by session ID
+const sessions: Record<string, SessionData> = {};
 
 /**
  * Handle POST requests for client-to-server communication
@@ -54,10 +63,13 @@ export async function handleMcpPost(req: Request, res: Response): Promise<void> 
   // Check for existing session ID
   const sessionId = req.headers['mcp-session-id'] as string | undefined;
   let transport: StreamableHTTPServerTransport;
+  let mcpServer: McpServer;
 
-  if (sessionId && transports[sessionId]) {
-    // Reuse existing transport
-    transport = transports[sessionId];
+  if (sessionId && sessions[sessionId]) {
+    // Reuse existing transport and MCP server
+    const session = sessions[sessionId];
+    transport = session.transport;
+    mcpServer = session.mcpServer;
     console.log(`  ♻️ Reusing existing transport for session: ${sessionId}`);
   } 
   else if (!sessionId && isInitializeRequest(req.body as JSONRPCRequest)) {
@@ -77,29 +89,35 @@ export async function handleMcpPost(req: Request, res: Response): Promise<void> 
       sendMissingAtlassianAccessToken(res, req, 'anywhere');
       return;
     }
-    console.log('    Has valid token, creating streamable transport');
+    
+    console.log('    Has valid token, creating per-session MCP server');
+    
+    // Create fresh MCP server instance with dynamic tool registration
+    mcpServer = createMcpServer(authInfo);
+    
+    console.log('    Creating streamable transport');
     transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
       onsessioninitialized: (newSessionId: string) => {
-        // Store the transport by session ID
-        console.log(`    Storing transport for new session: ${newSessionId}`);
-        transports[newSessionId] = transport;
+        // Store the session data (transport + MCP server)
+        console.log(`    Storing session data for: ${newSessionId}`);
+        sessions[newSessionId] = { transport, mcpServer };
         // Store auth context for this session
         setAuthContext(newSessionId, authInfo!);
       },
     });
 
-    // Clean up transport when closed
+    // Clean up session when transport closed
     transport.onclose = () => {
       if (transport.sessionId) {
         console.log(`.   Cleaning up session: ${transport.sessionId}`);
-        delete transports[transport.sessionId];
+        delete sessions[transport.sessionId];
         clearAuthContext(transport.sessionId);
       }
     };
 
-    // Connect the MCP server to this transport
-    await mcp.connect(transport);
+    // Connect the per-session MCP server to this transport
+    await mcpServer.connect(transport);
     console.log('    MCP server connected to new transport');
   } else {
     // Invalid request
@@ -178,8 +196,8 @@ export async function handleSessionRequest(req: Request, res: Response): Promise
   }
   
   const sessionId = req.headers['mcp-session-id'] as string | undefined;
-  if (!sessionId || !transports[sessionId]) {
-    console.log(`❌ Session ID issue - sessionId: ${sessionId}, available sessions: [${Object.keys(transports).join(', ')}]`);
+  if (!sessionId || !sessions[sessionId]) {
+    console.log(`❌ Session ID issue - sessionId: ${sessionId}, available sessions: [${Object.keys(sessions).join(', ')}]`);
     res.status(400).send('Invalid or missing session ID');
     return;
   }
@@ -197,7 +215,7 @@ export async function handleSessionRequest(req: Request, res: Response): Promise
     setAuthContext(sessionId, authInfo);
   }
 
-  const transport = transports[sessionId];
+  const { transport } = sessions[sessionId];
   await transport.handleRequest(req, res);
 }
 
