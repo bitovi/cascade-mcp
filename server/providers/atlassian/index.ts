@@ -2,7 +2,8 @@
  * Atlassian (Jira) OAuth Provider
  * 
  * Implements the OAuthProvider interface for Atlassian Cloud authentication.
- * Handles OAuth 2.0 PKCE flow with Atlassian-specific quirks and requirements.
+ * Handles Server-Side OAuth 2.0 flow with client_secret (NOT MCP PKCE).
+ * Bridge generates its own code_verifier for provider authentication.
  */
 
 import type { McpServer } from '../../jira-mcp/mcp-types.js';

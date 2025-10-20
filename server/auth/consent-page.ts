@@ -152,7 +152,14 @@ export function renderConnectionHub(req: Request, res: Response): void {
           }
         </div>
         
-        <!-- Figma provider will be added in Phase 1.4 -->
+        <div class="provider ${connectedProviders.includes('figma') ? 'connected' : ''}">
+          <h2>Figma</h2>
+          <p>Access Figma designs, files, and user information</p>
+          ${connectedProviders.includes('figma') 
+            ? '<span class="status">✓ Connected</span>'
+            : '<button onclick="location.href=\'/auth/connect/figma\'">Connect Figma</button>'
+          }
+        </div>
         
         <div class="done-section">
           <button class="done-button" onclick="location.href='/auth/done'" ${connectedProviders.length === 0 ? 'disabled' : ''}>

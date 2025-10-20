@@ -26,6 +26,7 @@ import {
   handleConnectionDone 
 } from './provider-server-oauth/index.js';
 import { atlassianProvider } from './providers/atlassian/index.js';
+import { figmaProvider } from './providers/figma/index.js';
 
 // configurations
 dotenv.config();
@@ -118,10 +119,9 @@ app.get('/callback', callback);
 app.get('/auth/connect', renderConnectionHub);
 app.get('/auth/connect/atlassian', makeAuthorize(atlassianProvider));
 app.get('/auth/callback/atlassian', makeCallback(atlassianProvider, { onSuccess: hubCallbackHandler }));
+app.get('/auth/connect/figma', makeAuthorize(figmaProvider));
+app.get('/auth/callback/figma', makeCallback(figmaProvider, { onSuccess: hubCallbackHandler }));
 app.get('/auth/done', handleConnectionDone);
-// Figma routes will be added in Phase 1.4:
-// app.get('/auth/connect/figma', makeAuthorize(figmaProvider));
-// app.get('/auth/callback/figma', makeCallback(figmaProvider, { onSuccess: hubCallbackHandler }));
 
 // --- MCP HTTP Endpoints ---
 // Handle POST requests for client-to-server communication

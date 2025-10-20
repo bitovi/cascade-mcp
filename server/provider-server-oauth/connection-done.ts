@@ -54,26 +54,61 @@ export async function handleConnectionDone(req: Request, res: Response): Promise
     // Build nested JWT payload per Q21
     // Structure: { atlassian: { access_token, refresh_token, expires_at, scope }, figma: {...} }
     
-    // For now, we use the createJiraMCPAuthToken function which expects Atlassian tokens
-    // This will be refactored in Phase 2 to support arbitrary providers
     const atlassianTokens = providerTokens['atlassian'];
+    const figmaTokens = providerTokens['figma'];
     
-    if (!atlassianTokens) {
-      throw new Error('No Atlassian tokens found - connection hub requires Atlassian authentication');
+    if (!atlassianTokens && !figmaTokens) {
+      throw new Error('No provider tokens found - please connect at least one service');
     }
     
-    // Create JWT - the createJiraMCPAuthToken function already creates nested structure
-    const jwt = await createJiraMCPAuthToken({
-      access_token: atlassianTokens.access_token,
-      refresh_token: atlassianTokens.refresh_token || '',
-      token_type: 'Bearer',
-      expires_in: Math.floor((atlassianTokens.expires_at - Date.now()) / 1000),
-      scope: atlassianTokens.scope || '',
-    }, { 
-      resource: req.session.mcpResource 
-    });
+    // Build nested JWT payload manually to support multiple providers
+    const jwtPayload: any = {
+      sub: 'user-' + Math.random().toString(36).substring(7),
+      iss: process.env.VITE_AUTH_SERVER_URL,
+      aud: req.session.mcpResource || process.env.VITE_AUTH_SERVER_URL,
+      scope: req.session.mcpScope || '',
+    };
     
-    console.log('  JWT created successfully');
+    // Add Atlassian tokens if present
+    if (atlassianTokens) {
+      console.log('  Adding Atlassian credentials to JWT');
+      jwtPayload.atlassian = {
+        access_token: atlassianTokens.access_token,
+        refresh_token: atlassianTokens.refresh_token,
+        expires_at: atlassianTokens.expires_at,
+        scope: atlassianTokens.scope,
+      };
+    }
+    
+    // Add Figma tokens if present
+    if (figmaTokens) {
+      console.log('  Adding Figma credentials to JWT');
+      jwtPayload.figma = {
+        access_token: figmaTokens.access_token,
+        refresh_token: figmaTokens.refresh_token,
+        expires_at: figmaTokens.expires_at,
+        scope: figmaTokens.scope,
+      };
+    }
+    
+    // Calculate JWT expiration (use shortest provider token expiration)
+    let minExpiresAt = Infinity;
+    if (atlassianTokens?.expires_at) minExpiresAt = Math.min(minExpiresAt, atlassianTokens.expires_at);
+    if (figmaTokens?.expires_at) minExpiresAt = Math.min(minExpiresAt, figmaTokens.expires_at);
+    
+    if (minExpiresAt !== Infinity) {
+      // JWT expires 1 minute before shortest provider token
+      jwtPayload.exp = Math.floor(minExpiresAt / 1000) - 60;
+    } else {
+      // Fallback to 1 hour
+      jwtPayload.exp = Math.floor(Date.now() / 1000) + 3600;
+    }
+    
+    // Create JWT with nested provider structure
+    const { jwtSign } = await import('../tokens.js');
+    const jwt = await jwtSign(jwtPayload);
+    
+    console.log('  JWT created successfully with providers:', Object.keys(jwtPayload).filter(k => ['atlassian', 'figma'].includes(k)));
     
     // Clear session provider data (tokens now embedded in JWT)
     delete req.session.providerTokens;
