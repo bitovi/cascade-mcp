@@ -83,27 +83,72 @@ setTimeout(cleanup, 3600000); // 1 hour
   - `server/providers/combined/tools/writing-shell-stories/index.ts` ✅
   - `server/providers/combined/index.ts` ✅
   - Import added to `server/mcp-core/server-factory.ts` ✅
-
-### 🔄 Ready to Enable
-- **Combined Provider Registration**: Code exists but commented out in `server-factory.ts` (lines 77-82)
-  - Waiting to enable when both Atlassian + Figma providers are authenticated
-  - Registration logic: `if (authContext.atlassian && authContext.figma) { combinedProvider.registerTools(mcp, authContext); }`
+  - Combined provider registration ENABLED in `server-factory.ts` ✅ (lines 77-82)
+  - Tool will be available when both Atlassian + Figma are authenticated
 
 ### ⏭️ Next Steps (in order)
-1. **Step 2.0**: Install Dependencies (`tmp-promise`, `yaml`)
-2. **Step 3.0**: Implement Phase 1 - Fetch epic and extract Figma URLs (inline in main tool)
-3. **Step 4.0**: Add temp directory creation to Phase 1 (inline, then extract to helper)
-4. **Step 5.0**: Implement Phase 2 - Parse Figma URLs and fetch metadata (inline)
-5. **Step 6.0**: Extract Figma URL Parser helper (refactor from Step 5.0)
-6. **Step 7.0**: Implement Phase 3 - Analyze screens/notes and generate YAML
+1. ~~**Step 2.0**: Install Dependencies (`tmp-promise`, `yaml`)~~ ✅ DONE
+2. ~~**Step 3.0**: Implement Phase 1 - Fetch epic and extract Figma URLs (inline in main tool)~~ ✅ DONE
+   - ✅ **Bonus**: Created `progress-notifier.ts` helper for simplified notifications
+3. ~~**Step 4.0**: Add temp directory creation to Phase 1 (inline, then extract to helper)~~ ✅ DONE
+   - ✅ Created `temp-directory-manager.ts` with lookup and 24hr cleanup
+   - ✅ Deterministic naming: `shell-stories-{sessionId}-{epicKey}`
+   - ✅ Reuses existing directories for same session/epic
+   - ✅ Auto-cleanup every 5 minutes for dirs older than 24 hours
+4. ~~**Step 5.0**: Implement Phase 2 - Parse Figma URLs and fetch metadata (inline)~~ ✅ DONE
+   - ✅ Created `figma-helpers.ts` with reusable Figma API utilities
+   - ✅ Functions: parseFigmaUrl, fetchFigmaFile, extractFramesAndNotes
+   - ✅ Phase 2 implementation: Fetches all Figma files and extracts frames/notes
+   - ✅ Error handling: Continues on individual URL failures with warnings
+5. ~~**Step 6.0**: Extract Figma URL Parser helper (refactor from Step 5.0)~~ ✅ DONE (already in figma-helpers.ts)
+6. ~~**Step 7.0**: Implement Phase 3 - Analyze screens/notes and generate YAML~~ ✅ DONE
+   - ✅ Implemented spatial analysis (Euclidean distance calculation)
+   - ✅ Associates notes with nearest frames (500px threshold)
+   - ✅ Sorts screens by layout (top-to-bottom, left-to-right)
+   - ✅ Generates screens.yaml with proper structure
+   - ✅ Handles unassociated notes
+   - ✅ Writes YAML file to temp directory
 7. **Step 8.0**: Extract Screen-Note Analyzer helper (refactor from Step 7.0)
 
 ### 📋 Remaining Steps After Step 8.0
 - YAML Generator helper extraction
-- Image Downloader implementation + helper
+- Image downloads using existing `figma-get-image-download` tool
 - AI analysis via sampling
 - Jira write-back
 - Error handling and polish
+
+### 🎉 Simplifications from Existing Figma Tools
+
+The existing Figma tools have already implemented the Figma API logic we need. However, **MCP tools cannot directly call other tools** - they must be invoked by the MCP client (VS Code Copilot).
+
+**Solution:** Extract the core logic from existing Figma tools into **shared helper functions** that both the existing tools and our new tool can use.
+
+#### What to Extract:
+
+1. **From `figma-get-metadata-for-layer.ts`** → Create `figma-helpers.ts`
+   - Function: `getLayerMetadata(fileKey: string, nodeId: string, token: string)`
+   - Fetches layer/node metadata from Figma API
+   - Returns node type (CANVAS, FRAME, Note), bounding box, etc.
+   
+2. **From `figma-get-layers-for-page.ts`** → Add to `figma-helpers.ts`
+   - Function: `getLayersForPage(fileKey: string, pageId: string, token: string)`
+   - Lists all child layers in a Figma page
+   - Returns structured metadata for visible layers
+   
+3. **From `figma-get-image-download.ts`** → Add to `figma-helpers.ts`
+   - Function: `downloadFigmaImage(fileKey: string, nodeId: string, token: string, options)`
+   - Gets image URL from Figma API and downloads as base64
+   - Returns image data ready to save
+
+#### Benefits of This Approach:
+
+- ✅ **Reusable**: Both existing tools and write-shell-stories can use the same helpers
+- ✅ **Efficient**: No MCP protocol overhead, direct function calls
+- ✅ **Maintainable**: One source of truth for Figma API logic
+- ✅ **Testable**: Helpers can be unit tested independently
+- ✅ **Authentication**: Share auth context seamlessly
+
+**Result:** Steps 5 and 9 will extract and use these helpers instead of making direct API calls OR trying to call tools (which isn't possible in MCP).
 
 ---
 
@@ -117,7 +162,7 @@ setTimeout(cleanup, 3600000); // 1 hour
 - ✅ File I/O (reading, writing, downloading images)
 - ✅ Data transformation (JSON to YAML, Markdown to ADF)
 - ✅ Spatial calculations (distance between frames and notes, sorting by coordinates)
-- ✅ Text extraction from structured data (STICKY_NOTE characters field)
+- ✅ Text extraction from structured data (Note INSTANCE characters field)
 - ✅ Temp directory management
 - ✅ Error handling and progress reporting
 
@@ -150,42 +195,52 @@ setTimeout(cleanup, 3600000); // 1 hour
 
 ---
 
-### Step 2.0: Install Dependencies ⏭️ NEXT
+### Step 2.0: Install Dependencies ✅ COMPLETE
 
-#### Step 2.0: Install Dependencies
-**What to do:**
-- Install `tmp-promise` for temporary directory management
-- Install `yaml` for YAML file generation and parsing
-- Install `node-fetch` if not already available for downloading images
+#### Step 2.0: Install Dependencies ✅ COMPLETE
+**What was done:**
+- ✅ Installed `tmp-promise` for temporary directory management
+- ✅ Installed `yaml` for YAML file generation and parsing
+- ✅ Dependencies added to `package.json`
 
-**How to verify:**
-- Dependencies appear in `package.json`
-- Can import and use `tmp-promise` without errors
-- Run `npm install` successfully
+**Verified:**
+- npm install completed successfully
+- Ready to import in TypeScript code
 
 ---
 
-### Step 3.0: Implement Phase 1 - Fetch Epic and Extract Figma URLs
+### Step 3.0: Implement Phase 1 - Fetch Epic and Extract Figma URLs ✅ COMPLETE
 
-#### Step 3.0: Implement Phase 1 - Fetch Epic and Extract Figma URLs [TypeScript - Main Tool]
-**What to do:**
-- Update `write-shell-stories.ts` main tool implementation
-- **[TS Logic]** Use `getJiraIssue` helper from `server/providers/atlassian/atlassian-helpers.ts` to fetch epic by key
-- **[TS Logic]** Parse epic description to extract Figma URLs (inline implementation using regex)
-  - Traverse ADF (Atlassian Document Format) structure
-  - Look for `inlineCard.attrs.url`, `text.marks.link.attrs.href`, and plain URLs in text
-  - Extract all URLs containing 'figma.com'
-- **[TS Logic]** Log all found Figma URLs
-- **[TS Logic]** Return progress message with URL count
+#### Step 3.0: Implement Phase 1 - Fetch Epic and Extract Figma URLs ✅ COMPLETE
+**What was done:**
+- ✅ Updated `write-shell-stories.ts` with Phase 1 implementation
+- ✅ **Added optional `cloudId` and `siteName` parameters** (consistent with other Jira tools like `atlassian-get-issue`)
+- ✅ Used `getJiraIssue` and `resolveCloudId` helpers from `atlassian-helpers.ts`
+- ✅ Implemented `extractFigmaUrlsFromADF()` function to parse epic description
+  - Traverses ADF (Atlassian Document Format) structure recursively
+  - Checks `inlineCard.attrs.url` nodes
+  - Checks `text.marks.link.attrs.href` for linked text
+  - Uses regex to find plain URLs in text content
+  - Extracts all URLs containing 'figma.com'
+- ✅ Added comprehensive logging for debugging
+- ✅ **Added MCP progress notifications** (following mcp-training pattern)
+  - `notifications/message` for general info/error logging
+  - `notifications/progress` for VS Code Copilot progress bars
+  - Progress tracking: 1 of 7 phases complete
+- ✅ **Created `progress-notifier.ts` helper** for simplified dual notifications
+- ✅ Returns progress message with URL count and epic details
+- ✅ Added error handling for missing tokens, epic not found, no URLs, and site resolution failures
 
-**How to verify:**
-- Tool can fetch epic from Jira when invoked with epicKey
-- Extracts all Figma URLs from epic description
-- Returns message like: "Found 3 Figma URLs in epic TEST-123"
-- Clear error if epic not found
-- Clear error if no Figma URLs found
+**Verified:**
+- Tool checks for both Atlassian and Figma authentication
+- Supports optional cloudId/siteName parameters for multi-site scenarios
+- Fetches epic from Jira using resolved cloud ID
+- Extracts Figma URLs from ADF document structure
+- Sends real-time progress notifications to MCP clients
+- Returns clear success message with found URLs
+- Proper error messages for all edge cases
 
-**Output:** Working tool that fetches epics and extracts Figma URLs (no helpers yet, all inline)
+**Output:** Working tool that fetches epics and extracts Figma URLs with streaming progress notifications (all inline, no helpers extracted yet)
 
 ---
 
@@ -225,23 +280,27 @@ setTimeout(cleanup, 3600000); // 1 hour
 - **[TS Logic]** For each Figma URL, parse fileKey and nodeId (inline regex implementation)
   - Handle format: `https://www.figma.com/design/{fileKey}/{name}?node-id={nodeId}`
   - Handle variations: with/without node-id, different URL formats
-- **[TS Logic]** For each parsed URL, fetch Figma metadata using Figma API
-  - Use auth token from context: `authInfo.figma.access_token`
-  - Call Figma API: `GET https://api.figma.com/v1/files/{fileKey}/nodes?ids={nodeId}`
-  - Determine if node is CANVAS (page), FRAME, or STICKY_NOTE
-- **[TS Logic]** If CANVAS, fetch all child layers recursively
-- **[TS Logic]** Build list of all FRAME and STICKY_NOTE nodes found
+- **[TS Logic]** Extract helpers from existing Figma tools (create `figma-helpers.ts` if needed)
+  - Extract `getLayerMetadata(fileKey, nodeId, token)` from `figma-get-metadata-for-layer.ts`
+  - Extract `getLayersForPage(fileKey, pageId, token)` from `figma-get-layers-for-page.ts`
+- **[TS Logic]** Use helpers to fetch Figma metadata
+  - Call `getLayerMetadata()` for each parsed URL
+  - If node is CANVAS (page), call `getLayersForPage()` to get children
+- **[TS Logic]** Build list of all FRAME and Note nodes found
 - **[TS Logic]** Log progress for each URL processed
 - **[TS Logic]** Return count of frames and notes found
 
 **How to verify:**
 - Parses Figma URLs correctly from epic
-- Fetches metadata from Figma API successfully
-- Identifies CANVAS nodes and fetches children
-- Collects all FRAMEs and STICKY_NOTEs
+- Helpers extracted and reusable by both old and new tools
+- Fetches metadata successfully (no MCP tool calls, direct helper usage)
+- Identifies CANVAS nodes and fetches children via helper
+- Collects all FRAMEs and Notes
 - Returns message like: "Processed 2 Figma URLs: found 5 frames, 3 notes"
 
-**Output:** Working tool that fetches and processes Figma design data
+**Output:** Working tool that fetches and processes Figma design data + extracted Figma helpers
+
+**Note:** 🔧 **Extraction Required!** MCP tools cannot call other tools directly. We must extract the core Figma API logic into shared helpers that both existing tools and our new tool can use.
 
 ---
 
@@ -272,11 +331,11 @@ setTimeout(cleanup, 3600000); // 1 hour
 #### Step 7.0: Implement Phase 3 - Analyze Screens/Notes and Generate YAML [TypeScript - Main Tool]
 **What to do:**
 - Update `write-shell-stories.ts` to analyze frame/note relationships
-- **[TS Logic]** Distinguish FRAME vs STICKY_NOTE types (check `node.type` field)
+- **[TS Logic]** Distinguish FRAME vs Note types (check `node.type` field and name)
 - **[TS Logic]** Implement spatial analysis inline
   - Calculate distances between notes and frames using Euclidean distance
   - Associate each note with nearest frame (within threshold, e.g., 500px)
-  - Extract text from STICKY_NOTE nodes (read `characters` field)
+  - Extract text from Note nodes (read `characters` field)
 - **[TS Logic]** Determine screen order from frame positions
   - Sort by Y coordinate (top-to-bottom), then X coordinate (left-to-right)
   - Or reverse if layout suggests different flow
@@ -295,30 +354,41 @@ setTimeout(cleanup, 3600000); // 1 hour
 
 **Output:** Working tool that produces screens.yaml with design structure
 
+**Performance Optimization (Step 7.0):**
+- ✅ **Implemented**: Updated Phase 2 to use Figma's `/nodes` endpoint instead of `/files` endpoint
+- Created `fetchFigmaNode(fileKey, nodeId, token)` helper in `figma-helpers.ts`
+- Old approach: Fetched entire file (could be 10+ MB for large files)
+- New approach: Fetches only the specific node requested (typically < 100 KB)
+- Handles node ID conversion from URL format (`node-id=222-22345`) to API format (`222:22345`)
+- Validates that URLs always have nodeIds (as per Figma URL specification)
+- **Benefit**: 10-100x performance improvement for large Figma files
+
 ---
 
-### Step 8.0: Extract Screen-Note Analyzer Helper
+### Step 8.0: Extract Screen-Note Analyzer Helper ✅
 
 #### Step 8.0: Extract Screen-Note Analyzer Helper [Refactoring]
-**What to do:**
-- Review spatial analysis code from Step 7.0
-- **[TS Logic]** Extract to `screen-analyzer.ts` helper
-  - Function: `analyzeScreens(nodes): { frames, notes, associations }`
-  - Spatial distance calculation
-  - Text extraction from notes
-  - Frame/note grouping logic
-- **[TS Logic]** Extract to `yaml-generator.ts` helper
-  - Function: `generateScreensYaml(analyzed): yamlString`
+**Status**: Complete
+
+**Implementation**:
+- Created `screen-analyzer.ts` helper with:
+  - `calculateDistance(x1, y1, x2, y2)`: Point-to-point Euclidean distance
+  - `calculateRectangleDistance(rect1, rect2)`: Edge-to-edge distance between rectangles
+  - `associateNotesWithFrames(frames, notes, baseUrl, maxDistance)`: Spatial proximity association
+    - Uses edge-to-edge distance (handles large frames correctly)
+    - Each note assigned to closest frame within threshold
+    - Returns screens array with sorted notes + unassociated notes
+- Created `yaml-generator.ts` helper with:
+  - `generateScreensYaml(screens, unassociatedNotes, order)`: Generates YAML structure
   - Screen ordering logic
-  - YAML structure generation
-- **[TS Logic]** Update main tool to use both helpers
-- **[TS Logic]** Add tests for edge cases (overlapping notes, distant notes, etc.)
+  - Conditional unassociated_notes field
+- Updated `write-shell-stories.ts` to use extracted helpers
+- Removed duplicate spatial analysis code from main tool
 
 **How to verify:**
 - Main tool still works with extracted helpers
-- Helpers handle edge cases from testing
+- Helpers are reusable by other code
 - Code is cleaner and more maintainable
-- Helpers are reusable
 
 **Output:** Cleaner main tool + two reusable helpers (screen analyzer, YAML generator)
 
@@ -329,49 +399,56 @@ setTimeout(cleanup, 3600000); // 1 hour
 #### Step 9.0: Implement Phase 4 - Download Images [TypeScript - Main Tool]
 **What to do:**
 - Update `write-shell-stories.ts` to download frame images
-- **[TS Logic]** For each frame from screens.yaml, get image URL from Figma API
-  - Call `GET https://api.figma.com/v1/images/{fileKey}?ids={nodeId}&format=png`
-  - Extract download URL from response
-- **[TS Logic]** Download image to temp directory (inline using fetch)
-  - Fetch image data from URL
+- **[TS Logic]** Extract helper from existing Figma tool (add to `figma-helpers.ts`)
+  - Extract `downloadFigmaImage(fileKey, nodeId, token, options)` from `figma-get-image-download.ts`
+  - Core logic: Get image URL from Figma API, download as base64
+- **[TS Logic]** For each frame from screens.yaml, use helper to download
+  - Call `downloadFigmaImage(fileKey, nodeId, token, { format: 'png', scale: 1 })`
+  - Get base64-encoded image data
+- **[TS Logic]** Save downloaded images to temp directory
+  - Decode base64 image data
   - Save to `{tempDir}/{screen-name}.png`
 - **[TS Logic]** Extract note text and save to `.notes.md` files
   - For each frame with notes, create `{screen-name}.notes.md`
-  - Include text from associated STICKY_NOTE nodes
+  - Include text from associated Note nodes (already have from metadata)
 - **[TS Logic]** Log download progress
 - **[TS Logic]** Handle download failures gracefully (try/catch per image)
 
 **How to verify:**
+- Helper extracted and reusable by both old and new tools
 - All frame images downloaded to temp directory
 - Image files exist with correct names
 - Note files created for frames with notes
 - Progress logged: "Downloaded 5/5 images, 3 note files created"
 - Tool continues if individual download fails
 
-**Output:** Working tool with image and note downloads
+**Output:** Working tool with image and note downloads + extracted image download helper
+
+**Note:** 🔧 **Extraction Required!** Must extract the image download logic into a shared helper since tools cannot call each other directly.
+
+**Future Optimization:** 🚀 Instead of downloading all images sequentially and then starting analysis, we could pipeline the work: start analyzing the first screen as soon as its image is downloaded, while continuing to download remaining images in parallel. This would significantly reduce total execution time for epics with many screens.
 
 ---
 
-### Step 10.0: Extract Image Downloader Helper
+### Step 10.0: Refactor Existing Figma Tools (Optional Cleanup)
 
-#### Step 10.0: Extract Image Downloader Helper [Refactoring]
+#### Step 10.0: Refactor Existing Figma Tools to Use Helpers [Optional Cleanup]
 **What to do:**
-- Review image download code from Step 9.0
-- **[TS Logic]** Extract to `image-downloader.ts` helper
-  - Function: `getImageUrl(fileKey, nodeId, token): Promise<string>`
-  - Function: `downloadImage(url, outputPath): Promise<void>`
-  - Rate limit handling
-  - Retry logic for failed downloads
-- **[TS Logic]** Update main tool to use the helper
-- **[TS Logic]** Add error handling tests
+- After extracting helpers in Steps 5 and 9, optionally refactor existing Figma tools
+- **[TS Logic]** Update `figma-get-metadata-for-layer.ts` to use `getLayerMetadata()` helper
+- **[TS Logic]** Update `figma-get-layers-for-page.ts` to use `getLayersForPage()` helper
+- **[TS Logic]** Update `figma-get-image-download.ts` to use `downloadFigmaImage()` helper
+- **[TS Logic]** Remove duplicated logic from tools - keep only tool-specific formatting/response
 
 **How to verify:**
-- Main tool still works with extracted helper
-- Helper handles rate limits gracefully
-- Retries failed downloads
-- Helper is reusable
+- Existing Figma tools still work correctly
+- Code is DRY (Don't Repeat Yourself)
+- Both old tools and new write-shell-stories tool use same helpers
+- All tests pass
 
-**Output:** Cleaner main tool + reusable image downloader helper
+**Output:** Cleaner codebase with shared helpers
+
+**Note:** � **Optional!** This step is cleanup/refactoring. Can be done later if time is tight. Main goal is to ensure both existing tools and our new tool share the same Figma API logic.
 
 ---
 

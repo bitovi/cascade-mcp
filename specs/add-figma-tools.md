@@ -750,13 +750,13 @@ Update connection hub to include Figma:
 ```
 
 **Deliverables:**
-- [ ] `OAuthProvider` interface defined (from 1.1)
-- [ ] Atlassian provider refactored and tested (from 1.2)
-- [ ] Connection hub UI working with Atlassian (from 1.3)
-- [ ] Figma provider implemented and tested
-- [ ] All Figma tools ported with `figma-` prefix
-- [ ] Connection hub updated with Figma option
-- [ ] Multi-provider JWT creation working
+- [x] `OAuthProvider` interface defined (from 1.1)
+- [x] Atlassian provider refactored and tested (from 1.2)
+- [x] Connection hub UI working with Atlassian (from 1.3)
+- [x] Figma provider implemented and tested
+- [x] All Figma tools ported with `figma-` prefix
+- [x] Connection hub updated with Figma option
+- [x] Multi-provider JWT creation working
 - [ ] Unit tests for both providers
 
 **Verification - How to Know It's Working:**
