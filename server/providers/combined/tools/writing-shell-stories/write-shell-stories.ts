@@ -9,6 +9,7 @@
 import { z } from 'zod';
 import * as path from 'path';
 import * as fs from 'fs/promises';
+import { CreateMessageResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import type { McpServer } from '../../../../mcp-core/mcp-types.js';
 import { getAuthInfoSafe } from '../../../../mcp-core/auth-helpers.js';
 import { resolveCloudId, getJiraIssue, handleJiraAuthError } from '../../../atlassian/atlassian-helpers.js';
@@ -16,12 +17,19 @@ import { createProgressNotifier } from './progress-notifier.js';
 import { getTempDir } from './temp-directory-manager.js';
 import { associateNotesWithFrames } from './screen-analyzer.js';
 import { generateScreensYaml } from './yaml-generator.js';
+import { writeNotesForScreen } from './note-text-extractor.js';
+import { 
+  generateScreenAnalysisPrompt,
+  SCREEN_ANALYSIS_SYSTEM_PROMPT,
+  SCREEN_ANALYSIS_MAX_TOKENS
+} from './prompt-screen-analysis.js';
 import { 
   parseFigmaUrl, 
   fetchFigmaFile,
   fetchFigmaNode,
   getFramesAndNotesForNode,
-  convertNodeIdToApiFormat 
+  convertNodeIdToApiFormat,
+  downloadFigmaImage
 } from '../../../figma/figma-helpers.js';
 import type { FigmaNodeMetadata } from '../../../figma/figma-helpers.js';
 
@@ -166,8 +174,10 @@ export function registerWriteShellStoriesTool(mcp: McpServer): void {
       try {
         console.log('  Starting shell story generation for epic:', epicKey);
 
-        // Create progress notifier for this execution (7 total phases)
-        const notify = createProgressNotifier(context, 7);
+        // Create progress notifier for this execution
+        // Initial total: 3 phases + unknown screens + 3 final phases = unknown
+        // We'll update the total after we know how many screens there are
+        const notify = createProgressNotifier(context, 6);
 
         // Send initial progress notification
         await notify(`Starting shell story generation for epic ${epicKey}...`, 0);
@@ -276,6 +286,7 @@ export function registerWriteShellStoriesTool(mcp: McpServer): void {
         
         // Parse and fetch metadata for each Figma URL
         const allFramesAndNotes: Array<{ url: string; metadata: FigmaNodeMetadata[] }> = [];
+        let figmaFileKey = ''; // Store file key for later use
         
         for (let i = 0; i < figmaUrls.length; i++) {
           const figmaUrl = figmaUrls[i];
@@ -298,6 +309,11 @@ export function registerWriteShellStoriesTool(mcp: McpServer): void {
           try {
             // Convert nodeId to API format (required for all URLs from Jira)
             const apiNodeId = convertNodeIdToApiFormat(urlInfo.nodeId);
+            
+            // Store file key for Phase 4
+            if (i === 0) {
+              figmaFileKey = urlInfo.fileKey;
+            }
             
             // Fetch specific node data using efficient /nodes endpoint
             const nodeData = await fetchFigmaNode(urlInfo.fileKey, apiNodeId, figmaToken);
@@ -377,8 +393,21 @@ export function registerWriteShellStoriesTool(mcp: McpServer): void {
         
         await notify(`✅ Phase 3 Complete: Generated screens.yaml (${screens.length} screens)`, 3);
 
-        // TODO: Phase 4: Download images and notes
-        // TODO: Phase 5: AI analysis via sampling
+        // ==========================================
+        // PHASE 4: Download images, analyze screens, and save notes
+        // ==========================================
+        const { downloadedImages, analyzedScreens, downloadedNotes } = await downloadAndAnalyzeScreens({
+          mcp,
+          screens,
+          allFrames,
+          allNotes,
+          figmaFileKey,
+          figmaToken,
+          tempDirPath,
+          notify
+        });
+
+        // TODO: Phase 5: Generate shell stories from analyses
         // TODO: Phase 6: Write back to Jira
 
         // Return progress summary
@@ -386,15 +415,16 @@ export function registerWriteShellStoriesTool(mcp: McpServer): void {
           content: [
             {
               type: 'text',
-              text: `✅ Phase 1-3 Complete:\n\n` +
+              text: `✅ Phase 1-4 Complete:\n\n` +
                     `Epic: ${issue.fields?.summary} (${epicKey})\n` +
                     `Site: ${siteInfo.siteName}\n` +
                     `Temp Directory: ${tempDirPath}\n\n` +
                     `Phase 1: Found ${figmaUrls.length} Figma URL(s)\n` +
                     `Phase 2: Extracted ${totalFrames} frames and ${totalNotes} notes\n` +
-                    `Phase 3: Generated screens.yaml with ${screens.length} screens\n\n` +
-                    `Screens YAML:\n${yamlPath}\n\n` +
-                    `Next: Implement Phase 4 (Download images and notes)`,
+                    `Phase 3: Generated screens.yaml with ${screens.length} screens\n` +
+                    `Phase 4: Downloaded ${downloadedImages} images, analyzed ${analyzedScreens} screens, ${downloadedNotes} note files\n\n` +
+                    `Screens YAML: ${yamlPath}\n\n` +
+                    `Next: Implement Phase 5 (Generate shell stories from analyses)`,
             },
           ],
         };
@@ -412,4 +442,205 @@ export function registerWriteShellStoriesTool(mcp: McpServer): void {
       }
     },
   );
+}
+
+/**
+ * Phase 4: Download images, analyze screens, and save notes
+ * 
+ * For each screen:
+ * 1. Prepare notes file
+ * 2. Download frame image from Figma (or await previous prefetch)
+ * 3. Start downloading NEXT image in background (pipeline optimization)
+ * 4. Run AI analysis on CURRENT screen (while next downloads in parallel)
+ * 5. Save analysis result
+ * 
+ * Performance optimization: Images are downloaded in a pipelined fashion where
+ * the next image downloads while the current screen is being analyzed by AI.
+ * This parallelization significantly reduces total execution time while still
+ * maintaining sequential Figma API calls (natural rate limiting).
+ * 
+ */
+async function downloadAndAnalyzeScreens(params: {
+  mcp: McpServer;
+  screens: Array<{ name: string; url: string; notes: string[] }>;
+  allFrames: FigmaNodeMetadata[];
+  allNotes: FigmaNodeMetadata[];
+  figmaFileKey: string;
+  figmaToken: string;
+  tempDirPath: string;
+  notify: ReturnType<typeof createProgressNotifier>;
+}): Promise<{ downloadedImages: number; analyzedScreens: number; downloadedNotes: number }> {
+  const { mcp, screens, allFrames, allNotes, figmaFileKey, figmaToken, tempDirPath, notify } = params;
+  
+  console.log('  Phase 4: Downloading images and analyzing screens...');
+  
+  // Add screens.length steps to the total (one step per screen analysis)
+  await notify(`Phase 4: Starting analysis of ${screens.length} screens...`, 4, 'info', screens.length);
+  
+  let downloadedImages = 0;
+  let analyzedScreens = 0;
+  let downloadedNotes = 0;
+  
+  // Helper to download image for a screen
+  async function downloadScreenImage(screen: typeof screens[number], frameId: string): Promise<{
+    base64Data: string;
+    byteSize: number;
+  } | null> {
+    try {
+      const imageResult = await downloadFigmaImage(
+        figmaFileKey,
+        frameId,
+        figmaToken,
+        { format: 'png', scale: 1 }
+      );
+      
+      const imageSizeKB = Math.round(imageResult.byteSize / 1024);
+      
+      // Save image to temp directory
+      const imagePath = path.join(tempDirPath, `${screen.name}.png`);
+      const imageBuffer = Buffer.from(imageResult.base64Data, 'base64');
+      await fs.writeFile(imagePath, imageBuffer);
+      
+      console.log(`    ✅ Downloaded image: ${screen.name}.png (${imageSizeKB}KB)`);
+      
+      return imageResult;
+    } catch (error: any) {
+      console.log(`    ⚠️ Failed to download image for ${screen.name}: ${error.message}`);
+      return null;
+    }
+  }
+  
+  // Pipeline: Start downloading the first image
+  let nextImagePromise: Promise<{ base64Data: string; byteSize: number } | null> | null = null;
+  
+  for (let i = 0; i < screens.length; i++) {
+    const screen = screens[i];
+    console.log(`  Processing screen ${i + 1}/${screens.length}: ${screen.name}`);
+    
+    // Send progress notification for this specific screen
+    const currentProgress = 4 + i;
+    await notify(`Analyzing screen: ${screen.name} (${i + 1}/${screens.length})`, currentProgress);
+    
+    // Find the frame for this screen
+    const frame = allFrames.find(f => 
+      screen.url.includes(f.id.replace(/:/g, '-'))
+    );
+    
+    if (!frame) {
+      console.log(`    ⚠️ Frame not found for screen: ${screen.name}`);
+      continue;
+    }
+    
+    // Step 1: Prepare notes file for this screen
+    const notesWritten = await writeNotesForScreen(screen, allNotes, tempDirPath);
+    if (notesWritten > 0) {
+      console.log(`    ✅ Prepared notes: ${screen.name}.notes.md (${notesWritten} notes)`);
+      downloadedNotes++;
+    }
+    
+    // Step 2: Download current image (or await previous download if pipelined)
+    let imageResult: { base64Data: string; byteSize: number } | null = null;
+    
+    if (i === 0) {
+      // First screen: download directly
+      imageResult = await downloadScreenImage(screen, frame.id);
+    } else {
+      // Subsequent screens: await the previous iteration's prefetch
+      imageResult = await nextImagePromise!;
+    }
+    
+    if (imageResult) {
+      downloadedImages++;
+    }
+    
+    // Step 3: Start downloading NEXT image while we analyze CURRENT (pipeline optimization)
+    const nextScreen = screens[i + 1];
+    if (nextScreen) {
+      const nextFrame = allFrames.find(f => 
+        nextScreen.url.includes(f.id.replace(/:/g, '-'))
+      );
+      
+      if (nextFrame) {
+        // Start next download in background (don't await)
+        nextImagePromise = downloadScreenImage(nextScreen, nextFrame.id);
+      }
+    }
+    
+    // Step 4: Run AI analysis on CURRENT screen (while next image downloads in parallel)
+    if (imageResult) {
+      try {
+        console.log(`    🤖 Analyzing screen with AI...`);
+        
+        // Read notes content if available
+        let notesContent = '';
+        const notesPath = path.join(tempDirPath, `${screen.name}.notes.md`);
+        try {
+          notesContent = await fs.readFile(notesPath, 'utf-8');
+        } catch {
+          // No notes file, that's okay
+        }
+        
+        // Generate analysis prompt using helper
+        const screenPosition = `${i + 1} of ${screens.length}`;
+        const analysisPrompt = generateScreenAnalysisPrompt(
+          screen.name,
+          screen.url,
+          screenPosition,
+          notesContent || undefined
+        );
+
+        // Send sampling request with image (while next image downloads)
+        const samplingResponse = await mcp.server.request({
+          "method": "sampling/createMessage",
+          "params": {
+            "messages": [
+              {
+                "role": "user",
+                "content": {
+                  "type": "text",
+                  "text": analysisPrompt
+                }
+              },
+              {
+                "role": "user",
+                "content": {
+                  "type": "image",
+                  "data": imageResult.base64Data,
+                  "mimeType": "image/png"
+                }
+              }
+            ],
+            "speedPriority": 0.5,
+            "systemPrompt": SCREEN_ANALYSIS_SYSTEM_PROMPT,
+            "maxTokens": SCREEN_ANALYSIS_MAX_TOKENS
+          }
+        }, CreateMessageResultSchema);
+        
+        const analysisText = samplingResponse.content?.text as string;
+        if (!analysisText) {
+          throw new Error('No analysis content received from AI');
+        }
+        
+        console.log(`    ✅ AI analysis complete (${analysisText.length} characters)`);
+        
+        // Step 5: Save analysis result
+        const analysisPath = path.join(tempDirPath, `${screen.name}.analysis.md`);
+        await fs.writeFile(analysisPath, analysisText, 'utf-8');
+        
+        console.log(`    ✅ Saved analysis: ${screen.name}.analysis.md`);
+        analyzedScreens++;
+        
+      } catch (error: any) {
+        console.log(`    ⚠️ Failed to analyze ${screen.name}: ${error.message}`);
+      }
+    }
+  }
+  
+  console.log(`  Phase 4 complete: ${downloadedImages}/${screens.length} images, ${analyzedScreens} analyses, ${downloadedNotes} note files`);
+  
+  // Progress for end of Phase 4 (after all screens analyzed)
+  const phase4EndProgress = 4 + screens.length;
+  await notify(`✅ Phase 4 Complete: Downloaded ${downloadedImages} images, analyzed ${analyzedScreens} screens, ${downloadedNotes} note files`, phase4EndProgress);
+  
+  return { downloadedImages, analyzedScreens, downloadedNotes };
 }

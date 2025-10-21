@@ -384,3 +384,138 @@ export function getFramesAndNotesForNode(
   return [];
 }
 
+/**
+ * Download options for Figma images
+ */
+export interface FigmaImageDownloadOptions {
+  format?: 'png' | 'jpg' | 'svg' | 'pdf';
+  scale?: number; // 0.1 to 4
+}
+
+/**
+ * Result of downloading a Figma image
+ */
+export interface FigmaImageDownloadResult {
+  base64Data: string;
+  mimeType: string;
+  byteSize: number;
+  imageUrl: string;
+}
+
+/**
+ * Download an image from Figma
+ * 
+ * This fetches the image URL from Figma API, then downloads the actual image.
+ * 
+ * @param fileKey - Figma file key
+ * @param nodeId - Node ID in API format (e.g., "123:456")
+ * @param token - Figma access token
+ * @param options - Download options (format, scale)
+ * @returns Image data as base64 with metadata
+ * @throws Error if download fails
+ */
+export async function downloadFigmaImage(
+  fileKey: string,
+  nodeId: string,
+  token: string,
+  options: FigmaImageDownloadOptions = {}
+): Promise<FigmaImageDownloadResult> {
+  const { format = 'png', scale = 1 } = options;
+  
+  console.log(`  Downloading Figma image: ${nodeId} (${format}, ${scale}x)`);
+  
+  // Step 1: Get image URL from Figma API
+  const figmaApiUrl = `https://api.figma.com/v1/images/${fileKey}`;
+  const params = new URLSearchParams({
+    ids: nodeId,
+    format,
+    scale: scale.toString(),
+  });
+  
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+  
+  try {
+    const response = await fetch(`${figmaApiUrl}?${params}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      signal: controller.signal,
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      logger.error('Figma images API error', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText,
+      });
+      throw new Error(`Figma images API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json() as any;
+    
+    if (data.err) {
+      throw new Error(`Figma API error: ${data.err}`);
+    }
+    
+    const imageUrl = data.images?.[nodeId];
+    if (!imageUrl) {
+      throw new Error(`No image URL returned for node ${nodeId}`);
+    }
+    
+    console.log(`    Got image URL from Figma API`);
+    
+    // Step 2: Download the actual image from Figma CDN
+    const imageController = new AbortController();
+    const imageTimeoutId = setTimeout(() => imageController.abort(), 30000); // 30 second timeout
+    
+    try {
+      const imageResponse = await fetch(imageUrl, {
+        signal: imageController.signal,
+      });
+      
+      clearTimeout(imageTimeoutId);
+      
+      if (!imageResponse.ok) {
+        throw new Error(`Failed to download image from CDN: ${imageResponse.status} ${imageResponse.statusText}`);
+      }
+      
+      const imageBlob = await imageResponse.blob();
+      console.log(`    Downloaded image: ${Math.round(imageBlob.size / 1024)}KB`);
+      
+      // Step 3: Convert to base64
+      const arrayBuffer = await imageBlob.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const base64Data = buffer.toString('base64');
+      
+      return {
+        base64Data,
+        mimeType: imageBlob.type || 'image/png',
+        byteSize: imageBlob.size,
+        imageUrl,
+      };
+      
+    } catch (error: any) {
+      clearTimeout(imageTimeoutId);
+      
+      if (error.name === 'AbortError') {
+        throw new Error('Image download timed out after 30 seconds');
+      }
+      
+      throw error;
+    }
+    
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    
+    if (error.name === 'AbortError') {
+      throw new Error('Figma API request timed out after 60 seconds');
+    }
+    
+    throw error;
+  }
+}
+
