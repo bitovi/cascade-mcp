@@ -32,6 +32,7 @@ import {
   getAtlassianConfig
 } from '../atlassian-auth-code-flow.ts';
 import type { OAuthHandler } from './types.ts';
+import { renderConnectionHub } from '../provider-server-oauth/index.js';
 
 /**
  * Type guard to ensure query parameter is a string
@@ -103,14 +104,8 @@ export const authorize: OAuthHandler = (req: Request, res: Response): void => {
     usingMcpPkce: !codeVerifier,
   });
 
-  // Create Atlassian authorization URL with PKCE parameters
-  const atlassianAuthUrl = createAtlassianAuthUrl({
-    codeChallenge,
-    codeChallengeMethod,
-    state: mcpState,
-    responseType,
-  });
-
-  console.log('  Redirecting to Atlassian:', atlassianAuthUrl);
-  res.redirect(atlassianAuthUrl);
+  // Per Authentication Flows section: Show connection hub for multi-provider flow
+  // The hub will display provider connection buttons and handle the multi-provider OAuth
+  console.log('  Rendering connection hub for multi-provider selection');
+  renderConnectionHub(req, res);
 };

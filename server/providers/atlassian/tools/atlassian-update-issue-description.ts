@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { logger } from '../observability/logger.ts';
-import { getAuthInfoSafe, handleJiraAuthError } from './auth-helpers.ts';
-import { resolveCloudId } from './atlassian-helpers.ts';
-import { convertMarkdownToAdf, validateAdf, type ADFDocument } from './markdown-converter.ts';
-import type { McpServer } from './mcp-types.ts';
+import { logger } from '../../../observability/logger.ts';
+import { getAuthInfoSafe, handleJiraAuthError } from '../../../mcp-core/auth-helpers.ts';
+import { resolveCloudId } from '../atlassian-helpers.ts';
+import { convertMarkdownToAdf, validateAdf, type ADFDocument } from '../markdown-converter.ts';
+import type { McpServer } from '../../../mcp-core/mcp-types.ts';
 
 // Tool parameters interface
 interface UpdateIssueDescriptionParams {
@@ -22,12 +22,12 @@ interface JiraUpdatePayload {
 }
 
 /**
- * Register the update-issue-description tool with the MCP server
+ * Register the atlassian-update-issue-description tool with the MCP server
  * @param mcp - MCP server instance
  */
-export function registerUpdateIssueDescriptionTool(mcp: McpServer): void {
+export function registerAtlassianUpdateIssueDescriptionTool(mcp: McpServer): void {
   mcp.registerTool(
-    'update-issue-description',
+    'atlassian-update-issue-description',
     {
       title: 'Update Jira Issue Description',
       description: 'Updates a Jira issue description with markdown content that will be converted to Atlassian Document Format (ADF)',
@@ -46,7 +46,7 @@ export function registerUpdateIssueDescriptionTool(mcp: McpServer): void {
       siteName, 
       notifyUsers = true 
     }: UpdateIssueDescriptionParams, context) => {
-      logger.info('update-issue-description called', { 
+      logger.info('atlassian-update-issue-description called', { 
         issueKey, 
         cloudId, 
         siteName,
@@ -55,8 +55,8 @@ export function registerUpdateIssueDescriptionTool(mcp: McpServer): void {
       });
 
       // Get auth info with proper error handling
-      const authInfo = getAuthInfoSafe(context, 'update-issue-description');
-      const token = authInfo?.atlassian_access_token;
+      const authInfo = getAuthInfoSafe(context, 'atlassian-update-issue-description');
+      const token = authInfo?.atlassian?.access_token;
 
       if (!token) {
         logger.error('No Atlassian access token found in auth context');

@@ -5,7 +5,7 @@
 
 import { marked } from 'marked';
 import { markdownToAdf } from 'marklassian';
-import { logger } from '../observability/logger.ts';
+import { logger } from '../../observability/logger.ts';
 
 // ADF (Atlassian Document Format) interfaces
 export interface ADFTextNode {
@@ -17,6 +17,14 @@ export interface ADFTextNode {
   }>;
 }
 
+export interface ADFNode {
+  type: string;
+  attrs?: any;
+  marks?: Array<{ type: string; attrs?: any }>;
+  text?: string;
+  content?: ADFNode[];
+}
+
 export interface ADFParagraph {
   type: 'paragraph';
   content: ADFTextNode[];
@@ -25,7 +33,7 @@ export interface ADFParagraph {
 export interface ADFDocument {
   version: number;
   type: 'doc';
-  content: ADFParagraph[];
+  content: ADFNode[];
 }
 
 /**
@@ -125,4 +133,84 @@ export function validateAdf(adf: any): adf is ADFDocument {
   }
 
   return true;
+}
+
+/**
+ * Remove a section from ADF content by heading text
+ * 
+ * Finds a heading containing the specified text and removes all content
+ * between that heading and the next heading of the same or higher level.
+ * 
+ * @param content - Array of ADF nodes to search
+ * @param headingText - Text to search for in headings (case-insensitive)
+ * @returns New content array with the section removed
+ */
+export function removeADFSectionByHeading(content: ADFNode[], headingText: string): ADFNode[] {
+  // Look for heading node with matching text
+  let sectionStartIndex = -1;
+  let sectionLevel = -1;
+  
+  for (let i = 0; i < content.length; i++) {
+    const node = content[i];
+    
+    // Check if this is a heading node
+    if (node.type === 'heading') {
+      // Check if it contains the target text
+      const hasMatchingText = node.content?.some((contentNode: ADFNode) => 
+        contentNode.type === 'text' && 
+        contentNode.text?.toLowerCase().includes(headingText.toLowerCase())
+      );
+      
+      if (hasMatchingText) {
+        sectionStartIndex = i;
+        sectionLevel = node.attrs?.level || 2;
+        logger.info(`Found existing "${headingText}" section`, { 
+          index: i, 
+          level: sectionLevel 
+        });
+        break;
+      }
+    }
+  }
+  
+  // If section not found, return original content
+  if (sectionStartIndex === -1) {
+    return content;
+  }
+  
+  // Find where the section ends (next heading of same or higher level)
+  let sectionEndIndex = content.length;
+  
+  // Search for next heading of same or higher level (lower number = higher level)
+  for (let i = sectionStartIndex + 1; i < content.length; i++) {
+    const node = content[i];
+    
+    if (node.type === 'heading') {
+      const headingLevel = node.attrs?.level || 2;
+      
+      // If we hit a heading of same or higher level, this is where the section ends
+      if (headingLevel <= sectionLevel) {
+        sectionEndIndex = i;
+        logger.info(`"${headingText}" section ends`, { 
+          endIndex: i, 
+          nextHeadingLevel: headingLevel 
+        });
+        break;
+      }
+    }
+  }
+  
+  // Remove only the content between start and end
+  const newContent = [
+    ...content.slice(0, sectionStartIndex),
+    ...content.slice(sectionEndIndex)
+  ];
+  
+  logger.info(`Removed existing "${headingText}" section`, { 
+    startIndex: sectionStartIndex, 
+    endIndex: sectionEndIndex - 1,
+    removedNodes: sectionEndIndex - sectionStartIndex
+  });
+  
+  return newContent;
 }

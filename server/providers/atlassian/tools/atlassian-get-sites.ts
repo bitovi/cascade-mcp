@@ -1,28 +1,28 @@
 /**
- * Get Accessible Jira Sites Tool
+ * Get Accessible Atlassian Sites Tool
  */
 
-import { logger } from '../observability/logger.ts';
-import { getAuthInfoSafe, handleJiraAuthError } from './auth-helpers.ts';
-import type { AtlassianSite } from './atlassian-helpers.ts';
-import type { McpServer } from './mcp-types.ts';
+import { logger } from '../../../observability/logger.ts';
+import { getAuthInfoSafe, handleJiraAuthError } from '../../../mcp-core/auth-helpers.ts';
+import type { AtlassianSite } from '../atlassian-helpers.ts';
+import type { McpServer } from '../../../mcp-core/mcp-types.ts';
 
 /**
- * Register the get-accessible-sites tool with the MCP server
+ * Register the atlassian-get-sites tool with the MCP server
  * @param mcp - MCP server instance
  */
-export function registerGetAccessibleSitesTool(mcp: McpServer): void {
+export function registerAtlassianGetSitesTool(mcp: McpServer): void {
   mcp.registerTool(
-    'get-accessible-sites',
+    'atlassian-get-sites',
     {
-      title: 'Get Accessible Jira Sites',
-      description: 'Get list of accessible Jira sites for the authenticated user',
+      title: 'Get Accessible Atlassian Sites',
+      description: 'Get list of accessible Atlassian sites for the authenticated user',
       inputSchema: {},
     },
     async (_, context) => {
       // Get auth info with proper error handling
-      const authInfo = getAuthInfoSafe(context, 'get-accessible-sites');
-      const token = authInfo?.atlassian_access_token;
+      const authInfo = getAuthInfoSafe(context, 'atlassian-get-sites');
+      const token = authInfo?.atlassian?.access_token;
 
       if (!token) {
         return {

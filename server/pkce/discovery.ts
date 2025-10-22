@@ -31,7 +31,7 @@ const serverStartTime = new Date();
 // 🔑 FIX: Include server instance in scopes to force VS Code to refresh tokens
 // This must match the scope in the WWW-Authenticate header
 // https://github.com/microsoft/vscode/issues/270383
-const serverInstanceScope = `server-instance-${serverStartTime.getTime()}`;
+const serverInstanceScope = /*`server-instance`;*/ `server-instance-${serverStartTime.getTime()}`;
 
 export { serverStartTime, serverInstanceScope };
 
@@ -43,7 +43,7 @@ export const oauthMetadata: OAuthHandler = (req: Request, res: Response): void =
   console.log('↔️ Received request for OAuth metadata');
   res.json({
     issuer: process.env.VITE_AUTH_SERVER_URL,
-    authorization_endpoint: process.env.VITE_AUTH_SERVER_URL + '/authorize',
+    authorization_endpoint: process.env.VITE_AUTH_SERVER_URL + '/auth/connect',
     token_endpoint: process.env.VITE_AUTH_SERVER_URL + '/access-token',
     registration_endpoint: process.env.VITE_AUTH_SERVER_URL + '/register',
     code_challenge_methods_supported: ['S256'],

@@ -117,25 +117,31 @@ export async function handleManualFlowCallback(req: Request, res: Response, para
     const jwtExpiresIn = Math.max(60, atlassianExpiresIn - 60);
     const jwtExpirationTime = Math.floor(Date.now() / 1000) + jwtExpiresIn;
 
-    // Create JWT with embedded Atlassian token
+    // Create JWT with nested Atlassian credentials (Q21, Q22)
     const jwt = await jwtSign({
       sub: 'user-' + randomUUID(),
       iss: process.env.VITE_AUTH_SERVER_URL,
       aud: process.env.VITE_AUTH_SERVER_URL,
       scope: ATLASSIAN_CONFIG.scopes,
-      atlassian_access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token,
+      atlassian: {
+        access_token: tokenData.access_token,
+        refresh_token: tokenData.refresh_token,
+        expires_at: jwtExpirationTime,
+        scope: ATLASSIAN_CONFIG.scopes,
+      },
       exp: jwtExpirationTime
     });
 
-    // Create a refresh token for manual flow
+    // Create a refresh token for manual flow with nested structure
     const refreshToken = await jwtSign({
       type: 'refresh_token',
       sub: 'user-' + randomUUID(),
       iss: process.env.VITE_AUTH_SERVER_URL,
       aud: process.env.VITE_AUTH_SERVER_URL,
       scope: ATLASSIAN_CONFIG.scopes,
-      atlassian_refresh_token: tokenData.refresh_token,
+      atlassian: {
+        refresh_token: tokenData.refresh_token,
+      },
       exp: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60) // 30 days
     });
 

@@ -3,10 +3,10 @@
  */
 
 import { z } from 'zod';
-import { logger } from '../observability/logger.ts';
-import { getAuthInfoSafe, handleJiraAuthError } from './auth-helpers.ts';
-import { resolveCloudId } from './atlassian-helpers.ts';
-import type { McpServer } from './mcp-types.ts';
+import { logger } from '../../../observability/logger.ts';
+import { getAuthInfoSafe, handleJiraAuthError } from '../../../mcp-core/auth-helpers.ts';
+import { resolveCloudId } from '../atlassian-helpers.ts';
+import type { McpServer } from '../../../mcp-core/mcp-types.ts';
 
 // Tool parameters interface
 interface GetJiraAttachmentsParams {
@@ -52,12 +52,12 @@ async function blobToBase64(blob: Blob): Promise<string> {
 }
 
 /**
- * Register the get-jira-attachments tool with the MCP server
+ * Register the atlassian-get-attachments tool with the MCP server
  * @param mcp - MCP server instance
  */
-export function registerGetJiraAttachmentsTool(mcp: McpServer): void {
+export function registerAtlassianGetAttachmentsTool(mcp: McpServer): void {
   mcp.registerTool(
-    'get-jira-attachments',
+    'atlassian-get-attachments',
     {
       title: 'Get Jira Issues Attachments',
       description: 'Fetch Jira attachments by attachment ID',
@@ -68,7 +68,7 @@ export function registerGetJiraAttachmentsTool(mcp: McpServer): void {
       },
     },
     async ({ attachmentIds, cloudId, siteName }: GetJiraAttachmentsParams, context) => {
-      logger.info('get-jira-attachments called', { 
+      logger.info('atlassian-get-attachments called', { 
         attachmentIds, 
         cloudId, 
         siteName,
@@ -76,8 +76,8 @@ export function registerGetJiraAttachmentsTool(mcp: McpServer): void {
       });
 
       // Get auth info with proper error handling
-      const authInfo = getAuthInfoSafe(context, 'get-jira-attachments');
-      const token = authInfo?.atlassian_access_token;
+      const authInfo = getAuthInfoSafe(context, 'atlassian-get-attachments');
+      const token = authInfo?.atlassian?.access_token;
 
       if (!token) {
         logger.error('No Atlassian access token found in auth context');
