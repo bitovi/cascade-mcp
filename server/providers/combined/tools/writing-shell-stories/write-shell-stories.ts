@@ -13,6 +13,13 @@ import { CreateMessageResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import type { McpServer } from '../../../../mcp-core/mcp-types.js';
 import { getAuthInfoSafe } from '../../../../mcp-core/auth-helpers.js';
 import { resolveCloudId, getJiraIssue, handleJiraAuthError } from '../../../atlassian/atlassian-helpers.js';
+import { 
+  convertMarkdownToAdf, 
+  validateAdf, 
+  removeADFSectionByHeading,
+  type ADFNode,
+  type ADFDocument
+} from '../../../atlassian/markdown-converter.js';
 import { createProgressNotifier } from './progress-notifier.js';
 import { getTempDir } from './temp-directory-manager.js';
 import { associateNotesWithFrames } from './screen-analyzer.js';
@@ -23,6 +30,11 @@ import {
   SCREEN_ANALYSIS_SYSTEM_PROMPT,
   SCREEN_ANALYSIS_MAX_TOKENS
 } from './prompt-screen-analysis.js';
+import {
+  generateShellStoryPrompt,
+  SHELL_STORY_SYSTEM_PROMPT,
+  SHELL_STORY_MAX_TOKENS
+} from './prompt-shell-stories.js';
 import { 
   parseFigmaUrl, 
   fetchFigmaFile,
@@ -40,23 +52,6 @@ interface WriteShellStoriesParams {
   epicKey: string;
   cloudId?: string;
   siteName?: string;
-}
-
-/**
- * Atlassian Document Format (ADF) types
- */
-interface ADFNode {
-  type: string;
-  attrs?: any;
-  marks?: Array<{ type: string; attrs?: any }>;
-  text?: string;
-  content?: ADFNode[];
-}
-
-interface ADFDocument {
-  version: number;
-  type: 'doc';
-  content: ADFNode[];
 }
 
 /**
@@ -175,9 +170,9 @@ export function registerWriteShellStoriesTool(mcp: McpServer): void {
         console.log('  Starting shell story generation for epic:', epicKey);
 
         // Create progress notifier for this execution
-        // Initial total: 3 phases + unknown screens + 3 final phases = unknown
+        // Initial total: Phase 1-3 (3) + Phase 4 screens (unknown) + Phase 5 (1) + Phase 6 (1) = 5 + screens
         // We'll update the total after we know how many screens there are
-        const notify = createProgressNotifier(context, 6);
+        const notify = createProgressNotifier(context, 7);
 
         // Send initial progress notification
         await notify(`Starting shell story generation for epic ${epicKey}...`, 0);
@@ -407,24 +402,51 @@ export function registerWriteShellStoriesTool(mcp: McpServer): void {
           notify
         });
 
-        // TODO: Phase 5: Generate shell stories from analyses
-        // TODO: Phase 6: Write back to Jira
+        // ==========================================
+        // PHASE 5: Generate shell stories from analyses
+        // ==========================================
+        const shellStoriesResult = await generateShellStoriesFromAnalyses({
+          mcp,
+          screens,
+          tempDirPath,
+          yamlPath,
+          notify,
+          startProgress: 4 + screens.length
+        });
 
-        // Return progress summary
+        // Phase 6: Write shell stories back to Jira epic
+        const phase6Progress = 4 + screens.length + 1; // After Phase 5
+        await notify('📝 Phase 6: Updating Jira epic...', phase6Progress);
+        
+        let shellStoriesContent = '';
+        if (shellStoriesResult.shellStoriesPath) {
+          try {
+            shellStoriesContent = await fs.readFile(shellStoriesResult.shellStoriesPath, 'utf-8');
+            
+            // Update the epic description with shell stories
+            await updateEpicWithShellStories({
+              epicKey,
+              cloudId: siteInfo.cloudId,
+              token: atlassianToken,
+              shellStoriesMarkdown: shellStoriesContent,
+              notify,
+              startProgress: phase6Progress
+            });
+            
+          } catch (error: any) {
+            console.log(`    ⚠️ Could not read shell stories file: ${error.message}`);
+            shellStoriesContent = `Error: Could not read shell stories file: ${error.message}`;
+          }
+        } else {
+          shellStoriesContent = 'No shell stories were generated.';
+        }
+
+        // Return shell stories to user
         return {
           content: [
             {
               type: 'text',
-              text: `✅ Phase 1-4 Complete:\n\n` +
-                    `Epic: ${issue.fields?.summary} (${epicKey})\n` +
-                    `Site: ${siteInfo.siteName}\n` +
-                    `Temp Directory: ${tempDirPath}\n\n` +
-                    `Phase 1: Found ${figmaUrls.length} Figma URL(s)\n` +
-                    `Phase 2: Extracted ${totalFrames} frames and ${totalNotes} notes\n` +
-                    `Phase 3: Generated screens.yaml with ${screens.length} screens\n` +
-                    `Phase 4: Downloaded ${downloadedImages} images, analyzed ${analyzedScreens} screens, ${downloadedNotes} note files\n\n` +
-                    `Screens YAML: ${yamlPath}\n\n` +
-                    `Next: Implement Phase 5 (Generate shell stories from analyses)`,
+              text: shellStoriesContent,
             },
           ],
         };
@@ -643,4 +665,216 @@ async function downloadAndAnalyzeScreens(params: {
   await notify(`✅ Phase 4 Complete: Downloaded ${downloadedImages} images, analyzed ${analyzedScreens} screens, ${downloadedNotes} note files`, phase4EndProgress);
   
   return { downloadedImages, analyzedScreens, downloadedNotes };
+}
+
+/**
+ * Phase 5: Generate shell stories from analyses
+ * 
+ * Reads all screen analysis files and uses AI sampling to generate
+ * prioritized shell stories following evidence-based incremental value principles.
+ * 
+ * @returns Object with storyCount, analysisCount, and shellStoriesPath
+ */
+async function generateShellStoriesFromAnalyses(params: {
+  mcp: McpServer;
+  screens: Array<{ name: string; url: string; notes: string[] }>;
+  tempDirPath: string;
+  yamlPath: string;
+  notify: ReturnType<typeof createProgressNotifier>;
+  startProgress: number;
+}): Promise<{ storyCount: number; analysisCount: number; shellStoriesPath: string | null }> {
+  const { mcp, screens, tempDirPath, yamlPath, notify, startProgress } = params;
+  
+  console.log('  Phase 5: Generating shell stories from analyses...');
+  
+  await notify('Phase 5: Generating shell stories from screen analyses...', startProgress);
+  
+  // Read screens.yaml for screen ordering
+  const screensYamlContent = await fs.readFile(yamlPath, 'utf-8');
+  
+  // Read all analysis files
+  const analysisFiles: Array<{ screenName: string; content: string }> = [];
+  for (const screen of screens) {
+    const analysisPath = path.join(tempDirPath, `${screen.name}.analysis.md`);
+    try {
+      const content = await fs.readFile(analysisPath, 'utf-8');
+      analysisFiles.push({ screenName: screen.name, content });
+      console.log(`    ✅ Read analysis: ${screen.name}.analysis.md`);
+    } catch (error: any) {
+      console.log(`    ⚠️ Could not read analysis for ${screen.name}: ${error.message}`);
+    }
+  }
+  
+  console.log(`  Loaded ${analysisFiles.length}/${screens.length} analysis files`);
+  
+  if (analysisFiles.length === 0) {
+    await notify('⚠️ No analysis files found - skipping shell story generation', startProgress, 'warning');
+    return { storyCount: 0, analysisCount: 0, shellStoriesPath: null };
+  }
+  
+  // Generate shell story prompt
+  const shellStoryPrompt = generateShellStoryPrompt(
+    screensYamlContent,
+    analysisFiles
+    // Optional: Add project context here if available
+  );
+  
+  console.log(`    🤖 Requesting shell story generation from AI...`);
+  
+  // Request shell story generation via sampling
+  const samplingResponse = await mcp.server.request({
+    "method": "sampling/createMessage",
+    "params": {
+      "messages": [
+        {
+          "role": "user",
+          "content": {
+            "type": "text",
+            "text": shellStoryPrompt
+          }
+        }
+      ],
+      "speedPriority": 0.5,
+      "systemPrompt": SHELL_STORY_SYSTEM_PROMPT,
+      "maxTokens": SHELL_STORY_MAX_TOKENS
+    }
+  }, CreateMessageResultSchema);
+  
+  const shellStoriesText = samplingResponse.content?.text as string;
+  if (!shellStoriesText) {
+    throw new Error('No shell stories content received from AI');
+  }
+  
+  console.log(`    ✅ Shell stories generated (${shellStoriesText.length} characters)`);
+  
+  // Save shell stories to file
+  const shellStoriesPath = path.join(tempDirPath, 'shell-stories.md');
+  await fs.writeFile(shellStoriesPath, shellStoriesText, 'utf-8');
+  
+  console.log(`    ✅ Saved shell stories: shell-stories.md`);
+  
+  // Count stories (rough estimate by counting "st" prefixes)
+  const storyMatches = shellStoriesText.match(/^- st\d+/gm);
+  const storyCount = storyMatches ? storyMatches.length : 0;
+  
+  await notify(`✅ Phase 5 Complete: Generated ${storyCount} shell stories`, startProgress + 1);
+  
+  return { storyCount, analysisCount: analysisFiles.length, shellStoriesPath };
+}
+
+/**
+ * Helper function for Phase 6: Update epic with shell stories
+ * @param params - Parameters for updating the epic
+ * @param params.epicKey - The Jira epic key
+ * @param params.cloudId - The Atlassian cloud ID
+ * @param params.token - The Atlassian access token
+ * @param params.shellStoriesMarkdown - The shell stories markdown content
+ * @param params.notify - Progress notification function
+ * @param params.startProgress - Starting progress value
+ */
+async function updateEpicWithShellStories({
+  epicKey,
+  cloudId,
+  token,
+  shellStoriesMarkdown,
+  notify,
+  startProgress
+}: {
+  epicKey: string;
+  cloudId: string;
+  token: string;
+  shellStoriesMarkdown: string;
+  notify: ReturnType<typeof createProgressNotifier>;
+  startProgress: number;
+}): Promise<void> {
+console.log('  Phase 6: Updating epic with shell stories...');
+
+  try {
+    // Fetch current epic to get existing description
+    console.log('    Fetching current epic description...');
+    const issueResponse = await getJiraIssue(cloudId, epicKey, undefined, token);
+    
+    if (issueResponse.status === 404) {
+      console.log(`    ⚠️ Epic ${epicKey} not found`);
+      await notify(`⚠️ Epic ${epicKey} not found`, startProgress, 'warning');
+      return;
+    }
+    
+    handleJiraAuthError(issueResponse, `Fetch epic ${epicKey} for update`);
+    
+    const issue = await issueResponse.json() as JiraIssue;
+    const currentDescription = issue.fields?.description;
+    
+    console.log('    ✅ Current epic description fetched');
+    
+    // Prepare new description content with shell stories section
+    const shellStoriesSection = `## Shell Stories\n\n${shellStoriesMarkdown}`;
+    
+    // Convert the new section to ADF
+    console.log('    Converting shell stories section to ADF...');
+    const shellStoriesAdf = await convertMarkdownToAdf(shellStoriesSection);
+    
+    if (!validateAdf(shellStoriesAdf)) {
+      console.log('    ⚠️ Failed to convert shell stories to valid ADF');
+      await notify('⚠️ Failed to convert shell stories to ADF', startProgress, 'warning');
+      return;
+    }
+    
+    console.log('    ✅ Shell stories converted to ADF');
+    
+    // Find and remove existing "Shell Stories" section if it exists
+    const contentWithoutShellStories = removeADFSectionByHeading(
+      currentDescription?.content || [],
+      'shell stories'
+    );
+    
+    // Combine description (without old shell stories) with new shell stories section
+    const updatedDescription: ADFDocument = {
+      version: 1,
+      type: 'doc',
+      content: [
+        ...contentWithoutShellStories,
+        ...shellStoriesAdf.content
+      ]
+    };
+    
+    // Update the epic
+    console.log('    Updating epic description...');
+    const updateUrl = `https://api.atlassian.com/ex/jira/${cloudId}/rest/api/3/issue/${epicKey}`;
+    
+    const updateResponse = await fetch(updateUrl, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        fields: {
+          description: updatedDescription
+        }
+      }),
+    });
+    
+    if (updateResponse.status === 404) {
+      console.log(`    ⚠️ Epic ${epicKey} not found`);
+      await notify(`⚠️ Epic ${epicKey} not found`, startProgress, 'warning');
+      return;
+    }
+    
+    if (updateResponse.status === 403) {
+      console.log(`    ⚠️ Insufficient permissions to update epic ${epicKey}`);
+      await notify(`⚠️ Insufficient permissions to update epic`, startProgress, 'warning');
+      return;
+    }
+    
+    handleJiraAuthError(updateResponse, `Update epic ${epicKey} description`);
+    
+    console.log('    ✅ Epic description updated successfully');
+    await notify(`✅ Phase 6 Complete: Epic updated with shell stories`, startProgress + 1);
+    
+  } catch (error: any) {
+    console.log(`    ⚠️ Error updating epic: ${error.message}`);
+    await notify(`⚠️ Error updating epic: ${error.message}`, startProgress, 'warning');
+  }
 }

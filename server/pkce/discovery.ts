@@ -31,7 +31,7 @@ const serverStartTime = new Date();
 // 🔑 FIX: Include server instance in scopes to force VS Code to refresh tokens
 // This must match the scope in the WWW-Authenticate header
 // https://github.com/microsoft/vscode/issues/270383
-const serverInstanceScope = `server-instance`;//`server-instance-${serverStartTime.getTime()}`;
+const serverInstanceScope = /*`server-instance`;*/ `server-instance-${serverStartTime.getTime()}`;
 
 export { serverStartTime, serverInstanceScope };
 
