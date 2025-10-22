@@ -452,47 +452,62 @@ The existing Figma tools have already implemented the Figma API logic we need. H
 
 ---
 
-### Step 11.0: Implement Phase 5 - Screen Analysis via Sampling
+### Step 11.0: Implement Phase 5 - Shell Story Generation via Sampling ✅ COMPLETE
 
-#### Step 11.0: Implement Phase 5 - Screen Analysis via Sampling [TypeScript + AI Sampling]
-**What to do:**
-- Update `write-shell-stories.ts` to analyze screens using AI
-- **[TS Logic]** For each screen, create analysis stub file first
-  - Create `{tempDir}/{screen-name}.analysis.md` with template sections
-  - Template: UI Elements, Behaviors, Technical Notes
-- **[TS Logic]** For each screen, prepare analysis prompt
-  - Read screen image from temp directory and encode as base64
-  - Read associated notes from `.notes.md` file
-  - Build prompt requesting detailed UI/UX analysis
-- **[AI PROMPT via Sampling]** Use MCP sampling to request analysis
+#### Step 11.0: Implement Phase 5 - Shell Story Generation via Sampling [TypeScript + AI Sampling] ✅ COMPLETE
+**What was done:**
+- ✅ Created `prompt-shell-stories.ts` helper with comprehensive shell story generation prompt
+  - Based on https://github.com/bitovi/ai-enablement-prompts/blob/main/writing-stories/from-figma/4-shell-stories.md
+  - Includes complete 14-step process from the reference
+  - System prompt emphasizes evidence-based only approach
+  - Max tokens: 16000 for detailed story generation
+- ✅ Updated `write-shell-stories.ts` to implement Phase 5
+- ✅ **[TS Logic]** Read all `*.analysis.md` files from temp directory
+- ✅ **[TS Logic]** Read `screens.yaml` for screen ordering context
+- ✅ **[TS Logic]** Prepare shell story generation prompt using helper
+  - Includes screens.yaml content
+  - Includes all screen analysis file contents
+  - Optional context parameter for project goals/constraints
+- ✅ **[AI PROMPT via Sampling]** Use MCP sampling to request shell stories
   - Call `mcp.server.request({ method: 'sampling/createMessage', ... })`
-  - Prompt includes: image data, notes content, analysis template
-  - AI generates: Comprehensive UI documentation
-- **[TS Logic]** Save AI response to analysis file (overwrite stub)
-- **[TS Logic]** Handle sampling errors gracefully
-- **[TS Logic]** Process screens sequentially to avoid overwhelming AI
+  - Prompt includes: All analyses, screen ordering, process steps, format requirements
+  - AI generates: Prioritized shell stories with + included, - deferred, ¿ questions
+- ✅ **[TS Logic]** Save AI response to `{tempDir}/shell-stories.md`
+- ✅ **[TS Logic]** Parse and count stories (by "st" prefix)
+- ✅ **[TS Logic]** Handle sampling errors gracefully
+- ✅ **[TS Logic]** Update progress notifications
+- ✅ **[TS Logic]** Update final summary with Phase 5 results
 
-**How to verify:**
-- Analysis stub files created for all screens
-- Sampling requests sent successfully with images
-- AI-generated analysis received and saved
-- Files contain comprehensive screen documentation
-- Returns message: "Analyzed 5 screens successfully"
+**Verified:**
+- Shell story prompt helper created with complete process from GitHub reference
+- All analysis files read successfully
+- Screens.yaml included for context
+- Sampling request sent with comprehensive prompt
+- AI-generated shell stories saved to file
+- Story count estimated and reported
+- Progress tracking updated: Phase 5 complete
+- Returns message: "Phase 1-5 Complete: Generated shell stories ({n} analyses processed)"
 
-**Output:** Working tool with AI-powered screen analysis
+**Output:** Working tool with AI-powered shell story generation following evidence-based incremental value principles!
+
+**Shell Story Format:**
+```markdown
+- st001 {Short Title} – {One sentence description}
+  ◦ ANALYSIS: {screen-name}.analysis.md, {screen-name}.analysis.md
+  ◦ DEPENDENCIES: {story IDs or 'none'}
+  ◦ + {Included behavior and functionality}
+  ◦ - {Deferred/excluded functionality}
+  ◦ ¿ {Open questions}
+```
 
 ---
 
-### Step 12.0: Implement Phase 6 - Shell Story Generation via Sampling
+### Step 12.0: Implement Phase 6 - Write Shell Stories to Jira
 
-#### Step 12.0: Implement Phase 6 - Shell Story Generation via Sampling [TypeScript + AI Sampling]
+#### Step 12.0: Implement Phase 6 - Write Shell Stories to Jira [TypeScript - Main Tool]
 **What to do:**
-- Update `write-shell-stories.ts` to generate shell stories
-- **[TS Logic]** After all screen analyses complete, read all analysis files
-  - Read all `{tempDir}/*.analysis.md` files
-  - Combine into context for story generation
-- **[TS Logic]** Prepare shell story generation prompt
-  - Include all screen analyses
+- Update `write-shell-stories.ts` to write shell stories back to Jira epic
+- **[TS Logic]** Read generated `shell-stories.md` from temp directory
   - Reference style guide from https://github.com/bitovi/ai-enablement-prompts/tree/main/writing-stories/from-figma
   - Request prioritized user stories with dependencies
 - **[AI PROMPT via Sampling]** Request shell story generation
