@@ -13,7 +13,6 @@ Cascading MCP Tools provides a collection of MCP (Model Context Protocol) capabi
 - **Multi-Provider OAuth**: Seamless authentication flow supporting both Atlassian and Figma
 - **Session Management**: Per-session MCP servers with dynamic tool registration based on user permissions
 
-
 ## Use
 
 ### Copilot
