@@ -1,12 +1,17 @@
-# Jira MCP Auth Bridge
+# Cascading MCP Tools
 
 <img width="256" alt="image" src="https://github.com/user-attachments/assets/25bf3e5e-390b-45e4-b5f5-dc8f38667547" />
 
 
-Jira MCP Auth Bridge provides an MCP service that enables fetching images from a Jira work item.
-Furthermore, it proxies Jira's authorization flow, enabling agents to be authorized through webpage redirects.
+Cascading MCP Tools provides a collection of MCP (Model Context Protocol) capabilities for [Bitovi's Cascading AI Enablement](https://bitovi.atlassian.net/wiki/spaces/AIEnabledDevelopment/pages/1523351554/Cascading+v1+Desktop+AI+implements+Figma+and+Jira). This service enables AI agents to work with design and project management tools through OAuth-authenticated integrations.
 
-Jira already supports an [RPC service](https://www.atlassian.com/blog/announcements/remote-mcp-server).  However, it doesn't support all of Jira's capabilities. This is why we built this project.
+**Key Capabilities:**
+
+- **Jira Integration**: Fetch issues, attachments, and images from Jira work items with full OAuth authentication
+- **Figma Integration**: Access Figma designs, download images, and analyze screen layouts
+- **Combined Tools**: Generate user stories from Figma designs and write them directly to Jira epics
+- **Multi-Provider OAuth**: Seamless authentication flow supporting both Atlassian and Figma
+- **Session Management**: Per-session MCP servers with dynamic tool registration based on user permissions
 
 
 ## Use
