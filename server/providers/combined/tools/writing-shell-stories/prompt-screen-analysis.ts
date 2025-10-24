@@ -13,15 +13,18 @@
  * @param screenUrl - Figma URL for the screen
  * @param screenPosition - Position in the screen flow (e.g., "1 of 5")
  * @param notesContent - Optional markdown content from design notes
+ * @param epicContext - Optional epic description content for context and priorities
  * @returns Formatted prompt for AI screen analysis
  */
 export function generateScreenAnalysisPrompt(
   screenName: string,
   screenUrl: string,
   screenPosition: string,
-  notesContent?: string
+  notesContent?: string,
+  epicContext?: string
 ): string {
   const hasNotes = !!notesContent;
+  const hasEpicContext = !!(epicContext && epicContext.trim());
   
   return `You are a UX analyst tasked with creating detailed documentation of this screen design. Be exhaustive in documenting every visible element.
 
@@ -30,10 +33,25 @@ export function generateScreenAnalysisPrompt(
 - **Figma Node URL:** ${screenUrl}
 - **Screen Order:** ${screenPosition}
 - **Has Notes:** ${hasNotes ? 'Yes' : 'No'}
+- **Has Epic Context:** ${hasEpicContext ? 'Yes' : 'No'}
 
 ## Design Notes & Annotations
 
 ${notesContent ? notesContent : 'No design notes available for this screen.'}
+
+## Epic Context & Priorities
+
+${hasEpicContext ? epicContext : 'No epic context available for this analysis.'}
+
+**How to use epic context:**
+- Flag features marked as "out of scope" using: ⚠️ SCOPE MISMATCH (these will NOT be implemented)
+- Flag features marked as "delay until end" using: ⏸️ DEFERRED (these WILL be implemented in later stories)
+- Example 1: "⏸️ DEFERRED: Pagination controls visible but epic explicitly delays until end"
+- Example 2: "⚠️ SCOPE MISMATCH: Admin panel visible but epic marks as out of scope"
+- Note discrepancies between screen designs and epic priorities
+- Reference epic constraints when documenting features
+- Epic priorities take precedence over screen designs when there are contradictions
+- IMPORTANT: Deferred features should still be documented fully - they will be implemented later
 
 ## Page Structure
 
@@ -96,7 +114,7 @@ Document the actual content shown:
 
 ## Analysis Guidelines
 
-- Read design notes first and integrate them into relevant sections
+- Read epic context and design notes first to understand priorities and scope
 - Be exhaustive in documenting every visible element
 - Include exact labels, button text, column headers
 - Note all visual states (active, hover, disabled, selected)
@@ -105,7 +123,11 @@ Document the actual content shown:
 - Identify potential user workflows
 - Note any error states or validation visible
 - Document loading states or empty states shown
-- Clearly distinguish what comes from visual analysis vs. design notes`;
+- Check epic context for scope and deferral guidance:
+  - If a feature is visible but marked for deferral in epic, note it with: "⏸️ DEFERRED: [Epic indicates this should be delayed]"
+  - If a feature contradicts epic scope, note it with: "⚠️ SCOPE MISMATCH: [Epic marks this as out of scope]"
+  - Reference epic constraints when documenting complex features
+- Clearly distinguish what comes from visual analysis vs. design notes vs. epic context`;
 }
 
 /**

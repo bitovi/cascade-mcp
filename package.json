@@ -8,6 +8,8 @@
     "start-local": "node --import ./loader.mjs server/server.ts",
     "typecheck": "tsc --noEmit",
     "prepare": "husky",
+    "test": "jest",
+    "test:watch": "jest --watch",
     "test:e2e:mcp-sdk:mock": "TEST_USE_MOCK_ATLASSIAN=true jest specs/mcp-sdk --testTimeout=30000 --runInBand"
   },
   "lint-staged": {
@@ -70,7 +72,8 @@
     "testEnvironment": "node",
     "testMatch": [
       "**/specs/**/*.test.js",
-      "**/specs/**/*.test.ts"
+      "**/specs/**/*.test.ts",
+      "**/server/**/*.test.ts"
     ],
     "transform": {
       "^.+\\.ts$": [

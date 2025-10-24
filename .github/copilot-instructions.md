@@ -5,6 +5,49 @@
 
 - With all api changes or file changes, keep the documentation in `server/readme.md` up to date.
 
+### Code Organization for MCP Tools
+
+**Folder Structure:**
+- Complex MCP tools should have their own folder under `server/providers/{provider}/tools/{tool-name}/`
+  - Use own folder for: Multi-step workflows, tools with sampling hooks, tools with helper modules
+  - Simple single-step tools can remain as single files
+- Each tool folder contains:
+  - `index.ts` - Exports the tool registration function
+  - `{tool-name}.ts` - Main tool implementation file
+  - `{helper-name}.ts` - Semi-specific helper modules (parsers, validators, formatters, etc.)
+
+**Main Tool File Structure (`{tool-name}.ts`):**
+1. **Top section**: Imports and type definitions
+2. **Middle section**: Tool registration function (orchestration only - calls helper functions)
+3. **Bottom section**: Step helper functions in execution order
+
+**Helper Function Guidelines:**
+- **Semi-specific helpers** (parsers, validators, domain logic) → Separate module files
+  - Example: `shell-story-parser.ts` with `parseShellStories()` function
+  - Definition: Could be used by different workflows, minimal dependencies on external state/parameters
+  - Benefits: Testable, reusable, maintainable
+  - Export types/interfaces used across modules
+  - Export functions for testing: `export function parseShellStories(...)`
+- **Broad workflow steps** → Exported functions at bottom of main file, in execution order
+  - Example: `fetchEpicAndExtractShellStories()`, `findNextUnwrittenStory()`, `validateDependencies()`
+  - These orchestrate the tool's main workflow steps
+  - Keep main handler clean by delegating to these functions
+  - Export for testing: `export async function fetchEpicAndExtractShellStories(...)`
+  - Functions should throw descriptive errors (don't return error objects)
+
+**Utility Function Placement:**
+- **General utilities** (date formatting, string manipulation) → `server/utils/` (to be created as needed)
+- **Provider-specific utilities** (Jira helpers, Figma helpers) → `server/providers/{provider}/` directory
+- **Tool-specific but reusable** (parsers, validators) → Separate module in tool folder
+
+**Example Structure:**
+```
+server/providers/combined/tools/write-next-story/
+├── index.ts                    # export { registerWriteNextStoryTool }
+├── write-next-story.ts         # Main tool + workflow step functions at bottom
+└── shell-story-parser.ts       # Semi-specific helper (parser logic)
+```
+
 ## Architecture Overview
 
 This is an **OAuth 2.0 bridge server** that enables MCP (Model Context Protocol) clients like VS Code Copilot to access Jira through secure authentication. The system has three main components:

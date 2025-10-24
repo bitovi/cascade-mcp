@@ -36,19 +36,40 @@ export const SHELL_STORY_MAX_TOKENS = 16000;
  * 
  * @param screensYaml - Content of screens.yaml file (screen ordering)
  * @param analysisFiles - Array of { screenName, content } for each analysis file
- * @param context - Optional project context, goals, or constraints
+ * @param epicContext - Optional epic description content (excluding Shell Stories section)
  * @returns Complete prompt for shell story generation
  */
 export function generateShellStoryPrompt(
   screensYaml: string,
   analysisFiles: Array<{ screenName: string; content: string }>,
-  context?: string
+  epicContext?: string
 ): string {
   const analysisSection = analysisFiles
     .map(({ screenName, content }) => {
       return `### ${screenName}.analysis.md\n\n${content}`;
     })
     .join('\n\n---\n\n');
+
+  // Build epic context section if provided
+  const epicContextSection = epicContext && epicContext.trim()
+    ? `**EPIC CONTEXT (from Epic Description):**
+
+<epic_context>
+${epicContext}
+</epic_context>
+
+**Use epic context as reference for:**
+- Understanding project priorities and sequencing preferences
+- Identifying features that are out of scope (don't create stories for these)
+- Noting features to implement later (create implementation stories at the end)
+- Understanding business constraints and requirements
+
+**Epic context does NOT mean:**
+- Defer features globally to every story (only defer where feature is visible in that story's screens)
+- Override evidence-based approach (screen analysis remains primary source of truth)
+
+`
+    : '';
 
   return `You are an expert product manager. When I give you screen analysis outputs (images and their detailed analysis files), think and work exactly as follows to produce a prioritized list of shell stories.
 
@@ -71,7 +92,7 @@ export function generateShellStoryPrompt(
 
 ## INPUTS (provided below)
 
-**SCREEN ORDERING (from screens.yaml):**
+${epicContextSection}**SCREEN ORDERING (from screens.yaml):**
 \`\`\`yaml
 ${screensYaml}
 \`\`\`
@@ -80,7 +101,6 @@ ${screensYaml}
 
 ${analysisSection}
 
-${context ? `**CONTEXT:**\n${context}\n\n` : ''}
 ## EVIDENCE VIOLATIONS (DO NOT DO)
 
 ❌ "Search functionality for finding applications" (when only search UI is visible)
@@ -93,40 +113,50 @@ ${context ? `**CONTEXT:**\n${context}\n\n` : ''}
 ✅ "Status dropdown filter (shows 'Active', 'Pending', 'Archived' options)"
 ✅ "Form submission (behavior not described - needs clarification)"
 
-
 ## PROCESS (follow in order)
 
-1. **INITIAL STORY NAME LIST**
+1. **REVIEW EPIC CONTEXT (IF PROVIDED)**
+   • Read epic context to understand priorities, constraints, and scope preferences
+   • Note any features marked as "out of scope" - don't create stories for these
+   • Note any features suggested to "defer" or "delay until end" - keep in mind for later stories
+   • Use as reference, not strict rules to apply to every story
+
+2. **INITIAL STORY NAME LIST**
    • Get the list of screen names from screens.yaml to determine which analysis files to review.
    • Review all screen analysis files and screen images that can be loaded from the analysis file's Figma Image Url value.
    • Identify distinct user-visible flows and functionality.
    • Break them into incremental units of value — each story should represent the smallest useful slice a user could benefit from.
-   • IMPORTANT: Prefer to not implement every UI element visible in a screen at once. Start with core functionality and defer advanced features like filtering, sorting, pagination to separate stories.
+   • IMPORTANT: Prefer to not implement every UI element visible in a screen at once. Start with core functionality and defer advanced features to separate stories.
+   • Note features mentioned in epic context as "out of scope" (don't create stories) or "defer/delay" (create implementation stories later)
    • Group screens into candidate stories when they form part of the same flow (e.g., add form + success + error).
    • If one screen contains multiple incremental steps of value, split it into multiple stories.
    • Do NOT force a fixed count. The correct number of stories depends on the functionality — sometimes 3, sometimes 20+.
 
-2. **PRIORITIZE**
+3. **PRIORITIZE**
    • Reorder stories by:
      - Customer/User Value (highest first)
      - Dependencies (sequence stories so that later ones build on earlier ones)
      - Blockers (unblock future stories early)
      - Risk (tackle high-risk elements earlier)
+   • If epic context mentions deferring features, ensure those implementation stories go toward the end
 
-3. **CROSS-REFERENCE SCREENS & ANALYSIS (CRITICAL)**
+4. **CROSS-REFERENCE SCREENS & ANALYSIS (CRITICAL)**
    • For each story, collect all relevant screens and analysis files across the flow.
-   • Add direct links:
-     - ANALYSIS: All related \`{screen-name}.analysis.md\` files
+   • Extract Figma URLs from each analysis file's "Figma Image URL" field
+   • Add direct links to Figma screens:
+     - SCREENS: Markdown links using screen name as link text and Figma URL as target
 
-4. **PARTIALLY REFINE THE FIRST STORY**
+5. **PARTIALLY REFINE THE FIRST STORY**
    • Add sub-bullets under the first story:
-     - ANALYSIS: (links found in step 3)
+     - SCREENS: (Figma links found in step 4)
      - DEPENDENCIES: Other story IDs this story depends on (or \`none\`)
-     - + Items that MUST be included now (behaviors, functionality, flows, and any shared components required)
-     - - Items explicitly excluded to defer
+     - + Items that MUST be included now (core behaviors, functionality, flows, and any shared components required)
+     - - Items to defer to later stories (advanced features, enhancements, complex interactions that aren't essential for basic user value)
      - ¿ Open questions (scope, behavior, technical assumptions)
+   • Focus on progressive enhancement: what's the simplest valuable implementation?
+   • Defer features that are visible in THIS story's screens but are lower priority or more complex than the core use case
 
-5. **PROMOTE MINUSES INTO CANDIDATE STORIES**
+6. **PROMOTE MINUSES INTO CANDIDATE STORIES**
    • Turn meaningful - items into new top-level stories. Add them to the prioritized list.
    • CRITICAL: Only promote deferrals that reference actual UI elements or functionality visible in the screens. Do not create speculative stories for features that don't exist in the designs.
 
@@ -165,11 +195,15 @@ ${context ? `**CONTEXT:**\n${context}\n\n` : ''}
 
    D) Validate evidence basis (screen-evidence audit):
       • For EVERY + and - bullet in every story:
-        ◦ Quote the specific text from the analysis file that supports this feature
-        ◦ If you cannot find supporting evidence, remove the bullet entirely
+        ◦ Verify the feature appears in THIS story's screen analysis files
+        ◦ If you cannot find the feature in this story's screens, remove the bullet entirely
         ◦ For visible UI elements without described behaviors, convert to ¿ questions
       • ANTI-PATTERN: Do not write "search functionality" if only "search bar" is described
       • CORRECT PATTERN: Write "search input field (UI element)" and ask "¿ What search behavior should this implement?"
+      • CRITICAL: Only add - bullets for features that are VISIBLE in this story's screens
+        ◦ Example CORRECT: Story about applicant list screen that shows filter buttons → "- Advanced filtering (defer to st008)"
+        ◦ Example WRONG: Story about agreement pricing screen that has no filters → Don't add "- Filtering (defer)" bullet
+        ◦ Rule: If the feature isn't in this story's screen analysis files, don't mention it in - bullets
 
    E) Add missing stories if needed:
       • IMPORTANT: Feel empowered to add new stories if the review reveals gaps
@@ -177,7 +211,16 @@ ${context ? `**CONTEXT:**\n${context}\n\n` : ''}
       • Re-number stories as needed to maintain logical progression
       • Update dependencies in existing stories to reference new story IDs
 
-   F) Final consistency check:
+   F) Verify deferred features have implementation stories:
+      • For any feature that was deferred with - bullets (whether from epic context or natural progressive enhancement):
+        ◦ Verify there's a corresponding implementation story later in the list
+        ◦ Ensure - bullets reference the correct story ID
+      • If epic context suggests deferring a feature and it appears in screens:
+        ◦ Ensure early stories defer it where visible
+        ◦ Ensure there's an implementation story at the end
+      • If a feature has - bullets but NO implementation story, ADD one now
+
+   G) Final consistency check:
       • Read through the entire story list as if you're a developer planning sprints
       • Verify each story can be completed independently in 1-2 sprints
       • Ensure the progression makes sense from a user value perspective
@@ -190,11 +233,11 @@ ${context ? `**CONTEXT:**\n${context}\n\n` : ''}
 11. **VERIFY STORY NUMBERING**
     • Confirm all stories are numbered sequentially (st001, st002, st003...)
     • Update any dependency references to match final story IDs
-    • Check that no story references a non-existent story ID
+    • Verify all ❌ bullets referencing deferred features have correct story IDs (e.g., "see st015")
 
 12. **FINAL STRUCTURE VALIDATION**
     • Confirm file contains exactly one story list
-    • Verify each story has all required sub-bullets (ANALYSIS, DEPENDENCIES, +, -, ¿)
+    • Verify each story has all required sub-bullets (SCREENS, DEPENDENCIES, +, -, ¿)
     • Ensure no incomplete or draft story entries remain
 
 13. **FINAL EVIDENCE VERIFICATION**
@@ -206,7 +249,7 @@ ${context ? `**CONTEXT:**\n${context}\n\n` : ''}
 
 ## QUALITY RULES
 
-• Always include ANALYSIS bullets linking to source files.
+• Always include SCREENS bullets linking to Figma designs (extract URLs from analysis file "Figma Image URL" fields).
 • A story may span multiple screens, or multiple stories may come from a single screen.
 • Always focus on incremental user value: stories must represent the smallest useful functionality.
 • Shared components must be introduced as + bullets inside the first story that needs them.
@@ -233,19 +276,19 @@ ${context ? `**CONTEXT:**\n${context}\n\n` : ''}
 
 • DON'T: "View Applicant Dashboard with Status Filtering, Pagination, and Advanced Columns"
 • DO:
-  ◦ \`st001\` Display Basic Applicant List – Show applicant names in a list (core data, no filtering)
-  ◦ \`st002\` Add Status Filtering to Applicant List – Allow users to filter applicants by status
-  ◦ \`st003\` Add Pagination to Applicant List – Add next/previous navigation for long lists
-  ◦ \`st004\` Add Advanced Columns to Complete Status View – Show additional data columns for detailed analysis
+  ◦ \`st001\` Display Basic Applicant List ⟩ Show applicant names in a list (core data, no filtering)
+  ◦ \`st002\` Add Status Filtering to Applicant List ⟩ Allow users to filter applicants by status
+  ◦ \`st003\` Add Pagination to Applicant List ⟩ Add next/previous navigation for long lists
+  ◦ \`st004\` Add Advanced Columns to Complete Status View ⟩ Show additional data columns for detailed analysis
 
 
 ## OUTPUT FORMAT (strict)
 
 • Output ONLY the final prioritized stories with complete details
 • Do NOT include the initial story list in the final output
-• One top-level bullet per story: \`- \`st{story number}\` **{short descriptive title}** – {one sentence description of the story}\`
+• One top-level bullet per story: \`- \`st{story number}\` **{short descriptive title}** ⟩ {one sentence description of the story}\`
 • Sub-bullets for each story (use proper markdown nested bullets with 2-space indentation and emoji symbols):
-  * ANALYSIS: {links to all relevant analysis files}
+  * SCREENS: {Figma URLs formatted as markdown links with screen names as link text}
   * DEPENDENCIES: {list of story IDs this story depends on, or \`none\`}
   * ✅ Included behavior and functionality (including shared components introduced here)
   * ❌ Deferred/excluded functionality
@@ -255,8 +298,8 @@ ${context ? `**CONTEXT:**\n${context}\n\n` : ''}
 
 ## EXAMPLE OUTPUT
 
-- \`st001\` **Add Promotion to Cart** – Allow users to apply a promotion code to their shopping cart
-  * ANALYSIS: promo-add-form.analysis.md, promo-success.analysis.md, promo-error.analysis.md
+- \`st001\` **Add Promotion to Cart** ⟩ Allow users to apply a promotion code to their shopping cart
+  * SCREENS: [promo-add-form](https://www.figma.com/design/aBc123XyZ/Project-Name?node-id=123-456), [promo-success](https://www.figma.com/design/aBc123XyZ/Project-Name?node-id=123-457), [promo-error](https://www.figma.com/design/aBc123XyZ/Project-Name?node-id=123-458)
   * DEPENDENCIES: none
   * ✅ User can enter a valid promotion code and apply it
   * ✅ Success state shows updated cart total with discount
