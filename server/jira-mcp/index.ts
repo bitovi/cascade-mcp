@@ -23,23 +23,28 @@ import { registerSearchTool } from './tool-search.ts';
 // Create MCP server instance
 const mcp = new McpServer(
   {
-    name: 'jira-tool-server',
+    name: 'bitovi-jira-mcp',
     version: '1.0.0',
   },
   {
     capabilities: {
-      tools: {},
+      tools: {
+        fetch: true,
+        search: true,
+        actions: true,
+      },
     },
+    
   },
 );
 
 // Register all tools
 logger.info('Registering MCP tools...');
 
-registerUpdateIssueDescriptionTool(mcp);
-registerGetAccessibleSitesTool(mcp);
-registerGetJiraIssueTool(mcp);
-registerGetJiraAttachmentsTool(mcp);
+// registerUpdateIssueDescriptionTool(mcp);
+// registerGetAccessibleSitesTool(mcp);
+// registerGetJiraIssueTool(mcp);
+// registerGetJiraAttachmentsTool(mcp);
 registerFetchTool(mcp);
 registerSearchTool(mcp);
 

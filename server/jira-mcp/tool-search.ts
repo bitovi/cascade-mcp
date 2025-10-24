@@ -1,9 +1,9 @@
 /**
- * Search Tool for ChatGPT MCP Client
+ * Fetch Tool for ChatGPT MCP Client
  * 
- * This tool provides a search capability specifically designed for ChatGPT
- * to search Jira issues by query string. Follows OpenAI MCP 
- * search tool specification patterns.
+ * This tool provides a fetch capability specifically designed for ChatGPT
+ * to retrieve Jira issue details by issue key/ID. Follows OpenAI MCP 
+ * fetch tool specification patterns.
  */
 
 import { z } from 'zod';
@@ -31,159 +31,209 @@ function getAuthHeader(token: string): { authType: 'PAT' | 'Bearer', authorizati
     };
   }
   
-  // Use standard Bearer token for OAuth
+  // Default to Bearer token (OAuth)
   return {
     authType: 'Bearer',
     authorization: `Bearer ${token}`
   };
 }
 
-/**
- * Schema for search tool parameters - follows OpenAI specification
- */
-const SearchParamsSchema = z.object({
-  query: z.string().describe('Search query to find relevant Jira issues')
-});
+// Tool parameters interface
+interface SearchParams {
+  query: string;
+}
 
-type SearchParams = z.infer<typeof SearchParamsSchema>;
-
-/**
- * Schema for individual search result item
- */
-const SearchResultItemSchema = z.object({
-  id: z.string().describe('Unique ID for the search result (issue key)'),
-  title: z.string().describe('Human-readable title of the issue'),
-  url: z.string().describe('Canonical URL for citation')
-});
-
-/**
- * Schema for search results response - matches OpenAI specification
- */
-const SearchResultsSchema = z.object({
-  results: z.array(SearchResultItemSchema).describe('Array of search result objects')
-});
-
-type SearchResults = z.infer<typeof SearchResultsSchema>;
-
-/**
- * Convert Jira issue data to search result format
- */
-function convertToSearchResult(issue: any, siteInfo: { cloudId: string, siteName: string, siteUrl: string }): SearchResults['results'][0] {
-  const issueKey = issue.key;
-  const summary = issue.fields?.summary || 'No title available';
-  const url = `${siteInfo.siteUrl}/browse/${issueKey}`;
-
-  return {
-    id: issueKey,
-    title: summary,
-    url: url
-  };
+// Response interface matching OpenAI MCP fetch tool specification
+interface FetchDocumentResponse {
+  id: string;
+  title: string;
+  url: string;
 }
 
 /**
  * Register the search tool with the MCP server
+ * @param mcp - MCP server instance
  */
-export function registerSearchTool(mcp: McpServer) {
-  console.log('Registering Jira search tool for ChatGPT MCP client');
+export function registerSearchTool(mcp: McpServer): void {
+console.log('Registering Jira issue search tool for ChatGPT MCP client');
 
   mcp.registerTool(
     'search',
     {
-      title: 'Search Jira Issues',
-      description: 'Search for Jira issues by query string. Returns a list of relevant issues with their IDs, titles, and URLs.',
+      title: 'Search Jira Issue',
+      description: 'Search for Jira issues by their key or ID. Automatically handles Jira authentication and cloud ID resolution.',
       inputSchema: {
-        query: z.string().describe('Search query to find relevant Jira issues'),
+        query: z.string().describe('The Jira issue key or ID (e.g., "USER-10", "PROJ-123") to search for.'),
       },
     },
-    async (params: SearchParams, context) => {
-      try {
-        console.log(`🔍 Search request received for query: "${params.query}"`);
+    async ({ query }: SearchParams, context) => {
+      logger.info('search tool called', {
+        query
+      });
 
-        // Get authentication info with safety check
-        const authInfo = getAuthInfoSafe(context, 'search');
-        const token = authInfo?.atlassian_access_token;
+      // Get auth info with proper error handling
+      const authInfo = getAuthInfoSafe(context, 'fetch');
+      const token = authInfo?.atlassian_access_token;
 
-        if (!token) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: 'Error: No valid Atlassian access token found in session context.',
-              },
-            ],
-          };
-        }
-
-        console.log(`  Using authentication token`);
-
-        // Resolve cloud ID from available sites
-        const siteInfo = await resolveCloudId(token);
-        console.log(`  Resolved cloud ID: ${siteInfo.cloudId}`);
-
-        // Prepare auth header
-        const { authorization } = getAuthHeader(token);
-
-        // Execute Jira search using JQL
-        // Using a broad search across summary, description, and comments
-        const jqlQuery = encodeURIComponent(`text ~ "${params.query}" OR summary ~ "${params.query}" OR description ~ "${params.query}"`);
-        const searchUrl = `https://api.atlassian.com/ex/jira/${siteInfo.cloudId}/rest/api/3/search?jql=${jqlQuery}&maxResults=10&fields=key,summary`;
-
-        console.log(`  Executing Jira search: ${searchUrl}`);
-
-        const response = await fetch(searchUrl, {
-          method: 'GET',
-          headers: {
-            'Authorization': authorization,
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (!response.ok) {
-          // Use the helper function for handling Jira auth errors
-          handleJiraAuthError(response, 'search');
-          const errorText = await response.text();
-          console.error(`  ❌ Jira API error: ${response.status} ${response.statusText}`);
-          console.error(`  Error details: ${errorText}`);
-          throw new Error(`Jira API request failed: ${response.status} ${response.statusText}`);
-        }
-
-        const searchData: any = await response.json();
-        console.log(`  ✅ Search completed. Found ${searchData.issues?.length || 0} results`);
-
-        // Convert Jira issues to search results format
-        const results: SearchResults['results'] = (searchData.issues || []).map((issue: any) => 
-          convertToSearchResult(issue, siteInfo)
-        );
-
-        const searchResults: SearchResults = { results };
-
-        // Return results in OpenAI MCP format (JSON-encoded string in text content)
-        const responseText = JSON.stringify(searchResults);
-        
-        console.log(`  📤 Returning ${results.length} search results`);
-        console.log(`  Results preview:`, sanitizeObjectWithJWTs(results.slice(0, 3)));
-
+      if (!token) {
+        logger.error('No Atlassian access token found in auth context');
         return {
           content: [
             {
-              type: 'text' as const,
-              text: responseText
-            }
-          ]
+              type: 'text',
+              text: 'Error: No valid Atlassian access token found in session context.',
+            },
+          ],
+        };
+      }
+
+      logger.info('Found valid auth token for fetch request', sanitizeObjectWithJWTs({
+        atlassianToken: token,
+        hasRefreshToken: !!authInfo.refresh_token,
+        scope: authInfo.scope,
+        issuer: authInfo.iss,
+        audience: authInfo.aud,
+        operation: 'fetch',
+        issueKey: query,
+      }));
+
+      try {
+        // Resolve the target cloud ID using the utility function
+        let siteInfo;
+        try {
+          siteInfo = await resolveCloudId(token);
+        } catch (error: any) {
+          logger.error('Failed to resolve cloud ID:', error);
+          return { 
+            content: [{ 
+              type: 'text', 
+              text: `Error: ${error.message}` 
+            }] 
+          };
+        }
+        
+        const targetCloudId = siteInfo.cloudId;
+
+        // Build the Jira API URL for the issue
+        const finalUrl = `https://api.atlassian.com/ex/jira/${targetCloudId}/rest/api/3/search/jql?jql=${encodeURIComponent(query)}`;
+
+        // Determine the appropriate authentication method
+        const { authType, authorization } = getAuthHeader(token);
+
+        // Prepare request headers
+        const requestHeaders: Record<string, string> = {
+          Authorization: authorization,
+          'Accept': 'application/json',
         };
 
-      } catch (error: any) {
-        console.error('Error in search request:', error);
+        logger.info('Making HTTP request', sanitizeObjectWithJWTs({ 
+          url: finalUrl,
+          method: 'GET',
+          authType,
+          requestToken: token,
+          issueKey: query
+        }));
+
+        // Make the HTTP request
+        const response = await fetch(finalUrl, {
+          method: 'GET',
+          headers: requestHeaders,
+        });
+
+        logger.info('HTTP request completed', {
+          status: response.status,
+          statusText: response.statusText,
+          contentType: response.headers.get('content-type'),
+          url: finalUrl
+        });
+
+        // Handle Jira authentication errors
+        handleJiraAuthError(response, `Search issue ${query}`);
+
+        if (response.status === 404) {
+          logger.warn('Issue not found', { issueKey: query });
+          return {
+            content: [{
+              type: 'text',
+              text: `Issue ${query} not found.`
+            }]
+          };
+        }
+
+        // Get response body
+        const responseText = await response.text();
+        logger.info('Jira API response received', { responseText });
+        let issueData;
+        
+        try {
+          issueData = JSON.parse(responseText);
+        } catch (parseError) {
+          logger.error('Failed to parse Jira response as JSON:', parseError);
+          return { 
+            content: [{ 
+              type: 'text', 
+              text: `Error: Failed to parse Jira response for issue ${query}.` 
+            }] 
+          };
+        }
+
+        // Extract key information from the Jira issue
+        const issueTitle = `${issueData.key}: ${issueData.fields?.summary || 'No summary'}`;
+        const issueText = issueData.fields?.description ? 
+          (typeof issueData.fields.description === 'string' ? 
+            issueData.fields.description : 
+            JSON.stringify(issueData.fields.description)) : 
+          'No description available';
+        
+        const issueUrl = `${siteInfo.siteUrl}/browse/${issueData.key}`;
+        
+        // Create metadata with additional issue information
+        const metadata = {
+          status: issueData.fields?.status?.name,
+          assignee: issueData.fields?.assignee?.displayName || 'Unassigned',
+          reporter: issueData.fields?.reporter?.displayName,
+          priority: issueData.fields?.priority?.name,
+          issueType: issueData.fields?.issuetype?.name,
+          created: issueData.fields?.created,
+          updated: issueData.fields?.updated,
+          project: issueData.fields?.project?.name,
+          cloudId: targetCloudId,
+          siteName: siteInfo.siteName
+        };
+
+        const fetchDocumentResponse: FetchDocumentResponse = {
+          id: issueData.key,
+          title: issueTitle,
+          url: issueUrl,
+        };
+
+        logger.info('Fetch request successful', {
+          issueKey: issueData.key,
+          status: response.status,
+          title: issueTitle
+        });
+
+        // Return the document object as JSON string in content array
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(fetchDocumentResponse, null, 2),
+            },
+          ],
+        };
+
+      } catch (err: any) {
+        logger.error('Error in fetch request:', err);
         return { 
           content: [{ 
             type: 'text', 
-            text: `Error making search request: ${error.message}` 
+            text: `Error making HTTP request: ${err.message}` 
           }] 
         };
       }
     },
   );
 
-  console.log('  Jira search tool registered successfully');
+  logger.info('  Jira issue search tool registered successfully');
 }

@@ -40,7 +40,7 @@ function getAuthHeader(token: string): { authType: 'PAT' | 'Bearer', authorizati
 
 // Tool parameters interface
 interface FetchParams {
-  id: string;
+  issueKey: string;
 }
 
 // Response interface matching OpenAI MCP fetch tool specification
@@ -65,12 +65,12 @@ console.log('Registering Jira issue fetch tool for ChatGPT MCP client');
       title: 'Fetch Jira Issue',
       description: 'Fetch details of a Jira issue by its issue key or ID. Automatically handles Jira authentication and cloud ID resolution.',
       inputSchema: {
-        id: z.string().describe('The Jira issue key or ID (e.g., "USER-10", "PROJ-123") to fetch details for.'),
+        issueKey: z.string().describe('The Jira issue key or ID (e.g., "USER-10", "PROJ-123") to fetch details for.'),
       },
     },
-    async ({ id }: FetchParams, context) => {
-      logger.info('fetch tool called', { 
-        issueKey: id
+    async ({ issueKey }: FetchParams, context) => {
+      logger.info('fetch tool called', {
+        issueKey
       });
 
       // Get auth info with proper error handling
@@ -96,7 +96,7 @@ console.log('Registering Jira issue fetch tool for ChatGPT MCP client');
         issuer: authInfo.iss,
         audience: authInfo.aud,
         operation: 'fetch',
-        issueKey: id,
+        issueKey,
       }));
 
       try {
@@ -117,7 +117,7 @@ console.log('Registering Jira issue fetch tool for ChatGPT MCP client');
         const targetCloudId = siteInfo.cloudId;
 
         // Build the Jira API URL for the issue
-        const finalUrl = `https://api.atlassian.com/ex/jira/${targetCloudId}/rest/api/3/issue/${id}`;
+        const finalUrl = `https://api.atlassian.com/ex/jira/${targetCloudId}/rest/api/3/issue/${issueKey}`;
 
         // Determine the appropriate authentication method
         const { authType, authorization } = getAuthHeader(token);
@@ -133,7 +133,7 @@ console.log('Registering Jira issue fetch tool for ChatGPT MCP client');
           method: 'GET',
           authType,
           requestToken: token,
-          issueKey: id
+          issueKey
         }));
 
         // Make the HTTP request
@@ -150,15 +150,15 @@ console.log('Registering Jira issue fetch tool for ChatGPT MCP client');
         });
 
         // Handle Jira authentication errors
-        handleJiraAuthError(response, `Fetch issue ${id}`);
+        handleJiraAuthError(response, `Fetch issue ${issueKey}`);
 
         if (response.status === 404) {
-          logger.warn('Issue not found', { issueKey: id });
-          return { 
-            content: [{ 
-              type: 'text', 
-              text: `Issue ${id} not found.` 
-            }] 
+          logger.warn('Issue not found', { issueKey });
+          return {
+            content: [{
+              type: 'text',
+              text: `Issue ${issueKey} not found.`
+            }]
           };
         }
 
@@ -173,7 +173,7 @@ console.log('Registering Jira issue fetch tool for ChatGPT MCP client');
           return { 
             content: [{ 
               type: 'text', 
-              text: `Error: Failed to parse Jira response for issue ${id}` 
+              text: `Error: Failed to parse Jira response for issue ${issueKey}.` 
             }] 
           };
         }

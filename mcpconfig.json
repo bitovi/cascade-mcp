@@ -1,0 +1,75 @@
+{
+  "name": "bitovi-jira",
+  "display_name": "Bitovi JIRA",
+  "description": "MCP connector for accessing JIRA issues, projects, and related data",
+  "version": "1.0.0",
+  "capabilities": {
+    "actions": true,
+    "search": true,
+    "fetch": true
+  },
+  "servers": [
+    {
+      "url": "https://3e44c84dbd00.ngrok-free.app",
+      "type": "mcp",
+      "allowed_tools": [
+        "search",
+        "fetch"
+      ],
+      "require_approval": "never"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "description": "JIRA API token authentication",
+    "fields": {
+      "token": {
+        "type": "string",
+        "description": "Personal API token for JIRA"
+      }
+    }
+  },
+  "actions": [
+    {
+      "name": "fetch",
+      "description": "Fetch details of a JIRA issue by its key",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "The issue key, e.g. PLAY-29"
+          }
+        },
+        "required": ["key"]
+      }
+    },
+    {
+      "name": "listProjects",
+      "description": "List all accessible JIRA projects",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "search",
+      "description": "Run a JQL query to search JIRA issues",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "jql": {
+            "type": "string",
+            "description": "JQL string for issue search"
+          },
+          "maxResults": {
+            "type": "integer",
+            "description": "Max number of results to return",
+            "default": 25
+          }
+        },
+        "required": ["jql"]
+      }
+    }
+  ]
+}
