@@ -30,6 +30,8 @@ jobs:
           VITE_JIRA_SCOPE: ${{ vars.VITE_JIRA_SCOPE }}
           VITE_JIRA_CALLBACK_URL: ${{ vars.VITE_JIRA_CALLBACK_URL }}
           VITE_JIRA_API_URL: ${{ vars.VITE_JIRA_API_URL }}
+          FIGMA_CLIENT_ID: ${{ vars.FIGMA_CLIENT_ID }}
+          FIGMA_OAUTH_SCOPES: ${{ vars.FIGMA_OAUTH_SCOPES }}
           VITE_STATUS_REPORTS_ENV: staging
           VITE_JIRA_APP_KEY: jira-mcp-auth-bridge-staging
 
