@@ -32,7 +32,7 @@ jobs:
           VITE_JIRA_API_URL: ${{ vars.VITE_JIRA_API_URL }}
           FIGMA_CLIENT_ID: ${{ vars.FIGMA_CLIENT_ID }}
           FIGMA_OAUTH_SCOPES: ${{ vars.FIGMA_OAUTH_SCOPES }}
-          FIGMA_CLIENT_SECRET: ${{ secrets.FIGMA_CLIENT_SECRET }}
+          # FIGMA_CLIENT_SECRET: ${{ secrets.FIGMA_CLIENT_SECRET }}
           VITE_STATUS_REPORTS_ENV: staging
           VITE_JIRA_APP_KEY: jira-mcp-auth-bridge-staging
 
