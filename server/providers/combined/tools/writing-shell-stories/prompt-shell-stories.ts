@@ -58,37 +58,15 @@ export function generateShellStoryPrompt(
 ${epicContext}
 </epic_context>
 
-**CRITICAL: Epic context establishes hard constraints:**
+**Use epic context as reference for:**
+- Understanding project priorities and sequencing preferences
+- Identifying features that are out of scope (don't create stories for these)
+- Noting features to implement later (create implementation stories at the end)
+- Understanding business constraints and requirements
 
-1. **OUT OF SCOPE = DO NOT CREATE STORIES**
-   - If epic uses language like "out of scope", "not included", "exclude", "already completed elsewhere"
-   - DO NOT create any stories for these features
-   - Example: "Header is out of scope" → No header stories created
-
-2. **DELAY/DEFER = CREATE STORIES AT THE END**
-   - If epic uses language like "delay until end", "defer", "delay until very end", "can delay", "should delay"
-   - These features MUST appear in TWO places:
-     a) Early stories: Use ❌ bullets to defer them
-     b) Final stories: CREATE implementation stories at the end of the list
-   - Example workflow for "delay search and export features":
-     * st001-st010: "❌ Search and export (epic defers to end, see st018-st019)"
-     * st018: "Implement Search Feature - Add search functionality..."
-     * st019: "Implement Export Feature - Add export functionality..."
-
-3. **PRIORITIZATION LANGUAGE PATTERNS**
-   - "delay X until the very end" → Defer in early stories, implement in final stories
-   - "delay X until the end" → Same as above
-   - "can delay X" → Same as above
-   - "should delay X" → Same as above
-   - "defer X" → Same as above
-   - "X is out of scope" → Do not create stories for X
-   - "exclude X" → Do not create stories for X
-   - "X already completed" → Do not create stories for X
-
-4. **CONTRADICTIONS BETWEEN EPIC AND SCREENS**
-   - Epic constraints take absolute precedence over visual analysis
-   - If screens show feature but epic defers it → Defer it in early stories, implement at end
-   - If screens show feature but epic excludes it → Do not create any stories for it
+**Epic context does NOT mean:**
+- Defer features globally to every story (only defer where feature is visible in that story's screens)
+- Override evidence-based approach (screen analysis remains primary source of truth)
 
 `
     : '';
@@ -135,19 +113,13 @@ ${analysisSection}
 ✅ "Status dropdown filter (shows 'Active', 'Pending', 'Archived' options)"
 ✅ "Form submission (behavior not described - needs clarification)"
 
-
 ## PROCESS (follow in order)
 
-1. **READ EPIC CONTEXT FIRST (IF PROVIDED)**
-   • Before analyzing screens, read epic context to understand:
-     - Features explicitly marked "out of scope" (language: "out of scope", "exclude", "not included", "already completed")
-     - Features marked for deferral (language: "delay until end", "defer", "can delay", "should delay")
-     - Priorities and sequencing constraints
-     - Technical or business constraints
-   • Create two lists:
-     a) OUT OF SCOPE: Features to exclude entirely (no stories)
-     b) DEFERRED: Features to defer in early stories but implement in final stories
-   • CRITICAL: If screens show features contradicting epic scope, you MUST defer or exclude them regardless of how prominent they are in the design
+1. **REVIEW EPIC CONTEXT (IF PROVIDED)**
+   • Read epic context to understand priorities, constraints, and scope preferences
+   • Note any features marked as "out of scope" - don't create stories for these
+   • Note any features suggested to "defer" or "delay until end" - keep in mind for later stories
+   • Use as reference, not strict rules to apply to every story
 
 2. **INITIAL STORY NAME LIST**
    • Get the list of screen names from screens.yaml to determine which analysis files to review.
@@ -155,23 +127,18 @@ ${analysisSection}
    • Identify distinct user-visible flows and functionality.
    • Break them into incremental units of value — each story should represent the smallest useful slice a user could benefit from.
    • IMPORTANT: Prefer to not implement every UI element visible in a screen at once. Start with core functionality and defer advanced features to separate stories.
-   • CHECK EPIC CONTEXT: Cross-reference screen features with your OUT OF SCOPE and DEFERRED lists
-   • For each DEFERRED feature visible in screens, create TWO types of stories:
-     a) Core stories that defer the feature (with ❌ bullets)
-     b) Implementation stories for the deferred feature (to be prioritized last)
+   • Note features mentioned in epic context as "out of scope" (don't create stories) or "defer/delay" (create implementation stories later)
    • Group screens into candidate stories when they form part of the same flow (e.g., add form + success + error).
    • If one screen contains multiple incremental steps of value, split it into multiple stories.
    • Do NOT force a fixed count. The correct number of stories depends on the functionality — sometimes 3, sometimes 20+.
 
 3. **PRIORITIZE**
    • Reorder stories by:
-     - Epic Constraints (stories implementing epic-deferred features go LAST)
-     - Customer/User Value (highest first, subject to epic constraints)
+     - Customer/User Value (highest first)
      - Dependencies (sequence stories so that later ones build on earlier ones)
      - Blockers (unblock future stories early)
      - Risk (tackle high-risk elements earlier)
-   • CRITICAL: Stories that implement epic-deferred features MUST be at the end of the prioritized list
-   • Example: If epic defers "filtering and export", those implementation stories should be the final stories (e.g., st022, st023)
+   • If epic context mentions deferring features, ensure those implementation stories go toward the end
 
 4. **CROSS-REFERENCE SCREENS & ANALYSIS (CRITICAL)**
    • For each story, collect all relevant screens and analysis files across the flow.
@@ -183,10 +150,11 @@ ${analysisSection}
    • Add sub-bullets under the first story:
      - SCREENS: (Figma links found in step 4)
      - DEPENDENCIES: Other story IDs this story depends on (or \`none\`)
-     - + Items that MUST be included now (behaviors, functionality, flows, and any shared components required)
-     - - Items explicitly excluded to defer (MUST include epic-deferred features with actual story references: "- Feature X (epic defers to end, see st015)")
+     - + Items that MUST be included now (core behaviors, functionality, flows, and any shared components required)
+     - - Items to defer to later stories (advanced features, enhancements, complex interactions that aren't essential for basic user value)
      - ¿ Open questions (scope, behavior, technical assumptions)
-   • CHECK EPIC CONTEXT: Ensure all epic-deferred features visible in this story's screens are listed in - bullets with forward references to their implementation stories created in step 2
+   • Focus on progressive enhancement: what's the simplest valuable implementation?
+   • Defer features that are visible in THIS story's screens but are lower priority or more complex than the core use case
 
 6. **PROMOTE MINUSES INTO CANDIDATE STORIES**
    • Turn meaningful - items into new top-level stories. Add them to the prioritized list.
@@ -227,11 +195,15 @@ ${analysisSection}
 
    D) Validate evidence basis (screen-evidence audit):
       • For EVERY + and - bullet in every story:
-        ◦ Quote the specific text from the analysis file that supports this feature
-        ◦ If you cannot find supporting evidence, remove the bullet entirely
+        ◦ Verify the feature appears in THIS story's screen analysis files
+        ◦ If you cannot find the feature in this story's screens, remove the bullet entirely
         ◦ For visible UI elements without described behaviors, convert to ¿ questions
       • ANTI-PATTERN: Do not write "search functionality" if only "search bar" is described
       • CORRECT PATTERN: Write "search input field (UI element)" and ask "¿ What search behavior should this implement?"
+      • CRITICAL: Only add - bullets for features that are VISIBLE in this story's screens
+        ◦ Example CORRECT: Story about applicant list screen that shows filter buttons → "- Advanced filtering (defer to st008)"
+        ◦ Example WRONG: Story about agreement pricing screen that has no filters → Don't add "- Filtering (defer)" bullet
+        ◦ Rule: If the feature isn't in this story's screen analysis files, don't mention it in - bullets
 
    E) Add missing stories if needed:
       • IMPORTANT: Feel empowered to add new stories if the review reveals gaps
@@ -239,18 +211,14 @@ ${analysisSection}
       • Re-number stories as needed to maintain logical progression
       • Update dependencies in existing stories to reference new story IDs
 
-   F) Verify epic-deferred features have implementation stories (CRITICAL):
-      • Review epic context and list ALL features with deferral language ("delay until end", "defer", "can delay", "should delay")
-      • For each deferred feature, verify:
-        ◦ It appears in ❌ bullets in early stories with forward reference (e.g., "- Search (epic defers to end, see st020)")
-        ◦ There is NO implementation in early stories (st001-st0XX)
-        ◦ There IS a corresponding story at the END implementing it (stYYY where YYY > XX)
-      • If a deferred feature has ❌ bullets but NO implementation story, ADD one now
-      • Generic example check:
-        - Epic says: "delay advanced reporting until the end"
-        - Early stories: ❌ Advanced reporting (epic defers to end, see st018) ✅
-        - Final stories: st018: Implement Advanced Reporting - Add report generation... ✅
-      • If this check fails, ADD the missing implementation stories NOW
+   F) Verify deferred features have implementation stories:
+      • For any feature that was deferred with - bullets (whether from epic context or natural progressive enhancement):
+        ◦ Verify there's a corresponding implementation story later in the list
+        ◦ Ensure - bullets reference the correct story ID
+      • If epic context suggests deferring a feature and it appears in screens:
+        ◦ Ensure early stories defer it where visible
+        ◦ Ensure there's an implementation story at the end
+      • If a feature has - bullets but NO implementation story, ADD one now
 
    G) Final consistency check:
       • Read through the entire story list as if you're a developer planning sprints
@@ -308,17 +276,17 @@ ${analysisSection}
 
 • DON'T: "View Applicant Dashboard with Status Filtering, Pagination, and Advanced Columns"
 • DO:
-  ◦ \`st001\` Display Basic Applicant List – Show applicant names in a list (core data, no filtering)
-  ◦ \`st002\` Add Status Filtering to Applicant List – Allow users to filter applicants by status
-  ◦ \`st003\` Add Pagination to Applicant List – Add next/previous navigation for long lists
-  ◦ \`st004\` Add Advanced Columns to Complete Status View – Show additional data columns for detailed analysis
+  ◦ \`st001\` Display Basic Applicant List ⟩ Show applicant names in a list (core data, no filtering)
+  ◦ \`st002\` Add Status Filtering to Applicant List ⟩ Allow users to filter applicants by status
+  ◦ \`st003\` Add Pagination to Applicant List ⟩ Add next/previous navigation for long lists
+  ◦ \`st004\` Add Advanced Columns to Complete Status View ⟩ Show additional data columns for detailed analysis
 
 
 ## OUTPUT FORMAT (strict)
 
 • Output ONLY the final prioritized stories with complete details
 • Do NOT include the initial story list in the final output
-• One top-level bullet per story: \`- \`st{story number}\` **{short descriptive title}** – {one sentence description of the story}\`
+• One top-level bullet per story: \`- \`st{story number}\` **{short descriptive title}** ⟩ {one sentence description of the story}\`
 • Sub-bullets for each story (use proper markdown nested bullets with 2-space indentation and emoji symbols):
   * SCREENS: {Figma URLs formatted as markdown links with screen names as link text}
   * DEPENDENCIES: {list of story IDs this story depends on, or \`none\`}
@@ -330,7 +298,7 @@ ${analysisSection}
 
 ## EXAMPLE OUTPUT
 
-- \`st001\` **Add Promotion to Cart** – Allow users to apply a promotion code to their shopping cart
+- \`st001\` **Add Promotion to Cart** ⟩ Allow users to apply a promotion code to their shopping cart
   * SCREENS: [promo-add-form](https://www.figma.com/design/aBc123XyZ/Project-Name?node-id=123-456), [promo-success](https://www.figma.com/design/aBc123XyZ/Project-Name?node-id=123-457), [promo-error](https://www.figma.com/design/aBc123XyZ/Project-Name?node-id=123-458)
   * DEPENDENCIES: none
   * ✅ User can enter a valid promotion code and apply it

@@ -19,10 +19,12 @@ This tool writes the next Jira story from a list of shell stories in an epic. It
 
 1. **Fetch Epic** - Get epic description containing shell stories
 2. **Find Next Story** - Identify first unwritten shell story
-3. **Validate Dependencies** - Ensure dependency stories are current
+3. **Validate Dependencies** - Ensure dependency stories exist and are written (MVP: basic check only)
 4. **Generate Story** - Create full Jira story using AI
 5. **Create Jira Issue** - Post story as new Jira issue
 6. **Update Epic** - Mark shell story as completed with link and timestamp
+
+**Future Enhancement** (Step 11): Add advanced dependency validation with timestamp checking and automatic regeneration of stale dependencies.
 
 ## Detailed Implementation Steps
 
@@ -47,21 +49,22 @@ This tool writes the next Jira story from a list of shell stories in an epic. It
 **What to do**:
 - Use `getAuthInfoSafe()` to get Atlassian token
 - Use `resolveCloudId()` to get cloud ID
-- Use `getJiraIssue()` to fetch epic (with `expand=changelog` to support future dependency validation)
+- Use `getJiraIssue()` to fetch epic with: `fields=description,summary,project,key` (no changelog needed for MVP)
+- Extract project key from epic response for use in Step 7
 - Use `convertAdfToMarkdown()` to convert epic description to markdown
 - Parse markdown to extract Shell Stories section
 
 **Required utilities** (already exist):
 - `getAuthInfoSafe()` from `mcp-core/auth-helpers.ts`
 - `resolveCloudId()` from `atlassian-helpers.ts`
-- `getJiraIssue()` from `atlassian-helpers.ts` - Note: Will need to pass `expand=changelog` in fields parameter
+- `getJiraIssue()` from `atlassian-helpers.ts` - Pass `fields=description,summary,project,key`
 - `convertAdfToMarkdown()` from `markdown-converter.ts`
 
 **How to verify**:
 - Log the epic description markdown
 - Confirm Shell Stories section is present
 - Parse and log shell story titles as array
-- Verify changelog data is available (for future use in Step 5)
+- Verify project key extracted (e.g., "PROJ" from "PROJ-123")
 
 ### Step 3: Parse Shell Stories Structure
 
@@ -111,38 +114,31 @@ interface ParsedShellStory {
 - Confirm correct story is identified
 - Test edge cases above
 
-### Step 5: Validate and Update Dependencies
+### Step 5: Validate Dependencies (MVP - Basic Validation Only)
 
 **What to do**:
 For each dependency story ID in `storyToWrite.dependencies`:
 1. Find the dependency in parsed stories array
-2. If dependency not yet written (no `jiraUrl`) → return error
-3. If dependency has `jiraUrl`:
-   - Fetch the Jira issue using `getJiraIssue()` with `expand=changelog` parameter
-   - Extract the most recent update timestamp from changelog
-   - Compare with dependency's `timestamp` in shell story
-   - If Jira issue updated more recently → mark for regeneration
+2. If dependency not found → return error "Dependency {id} not found in shell stories"
+3. If dependency not yet written (no `jiraUrl`) → return error "Dependency {id} must be written before {storyToWrite.id}"
+4. If dependency has `jiraUrl` → Continue (assume it's up-to-date)
 
-**Fetching changelog**:
-- Use `getJiraIssue()` with fields parameter including changelog
-- URL format: `/rest/api/3/issue/${issueKey}?expand=changelog`
-- Response includes `changelog.histories[]` array with updates
-- Get most recent: `changelog.histories[0].created` (sorted newest first)
-- Each history has: `id`, `created` (ISO timestamp), `items[]` (changes)
+**MVP Scope**:
+- Only validate that dependencies exist and have been written
+- Do NOT check timestamps or fetch changelog
+- Do NOT regenerate dependency content
+- Assume all written dependencies are current
 
-**Regeneration logic** (if dependency changed):
-- Need to re-analyze the screens for that dependency
-- Generate new shell story content for that dependency only
-- Update the dependency's entry in epic's Shell Stories section
-- Update timestamp to match Jira's latest update
+**Future Enhancement** (see Step 11):
+- Add timestamp comparison using changelog
+- Implement dependency regeneration workflow
+- Update stale dependencies automatically
 
 **How to verify**:
 - Test with story that has dependencies
-- Log comparison of timestamps
-- Verify changelog is returned from `getJiraIssue()`
-- Manually update a dependency story in Jira
-- Verify regeneration is triggered
-- Confirm epic is updated with new content and latest timestamp
+- Verify error when dependency not written
+- Verify success when all dependencies have Jira URLs
+- Confirm no changelog fetching occurs
 
 ### Step 6: Generate Full Story Content
 
@@ -151,21 +147,25 @@ For each dependency story ID in `storyToWrite.dependencies`:
 - Use story writing guidelines from Bitovi
 - Include context from: shell story content, dependency stories, screen analysis files
 
-**Loading screen analysis files and images**:
+**Loading screen analysis files**:
 - Extract screen names from SCREENS bullets (use link text as analysis file identifier)
 - Check temp folder for existing `.analysis.md` files (from previous `write-shell-stories` run)
-- If analysis files missing → regenerate them using shared helper (see Considerations)
-- Check temp folder for Figma image downloads
-- If images missing → re-download them
+- If analysis files missing:
+  - Download Figma images for those screens (needed for AI analysis)
+  - Regenerate analysis files using shared helper (see Considerations)
+  - Both images and analysis files remain in temp cache
 - Reusable helper should support both this tool and other future tools
+- Note: We don't send Figma images as context to story generation prompt (see Q16)
+- Temp cache cleanup happens automatically on timeout (managed by existing cleanup process)
 
 **Prompt should include**:
 - Shell story details (✅ ❌ ❓ bullets)
 - Dependency story summaries (for context) - just shell story content, not full Jira descriptions
 - Screen analysis files referenced in SCREENS bullets
-- Figma images (if available and deemed useful - see Considerations)
-- Story writing format requirements
+- Story writing format requirements (loaded from `story-writing-guidelines.md`)
 - Nested Gherkin format for acceptance criteria
+
+**Note**: Figma images are NOT included in the prompt (see Q16). Images are only used to generate analysis files if they're missing.
 
 **Required sections** (per spec):
 1. User Story (As a … I want … so that …)
@@ -178,17 +178,19 @@ For each dependency story ID in `storyToWrite.dependencies`:
 **How to verify**:
 - Generate story for simple test case
 - Check all required sections present
-- Verify Figma images embedded in acceptance criteria
+- Verify Figma images embedded in acceptance criteria (as links from analysis files)
 - Validate Gherkin format (**GIVEN**, **WHEN**, **THEN** bolded)
 - Confirm no speculative features added
-- Test with missing analysis files to verify regeneration works
-- Test with cached analysis files to verify reuse works
+- Test with missing analysis files to verify regeneration works (images downloaded, analysis created, both cached)
+- Test with cached analysis files to verify reuse works (no regeneration needed)
+- Verify temp cache cleanup happens automatically on timeout
 
 ### Step 7: Create Jira Issue
 
 **What to do**:
 - Convert generated markdown story to ADF using `convertMarkdownToAdf()`
 - Validate ADF using `validateAdf()`
+- Extract project key from epic (see Q11 for approach)
 - Create new Jira issue as subtask of epic
 - Use Jira REST API: `POST /rest/api/3/issue`
 - After creation, add blocker links for all immediate dependencies
@@ -197,7 +199,7 @@ For each dependency story ID in `storyToWrite.dependencies`:
 ```typescript
 {
   fields: {
-    project: { key: "..." },
+    project: { key: projectKey },  // Extract from epic in Step 2
     parent: { key: epicKey },
     summary: storyToWrite.title,
     description: adfDocument,
@@ -224,6 +226,7 @@ For each dependency story ID in `storyToWrite.dependencies`:
   }
 }
 ```
+- Note: "Blocks" link type is standard in Jira Cloud, but verify availability
 
 **How to verify**:
 - Create test issue in Jira
@@ -299,19 +302,54 @@ For each dependency story ID in `storyToWrite.dependencies`:
 - Create end-to-end test with real epic
 - Run full workflow from fetch to epic update
 - Verify second run picks up next story
-- Test dependency validation with updated Jira issues
+- Test basic dependency validation
 
 **Test scenarios**:
 1. Write first story (no dependencies)
 2. Write second story (depends on first)
-3. Update first story in Jira, write third story (depends on first)
-4. Verify regeneration triggered
+3. Verify third story (depends on first and second)
+4. Test error: story with unwritten dependency
 
 **How to verify**:
 - All stories created successfully
 - Epic properly updated after each story
-- Dependencies validated correctly
-- Regeneration works when needed
+- Dependencies validated correctly (exist and have Jira URLs)
+- Error handling works for unwritten dependencies
+
+### Step 11: Future Enhancement - Advanced Dependency Validation
+
+**What to do** (implement after MVP is working):
+For each dependency story ID in `storyToWrite.dependencies`:
+1. Fetch the Jira issue using `getJiraIssue()` with `expand=changelog&fields=description,summary,updated,project`
+2. Extract the most recent update timestamp: `changelog.histories[0].created`
+3. Compare with dependency's `timestamp` in shell story
+4. If Jira issue updated more recently → regenerate dependency content
+
+**Dependency Regeneration Workflow**:
+- Create new prompt to extract scope from existing Jira story
+- Prompt should read story description and extract:
+  - What's in scope (implemented features)
+  - What's out of scope (deferred features)
+  - Key functionality summary
+- Load dependency's SCREENS from shell story
+- Re-analyze those specific screens (may already be cached)
+- Generate new shell story content for ONLY that dependency
+- Update the dependency's entry in epic's Shell Stories section
+- Update timestamp to match Jira's latest update
+- If Jira description differs, update the Jira issue description too
+
+**New prompt requirements**:
+- Read existing Jira story (including Figma references)
+- Extract in-scope vs out-of-scope items
+- Summarize implementation details
+- Format as shell story bullets (✅ ❌ ❓)
+
+**How to verify**:
+- Manually update a dependency story in Jira
+- Run tool on story that depends on it
+- Verify regeneration is triggered
+- Confirm epic updated with new content and timestamp
+- Confirm Jira issue description updated if content changed
 
 ## Questions
 
@@ -344,52 +382,84 @@ Just the shell story summaries.
 
 Is it harder to look for just description and summary updates?
 
+**Answer**: Looking at specific fields requires filtering `changelog.histories[].items[]` array for items where `field === 'description'` or `field === 'summary'`. Looking at ANY update just uses `changelog.histories[0].created`. The filtered approach is slightly more complex but more precise. Since you asked about difficulty - filtering is straightforward: just iterate through items and check the field name. **Recommendation**: Start with ANY update (simpler), then refine to description/summary-only if you get false positives from status changes.
+
+Yes, the changelog is also paginated.  So you might have to go back to find if a description or summary had been updated.
+
+**DECISION**: Use Option A - Just use `changelog.histories[0].created` for ANY update. No pagination handling needed. Simpler implementation. 
+
 **Q8**: When using `getJiraIssue()` with `expand=changelog`, should we also specify which fields to return to optimize the response size, or fetch all fields?
 
 If we can specify description and summary, that's all we need I believe.
 
+**Answer**: Yes, you can use `fields=description,summary,updated,project` parameter. This reduces payload size significantly.
+
 **Q9**: For Step 8 (updating epic with completion marker), should we work directly with ADF structure or use the hybrid approach (convert just Shell Stories section to markdown, update, convert back)? Direct ADF manipulation is more efficient but more complex. The hybrid approach is safer but does roundtrip conversion.
 
-Which is easier?  Lets start with whatever is easier to accomplish. 
+Which is easier?  Lets start with whatever is easier to accomplish.
+
+**Answer**: Hybrid approach is easier. The markdown format is simple and predictable: `` `st001` **Title** – Description`` becomes `` `st001` **[Title](url)** – Description _timestamp_``. With ADF you'd need to navigate bulletList → listItem → paragraph → text/link/emphasis nodes. **Recommendation**: Use hybrid approach (extract section, update markdown, replace section).
+
+**Q10**: When regenerating a dependency's shell story content in Step 5, should we use the same prompts and process as `write-shell-stories` tool? This would mean re-analyzing screens and generating shell story content for just that ONE story.
+
+No, we will need to use a different prompt.  It will have to read the story (including any figma references in that story) and extract out what's in and out of scope and summarize that. We should do this later in the plan.
+
+**DECISION**: Move dependency validation and regeneration to end of plan as a future enhancement. For MVP implementation:
+- **Skip Step 5 entirely** - Don't check dependency timestamps
+- Assume all dependencies are up-to-date
+- Only verify dependencies exist and have Jira URLs (are written)
+- Add full dependency validation/regeneration as final step in plan after core functionality works 
+
+**Q11**: For Step 7, how do we extract the project key from the epic? Should we fetch the epic's project field in Step 2, or parse it from the epicKey (e.g., "PROJ-123" → "PROJ")?
+
+Yes, exactly.
+
+**Q12**: Should this tool provide progress notifications like `write-shell-stories` does using `createProgressNotifier`? This could be helpful for long-running operations like regenerating dependencies.
+
+yes.
+
+**Q13**: If creating the Jira issue succeeds (Step 7) but updating the epic fails (Step 8), we have an orphaned story. Should we: a) Try to delete the created issue, b) Continue anyway and log the error, or c) Leave the story created but warn the user to manually update the epic?
+
+Warn the user.
+
+
+
+**Q14**: When including dependency story content in the prompt (Step 6), should we include: a) Just the shell story content from the epic, or b) The full Jira issue description from the dependency story?
+
+I hope that the shell story is enough. Lets start with that.
+
+**Q15**: The temp folder references in Step 6 - is this the same temp folder from `getTempDir()` in `write-shell-stories.ts`? Should we document the temp folder lifecycle (creation, persistence, cleanup)?
+
+
+**Answer**: Already documented in the **"Important Implementation Details" → "Temp Folder Management"** section below. This section explains:
+- Use `getTempDir()` helper for consistent location
+- What files are stored (`.analysis.md` files and Figma images)
+- That files persist across tool invocations (cached for reuse)
+- Filename patterns for analysis files and images
+
+This is for the developers implementing this tool - it's in this spec document.
+
+**Q16**: In the Considerations section, you ask "should we also provide the images as context to the AI when writing the stories?" - Do you want to include Figma images in the story generation prompt, or only link to them in the acceptance criteria? 
+
+We won't send images as context for now. We might change that later. 
 
 ## Story Writing Format Requirements
 
-Stories must follow guidelines from:
-- https://bitovi.atlassian.net/wiki/spaces/agiletraining/pages/401113200/Story+Writing
-- https://bitovi.atlassian.net/wiki/spaces/BITAPP/pages/472580235
+Story writing guidelines are maintained in: `server/providers/combined/tools/write-next-story/story-writing-guidelines.md`
 
-**Required sections**:
-1. User Story (As a … I want … so that …)
+This file will be loaded at runtime and embedded in the story generation prompt.
+
+**Source**: https://bitovi.atlassian.net/wiki/spaces/agiletraining/pages/401113200/Story+Writing
+
+**Key sections in the guidelines**:
+1. User Story Statement (As a … I want … so that …)
 2. Supporting Artifacts (Figma links, analysis files)
 3. Out of Scope (❌ bullets from shell story)
 4. Non-Functional Requirements
 5. Developer Notes (technical dependencies)
 6. Acceptance Criteria (nested Gherkin format)
 
-**Nested Gherkin Format**:
-```markdown
-**GIVEN** [initial state or context]:
-
-![Description of initial state](https://www.figma.com/design/...)
-
-- **WHEN** [user action], **THEN**
-  - [expected result 1]
-  - [expected result 2]
-    
-    ![Description of intermediate state](https://www.figma.com/design/...)
-
-  - **WHEN** [subsequent action], **THEN**
-    - [expected result]
-
-      ![Description of final state](https://www.figma.com/design/...)
-```
-
-**Critical constraints**:
-- Base acceptance criteria ONLY on visible designs and analysis files
-- Do NOT add speculative features
-- AVOID generic styling criteria (spacing, fonts, contrast) - developers will match designs
-- Include Figma images inline with relevant acceptance criteria
-- Bold all Gherkin keywords: **GIVEN**, **WHEN**, **THEN**
+See the `story-writing-guidelines.md` file for complete details on format, syntax, and constraints.
 
 
 ## Considerations
@@ -398,7 +468,36 @@ Stories must follow guidelines from:
 
 - We might not have the screen analysis files to send to the writing stories prompt.  We should check if they are in the temporary folder, but if they are not, we will need to regenerate.  We should make the re-download and build analysis helper in such a way that multiple tools can use it.  We should be able to identify the name of the analysis file from the title of the link in the `SCREENS:` section.
 
-- Besides the screen analysis, should we also provide the images as context to the AI when writing the stories?  If yes, I'd like to check if the temporary folder still has them, if not, we will need to redownload and send them too.  
+- Figma images are downloaded when analysis files need to be regenerated. Images are used by AI to create the `.analysis.md` files, but are NOT sent as context to the story generation prompt. Both images and analysis files persist in the temp cache folder and are cleaned up together on timeout (automatic periodic cleanup).
+
+## Important Implementation Details
+
+### Temp Folder Management
+- Use `getTempDir()` helper from `write-shell-stories.ts` for consistent temp folder location
+- Temp folder contains: `.analysis.md` files and Figma images (both cached together)
+- All files persist across tool invocations (cached for reuse)
+- Automatic cleanup: Temp folder cleaned up on timeout (existing periodic cleanup process)
+- Screen analysis filename pattern: `{screen-name}.analysis.md` (match link text from SCREENS bullets)
+- Figma images: Downloaded when generating analysis files, persist in cache with analysis files
+
+### Story Generation Prompt Structure
+- Load story writing guidelines from `story-writing-guidelines.md` file in tool folder
+- Include shell story full content (✅ ❌ ❓ bullets)
+- Include dependency shell story summaries (just the shell story content from epic, not full Jira descriptions)
+- Include screen analysis file contents
+- Do NOT include Figma images as context (see Q16) - images only used for generating analysis files
+- Embed complete guidelines in prompt (not just URLs)
+- Emphasize evidence-based approach (no speculation)
+
+### Progress Notifications
+- Consider using `createProgressNotifier()` like `write-shell-stories` does
+- Key progress points: Fetching epic, validating dependencies, regenerating dependencies, generating story, creating issue, updating epic
+- Helps users understand long-running operations
+
+### Error Recovery Strategy
+- If Step 7 (create issue) succeeds but Step 8 (update epic) fails → see Q13 for approach
+- Log all errors with context (epic key, story ID, operation that failed)
+- Partial success states should be clearly communicated to user  
 
 ## Implementation
 

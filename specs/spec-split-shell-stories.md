@@ -423,3 +423,340 @@ Compare before/after split implementation.
 
 4. **When to stop iterating**: If Prompt 3 keeps discovering new stories, when do we stop?
    - Mitigation: Set max iterations (e.g., 2 rounds of discovery), or require manual approval for new stories
+
+---
+
+## Implementation Plan (Option A - Two-Prompt Split)
+
+### Phase 1: Create Prompt Files
+
+#### File 1: `prompt-story-planning.ts`
+
+**Purpose**: Extract steps 1-3, 11 from current prompt to generate prioritized story list with titles only.
+
+**Key Changes from Current Prompt**:
+- Remove all detailing steps (4-9, 12-13)
+- Focus only on story discovery and prioritization
+- Input uses screen analysis **summaries** instead of full content (lighter context)
+- Output is simple numbered list with ANALYSIS references (which screens each story relates to)
+- Creates implementation stories for epic-deferred features at the end
+
+**Function Signature**:
+```typescript
+export function generateStoryPlanningPrompt(
+  screensYaml: string,
+  analysisFileSummaries: Array<{ screenName: string; summary: string }>,
+  epicContext?: string
+): string
+```
+
+**Output Format**:
+```markdown
+# Final Prioritized Stories
+
+- st001: Display Basic Applicant List - Show applicant names in a simple list
+  * ANALYSIS: applicants-new
+- st002: Display In Progress Applicants - Show applicants with in-progress status
+  * ANALYSIS: applicants-in-progress
+...
+- st013: Implement Sorting Feature - Add sortable columns to applicant lists
+  * ANALYSIS: applicants-new, applicants-in-progress, applicants-complete
+- st014: Implement Location Map - Add interactive map for applicant location
+  * ANALYSIS: application-map
+```
+
+**Critical Rules Added**:
+- "Only create implementation stories for features that actually appear in the screen analyses" (prevents speculative stories)
+- "Do NOT add detailed bullets yet - this is planning phase only"
+- Epic context section emphasizes creating implementation stories at END of list
+
+#### File 2: `prompt-story-detailing.ts`
+
+**Purpose**: Extract steps 4-9, 12-13 from current prompt to add detailed bullets to pre-existing story list.
+
+**Key Changes from Current Prompt**:
+- Remove story discovery and prioritization steps (1-3, 11)
+- Input includes **prioritized story list from Prompt 1** as context
+- Input uses **full screen analysis content** (needed for evidence-based detailing)
+- **CRITICAL NEW RULE**: Only defer features visible in THIS story's screens
+
+**Function Signature**:
+```typescript
+export function generateStoryDetailingPrompt(
+  storyList: string,
+  analysisFiles: Array<{ screenName: string; content: string }>,
+  epicContext?: string
+): string
+```
+
+**Critical Rules Added**:
+
+```markdown
+## CRITICAL RULE: DEFER ONLY VISIBLE FEATURES
+
+• Only add - bullets for features that appear in THIS story's screen analyses
+• Do NOT add global deferrals to unrelated stories
+• Example violations to AVOID:
+  ❌ Adding "- Filtering (defer)" to Agreement Tab story when filtering isn't on Agreement tab
+  ❌ Adding "- Location map (defer)" to every story when location map only appears in Location tab story
+  ❌ Adding "- TruthFilter (defer)" to stories that don't involve the Checks screen
+```
+
+**Strong Examples Section**:
+```markdown
+### CORRECT: Deferring features visible in story's screens
+
+Story: st001: Display Basic Applicant List
+- ANALYSIS: applicants-new
+- Screen shows: Table with names, status filter buttons, sort arrows
+- ✅ Correct - bullets:
+  * ❌ Status filtering (defer to st013) ← Filter buttons are VISIBLE
+  * ❌ Sorting by Submitted column (defer to st014) ← Sort arrows are VISIBLE
+
+### INCORRECT: Deferring features not in story's screens
+
+Story: st011: Display Application Agreement Tab
+- ANALYSIS: application-agreement-fixed, application-agreement-rate
+- Screen shows: Pricing configuration, no filtering/sorting/maps
+- ❌ WRONG - bullets:
+  * ❌ Status filtering (defer) ← NO filtering UI on Agreement tab
+  * ❌ Location map (defer) ← NO map on Agreement tab
+- ✅ Correct: NO - bullets for filtering/maps (they don't appear here)
+```
+
+### Phase 2: Update Tool Orchestration
+
+Modify `generateShellStoriesFromAnalyses` function in `write-shell-stories.ts`:
+
+**Current Flow (Single Prompt)**:
+```typescript
+// Read all analysis files (full content)
+const analysisFiles = await readAllAnalysisFiles(screens, tempDirPath);
+
+// Generate single prompt with everything
+const prompt = generateShellStoryPrompt(screensYaml, analysisFiles, epicContext);
+
+// One AI call
+const shellStories = await mcp.sampling.createMessage(prompt, ...);
+```
+
+**New Flow (Two Prompts)**:
+```typescript
+// PROMPT 1: Planning - use analysis summaries only
+const analysisSummaries = await generateAnalysisSummaries(screens, tempDirPath);
+
+const planningPrompt = generateStoryPlanningPrompt(
+  screensYaml,
+  analysisSummaries,
+  epicContext
+);
+
+await notify('Phase 5.1: Planning story list...', startProgress);
+
+const storyListResponse = await mcp.server.request({
+  method: "sampling/createMessage",
+  params: {
+    messages: [{ role: "user", content: { type: "text", text: planningPrompt } }],
+    systemPrompt: STORY_PLANNING_SYSTEM_PROMPT,
+    maxTokens: STORY_PLANNING_MAX_TOKENS,
+    speedPriority: 0.5
+  }
+}, CreateMessageResultSchema);
+
+const storyList = storyListResponse.content?.text as string;
+
+// Save intermediate result for debugging
+await fs.writeFile(
+  path.join(tempDirPath, 'story-list.md'),
+  storyList,
+  'utf-8'
+);
+
+// PROMPT 2: Detailing - use full analysis content
+const analysisFiles = await readAllAnalysisFiles(screens, tempDirPath);
+
+const detailingPrompt = generateStoryDetailingPrompt(
+  storyList,
+  analysisFiles,
+  epicContext
+);
+
+await notify('Phase 5.2: Adding story details...', startProgress + 0.5);
+
+const shellStoriesResponse = await mcp.server.request({
+  method: "sampling/createMessage",
+  params: {
+    messages: [{ role: "user", content: { type: "text", text: detailingPrompt } }],
+    systemPrompt: STORY_DETAILING_SYSTEM_PROMPT,
+    maxTokens: STORY_DETAILING_MAX_TOKENS,
+    speedPriority: 0.5
+  }
+}, CreateMessageResultSchema);
+
+const shellStoriesText = shellStoriesResponse.content?.text as string;
+```
+
+**Helper Function to Add**:
+```typescript
+/**
+ * Generate analysis summaries for story planning
+ * Extracts just the key metadata from each analysis file
+ */
+async function generateAnalysisSummaries(
+  screens: Array<{ name: string; url: string; notes: string[] }>,
+  tempDirPath: string
+): Promise<Array<{ screenName: string; summary: string }>> {
+  const summaries: Array<{ screenName: string; summary: string }> = [];
+  
+  for (const screen of screens) {
+    const analysisPath = path.join(tempDirPath, `${screen.name}.analysis.md`);
+    try {
+      const content = await fs.readFile(analysisPath, 'utf-8');
+      
+      // Extract first ~500 chars or first section as summary
+      // This gives AI enough context to identify stories without full details
+      const lines = content.split('\n');
+      const summaryLines = lines.slice(0, 20); // First 20 lines
+      const summary = summaryLines.join('\n');
+      
+      summaries.push({ screenName: screen.name, summary });
+    } catch (error: any) {
+      console.log(`    ⚠️ Could not read analysis for ${screen.name}: ${error.message}`);
+    }
+  }
+  
+  return summaries;
+}
+```
+
+### Phase 3: Add Feature Flag
+
+Add environment variable or configuration to toggle between approaches:
+
+```typescript
+// In write-shell-stories.ts
+const USE_SPLIT_PROMPTS = process.env.USE_SPLIT_SHELL_STORY_PROMPTS === 'true';
+
+if (USE_SPLIT_PROMPTS) {
+  console.log('  Using two-prompt split approach (planning + detailing)');
+  return await generateShellStoriesWithSplitPrompts({
+    mcp, screens, tempDirPath, yamlPath, notify, startProgress, epicContext
+  });
+} else {
+  console.log('  Using single-prompt approach (legacy)');
+  return await generateShellStoriesFromAnalyses({
+    mcp, screens, tempDirPath, yamlPath, notify, startProgress, epicContext
+  });
+}
+```
+
+**Environment Variable**:
+```bash
+# Enable split prompts
+export USE_SPLIT_SHELL_STORY_PROMPTS=true
+
+# Use legacy single prompt (default)
+export USE_SPLIT_SHELL_STORY_PROMPTS=false
+```
+
+### Phase 4: Testing Strategy
+
+**Test Cases**:
+
+1. **Test: Excessive Deferral Repetition (The Original Issue)**
+   - Epic with: "delay filtering, sorting, TruthFilter, location map until the end"
+   - Screens: applicants-new, applicants-in-progress, application-agreement, application-map
+   - **Expected**: 
+     - Stories st001-st002 (applicant lists) defer filtering/sorting (visible in those screens)
+     - Story for Agreement tab has NO deferrals (filtering/sorting not visible)
+     - Implementation stories st0XX-st0YY at end for filtering, sorting, TruthFilter, map
+   - **Validates**: Fix for excessive repetition issue
+
+2. **Test: Deferred Implementation Stories Created**
+   - Epic with: "defer advanced reporting and export until the end"
+   - **Expected**:
+     - Early stories defer these features with forward references
+     - Final stories implement "Implement Advanced Reporting" and "Implement Export Feature"
+   - **Validates**: Epic deferrals produce implementation stories
+
+3. **Test: Out of Scope Features Excluded**
+   - Epic with: "Header and footer are out of scope"
+   - Screens showing header/footer
+   - **Expected**: No stories for header/footer created
+   - **Validates**: Out-of-scope exclusion works
+
+4. **Test: Story Numbering Sequential**
+   - Any epic with 10+ stories
+   - **Expected**: Stories numbered st001, st002, ..., st010, st011 with no gaps
+   - **Validates**: No story replacement issues
+
+**Comparison Metrics**:
+
+Run same epic through both approaches and compare:
+
+| Metric | Single Prompt | Split Prompts | Target |
+|--------|--------------|---------------|--------|
+| Stories with irrelevant - bullets | 12/17 (71%) | 2/17 (12%) | <20% |
+| Epic deferrals with implementation stories | 2/4 (50%) | 4/4 (100%) | 100% |
+| Story numbering gaps | 1 | 0 | 0 |
+| Manual corrections needed | 8 | 2 | <3 |
+| Total tokens used | ~12K | ~15K | <20K |
+| Generation time | 45s | 65s | <90s |
+
+### Phase 5: Rollout Plan
+
+1. **Week 1: Implementation**
+   - Create `prompt-story-planning.ts` and `prompt-story-detailing.ts`
+   - Add `generateShellStoriesWithSplitPrompts` function
+   - Add feature flag
+   - Test with 3 sample epics
+
+2. **Week 2: Validation**
+   - A/B test on 10 real epics (5 single, 5 split)
+   - Collect metrics
+   - Gather user feedback on story quality
+
+3. **Week 3: Decision**
+   - If metrics show improvement: Set `USE_SPLIT_SHELL_STORY_PROMPTS=true` as default
+   - If no improvement: Keep as opt-in, investigate issues
+   - If worse: Deprecate and analyze failure modes
+
+4. **Week 4: Cleanup**
+   - If successful: Deprecate single prompt, update docs
+   - If failed: Remove split prompt code
+
+### Known Risks & Mitigations
+
+**Risk 1: Increased Token Cost**
+- Split prompts may use 20-30% more tokens
+- **Mitigation**: Monitor costs, optimize if needed (e.g., more aggressive summary for Prompt 1)
+
+**Risk 2: Inconsistency Between Prompts**
+- Story list from Prompt 1 might not perfectly align with details in Prompt 2
+- **Mitigation**: Pass epic context to both prompts, include clear cross-references
+
+**Risk 3: Longer Execution Time**
+- Two sequential AI calls vs. one
+- **Mitigation**: Acceptable tradeoff for quality, can optimize later with parallel processing
+
+**Risk 4: Prompt 1 Misses Stories**
+- Planning prompt might not identify all necessary stories
+- **Mitigation**: Comprehensive testing, allow Prompt 2 to flag missing stories in future iteration
+
+### Future Enhancements (Option B)
+
+If Option A shows promise but still has issues:
+
+1. **Per-Story Parallelization**
+   - Split Prompt 2 into individual story detailing calls
+   - Run in parallel for speed
+   - Only load relevant analyses per story
+
+2. **Iterative Discovery**
+   - Allow Prompt 2 to suggest new stories
+   - Re-run Prompt 1 with discoveries
+   - Maximum 2 iterations to prevent infinite loops
+
+3. **Three-Prompt Split**
+   - Implement full Option B (Gatherer, Prioritizer, Detailer)
+   - For very large epics (30+ stories)
