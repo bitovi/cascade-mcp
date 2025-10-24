@@ -4,6 +4,9 @@
  * Generates shell stories from Figma designs linked in a Jira epic.
  * This tool orchestrates fetching Jira content, analyzing Figma designs,
  * and generating user stories through AI-powered sampling.
+ * 
+ * The tool uses epic description content (excluding the ## Shell Stories section)
+ * to guide prioritization and scope decisions during story generation.
  */
 
 import { z } from 'zod';
@@ -17,6 +20,8 @@ import {
   convertMarkdownToAdf, 
   validateAdf, 
   removeADFSectionByHeading,
+  convertAdfToMarkdown,
+  countADFSectionsByHeading,
   type ADFNode,
   type ADFDocument
 } from '../../../atlassian/markdown-converter.js';
@@ -124,10 +129,10 @@ export function registerWriteShellStoriesTool(mcp: McpServer): void {
     'write-shell-stories',
     {
       title: 'Write Shell Stories from Figma',
-      description: 'Generate shell stories from Figma designs linked in a Jira epic. Analyzes screens, downloads assets, and creates prioritized user stories.',
+      description: 'Generate shell stories from Figma designs linked in a Jira epic. Analyzes screens, downloads assets, and creates prioritized user stories. Uses epic description content to guide prioritization and scope decisions.',
       inputSchema: {
         epicKey: z.string()
-          .describe('The Jira epic key (e.g., "PROJ-123", "USER-10"). The epic description should contain Figma design URLs.'),
+          .describe('The Jira epic key (e.g., "PROJ-123", "USER-10"). The epic description should contain Figma design URLs and optional context about priorities, scope, and constraints.'),
         cloudId: z.string().optional()
           .describe('The cloud ID to specify the Jira site. If not provided, will use the first accessible site.'),
         siteName: z.string().optional()
@@ -253,6 +258,28 @@ export function registerWriteShellStoriesTool(mcp: McpServer): void {
 
         // Send completion notification for Phase 1
         await notify(`✅ Phase 1 Complete: Found ${figmaUrls.length} Figma URL(s)`, 1);
+
+        // ==========================================
+        // PHASE 1.6: Extract epic context (excluding Shell Stories)
+        // ==========================================
+        const epicContextResult = await extractEpicContext({
+          description,
+          epicKey,
+          notify
+        });
+        
+        // Handle error if multiple Shell Stories sections found
+        if (epicContextResult.error?.shouldReturn) {
+          return {
+            content: [{
+              type: 'text',
+              text: epicContextResult.error.message
+            }]
+          };
+        }
+        
+        const epicContext = epicContextResult.epicContext;
+        const contentWithoutShellStories = epicContextResult.contentWithoutShellStories;
 
         // ==========================================
         // PHASE 1.5: Create temp directory for data
@@ -399,7 +426,8 @@ export function registerWriteShellStoriesTool(mcp: McpServer): void {
           figmaFileKey,
           figmaToken,
           tempDirPath,
-          notify
+          notify,
+          epicContext // Pass epic context to screen analysis phase
         });
 
         // ==========================================
@@ -411,7 +439,8 @@ export function registerWriteShellStoriesTool(mcp: McpServer): void {
           tempDirPath,
           yamlPath,
           notify,
-          startProgress: 4 + screens.length
+          startProgress: 4 + screens.length,
+          epicContext
         });
 
         // Phase 6: Write shell stories back to Jira epic
@@ -429,6 +458,7 @@ export function registerWriteShellStoriesTool(mcp: McpServer): void {
               cloudId: siteInfo.cloudId,
               token: atlassianToken,
               shellStoriesMarkdown: shellStoriesContent,
+              contentWithoutShellStories,
               notify,
               startProgress: phase6Progress
             });
@@ -467,6 +497,80 @@ export function registerWriteShellStoriesTool(mcp: McpServer): void {
 }
 
 /**
+ * Phase 1.6: Extract epic context from description
+ * 
+ * Extracts user-authored content from epic description by:
+ * 1. Checking for multiple Shell Stories sections (error if found)
+ * 2. Removing the Shell Stories section
+ * 3. Converting remaining ADF content to markdown
+ * 
+ * @returns Object with epicContext markdown, contentWithoutShellStories ADF, and any error information
+ */
+async function extractEpicContext(params: {
+  description: ADFDocument;
+  epicKey: string;
+  notify: ReturnType<typeof createProgressNotifier>;
+}): Promise<{ 
+  epicContext: string; 
+  contentWithoutShellStories: ADFNode[];
+  error?: { message: string; shouldReturn: boolean } 
+}> {
+  const { description, epicKey, notify } = params;
+  
+  console.log('  Phase 1.6: Extracting epic context from description...');
+  await notify('Extracting epic content...', 1);
+  
+  let epicContext = '';
+  let contentWithoutShellStories: ADFNode[] = [];
+  
+  try {
+    // Check for multiple Shell Stories sections
+    const shellStoriesCount = countADFSectionsByHeading(description.content || [], 'shell stories');
+    if (shellStoriesCount > 1) {
+      await notify(`Error: Multiple Shell Stories sections found`, 1, 'error');
+      return {
+        epicContext: '',
+        contentWithoutShellStories: [],
+        error: {
+          message: `Error: Epic ${epicKey} contains ${shellStoriesCount} "## Shell Stories" sections. Please consolidate into one section.`,
+          shouldReturn: true
+        }
+      };
+    }
+    
+    // Remove Shell Stories section
+    contentWithoutShellStories = removeADFSectionByHeading(
+      description.content || [],
+      'shell stories'
+    );
+    
+    // Convert remaining ADF to markdown
+    epicContext = convertAdfToMarkdown({
+      version: 1,
+      type: 'doc',
+      content: contentWithoutShellStories
+    });
+    epicContext = epicContext.trim();
+    
+    console.log(`  Epic context extracted: ${epicContext.length} characters`);
+    if (epicContext.length > 0) {
+      console.log(`    Preview: ${epicContext.substring(0, 200)}${epicContext.length > 200 ? '...' : ''}`);
+      await notify(`✅ Using ${epicContext.length} chars of epic content`, 1);
+    } else {
+      console.log('    No additional epic content found (only Figma links)');
+      await notify('No additional epic content found (only Figma links)', 1);
+    }
+  } catch (error: any) {
+    console.log(`  ⚠️ Failed to extract epic context: ${error.message}`);
+    console.log('  Continuing without epic context...');
+    epicContext = '';
+    contentWithoutShellStories = [];
+  }
+  
+  return { epicContext, contentWithoutShellStories };
+}
+
+/**
  * Phase 4: Download images, analyze screens, and save notes
  * 
  * For each screen:
@@ -491,8 +595,9 @@ async function downloadAndAnalyzeScreens(params: {
   figmaToken: string;
   tempDirPath: string;
   notify: ReturnType<typeof createProgressNotifier>;
+  epicContext?: string; // Optional epic description content for context
 }): Promise<{ downloadedImages: number; analyzedScreens: number; downloadedNotes: number }> {
-  const { mcp, screens, allFrames, allNotes, figmaFileKey, figmaToken, tempDirPath, notify } = params;
+  const { mcp, screens, allFrames, allNotes, figmaFileKey, figmaToken, tempDirPath, notify, epicContext } = params;
   
   console.log('  Phase 4: Downloading images and analyzing screens...');
   
@@ -608,7 +713,8 @@ async function downloadAndAnalyzeScreens(params: {
           screen.name,
           screen.url,
           screenPosition,
-          notesContent || undefined
+          notesContent || undefined,
+          epicContext // Pass epic context to screen analysis
         );
 
         // Send sampling request with image (while next image downloads)
@@ -645,9 +751,10 @@ async function downloadAndAnalyzeScreens(params: {
         
         console.log(`    ✅ AI analysis complete (${analysisText.length} characters)`);
         
-        // Step 5: Save analysis result
+        // Step 5: Save analysis result with Figma URL prepended
+        const analysisWithUrl = `**Figma URL:** ${screen.url}\n\n${analysisText}`;
         const analysisPath = path.join(tempDirPath, `${screen.name}.analysis.md`);
-        await fs.writeFile(analysisPath, analysisText, 'utf-8');
+        await fs.writeFile(analysisPath, analysisWithUrl, 'utf-8');
         
         console.log(`    ✅ Saved analysis: ${screen.name}.analysis.md`);
         analyzedScreens++;
@@ -682,8 +789,9 @@ async function generateShellStoriesFromAnalyses(params: {
   yamlPath: string;
   notify: ReturnType<typeof createProgressNotifier>;
   startProgress: number;
+  epicContext?: string;
 }): Promise<{ storyCount: number; analysisCount: number; shellStoriesPath: string | null }> {
-  const { mcp, screens, tempDirPath, yamlPath, notify, startProgress } = params;
+  const { mcp, screens, tempDirPath, yamlPath, notify, startProgress, epicContext } = params;
   
   console.log('  Phase 5: Generating shell stories from analyses...');
   
@@ -715,11 +823,19 @@ async function generateShellStoriesFromAnalyses(params: {
   // Generate shell story prompt
   const shellStoryPrompt = generateShellStoryPrompt(
     screensYamlContent,
-    analysisFiles
-    // Optional: Add project context here if available
+    analysisFiles,
+    epicContext
   );
   
+  // Save prompt to temp directory for debugging
+  const promptPath = path.join(tempDirPath, 'shell-stories-prompt.md');
+  await fs.writeFile(promptPath, shellStoryPrompt, 'utf-8');
+  console.log(`    ✅ Saved prompt: shell-stories-prompt.md`);
+  
   console.log(`    🤖 Requesting shell story generation from AI...`);
+  if (epicContext && epicContext.length > 0) {
+    console.log(`    Using epic context (${epicContext.length} characters) to guide prioritization`);
+  }
   
   // Request shell story generation via sampling
   const samplingResponse = await mcp.server.request({
@@ -769,6 +885,7 @@ async function generateShellStoriesFromAnalyses(params: {
  * @param params.cloudId - The Atlassian cloud ID
  * @param params.token - The Atlassian access token
  * @param params.shellStoriesMarkdown - The shell stories markdown content
+ * @param params.contentWithoutShellStories - The epic description ADF content without Shell Stories section (from Phase 1.6)
  * @param params.notify - Progress notification function
  * @param params.startProgress - Starting progress value
  */
@@ -777,6 +894,7 @@ async function updateEpicWithShellStories({
   cloudId,
   token,
   shellStoriesMarkdown,
+  contentWithoutShellStories,
   notify,
   startProgress
 }: {
@@ -784,29 +902,13 @@ async function updateEpicWithShellStories({
   cloudId: string;
   token: string;
   shellStoriesMarkdown: string;
+  contentWithoutShellStories: ADFNode[];
   notify: ReturnType<typeof createProgressNotifier>;
   startProgress: number;
 }): Promise<void> {
 console.log('  Phase 6: Updating epic with shell stories...');
 
   try {
-    // Fetch current epic to get existing description
-    console.log('    Fetching current epic description...');
-    const issueResponse = await getJiraIssue(cloudId, epicKey, undefined, token);
-    
-    if (issueResponse.status === 404) {
-      console.log(`    ⚠️ Epic ${epicKey} not found`);
-      await notify(`⚠️ Epic ${epicKey} not found`, startProgress, 'warning');
-      return;
-    }
-    
-    handleJiraAuthError(issueResponse, `Fetch epic ${epicKey} for update`);
-    
-    const issue = await issueResponse.json() as JiraIssue;
-    const currentDescription = issue.fields?.description;
-    
-    console.log('    ✅ Current epic description fetched');
-    
     // Prepare new description content with shell stories section
     const shellStoriesSection = `## Shell Stories\n\n${shellStoriesMarkdown}`;
     
@@ -822,13 +924,7 @@ console.log('  Phase 6: Updating epic with shell stories...');
     
     console.log('    ✅ Shell stories converted to ADF');
     
-    // Find and remove existing "Shell Stories" section if it exists
-    const contentWithoutShellStories = removeADFSectionByHeading(
-      currentDescription?.content || [],
-      'shell stories'
-    );
-    
-    // Combine description (without old shell stories) with new shell stories section
+    // Combine description (without old shell stories from Phase 1.6) with new shell stories section
     const updatedDescription: ADFDocument = {
       version: 1,
       type: 'doc',
