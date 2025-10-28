@@ -37,6 +37,34 @@
   Implements specific Jira operations like fetching issues, sites, and updating descriptions.  
   *Example*: `tool-get-accessible-sites.ts::handler()` - Fetch Atlassian sites
 
+## Available MCP Tools
+
+### Standard Atlassian Tools
+- **atlassian-get-sites** - List accessible Atlassian cloud sites
+- **atlassian-get-issue** - Retrieve complete Jira issue details with ADF description
+- **atlassian-get-attachments** - Fetch issue attachments by ID
+- **atlassian-update-issue-description** - Update issue description with markdown (converts to ADF)
+
+### ChatGPT-Compatible Tools
+These tools follow OpenAI's MCP specification patterns for optimal ChatGPT integration:
+
+- **fetch** - Fetch Jira issue by key
+  - Returns standardized document format: `{ id, title, text, url, metadata }`
+  - Description converted from ADF to markdown for readability
+  - Metadata includes: status, assignee, reporter, priority, issueType, created, updated, project
+  - Example: `fetch({ issueKey: "PLAY-38" })`
+
+- **search** - Search Jira issues using JQL
+  - Input: JQL query string and optional maxResults (default: 25)
+  - Returns array of document summaries
+  - Each result includes: issue key, summary, status, assignee, due date, priority
+  - Example: `search({ jql: "project = PLAY AND status = 'In Progress'", maxResults: 10 })`
+
+**Key Differences:**
+- **Standard tools**: Return full Jira API responses with ADF formatting
+- **ChatGPT tools**: Return simplified document format with markdown text
+- **Both are always available** - use based on client needs (VS Code Copilot vs ChatGPT)
+
 ## Key Authentication Patterns
 
 ### JWT Token Structure

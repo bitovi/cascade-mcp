@@ -52,6 +52,10 @@ export function createMcpServer(authContext: AuthContext): McpServer {
         tools: {},
         logging: {},
         sampling: {}, // Support agent callbacks (used by utility-test-sampling)
+        // ChatGPT-compatible capabilities (added for OpenAI MCP client support)
+        fetch: true,   // Enable fetch tool for retrieving Jira issues
+        search: true,  // Enable search tool for JQL queries
+        actions: true, // Purpose unclear, but included per ChatGPT PR requirements
       },
     },
   );
