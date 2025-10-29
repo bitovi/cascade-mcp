@@ -39,7 +39,6 @@ jobs:
           VITE_COMMIT_SHA: ${{ github.sha }}
           VITE_AUTH_SERVER_URL: ${{ vars.VITE_AUTH_SERVER_URL }}
           VITE_JIRA_CLIENT_ID: ${{ vars.VITE_JIRA_CLIENT_ID }}
-          JIRA_CLIENT_SECRET: ${{ secrets.JIRA_CLIENT_SECRET }}
           VITE_JIRA_SCOPE: ${{ vars.VITE_JIRA_SCOPE }}
           VITE_JIRA_CALLBACK_URL: ${{ vars.VITE_JIRA_CALLBACK_URL }}
           VITE_JIRA_API_URL: ${{ vars.VITE_JIRA_API_URL }}
@@ -49,12 +48,13 @@ jobs:
           VITE_STATUS_REPORTS_ENV: ''
           AWS_SECRET_ACCESS_KEY: ''
           AWS_ACCESS_KEY_ID: ''
-
+          FIGMA_CLIENT_ID: ${{ vars.FIGMA_CLIENT_ID }}
       - name: Add Test User .env
         run: |
           echo "JIRA_TEST_USERNAME=${{ vars.JIRA_TEST_USERNAME }}" >> .env
           echo "JIRA_TEST_PASSWORD=${{ secrets.JIRA_TEST_PASSWORD }}" >> .env
           echo "JIRA_CLIENT_SECRET=${{ secrets.JIRA_CLIENT_SECRET }}" >> .env
+          echo "FIGMA_CLIENT_SECRET=${{ secrets.FIGMA_CLIENT_SECRET }}" >> .env
           echo "JIRA_TOTP_SECRET=${{ secrets.JIRA_TOTP_SECRET }}" >> .env
           echo "PORT=${{ vars.PORT }}"
           echo ".env file updated"
