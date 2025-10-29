@@ -152,12 +152,16 @@ describe('Standards: Initial Connection', () => {
           jsonrpc: '2.0',
           id: 1,
           method: 'initialize',
-          params: { protocolVersion: '2025-06-18' }
+          params: {
+            protocolVersion: '2025-06-18',
+            clientInfo: { name: 'Standard MCP Client', version: '1.0.0' },
+            capabilities: {}
+          }
         })
       });
 
       const wwwAuth = authResponse.headers.get('WWW-Authenticate');
-      const metadataMatch = wwwAuth.match(/resource_metadata_url="([^"]+)"/);
+      const metadataMatch = wwwAuth.match(/resource_metadata="([^"]+)"/);
       const metadataUrl = metadataMatch[1];
 
       // RFC 9728: Resource metadata should return valid OAuth metadata
