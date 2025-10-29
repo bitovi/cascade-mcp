@@ -49,6 +49,7 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/express-session": "^1.18.2",
+    "@types/jest": "^30.0.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/morgan": "^1.9.10",
     "@types/node": "^22.14.0",
@@ -90,7 +91,7 @@
       ]
     },
     "transformIgnorePatterns": [
-      "node_modules/(?!(@modelcontextprotocol|node-fetch)/)"
+      "node_modules/(?!(@modelcontextprotocol|node-fetch|marklassian|marked)/)"
     ],
     "moduleNameMapper": {
       "^(\\.{1,2}/.*)\\.js$": "$1"

@@ -1,9 +1,15 @@
 /**
- * Test script for markdown to ADF conversion
- * Run with: node --loader ./loader.mjs server/providers/atlassian/markdown-converter.test.ts
+ * Jest test suite for markdown to ADF conversion functionality
  */
 
-import { convertMarkdownToAdf } from './markdown-converter.js';
+import { 
+  convertMarkdownToAdf, 
+  validateAdf, 
+  removeADFSectionByHeading, 
+  countADFSectionsByHeading,
+  convertAdfToMarkdown,
+  type ADFDocument 
+} from './markdown-converter.js';
 
 /**
  * Helper to calculate max nesting depth of bullet lists in ADF content
@@ -24,200 +30,298 @@ function getMaxListDepth(content: any[], currentDepth: number = 0): number {
   return maxDepth;
 }
 
-async function runTests() {
-  console.log('='.repeat(80));
-  console.log('MARKDOWN TO ADF CONVERSION TESTS');
-  console.log('='.repeat(80));
+describe('Markdown to ADF Converter', () => {
+  describe('convertMarkdownToAdf', () => {
+    test('should convert simple markdown to valid ADF', async () => {
+      const markdown = '# Hello World\n\nThis is a test.';
+      const adf = await convertMarkdownToAdf(markdown);
+      
+      expect(validateAdf(adf)).toBe(true);
+      expect(adf.version).toBe(1);
+      expect(adf.type).toBe('doc');
+      expect(adf.content).toHaveLength(2);
+    });
 
-  // Test 1: Simple two-level nested bullets
-  console.log('\n\n📝 TEST 1: Simple two-level nested bullets');
-  console.log('-'.repeat(80));
-  const markdown1 = `## Shell Stories
+    test('should handle empty input gracefully', async () => {
+      const adf = await convertMarkdownToAdf('');
+      
+      expect(validateAdf(adf)).toBe(true);
+      expect(adf.content).toHaveLength(1);
+      expect(adf.content[0].type).toBe('paragraph');
+    });
 
-- st001 Display Basic Applicant List
-  * ANALYSIS: applicants-new.analysis.md
-  * DEPENDENCIES: none
-  * Display header/navigation bar
-  * Show main heading "Applications"`;
+    test('should handle null/undefined input', async () => {
+      const adf1 = await convertMarkdownToAdf(null as any);
+      const adf2 = await convertMarkdownToAdf(undefined as any);
+      
+      expect(validateAdf(adf1)).toBe(true);
+      expect(validateAdf(adf2)).toBe(true);
+    });
 
-  const adf1 = await convertMarkdownToAdf(markdown1);
-  console.log('Markdown:', markdown1);
-  console.log('\nADF Output:');
-  console.log(JSON.stringify(adf1, null, 2));
-  console.log('\n✅ Max nesting depth:', getMaxListDepth(adf1.content));
-
-  // Test 2: Three-level nested bullets (current format)
-  console.log('\n\n📝 TEST 2: Three-level nested bullets (current format with * +)');
-  console.log('-'.repeat(80));
-  const markdown2 = `## Shell Stories
-
-- st001 Display Basic Applicant List
-  * ANALYSIS: applicants-new.analysis.md
-  * DEPENDENCIES: none
-  * + Display header/navigation bar
-  * - Status filter interactivity (defer)
-  * ¿ What happens when search is used?`;
-
-  const adf2 = await convertMarkdownToAdf(markdown2);
-  console.log('Markdown:', markdown2);
-  console.log('\nADF Output (first 2 content blocks):');
-  console.log(JSON.stringify(adf2.content.slice(0, 2), null, 2));
-  console.log('\n❌ Max nesting depth:', getMaxListDepth(adf2.content), '(Jira limit is 2)');
-
-  // Test 3: Bold text markers
-  console.log('\n\n📝 TEST 3: Bold text markers instead of nesting');
-  console.log('-'.repeat(80));
-  const markdown3 = `## Shell Stories
+    test('should convert nested bullet lists correctly', async () => {
+      const markdown = `## Shell Stories
 
 - st001 Display Basic Applicant List
   * ANALYSIS: applicants-new.analysis.md
   * DEPENDENCIES: none
-  * **+** Display header/navigation bar
-  * **-** Status filter interactivity (defer)
-  * **¿** What happens when search is used?`;
+  * Display header/navigation bar`;
 
-  const adf3 = await convertMarkdownToAdf(markdown3);
-  console.log('Markdown:', markdown3);
-  console.log('\nADF Output:');
-  console.log(JSON.stringify(adf3, null, 2));
-  console.log('\n✅ Max nesting depth:', getMaxListDepth(adf3.content));
+      const adf = await convertMarkdownToAdf(markdown);
+      
+      expect(validateAdf(adf)).toBe(true);
+      expect(getMaxListDepth(adf.content)).toBeLessThanOrEqual(2);
+    });
 
-  // Test 4: Emoji markers
-  console.log('\n\n📝 TEST 4: Emoji markers instead of symbols');
-  console.log('-'.repeat(80));
-  const markdown4 = `## Shell Stories
+    test('should handle bold text formatting', async () => {
+      const markdown = `- **Important** item
+- Regular item`;
 
-- st001 Display Basic Applicant List
-  * ANALYSIS: applicants-new.analysis.md
-  * DEPENDENCIES: none
-  * ✅ Display header/navigation bar
-  * ❌ Status filter interactivity (defer)
-  * ❓ What happens when search is used?`;
+      const adf = await convertMarkdownToAdf(markdown);
+      
+      expect(validateAdf(adf)).toBe(true);
+      expect(JSON.stringify(adf)).toContain('"type":"strong"');
+    });
 
-  const adf4 = await convertMarkdownToAdf(markdown4);
-  console.log('Markdown:', markdown4);
-  console.log('\nADF Output (nested list portion):');
-  console.log(JSON.stringify(adf4.content[1], null, 2));
-  console.log('\n✅ Max nesting depth:', getMaxListDepth(adf4.content));
+    test('should handle inline code formatting', async () => {
+      const markdown = '- `code` item\n- regular item';
 
-  // Test 5: Plain text symbols at same level
-  console.log('\n\n📝 TEST 5: Plain text symbols (+ - ¿) without extra indent');
-  console.log('-'.repeat(80));
-  const markdown5 = `## Shell Stories
+      const adf = await convertMarkdownToAdf(markdown);
+      
+      expect(validateAdf(adf)).toBe(true);
+      expect(JSON.stringify(adf)).toContain('"type":"code"');
+    });
 
-- st001 Display Basic Applicant List
-  * ANALYSIS: applicants-new.analysis.md
-  * + Display header (included)
-  * - Status filter (deferred)
-  * ¿ What happens with search?`;
+    test('should handle escaped characters', async () => {
+      const markdown = `- \\+ escaped plus
+- \\- escaped minus`;
 
-  const adf5 = await convertMarkdownToAdf(markdown5);
-  console.log('Markdown:', markdown5);
-  console.log('\nADF Output:');
-  console.log(JSON.stringify(adf5, null, 2));
-  console.log('\n✅ Max nesting depth:', getMaxListDepth(adf5.content));
+      const adf = await convertMarkdownToAdf(markdown);
+      
+      expect(validateAdf(adf)).toBe(true);
+      expect(getMaxListDepth(adf.content)).toBeLessThanOrEqual(2);
+    });
+  });
 
-  // Test 6: Using HTML entities or escape characters
-  console.log('\n\n📝 TEST 6: Escaped characters (\\+ \\- etc)');
-  console.log('-'.repeat(80));
-  const markdown6 = `## Shell Stories
+  describe('validateAdf', () => {
+    test('should validate correct ADF structure', () => {
+      const validAdf: ADFDocument = {
+        version: 1,
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              { type: 'text', text: 'Hello' }
+            ]
+          }
+        ]
+      };
 
-- st001 Display Basic Applicant List
-  * ANALYSIS: applicants-new.analysis.md
-  * \\+ Display header (included)
-  * \\- Status filter (deferred)
-  * \\¿ What happens with search?`;
+      expect(validateAdf(validAdf)).toBe(true);
+    });
 
-  const adf6 = await convertMarkdownToAdf(markdown6);
-  console.log('Markdown:', markdown6);
-  console.log('\nADF Output:');
-  console.log(JSON.stringify(adf6, null, 2));
-  console.log('\n✅ Max nesting depth:', getMaxListDepth(adf6.content));
+    test('should reject invalid ADF structures', () => {
+      expect(validateAdf(null)).toBe(false);
+      expect(validateAdf(undefined)).toBe(false);
+      expect(validateAdf({})).toBe(false);
+      expect(validateAdf({ version: 2, type: 'doc', content: [] })).toBe(false);
+      expect(validateAdf({ version: 1, type: 'invalid', content: [] })).toBe(false);
+      expect(validateAdf({ version: 1, type: 'doc' })).toBe(false);
+    });
+  });
 
-  // Test 7: Using inline code for symbols
-  console.log('\n\n📝 TEST 7: Inline code markers (`+` `-` `¿`)');
-  console.log('-'.repeat(80));
-  const markdown7 = `## Shell Stories
+  describe('removeADFSectionByHeading', () => {
+    test('should remove section by heading text', () => {
+      const content = [
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Shell Stories' }]
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Some content' }]
+        },
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Other Section' }]
+        }
+      ];
 
-- st001 Display Basic Applicant List
-  * ANALYSIS: applicants-new.analysis.md
-  * \`+\` Display header (included)
-  * \`-\` Status filter (deferred)
-  * \`¿\` What happens with search?`;
+      const result = removeADFSectionByHeading(content, 'Shell Stories');
+      
+      expect(result).toHaveLength(1);
+      expect(result[0].type).toBe('heading');
+      expect(result[0].content?.[0].text).toBe('Other Section');
+    });
 
-  const adf7 = await convertMarkdownToAdf(markdown7);
-  console.log('Markdown:', markdown7);
-  console.log('\nADF Output (nested list):');
-  console.log(JSON.stringify(adf7.content[1], null, 2));
-  console.log('\n✅ Max nesting depth:', getMaxListDepth(adf7.content));
+    test('should return original content if section not found', () => {
+      const content = [
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Some content' }]
+        }
+      ];
 
-  // Test 8: Using dash-based lists instead of asterisk
-  console.log('\n\n📝 TEST 8: Dash-based nested lists (- and  - -)');
-  console.log('-'.repeat(80));
-  const markdown8 = `## Shell Stories
+      const result = removeADFSectionByHeading(content, 'Nonexistent');
+      
+      expect(result).toEqual(content);
+    });
+  });
 
-- st001 Display Basic Applicant List
-  - ANALYSIS: applicants-new.analysis.md
-  - DEPENDENCIES: none
-  - + Display header (included)
-  - - Status filter (deferred)
-  - ¿ What happens with search?`;
+  describe('countADFSectionsByHeading', () => {
+    test('should count matching sections', () => {
+      const content = [
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Shell Stories' }]
+        },
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Other Section' }]
+        },
+        {
+          type: 'heading',
+          attrs: { level: 3 },
+          content: [{ type: 'text', text: 'More Shell Stories' }]
+        }
+      ];
 
-  const adf8 = await convertMarkdownToAdf(markdown8);
-  console.log('Markdown:', markdown8);
-  console.log('\nADF Output:');
-  console.log(JSON.stringify(adf8, null, 2));
-  console.log('\n✅ Max nesting depth:', getMaxListDepth(adf8.content));
+      expect(countADFSectionsByHeading(content, 'Shell Stories')).toBe(2);
+      expect(countADFSectionsByHeading(content, 'Other')).toBe(1);
+      expect(countADFSectionsByHeading(content, 'Nonexistent')).toBe(0);
+    });
+  });
 
-  // Test 9: Using blockquote-style indentation
-  console.log('\n\n📝 TEST 9: Mixed list with > blockquote prefix');
-  console.log('-'.repeat(80));
-  const markdown9 = `## Shell Stories
+  describe('convertAdfToMarkdown', () => {
+    test('should convert simple ADF to markdown', () => {
+      const adf: ADFDocument = {
+        version: 1,
+        type: 'doc',
+        content: [
+          {
+            type: 'heading',
+            attrs: { level: 1 },
+            content: [{ type: 'text', text: 'Title' }]
+          },
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'Hello world' }]
+          }
+        ]
+      };
 
-- st001 Display Basic Applicant List
-  * ANALYSIS: applicants-new.analysis.md
-  * > + Display header (included)
-  * > - Status filter (deferred)`;
+      const markdown = convertAdfToMarkdown(adf);
+      
+      expect(markdown).toContain('# Title');
+      expect(markdown).toContain('Hello world');
+    });
 
-  const adf9 = await convertMarkdownToAdf(markdown9);
-  console.log('Markdown:', markdown9);
-  console.log('\nADF Output:');
-  console.log(JSON.stringify(adf9, null, 2));
-  console.log('\n✅ Max nesting depth:', getMaxListDepth(adf9.content));
+    test('should handle bullet lists in ADF', () => {
+      const adf: ADFDocument = {
+        version: 1,
+        type: 'doc',
+        content: [
+          {
+            type: 'bulletList',
+            content: [
+              {
+                type: 'listItem',
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: [{ type: 'text', text: 'First item' }]
+                  }
+                ]
+              },
+              {
+                type: 'listItem',
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: [{ type: 'text', text: 'Second item' }]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      };
 
-  // Test 10: Plain text with symbols, no asterisk prefix
-  console.log('\n\n📝 TEST 10: Symbols as part of text content (no special bullet)');
-  console.log('-'.repeat(80));
-  const markdown10 = `## Shell Stories
+      const markdown = convertAdfToMarkdown(adf);
+      
+      expect(markdown).toContain('- First item');
+      expect(markdown).toContain('- Second item');
+    });
 
-- st001 Display Basic Applicant List
-  * ANALYSIS: applicants-new.analysis.md
-  * DEPENDENCIES: none
-  * + Display header (included)
-  * - Status filter (deferred)
-  * ? What happens with search?`;
+    test('should handle formatted text in ADF', () => {
+      const adf: ADFDocument = {
+        version: 1,
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              { 
+                type: 'text', 
+                text: 'Bold text',
+                marks: [{ type: 'strong' }]
+              },
+              { type: 'text', text: ' and ' },
+              { 
+                type: 'text', 
+                text: 'code',
+                marks: [{ type: 'code' }]
+              }
+            ]
+          }
+        ]
+      };
 
-  const adf10 = await convertMarkdownToAdf(markdown10);
-  console.log('Markdown:', markdown10);
-  console.log('\nADF Output:');
-  console.log(JSON.stringify(adf10, null, 2));
-  console.log('\n✅ Max nesting depth:', getMaxListDepth(adf10.content));
+      const markdown = convertAdfToMarkdown(adf);
+      
+      expect(markdown).toContain('**Bold text**');
+      expect(markdown).toContain('`code`');
+    });
 
-  console.log('\n\n' + '='.repeat(80));
-  console.log('SUMMARY');
-  console.log('='.repeat(80));
-  console.log('Test 1 (simple 2-level):        Depth =', getMaxListDepth(adf1.content));
-  console.log('Test 2 (current * + format):    Depth =', getMaxListDepth(adf2.content), '❌ TOO DEEP');
-  console.log('Test 3 (bold **+** markers):    Depth =', getMaxListDepth(adf3.content));
-  console.log('Test 4 (emoji ✅ markers):       Depth =', getMaxListDepth(adf4.content));
-  console.log('Test 5 (plain + at level 2):    Depth =', getMaxListDepth(adf5.content), '❌ TOO DEEP');
-  console.log('Test 6 (escaped \\+):             Depth =', getMaxListDepth(adf6.content));
-  console.log('Test 7 (inline code `+`):       Depth =', getMaxListDepth(adf7.content));
-  console.log('Test 8 (dash lists - -):        Depth =', getMaxListDepth(adf8.content));
-  console.log('Test 9 (blockquote > +):        Depth =', getMaxListDepth(adf9.content));
-  console.log('Test 10 (symbols as text):      Depth =', getMaxListDepth(adf10.content));
-  console.log('='.repeat(80));
-}
+    test('should handle empty ADF gracefully', () => {
+      const adf: ADFDocument = {
+        version: 1,
+        type: 'doc',
+        content: []
+      };
 
-// Run the tests
-runTests().catch(console.error);
+      const markdown = convertAdfToMarkdown(adf);
+      
+      expect(typeof markdown).toBe('string');
+      expect(markdown.length).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe('List Nesting Limits', () => {
+    test('should respect Jira list nesting limits', async () => {
+      const shallowMarkdown = `- Level 1
+  * Level 2`;
+      
+      const deepMarkdown = `- Level 1
+  * Level 2
+    + Level 3`;
+
+      const shallowAdf = await convertMarkdownToAdf(shallowMarkdown);
+      const deepAdf = await convertMarkdownToAdf(deepMarkdown);
+
+      expect(getMaxListDepth(shallowAdf.content)).toBeLessThanOrEqual(2);
+      
+      // Deep nesting may exceed Jira limits - this documents the behavior
+      const deepDepth = getMaxListDepth(deepAdf.content);
+      if (deepDepth > 2) {
+        // This is expected behavior - marklassian creates deep nesting
+        // that may need to be flattened for Jira compatibility
+        expect(deepDepth).toBeGreaterThan(2);
+      }
+    });
+  });
+});

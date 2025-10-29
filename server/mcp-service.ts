@@ -23,11 +23,10 @@ import { Request, Response } from 'express';
 import { setAuthContext, clearAuthContext } from './mcp-core/index.ts';
 import { createMcpServer } from './mcp-core/server-factory.ts';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { isInitializeRequest, type JSONRPCRequest } from '@modelcontextprotocol/sdk/types.js';
 import { InvalidTokenError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 import { randomUUID } from 'node:crypto';
 import { logger } from './observability/logger.ts';
-import { jwtVerify, sanitizeJwtPayload, formatTokenWithExpiration, parseJWT, type JWTPayload } from './tokens.ts';
+import { sanitizeJwtPayload, formatTokenWithExpiration, parseJWT, type JWTPayload } from './tokens.ts';
 import { type AuthContext } from './mcp-core/auth-context-store.ts';
 import { serverInstanceScope, serverStartTime } from './pkce/discovery.ts';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -71,9 +70,11 @@ export async function handleMcpPost(req: Request, res: Response): Promise<void> 
     transport = session.transport;
     mcpServer = session.mcpServer;
     console.log(`  ♻️ Reusing existing transport for session: ${sessionId}`);
-  } 
-  else if (!sessionId && isInitializeRequest(req.body as JSONRPCRequest)) {
-    // New initialization request
+  }
+  // Preferring to not use isInitializeRequest here due to returning false negatives on malformed requests
+  // e.g. missing clientInfo or having an empty object for capabilities.roots
+  else if (!sessionId && req.body?.method === 'initialize') {
+    // New initialization request (includes both well-formed and malformed initialize attempts)
     console.log('  🥚 New MCP initialization request.');
 
     // Extract and validate auth info
@@ -228,18 +229,21 @@ export async function handleSessionRequest(req: Request, res: Response): Promise
  * @returns True if client is VS Code
  */
 function isVSCodeClient(req: Request): boolean {
-  // Check User-Agent header - VS Code sends "node"
   const userAgent = req.headers['user-agent'];
-  if (userAgent === 'node') {
-    return true;
-  }
   
-  // Check MCP initialize request clientInfo
+  // Check MCP initialize request clientInfo first (most reliable)
   if (req.body && req.body.method === 'initialize' && req.body.params && req.body.params.clientInfo) {
     const clientName = req.body.params.clientInfo.name;
     if (clientName === 'Visual Studio Code') {
       return true;
     }
+  }
+  
+  // Only use User-Agent as fallback when no clientInfo is available
+  // This handles cases where VS Code sends requests without clientInfo
+  if (userAgent === 'node' && 
+      (!req.body?.params?.clientInfo)) {
+    return true;
   }
   
   return false;

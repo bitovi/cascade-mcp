@@ -21,8 +21,7 @@
 
 import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';
 import { startTestServer, stopTestServer } from '../../../shared/helpers/test-server.js';
-import { standardMcpClient } from '../../../shared/helpers/mcp-client.js';
-import { validateWwwAuthenticate, validateRfc6750Compliance } from '../../../shared/helpers/assertions.js';
+import { validateRfc6750Compliance } from '../../../shared/helpers/assertions.js';
 
 describe('Standards: Initial Connection', () => {
   let serverUrl;
@@ -158,7 +157,7 @@ describe('Standards: Initial Connection', () => {
       });
 
       const wwwAuth = authResponse.headers.get('WWW-Authenticate');
-      const metadataMatch = wwwAuth.match(/resource_metadata="([^"]+)"/);
+      const metadataMatch = wwwAuth.match(/resource_metadata_url="([^"]+)"/);
       const metadataUrl = metadataMatch[1];
 
       // RFC 9728: Resource metadata should return valid OAuth metadata
@@ -176,7 +175,7 @@ describe('Standards: Initial Connection', () => {
 
       // Each authorization server should have required fields
       const authServer = metadata.authorization_servers[0];
-      expect(authServer).toContain('/.well-known/oauth-authorization-server');
+      expect(authServer).toContain(process.env.VITE_AUTH_SERVER_URL);
     });
 
     test('authorization server metadata contains required endpoints', async () => {
@@ -186,7 +185,7 @@ describe('Standards: Initial Connection', () => {
       const authServerUrl = protectedResource.authorization_servers[0];
 
       // RFC 8414: Authorization server metadata
-      const authMetadataResponse = await fetch(authServerUrl);
+      const authMetadataResponse = await fetch(`${authServerUrl}/.well-known/oauth-authorization-server`);
       expect(authMetadataResponse.ok).toBe(true);
 
       const authMetadata = await authMetadataResponse.json();
