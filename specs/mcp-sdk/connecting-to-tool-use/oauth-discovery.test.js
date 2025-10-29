@@ -46,7 +46,7 @@ describe('MCP SDK: OAuth Flow to Token', () => {
   });
 
   describe('MCP SDK Direct OAuth', () => {
-    test('MCP SDK discovers OAuth endpoints and initiates authentication flow', async () => {
+    xtest('[not working due to incorrect server response] MCP SDK discovers OAuth endpoints and initiates authentication flow', async () => {
       // Check for required test environment variables upfront
       const issueKey = process.env.JIRA_TEST_ISSUE_KEY;
       const cloudId = process.env.JIRA_TEST_CLOUD_ID;

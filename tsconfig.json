@@ -20,7 +20,7 @@
       "undici-types": ["./node_modules/undici/types"]
     },
     "sourceMap": true,
-    "types": ["node"]
+    "types": ["node", "jest"]
   },
   "include": ["server/**/*", "specs/**/*"],
   "exclude": ["node_modules", "dist", "**/*.test.js"]

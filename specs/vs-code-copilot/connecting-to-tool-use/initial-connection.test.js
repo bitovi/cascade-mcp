@@ -77,8 +77,8 @@ describe('VS Code: Initial Connection Deviations', () => {
   });
 
   describe('VS Code Client Detection via User-Agent', () => {
-    test('User-Agent "node" triggers VS Code parameter usage', async () => {
-      // Standard initialize request but with VS Code User-Agent
+    test('User-Agent "node" triggers VS Code parameter usage when no clientInfo present', async () => {
+      // Request with VS Code User-Agent but NO clientInfo (fallback scenario)
       const response = await fetch(`${serverUrl}/mcp`, {
         method: 'POST',
         headers: { 
@@ -91,10 +91,12 @@ describe('VS Code: Initial Connection Deviations', () => {
           method: 'initialize',
           params: {
             protocolVersion: '2025-06-18',
-            clientInfo: {
-              name: 'Some Other Client',  // NOT VS Code in name
-              version: '1.0.0'
+            capabilities: {
+              roots: { listChanged: true },
+              sampling: {},
+              elicitation: {}
             }
+            // No clientInfo - triggers User-Agent fallback detection
           }
         })
       });
@@ -103,7 +105,7 @@ describe('VS Code: Initial Connection Deviations', () => {
 
       const wwwAuthHeader = response.headers.get('WWW-Authenticate');
       
-      // Should still use VS Code parameter due to User-Agent detection
+      // Should use VS Code parameter due to User-Agent fallback when no clientInfo
       expect(wwwAuthHeader).toMatch(/resource_metadata_url="[^"]+"/);
       expect(wwwAuthHeader).not.toMatch(/resource_metadata="[^"]+"[^_]/);
     });
@@ -117,6 +119,11 @@ describe('VS Code: Initial Connection Deviations', () => {
         method: 'initialize',
         params: {
           protocolVersion: '2025-06-18',
+          capabilities: {
+            roots: { listChanged: true },
+            sampling: {},
+            elicitation: {}
+          },
           clientInfo: { name: 'Visual Studio Code', version: '1.103.2' }
         }
       };
@@ -157,6 +164,11 @@ describe('VS Code: Initial Connection Deviations', () => {
         method: 'initialize',
         params: {
           protocolVersion: '2025-06-18',
+          capabilities: {
+            roots: { listChanged: true },
+            sampling: {},
+            elicitation: {}
+          },
           clientInfo: { name: 'Standard MCP Client', version: '1.0.0' }
         }
       };
@@ -195,6 +207,11 @@ describe('VS Code: Initial Connection Deviations', () => {
           method: 'initialize',
           params: {
             protocolVersion: '2025-06-18',
+            capabilities: {
+              roots: { listChanged: true },
+              sampling: {},
+              elicitation: {}
+            },
             clientInfo: { name: 'Visual Studio Code', version: '1.103.2' }
           }
         })
@@ -213,10 +230,9 @@ describe('VS Code: Initial Connection Deviations', () => {
       expect(metadata.authorization_servers).toBeDefined();
 
       // Authorization server metadata should be accessible
-      const authServerUrl = metadata.authorization_servers[0];
+      const authServerUrl = `${metadata.authorization_servers[0]}/.well-known/oauth-authorization-server`;
       const authResponse = await fetch(authServerUrl);
       expect(authResponse.ok).toBe(true);
-
       const authMetadata = await authResponse.json();
       expect(authMetadata.authorization_endpoint).toBeDefined();
       expect(authMetadata.token_endpoint).toBeDefined();
