@@ -18,7 +18,7 @@ jobs:
           node-version: 22
       - run: npm i
       - run: npm run typecheck
-      - run: npm run build
+      #- run: npm run build
       - run: npm run test
   e2e-test:
     name: Run E2E Tests
@@ -63,7 +63,7 @@ jobs:
           npm ci
           npx playwright install
           sudo npx playwright install-deps
-          npm run build
+        # npm run build # no build script at this time
 
       - name: Run E2E Tests
         run: npm run test:e2e:mcp-sdk:mock
