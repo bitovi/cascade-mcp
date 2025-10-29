@@ -38,7 +38,8 @@ jobs:
         env:
           VITE_COMMIT_SHA: ${{ github.sha }}
           VITE_AUTH_SERVER_URL: ${{ vars.VITE_AUTH_SERVER_URL }}
-          VITE_JIRA_CLIENT_ID: ${{ secrets.VITE_JIRA_CLIENT_ID }}
+          VITE_JIRA_CLIENT_ID: ${{ vars.VITE_JIRA_CLIENT_ID }}
+          JIRA_CLIENT_SECRET: ${{ secrets.JIRA_CLIENT_SECRET }}
           VITE_JIRA_SCOPE: ${{ vars.VITE_JIRA_SCOPE }}
           VITE_JIRA_CALLBACK_URL: ${{ vars.VITE_JIRA_CALLBACK_URL }}
           VITE_JIRA_API_URL: ${{ vars.VITE_JIRA_API_URL }}
