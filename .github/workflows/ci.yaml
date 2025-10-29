@@ -52,6 +52,8 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ''
           AWS_ACCESS_KEY_ID: ''
           FIGMA_CLIENT_ID: ${{ vars.FIGMA_CLIENT_ID }}
+          FIGMA_OAUTH_SCOPES: ${{ vars.FIGMA_OAUTH_SCOPES }}
+          JIRA_TEST_PAT: CI Test PAT
       - name: Add Test User .env
         run: |
           echo "JIRA_TEST_USERNAME=${{ vars.JIRA_TEST_USERNAME }}" >> .env
