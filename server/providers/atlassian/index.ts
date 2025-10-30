@@ -31,7 +31,7 @@ export const atlassianProvider: OAuthProvider = {
   createAuthUrl(params: AuthUrlParams): string {
     const clientId = process.env.VITE_JIRA_CLIENT_ID;
     const baseUrl = process.env.VITE_AUTH_SERVER_URL || 'http://localhost:3000';
-    const redirectUri = params.redirectUri || `${baseUrl}/callback`;
+    const redirectUri = params.redirectUri || `${baseUrl}/auth/callback/atlassian`;
     const scope = params.scope || process.env.VITE_JIRA_SCOPE || 'read:jira-work write:jira-work offline_access';
     
     const urlParams: Record<string, string> = {
@@ -78,7 +78,7 @@ export const atlassianProvider: OAuthProvider = {
     const clientId = process.env.VITE_JIRA_CLIENT_ID;
     const clientSecret = process.env.JIRA_CLIENT_SECRET;
     const baseUrl = process.env.VITE_AUTH_SERVER_URL || 'http://localhost:3000';
-    const redirectUri = params.redirectUri || `${baseUrl}/callback`;
+    const redirectUri = params.redirectUri || `${baseUrl}/auth/callback/atlassian`;
     
     const tokenRes = await fetch('https://auth.atlassian.com/oauth/token', {
       method: 'POST',
