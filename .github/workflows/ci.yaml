@@ -45,7 +45,6 @@ jobs:
           VITE_JIRA_SCOPE: ${{ vars.VITE_JIRA_SCOPE }}
           VITE_JIRA_CALLBACK_URL: ${{ vars.VITE_JIRA_CALLBACK_URL }}
           VITE_JIRA_API_URL: ${{ vars.VITE_JIRA_API_URL }}
-          VITE_JIRA_APP_KEY: ''
           BACKEND_SENTRY_DSN: ''
           VITE_FRONTEND_SENTRY_DSN: ''
           VITE_STATUS_REPORTS_ENV: ''
