@@ -27,7 +27,7 @@ jobs:
           tf_stack_destroy: true
 
           aws_r53_enable: true
-          aws_r53_sub_domain_name: jira-mcp-auth-bridge
+          aws_r53_sub_domain_name: cascade
           aws_r53_domain_name: bitovi.tools
           aws_elb_app_port: 3000
 

@@ -53,7 +53,6 @@ Example:
 ```env
 VITE_JIRA_CLIENT_ID=your-client-id-here
 JIRA_CLIENT_SECRET=your-client-secret-here
-VITE_JIRA_APP_KEY=your-app-key-here
 VITE_JIRA_CALLBACK_URL=http://localhost:3000/callback
 VITE_JIRA_SCOPE="read:jira-work write:jira-work offline_access"
 SESSION_SECRET=changeme_in_dev

@@ -35,7 +35,6 @@ jobs:
           FIGMA_OAUTH_SCOPES: ${{ vars.FIGMA_OAUTH_SCOPES }}
           FIGMA_CLIENT_SECRET: ${{ secrets.FIGMA_CLIENT_SECRET }}
           VITE_STATUS_REPORTS_ENV: staging
-          VITE_JIRA_APP_KEY: jira-mcp-auth-bridge-staging
 
       - id: deploy
         name: Deploy
@@ -50,7 +49,7 @@ jobs:
 
           aws_r53_enable: true
           aws_r53_create_sub_cert: true
-          aws_r53_sub_domain_name: jira-mcp-auth-bridge-staging
+          aws_r53_sub_domain_name: cascade-staging
           aws_r53_domain_name: bitovi.tools
           aws_elb_app_port: 3000
 
