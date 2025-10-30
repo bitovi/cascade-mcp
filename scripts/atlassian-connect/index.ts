@@ -11,12 +11,12 @@ const __dirname = dirname(__filename);
 const deploymentConnectMetadata = {
   staging: {
     name: 'Status Reports for Jira (Staging)',
-    baseUrl: 'https://jira-mcp-auth-bridge-staging.bitovi.com',
+    baseUrl: 'https://cascade-staging.bitovi.com',
     key: 'bitovi.jira-mcp-auth-bridge.staging',
   },
   production: {
     name: 'Status Reports for Jira',
-    baseUrl: 'https://jira-mcp-auth-bridge.bitovi.com',
+    baseUrl: 'https://cascade.bitovi.com',
     key: 'bitovi.jira-mcp-auth-bridge',
   },
 } as const;

@@ -10,8 +10,8 @@ Thank you for your interest in contributing! This guide will help you set up the
 ## 1. Fork and Clone the Repository
 
 ```bash
-git clone https://github.com/bitovi/jira-mcp-auth-bridge.git
-cd jira-mcp-auth-bridge
+git clone https://github.com/bitovi/cascade-mcp.git
+cd cascade-mcp
 ```
 
 ## 2. Install Dependencies
