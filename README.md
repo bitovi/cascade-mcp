@@ -29,11 +29,11 @@ Select the `HTTP` option:
 
 > <img width="1293" height="534" alt="image" src="https://github.com/user-attachments/assets/9cc34977-1178-4a97-a4d7-0253a34d28bd" />
 
-Paste the following URL and hit enter: `https://jira-mcp-auth-bridge.bitovi.com/mcp`
+Paste the following URL and hit enter: `https://cascade.bitovi.com/mcp`
 
 > <img width="867" height="130" alt="image" src="https://github.com/user-attachments/assets/38395afc-b03d-4aff-a7e3-9f74ed902563" />
 
-Add `bitovi-jira-mcp` as the name and hit enter:
+Add `cascade-mcp` as the name and hit enter:
 
 > <img width="866" height="124" alt="image" src="https://github.com/user-attachments/assets/6bb9be89-8521-48e1-97e5-8f0fc51b240f" />
 
@@ -42,8 +42,8 @@ You can use the following JSON too if the `Add Server` button did not work for y
 ```json
 {
     "servers": {
-        "bitovi-jira-mcp": {
-            "url": "https://jira-mcp-auth-bridge.bitovi.com/mcp"
+        "cascade-mcp": {
+            "url": "https://cascade.bitovi.com/mcp"
         }
     }
 }
