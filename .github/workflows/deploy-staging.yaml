@@ -9,6 +9,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+env:
+  PORT: 3000
+
 jobs:
   Build-Server:
     runs-on: ubuntu-latest
@@ -36,6 +39,7 @@ jobs:
           FIGMA_OAUTH_SCOPES: ${{ vars.FIGMA_OAUTH_SCOPES }}
           FIGMA_CLIENT_SECRET: ${{ secrets.FIGMA_CLIENT_SECRET }}
           VITE_STATUS_REPORTS_ENV: staging
+          PORT: ${{ env.PORT }}
 
       - id: deploy
         name: Deploy
@@ -52,7 +56,7 @@ jobs:
           aws_r53_create_sub_cert: true
           aws_r53_sub_domain_name: cascade-staging
           aws_r53_domain_name: bitovi.tools
-          aws_elb_app_port: 3000
+          aws_elb_app_port: ${{ env.PORT }}
 
           docker_full_cleanup: true
 
@@ -60,4 +64,3 @@ jobs:
           aws_ec2_instance_root_vol_size: 16
 
           repo_env: repo_env
-          env_ghs: ${{ secrets.DOT_ENV_STAGING }}
