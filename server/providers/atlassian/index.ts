@@ -147,6 +147,7 @@ export const atlassianProvider: OAuthProvider = {
     console.log(`[ATLASSIAN]   - JIRA_CLIENT_SECRET: ${clientSecret ? 'present (length: ' + clientSecret.length + ')' : 'MISSING'}`);
     if (clientSecret) {
       console.log(`[ATLASSIAN]   - Secret starts with: ${clientSecret.substring(0, 4)}... (format: ${clientSecret.startsWith('ATOA') ? 'NEW ATOA format' : 'OLD format or custom'})`);
+      console.log(`[ATLASSIAN]   - 🔍 SECRET LAST 8 CHARS FOR VERIFICATION: ...${clientSecret.slice(-8)}`);
     }
     console.log(`[ATLASSIAN]   - VITE_AUTH_SERVER_URL: ${baseUrl}`);
     console.log(`[ATLASSIAN]   - Redirect URI: ${redirectUri}`);
