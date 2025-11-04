@@ -80,6 +80,12 @@ export function makeCallback(
         hasCodeChallenge: !!req.session.codeChallenge,
         codeChallengePreview: req.session.codeChallenge?.substring(0, 10),
       });
+      
+      // Log the FULL code_challenge we sent during authorization
+      if (req.session.codeChallenge) {
+        console.log(`[CALLBACK] CRITICAL: Code challenge we sent to Atlassian during auth: ${req.session.codeChallenge}`);
+        console.log(`[CALLBACK] This should match what Atlassian expects when we send the code_verifier`);
+      }
 
       // Get the code_verifier we generated when initiating this provider's OAuth flow
       // (This is OUR code_verifier for Server-Side OAuth, NOT the MCP client's code_verifier)

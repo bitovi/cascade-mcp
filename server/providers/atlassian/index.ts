@@ -15,6 +15,7 @@ import type {
   CallbackParams
 } from '../provider-interface.js';
 import { registerAtlassianTools } from './tools/index.js';
+import { generateCodeChallenge } from '../../tokens.js';
 
 /**
  * Atlassian Provider Object
@@ -140,6 +141,9 @@ export const atlassianProvider: OAuthProvider = {
     console.log(`[ATLASSIAN] Environment variables:`);
     console.log(`[ATLASSIAN]   - VITE_JIRA_CLIENT_ID: ${clientId ? clientId.substring(0, 10) + '...' : 'MISSING'}`);
     console.log(`[ATLASSIAN]   - JIRA_CLIENT_SECRET: ${clientSecret ? 'present (length: ' + clientSecret.length + ')' : 'MISSING'}`);
+    if (clientSecret) {
+      console.log(`[ATLASSIAN]   - Secret starts with: ${clientSecret.substring(0, 4)}... (format: ${clientSecret.startsWith('ATOA') ? 'NEW ATOA format' : 'OLD format or custom'})`);
+    }
     console.log(`[ATLASSIAN]   - VITE_AUTH_SERVER_URL: ${baseUrl}`);
     console.log(`[ATLASSIAN]   - Redirect URI: ${redirectUri}`);
 
@@ -160,6 +164,32 @@ export const atlassianProvider: OAuthProvider = {
       redirect_uri: requestBody.redirect_uri,
       code_verifier: requestBody.code_verifier?.substring(0, 10) + '... (length: ' + requestBody.code_verifier?.length + ')',
     });
+
+    // PKCE Validation: Compute what the code_challenge SHOULD be from our code_verifier
+    console.log(`[ATLASSIAN] 🔐 PKCE VALIDATION:`);
+    try {
+      const computedChallenge = generateCodeChallenge(params.codeVerifier);
+      console.log(`[ATLASSIAN]   - Our code_verifier: ${params.codeVerifier.substring(0, 15)}... (full length: ${params.codeVerifier.length})`);
+      console.log(`[ATLASSIAN]   - Computed code_challenge: ${computedChallenge.substring(0, 15)}... (full length: ${computedChallenge.length})`);
+      console.log(`[ATLASSIAN]   - Full computed challenge: ${computedChallenge}`);
+      
+      // Extract what Atlassian stored in the authorization code
+      try {
+        const codeParts = params.code.split('.');
+        if (codeParts.length === 3) {
+          const codePayload = JSON.parse(Buffer.from(codeParts[1], 'base64url').toString());
+          const atlassianStoredPkce = codePayload['https://id.atlassian.com/pkce'];
+          if (atlassianStoredPkce) {
+            console.log(`[ATLASSIAN]   - Atlassian's encrypted PKCE: ${atlassianStoredPkce.substring(0, 30)}...`);
+            console.log(`[ATLASSIAN]   - NOTE: Atlassian encrypts the code_challenge for security`);
+          }
+        }
+      } catch (e) {
+        console.log(`[ATLASSIAN]   - Could not decode auth code JWT (this is OK)`);
+      }
+    } catch (err) {
+      console.error(`[ATLASSIAN]   - ERROR computing code_challenge:`, err);
+    }
 
     console.log(`[ATLASSIAN] Making POST request to: https://auth.atlassian.com/oauth/token`);
     console.log(`[ATLASSIAN] Request headers: Content-Type: application/json`);
