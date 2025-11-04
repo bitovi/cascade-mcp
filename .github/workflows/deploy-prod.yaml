@@ -2,7 +2,7 @@ name: Deploy Latest tag
 
 on:
   release:
-    types: [published, created, edited]
+    types: [published, edited]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
