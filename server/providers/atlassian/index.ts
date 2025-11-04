@@ -7,12 +7,12 @@
  */
 
 import type { McpServer } from '../../mcp-core/mcp-types.js';
-import type { 
-  OAuthProvider, 
-  AuthUrlParams, 
-  TokenExchangeParams, 
-  StandardTokenResponse, 
-  CallbackParams 
+import type {
+  OAuthProvider,
+  AuthUrlParams,
+  TokenExchangeParams,
+  StandardTokenResponse,
+  CallbackParams
 } from '../provider-interface.js';
 import { registerAtlassianTools } from './tools/index.js';
 
@@ -22,18 +22,34 @@ import { registerAtlassianTools } from './tools/index.js';
  */
 export const atlassianProvider: OAuthProvider = {
   name: 'atlassian',
-  
+
   /**
    * Create Atlassian OAuth authorization URL
    * @param params - Authorization parameters including PKCE challenge
    * @returns Full Atlassian authorization URL
    */
   createAuthUrl(params: AuthUrlParams): string {
+    console.log(`[ATLASSIAN] Creating auth URL with params:`, {
+      redirectUri: params.redirectUri,
+      codeChallenge: params.codeChallenge?.substring(0, 10) + '...',
+      codeChallengeMethod: params.codeChallengeMethod,
+      state: params.state?.substring(0, 10) + '...',
+      responseType: params.responseType,
+      scope: params.scope,
+    });
+
     const clientId = process.env.VITE_JIRA_CLIENT_ID;
     const baseUrl = process.env.VITE_AUTH_SERVER_URL || 'http://localhost:3000';
     const redirectUri = params.redirectUri || `${baseUrl}/auth/callback/atlassian`;
     const scope = params.scope || process.env.VITE_JIRA_SCOPE || 'read:jira-work write:jira-work offline_access';
-    
+
+    console.log(`[ATLASSIAN] Using environment variables:`);
+    console.log(`[ATLASSIAN]   - VITE_JIRA_CLIENT_ID: ${clientId?.substring(0, 10)}...`);
+    console.log(`[ATLASSIAN]   - VITE_AUTH_SERVER_URL: ${baseUrl}`);
+    console.log(`[ATLASSIAN]   - VITE_JIRA_SCOPE: ${process.env.VITE_JIRA_SCOPE || 'not set, using default'}`);
+    console.log(`[ATLASSIAN]   - Final redirect_uri: ${redirectUri}`);
+    console.log(`[ATLASSIAN]   - Final scope: ${scope}`);
+
     const urlParams: Record<string, string> = {
       client_id: clientId!,
       response_type: params.responseType || 'code',
@@ -42,14 +58,17 @@ export const atlassianProvider: OAuthProvider = {
       code_challenge: params.codeChallenge,
       code_challenge_method: params.codeChallengeMethod,
     };
-    
+
     if (params.state) {
       urlParams.state = params.state;
     }
-    
-    return `https://auth.atlassian.com/authorize?${new URLSearchParams(urlParams).toString()}`;
+
+    const fullUrl = `https://auth.atlassian.com/authorize?${new URLSearchParams(urlParams).toString()}`;
+    console.log(`[ATLASSIAN] Generated full auth URL (first 100 chars): ${fullUrl.substring(0, 100)}...`);
+
+    return fullUrl;
   },
-  
+
   /**
    * Extract callback parameters from OAuth redirect
    * Handles Atlassian-specific URL encoding quirk: + gets decoded as space
@@ -57,48 +76,151 @@ export const atlassianProvider: OAuthProvider = {
    * @returns Extracted and normalized callback parameters
    */
   extractCallbackParams(req: any): CallbackParams {
+    console.log(`[ATLASSIAN] Extracting callback parameters from query string`);
+    console.log(`[ATLASSIAN] Full query object:`, req.query);
+
     const { code, state } = req.query;
-    
+
+    console.log(`[ATLASSIAN] Raw extracted values:`);
+    console.log(`[ATLASSIAN]   - code: ${code ? code.substring(0, 30) + '... (length: ' + code.length + ')' : 'MISSING'}`);
+    console.log(`[ATLASSIAN]   - state: ${state ? state.substring(0, 20) + '... (length: ' + state.length + ')' : 'MISSING'}`);
+
+    // Try to decode the authorization code JWT to see what Atlassian stored
+    if (code) {
+      try {
+        const parts = code.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+          console.log(`[ATLASSIAN] Decoded authorization code JWT payload:`, {
+            jti: payload.jti,
+            sub: payload.sub?.substring(0, 20) + '...',
+            iss: payload.iss,
+            aud: payload.aud?.substring(0, 10) + '...',
+            exp: payload.exp ? new Date(payload.exp * 1000).toISOString() : 'none',
+            hasPkce: !!payload['https://id.atlassian.com/pkce'],
+            pkcePreview: payload['https://id.atlassian.com/pkce']?.substring(0, 30),
+          });
+          console.log(`[ATLASSIAN] This shows what code_challenge Atlassian stored during authorization`);
+        }
+      } catch (err) {
+        console.log(`[ATLASSIAN] Could not decode authorization code as JWT (this is normal)`);
+      }
+    }
+
     // Handle Atlassian-specific URL encoding: + gets decoded as space
     const normalizedState = state ? state.replace(/ /g, '+') : state;
-    
+
+    if (state !== normalizedState) {
+      console.log(`[ATLASSIAN] State was normalized (spaces replaced with +)`);
+      console.log(`[ATLASSIAN]   - Original: ${state?.substring(0, 20)}...`);
+      console.log(`[ATLASSIAN]   - Normalized: ${normalizedState?.substring(0, 20)}...`);
+    }
+
     return {
       code: code || '',
       state,
       normalizedState,
     };
   },
-  
+
   /**
    * Exchange authorization code for Atlassian access/refresh tokens
    * @param params - Token exchange parameters including code verifier
    * @returns Standardized token response
    */
   async exchangeCodeForTokens(params: TokenExchangeParams): Promise<StandardTokenResponse> {
+    console.log(`\n========== ATLASSIAN TOKEN EXCHANGE START ==========`);
+    console.log(`[ATLASSIAN] Preparing token exchange request...`);
+
     const clientId = process.env.VITE_JIRA_CLIENT_ID;
     const clientSecret = process.env.JIRA_CLIENT_SECRET;
     const baseUrl = process.env.VITE_AUTH_SERVER_URL || 'http://localhost:3000';
     const redirectUri = params.redirectUri || `${baseUrl}/auth/callback/atlassian`;
-    
-    const tokenRes = await fetch('https://auth.atlassian.com/oauth/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        grant_type: 'authorization_code',
-        client_id: clientId,
-        client_secret: clientSecret,
-        code: params.code,
-        redirect_uri: redirectUri,
-        code_verifier: params.codeVerifier,
-      }),
+
+    console.log(`[ATLASSIAN] Environment variables:`);
+    console.log(`[ATLASSIAN]   - VITE_JIRA_CLIENT_ID: ${clientId ? clientId.substring(0, 10) + '...' : 'MISSING'}`);
+    console.log(`[ATLASSIAN]   - JIRA_CLIENT_SECRET: ${clientSecret ? 'present (length: ' + clientSecret.length + ')' : 'MISSING'}`);
+    console.log(`[ATLASSIAN]   - VITE_AUTH_SERVER_URL: ${baseUrl}`);
+    console.log(`[ATLASSIAN]   - Redirect URI: ${redirectUri}`);
+
+    const requestBody = {
+      grant_type: 'authorization_code',
+      client_id: clientId,
+      client_secret: clientSecret,
+      code: params.code,
+      redirect_uri: redirectUri,
+      code_verifier: params.codeVerifier,
+    };
+
+    console.log(`[ATLASSIAN] Token request body:`, {
+      grant_type: requestBody.grant_type,
+      client_id: requestBody.client_id?.substring(0, 10) + '...',
+      client_secret: requestBody.client_secret ? 'present (length: ' + requestBody.client_secret.length + ')' : 'MISSING',
+      code: requestBody.code?.substring(0, 20) + '...',
+      redirect_uri: requestBody.redirect_uri,
+      code_verifier: requestBody.code_verifier?.substring(0, 10) + '... (length: ' + requestBody.code_verifier?.length + ')',
     });
-    
+
+    console.log(`[ATLASSIAN] Making POST request to: https://auth.atlassian.com/oauth/token`);
+    console.log(`[ATLASSIAN] Request headers: Content-Type: application/json`);
+
+    let tokenRes: Response;
+    let fetchError: Error | null = null;
+
+    try {
+      tokenRes = await fetch('https://auth.atlassian.com/oauth/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      });
+    } catch (err) {
+      fetchError = err as Error;
+      console.error(`[ATLASSIAN] FATAL: Failed to make HTTP request to Atlassian token endpoint`);
+      console.error(`[ATLASSIAN] Network error:`, fetchError.message);
+      console.error(`[ATLASSIAN] This could mean:`);
+      console.error(`[ATLASSIAN]   1. Network connectivity issue`);
+      console.error(`[ATLASSIAN]   2. DNS resolution failure`);
+      console.error(`[ATLASSIAN]   3. Firewall blocking outbound HTTPS`);
+      throw new Error(`Network error contacting Atlassian: ${fetchError.message}`);
+    }
+
+    console.log(`[ATLASSIAN] Response received:`);
+    console.log(`[ATLASSIAN]   - Status: ${tokenRes.status} ${tokenRes.statusText}`);
+    console.log(`[ATLASSIAN]   - Headers:`, {
+      'content-type': tokenRes.headers.get('content-type'),
+      'content-length': tokenRes.headers.get('content-length'),
+      'x-request-id': tokenRes.headers.get('x-request-id'),
+      'date': tokenRes.headers.get('date'),
+    });
+
     const tokenData = await tokenRes.json() as any;
-    
+
+    console.log(`[ATLASSIAN] Response body:`, {
+      hasAccessToken: !!tokenData.access_token,
+      hasRefreshToken: !!tokenData.refresh_token,
+      tokenType: tokenData.token_type,
+      expiresIn: tokenData.expires_in,
+      scope: tokenData.scope,
+      error: tokenData.error,
+      errorDescription: tokenData.error_description,
+    });
+
     if (!tokenData.access_token) {
+      console.error(`[ATLASSIAN] ERROR: Token exchange failed!`);
+      console.error(`[ATLASSIAN] Full error response: ${JSON.stringify(tokenData, null, 2)}`);
+      console.error(`[ATLASSIAN] This typically means:`);
+      console.error(`[ATLASSIAN]   1. Client ID or Client Secret is incorrect`);
+      console.error(`[ATLASSIAN]   2. Code verifier doesn't match code challenge`);
+      console.error(`[ATLASSIAN]   3. Redirect URI doesn't match what was registered`);
+      console.error(`[ATLASSIAN]   4. Authorization code has expired or been used`);
+      console.error(`========== ATLASSIAN TOKEN EXCHANGE FAILED ==========\n`);
       throw new Error(`Atlassian token exchange failed: ${JSON.stringify(tokenData)}`);
     }
-    
+
+    console.log(`[ATLASSIAN] Token exchange successful!`);
+    console.log(`[ATLASSIAN] Access token (first 20 chars): ${tokenData.access_token.substring(0, 20)}...`);
+    console.log(`========== ATLASSIAN TOKEN EXCHANGE END ==========\n`);
+
     return {
       access_token: tokenData.access_token,
       refresh_token: tokenData.refresh_token,
@@ -107,7 +229,7 @@ export const atlassianProvider: OAuthProvider = {
       scope: tokenData.scope,
     };
   },
-  
+
   /**
    * Get default OAuth scopes for Atlassian
    * @returns Array of scope strings
@@ -115,7 +237,7 @@ export const atlassianProvider: OAuthProvider = {
   getDefaultScopes(): string[] {
     return ['read:jira-work', 'write:jira-work', 'offline_access'];
   },
-  
+
   /**
    * Register Atlassian-specific MCP tools
    * Tools will be registered with 'atlassian-' prefix per Q13
