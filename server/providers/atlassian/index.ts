@@ -66,6 +66,8 @@ export const atlassianProvider: OAuthProvider = {
 
     const fullUrl = `https://auth.atlassian.com/authorize?${new URLSearchParams(urlParams).toString()}`;
     console.log(`[ATLASSIAN] Generated full auth URL (first 100 chars): ${fullUrl.substring(0, 100)}...`);
+    console.log(`[ATLASSIAN] 🔑 CRITICAL - Code challenge being sent to Atlassian: ${params.codeChallenge}`);
+    console.log(`[ATLASSIAN] 🔑 Full authorization URL:\n${fullUrl}`);
 
     return fullUrl;
   },
@@ -97,11 +99,13 @@ export const atlassianProvider: OAuthProvider = {
             sub: payload.sub?.substring(0, 20) + '...',
             iss: payload.iss,
             aud: payload.aud?.substring(0, 10) + '...',
+            audFull: payload.aud,
             exp: payload.exp ? new Date(payload.exp * 1000).toISOString() : 'none',
             hasPkce: !!payload['https://id.atlassian.com/pkce'],
             pkcePreview: payload['https://id.atlassian.com/pkce']?.substring(0, 30),
           });
           console.log(`[ATLASSIAN] This shows what code_challenge Atlassian stored during authorization`);
+          console.log(`[ATLASSIAN] 🚨 VERIFY: Auth code issued for client_id: ${payload.aud}`);
         }
       } catch (err) {
         console.log(`[ATLASSIAN] Could not decode authorization code as JWT (this is normal)`);
@@ -139,7 +143,7 @@ export const atlassianProvider: OAuthProvider = {
     const redirectUri = params.redirectUri || `${baseUrl}/auth/callback/atlassian`;
 
     console.log(`[ATLASSIAN] Environment variables:`);
-    console.log(`[ATLASSIAN]   - VITE_JIRA_CLIENT_ID: ${clientId ? clientId.substring(0, 10) + '...' : 'MISSING'}`);
+    console.log(`[ATLASSIAN]   - VITE_JIRA_CLIENT_ID (FULL): ${clientId || 'MISSING'}`);
     console.log(`[ATLASSIAN]   - JIRA_CLIENT_SECRET: ${clientSecret ? 'present (length: ' + clientSecret.length + ')' : 'MISSING'}`);
     if (clientSecret) {
       console.log(`[ATLASSIAN]   - Secret starts with: ${clientSecret.substring(0, 4)}... (format: ${clientSecret.startsWith('ATOA') ? 'NEW ATOA format' : 'OLD format or custom'})`);
@@ -172,7 +176,7 @@ export const atlassianProvider: OAuthProvider = {
       console.log(`[ATLASSIAN]   - Our code_verifier: ${params.codeVerifier.substring(0, 15)}... (full length: ${params.codeVerifier.length})`);
       console.log(`[ATLASSIAN]   - Computed code_challenge: ${computedChallenge.substring(0, 15)}... (full length: ${computedChallenge.length})`);
       console.log(`[ATLASSIAN]   - Full computed challenge: ${computedChallenge}`);
-      
+
       // Extract what Atlassian stored in the authorization code
       try {
         const codeParts = params.code.split('.');
