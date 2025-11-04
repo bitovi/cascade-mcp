@@ -169,6 +169,16 @@ export const atlassianProvider: OAuthProvider = {
       redirect_uri: requestBody.redirect_uri,
       code_verifier: requestBody.code_verifier?.substring(0, 10) + '... (length: ' + requestBody.code_verifier?.length + ')',
     });
+    
+    console.log(`[ATLASSIAN] 🔍 FULL TOKEN EXCHANGE REQUEST BODY (for debugging):`);
+    console.log(JSON.stringify({
+      grant_type: requestBody.grant_type,
+      client_id: requestBody.client_id,
+      client_secret: '***' + requestBody.client_secret?.slice(-8),
+      code: requestBody.code,
+      redirect_uri: requestBody.redirect_uri,
+      code_verifier: requestBody.code_verifier,
+    }, null, 2));
 
     // PKCE Validation: Compute what the code_challenge SHOULD be from our code_verifier
     console.log(`[ATLASSIAN] 🔐 PKCE VALIDATION:`);
