@@ -6,6 +6,9 @@ on:
   workflow_dispatch:
   push:
     branches: ['*']
+    paths-ignore:
+      - '**.md'
+      - '.github/workflows/**'
 
 env:
   PORT: 3000

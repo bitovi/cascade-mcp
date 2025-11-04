@@ -3,6 +3,9 @@ name: Deploy Staging
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - '.github/workflows/**'
   workflow_dispatch:
 
 concurrency:
