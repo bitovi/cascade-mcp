@@ -7,6 +7,9 @@ on:
   push:
     branches: ['*']
 
+env:
+  PORT: 3000
+
 jobs:
   unit-test:
     name: Run Tests
@@ -53,6 +56,7 @@ jobs:
           FIGMA_CLIENT_ID: ${{ vars.FIGMA_CLIENT_ID }}
           FIGMA_OAUTH_SCOPES: ${{ vars.FIGMA_OAUTH_SCOPES }}
           JIRA_TEST_PAT: CI Test PAT
+          PORT: ${{ env.PORT }}
       - name: Add Test User .env
         run: |
           echo "JIRA_TEST_USERNAME=${{ vars.JIRA_TEST_USERNAME }}" >> .env
@@ -60,7 +64,6 @@ jobs:
           echo "JIRA_CLIENT_SECRET=${{ secrets.JIRA_CLIENT_SECRET }}" >> .env
           echo "FIGMA_CLIENT_SECRET=${{ secrets.FIGMA_CLIENT_SECRET }}" >> .env
           echo "JIRA_TOTP_SECRET=${{ secrets.JIRA_TOTP_SECRET }}" >> .env
-          echo "PORT=${{ vars.PORT }}"
           echo ".env file updated"
 
       - name: Install Dependencies

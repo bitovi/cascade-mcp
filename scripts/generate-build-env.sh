@@ -45,9 +45,4 @@ EOF
 # Need repo_env for ec2-deploy
 cp .env repo_env
 
-echo ".env and repo_env created at $(pwd)"
-echo "🔍 JIRA_CLIENT_SECRET verification:"
-echo "  Length: ${#JIRA_CLIENT_SECRET}"
-echo "  First 4 chars: ${JIRA_CLIENT_SECRET:0:4}"
-echo "  Last 8 chars: ${JIRA_CLIENT_SECRET: -8}"
-echo "  Starts with ATOA: $(if [[ $JIRA_CLIENT_SECRET == ATOA* ]]; then echo 'YES'; else echo 'NO'; fi)"
+echo "PORT: $PORT"
