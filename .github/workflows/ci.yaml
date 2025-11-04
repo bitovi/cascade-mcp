@@ -55,7 +55,6 @@ jobs:
           AWS_ACCESS_KEY_ID: ''
           FIGMA_CLIENT_ID: ${{ vars.FIGMA_CLIENT_ID }}
           FIGMA_OAUTH_SCOPES: ${{ vars.FIGMA_OAUTH_SCOPES }}
-          JIRA_TEST_PAT: CI Test PAT
           PORT: ${{ env.PORT }}
       - name: Add Test User .env
         run: |
@@ -64,6 +63,7 @@ jobs:
           echo "JIRA_CLIENT_SECRET=${{ secrets.JIRA_CLIENT_SECRET }}" >> .env
           echo "FIGMA_CLIENT_SECRET=${{ secrets.FIGMA_CLIENT_SECRET }}" >> .env
           echo "JIRA_TOTP_SECRET=${{ secrets.JIRA_TOTP_SECRET }}" >> .env
+          echo "JIRA_TEST_PAT=CI Test PAT" >> .env
           echo ".env file updated"
 
       - name: Install Dependencies
