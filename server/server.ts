@@ -107,6 +107,9 @@ app.use(morgan('common', {
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Serve static files from the 'static' directory
+app.use(express.static('static'));
+
 // Error handler middleware
 app.use(function onError(err: Error, req: Request, res: Response, next: NextFunction) {
   // Todo: do we want a page for this?
@@ -143,25 +146,27 @@ app.get('/debug/config', (req, res) => {
   });
 });
 
+// Favicon route
+app.get('/favicon.ico', (req, res) => {
+  res.sendFile('favicon.ico', { root: 'static' });
+});
+
 // Root endpoint for service discovery
 app.get('/', (req, res) => {
   const baseUrl = process.env.VITE_AUTH_SERVER_URL || `http://localhost:${process.env.PORT || 3000}`;
 
   res.send(`
-    <h1>Jira MCP Auth Bridge</h1>
-    <p>OAuth 2.0 authorization server for Jira MCP clients</p>
+    <h1>Cascade MCP service</h1>
+    <p>MCP tools that help software teams. Integrates Jira and Figma. See <a href="https://github.com/bitovi/cascade-mcp">Cascade MCP on GitHub</a> for guides and documentation.</p>
+    <p>Note: some tools require <a href="https://modelcontextprotocol.io/specification/2025-06-18/client/sampling">sampling</a>. Make sure your agent supports sampling.</p>
     <h2>Available Endpoints</h2>
     <ul>
+      <li><a href="/mcp">MCP Endpoint</a> - <code>${baseUrl}/mcp</code></li>
+      <li><a href="/.well-known/oauth-authorization-server">OAuth Server Metadata</a></li>
       <li><a href="/.well-known/oauth-authorization-server">OAuth Server Metadata</a></li>
       <li><a href="/.well-known/oauth-protected-resource">Protected Resource Metadata</a></li>
       <li><a href="/get-access-token">Manual Token Retrieval</a></li>
     </ul>
-    <h2>OAuth Flow</h2>
-    <ol>
-      <li>Client registration: POST /register</li>
-      <li>Authorization: GET /authorize</li>
-      <li>Token exchange: POST /access-token</li>
-    </ol>
   `);
 });
 
