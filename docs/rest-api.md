@@ -13,11 +13,19 @@ https://your-domain.com  # Production
 
 ## Authentication
 
-All REST API endpoints require three types of tokens:
+All REST API endpoints require authentication via HTTP headers:
 
-1. **Atlassian PAT** - Personal Access Token for Jira API access
-2. **Figma PAT** - Personal Access Token for Figma API access  
-3. **Anthropic API Key** - API key for AI-powered story generation
+**Required Headers:**
+- `X-Atlassian-Token` - Base64-encoded `email:api_token` for Jira Basic Auth
+- `X-Figma-Token` - Figma Personal Access Token
+- `X-Anthropic-Token` - Anthropic API key for AI-powered story generation
+
+**Example Headers:**
+```bash
+X-Atlassian-Token: eW91ci1lbWFpbEBleGFtcGxlLmNvbTpBVEFUVDN4RmZHRjA...
+X-Figma-Token: figd_5L7d0...
+X-Anthropic-Token: sk-ant-api03-...
+```
 
 ### Obtaining Tokens
 
@@ -26,14 +34,23 @@ All REST API endpoints require three types of tokens:
 2. Click "Create API token"
 3. Give it a descriptive name
 4. Copy the generated token (starts with `ATATT...`)
+5. **Encode for REST API**: Base64-encode `your-email@example.com:ATATT...`
+   - Command: `echo -n "your-email@example.com:ATATT..." | base64`
+   - Or use: `Buffer.from('email:token').toString('base64')` in Node.js
+   - The API uses Basic Authentication with this format
+6. Required scopes:
+   - Read and write Jira issues
+   - Access to your Jira workspace
 
 **Figma PAT:**
-1. Go to https://www.figma.com/developers/api#access-tokens
+1. Go to https://www.figma.com/settings (scroll to "Personal access tokens")
 2. Generate a new personal access token
 3. Copy the token (starts with `figd_...`)
+4. Required scopes:
+   - File content - Read only
 
 **Anthropic API Key:**
-1. Go to https://console.anthropic.com/
+1. Go to https://console.anthropic.com/settings/keys
 2. Create an API key
 3. Copy the key (starts with `sk-ant-...`)
 
@@ -45,14 +62,19 @@ Generates prioritized shell stories from Figma designs linked in a Jira epic.
 
 **Endpoint:** `POST /api/write-shell-stories`
 
+**Headers:**
+- `Content-Type: application/json`
+- `X-Atlassian-Token` (required) - Base64-encoded `email:token` for Basic Auth
+- `X-Figma-Token` (required) - Figma Personal Access Token (starts with `figd_...`)
+- `X-Anthropic-Token` (required) - Anthropic API key (starts with `sk-ant-...`)
+
 **Request Body:**
 ```json
 {
   "epicKey": "PROJ-123",
   "siteName": "my-jira-site",
-  "atlassianToken": "ATATT3xFfGF0...",
-  "figmaToken": "figd_5L7d0...",
-  "anthropicApiKey": "sk-ant-api03-..."
+  "cloudId": "uuid",
+  "sessionId": "unique-id"
 }
 ```
 
@@ -61,9 +83,6 @@ Generates prioritized shell stories from Figma designs linked in a Jira epic.
 - `siteName` (optional) - Name of the Jira site to use
 - `cloudId` (optional) - Atlassian cloud ID (alternative to siteName)
 - `sessionId` (optional) - Unique session ID for temp directory naming
-- `atlassianToken` (required) - Atlassian Personal Access Token
-- `figmaToken` (required) - Figma Personal Access Token
-- `anthropicApiKey` (required) - Anthropic API key
 
 **Success Response (200 OK):**
 ```json
@@ -87,30 +106,38 @@ Generates prioritized shell stories from Figma designs linked in a Jira epic.
 
 **Example using curl:**
 ```bash
+# First, create the base64-encoded token for Atlassian:
+# echo -n "your-email@example.com:ATATT3xFfGF0..." | base64
+
 curl -X POST http://localhost:3000/api/write-shell-stories \
   -H "Content-Type: application/json" \
+  -H "X-Atlassian-Token: <base64(email:token)>" \
+  -H "X-Figma-Token: figd_5L7d0..." \
+  -H "X-Anthropic-Token: sk-ant-api03-..." \
   -d '{
     "epicKey": "PROJ-123",
-    "siteName": "my-jira-site",
-    "atlassianToken": "ATATT3xFfGF0...",
-    "figmaToken": "figd_5L7d0...",
-    "anthropicApiKey": "sk-ant-api03-..."
+    "siteName": "my-jira-site"
   }'
 ```
 
 **Example using Node.js:**
 ```javascript
+// Create base64-encoded Atlassian token
+const atlassianToken = Buffer.from(
+  `${process.env.ATLASSIAN_EMAIL}:${process.env.ATLASSIAN_PAT}`
+).toString('base64');
+
 const response = await fetch('http://localhost:3000/api/write-shell-stories', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
+    'X-Atlassian-Token': atlassianToken,
+    'X-Figma-Token': process.env.FIGMA_PAT,
+    'X-Anthropic-Token': process.env.ANTHROPIC_API_KEY,
   },
   body: JSON.stringify({
     epicKey: 'PROJ-123',
     siteName: 'my-jira-site',
-    atlassianToken: process.env.ATLASSIAN_PAT,
-    figmaToken: process.env.FIGMA_PAT,
-    anthropicApiKey: process.env.ANTHROPIC_API_KEY,
   }),
 });
 
@@ -126,18 +153,27 @@ Writes the next Jira story from shell stories in an epic. Validates dependencies
 
 **Endpoint:** `POST /api/write-next-story`
 
+**Headers:**
+- `Content-Type: application/json`
+- `X-Atlassian-Token` (required) - Base64-encoded `email:token` for Basic Auth
+- `X-Figma-Token` (required) - Figma Personal Access Token (starts with `figd_...`)
+- `X-Anthropic-Token` (required) - Anthropic API key (starts with `sk-ant-...`)
+
 **Request Body:**
 ```json
 {
   "epicKey": "PROJ-123",
   "siteName": "my-jira-site",
-  "atlassianToken": "ATATT3xFfGF0...",
-  "figmaToken": "figd_5L7d0...",
-  "anthropicApiKey": "sk-ant-api03-..."
+  "cloudId": "uuid",
+  "sessionId": "unique-id"
 }
 ```
 
-**Parameters:** Same as write-shell-stories
+**Parameters:**
+- `epicKey` (required) - The Jira epic key (e.g., "PROJ-123")
+- `siteName` (optional) - Name of the Jira site to use
+- `cloudId` (optional) - Atlassian cloud ID (alternative to siteName)
+- `sessionId` (optional) - Unique session ID for temp directory naming
 
 **Success Response (200 OK):**
 ```json
@@ -170,29 +206,42 @@ Writes the next Jira story from shell stories in an epic. Validates dependencies
 
 **Example using curl:**
 ```bash
+# First, create the base64-encoded token for Atlassian:
+# echo -n "your-email@example.com:ATATT3xFfGF0..." | base64
+
 curl -X POST http://localhost:3000/api/write-next-story \
   -H "Content-Type: application/json" \
+  -H "X-Atlassian-Token: <base64(email:token)>" \
+  -H "X-Figma-Token: figd_5L7d0..." \
+  -H "X-Anthropic-Token: sk-ant-api03-..." \
   -d '{
     "epicKey": "PROJ-123",
-    "siteName": "my-jira-site",
-    "atlassianToken": "ATATT3xFfGF0...",
-    "figmaToken": "figd_5L7d0...",
-    "anthropicApiKey": "sk-ant-api03-..."
+    "siteName": "my-jira-site"
   }'
 ```
 
 **Example Workflow (Node.js):**
 ```javascript
+// Create base64-encoded Atlassian token
+const atlassianToken = Buffer.from(
+  `${process.env.ATLASSIAN_EMAIL}:${process.env.ATLASSIAN_PAT}`
+).toString('base64');
+
+// Prepare headers for both API calls
+const headers = {
+  'Content-Type': 'application/json',
+  'X-Atlassian-Token': atlassianToken,
+  'X-Figma-Token': process.env.FIGMA_PAT,
+  'X-Anthropic-Token': process.env.ANTHROPIC_API_KEY,
+};
+
 // 1. Generate shell stories first
 const shellStoriesResult = await fetch('http://localhost:3000/api/write-shell-stories', {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
+  headers,
   body: JSON.stringify({
     epicKey: 'PROJ-123',
     siteName: 'my-jira-site',
-    atlassianToken: process.env.ATLASSIAN_PAT,
-    figmaToken: process.env.FIGMA_PAT,
-    anthropicApiKey: process.env.ANTHROPIC_API_KEY,
   }),
 });
 
@@ -204,13 +253,10 @@ let storiesWritten = 0;
 while (true) {
   const nextStoryResult = await fetch('http://localhost:3000/api/write-next-story', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({
       epicKey: 'PROJ-123',
       siteName: 'my-jira-site',
-      atlassianToken: process.env.ATLASSIAN_PAT,
-      figmaToken: process.env.FIGMA_PAT,
-      anthropicApiKey: process.env.ANTHROPIC_API_KEY,
     }),
   });
 
@@ -238,7 +284,8 @@ console.log(`Total stories written: ${storiesWritten}`);
 All endpoints return JSON responses with appropriate HTTP status codes:
 
 - **200 OK** - Request successful
-- **400 Bad Request** - Invalid request body or missing required fields
+- **400 Bad Request** - Invalid request body, missing required fields, or dependency errors
+- **401 Unauthorized** - Missing or invalid authentication headers
 - **500 Internal Server Error** - Server error during processing
 
 Error responses include:
@@ -249,6 +296,14 @@ Error responses include:
   "details": "Stack trace (development only)"
 }
 ```
+
+**Common error messages:**
+- `Missing required header: X-Atlassian-Token` (401) - Add Atlassian token header
+- `Missing required header: X-Figma-Token` (401) - Add Figma token header
+- `Missing required header: X-Anthropic-Token` (401) - Add Anthropic token header
+- `Missing required field: epicKey` (400) - Add epicKey to request body
+- `Dependency not satisfied` (400) - Story dependencies must be written first
+- `Invalid authentication tokens` (401) - One or more tokens are invalid or expired
 
 ## Rate Limiting
 
@@ -270,12 +325,62 @@ For high-volume usage, consider:
 3. **Use HTTPS in production** - The development server uses HTTP
 4. **Implement request signing** - For additional security in production
 5. **Monitor token usage** - Watch for unexpected API calls
+6. **Validate tokens before deployment** - Run `npm run validate-pat-tokens` to verify permissions
+
+## Testing
+
+### Validate Your Tokens
+
+Before using the REST API, validate that your tokens have the correct permissions:
+
+```bash
+npm run validate-pat-tokens
+```
+
+This script will:
+- ✅ Verify both PAT tokens are valid and not expired
+- ✅ Check you have access to your Jira workspace
+- ✅ Confirm you have CREATE_ISSUES permission
+- ✅ Verify the Figma token can read file content
+- ✅ Display your user info and permissions
+
+**Required Environment Variables** (in `.env` file):
+```bash
+JIRA_TEST_PAT="base64-encoded-email:token"
+FIGMA_TEST_PAT="figd_..."
+ANTHROPIC_API_KEY="sk-ant-..."
+JIRA_TEST_CLOUD_ID="your-cloud-id"
+```
+
+### End-to-End Test
+
+Run the full E2E test to verify both endpoints work:
+
+```bash
+npm run test:e2e:rest-api
+```
+
+This test will:
+- ✅ Start the local server
+- ✅ Create a test epic in the PLAY project
+- ✅ Call `/api/write-shell-stories` with the epic key
+- ✅ Verify shell stories were generated
+- ✅ Call `/api/write-next-story` to create the first story
+- ✅ Verify the story was created successfully
+- ✅ Leave the epic for manual exploration
+
+**Expected duration:** ~2-3 minutes (includes AI generation)
 
 ## Troubleshooting
 
-**"Missing required field" errors:**
-- Ensure all required fields are present in the request body
-- Check that tokens are properly formatted (no extra quotes or whitespace)
+**"Missing required header" errors (401):**
+- Ensure all three token headers are present: `X-Atlassian-Token`, `X-Figma-Token`, `X-Anthropic-Token`
+- Check that headers are properly formatted (no extra quotes or whitespace)
+- For Atlassian: Verify the token is base64-encoded in the format `base64(email:token)`
+
+**"Missing required field" errors (400):**
+- Ensure `epicKey` is present in the request body
+- Verify the request body is valid JSON
 
 **Figma 403 errors:**
 - Verify your Figma PAT has not expired
@@ -283,14 +388,16 @@ For high-volume usage, consider:
 - Ensure the file URL in the epic description is correct
 
 **Jira authentication errors:**
-- Verify your Atlassian PAT is valid
-- Check that your token has write permissions for the project
-- Confirm the site name or cloud ID is correct
+- Verify your Atlassian token is properly base64-encoded
+- Check that your PAT token (ATATT...) is valid and not expired
+- Confirm you have write permissions for the Jira project
+- Run `npm run validate-pat-tokens` to diagnose permission issues
 
-**Dependency errors when writing stories:**
+**Dependency errors when writing stories (400):**
 - Stories must be written in dependency order
 - The epic's Shell Stories section tracks which stories are complete
 - Dependencies are specified in the shell story format
+- The API will automatically select the next available story
 
 ## Support
 
