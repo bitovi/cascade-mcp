@@ -6,7 +6,6 @@ Cascading MCP Tools provides a collection of MCP (Model Context Protocol) capabi
 
 <br clear="all" />
 
-
 **Key Capabilities:**
 
 - **Jira Integration**: Fetch issues, attachments, and images from Jira work items with full OAuth authentication
