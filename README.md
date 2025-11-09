@@ -1,6 +1,6 @@
 # Cascading MCP Tools
 
-<img width="600" height="600" alt="cascade-mcp" src="https://github.com/user-attachments/assets/79a3f9d3-d323-4948-a563-e6788b32cda9" />
+<img width="200" height="200" alt="cascade-mcp" src="https://github.com/user-attachments/assets/79a3f9d3-d323-4948-a563-e6788b32cda9" />
 
 
 Cascading MCP Tools provides a collection of MCP (Model Context Protocol) capabilities for [Bitovi's Cascading AI Enablement](https://bitovi.atlassian.net/wiki/spaces/AIEnabledDevelopment/pages/1523351554/Cascading+v1+Desktop+AI+implements+Figma+and+Jira). This service enables AI agents to work with design and project management tools through OAuth-authenticated integrations.
