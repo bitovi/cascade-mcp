@@ -36,7 +36,29 @@ You must register a new OAuth 2.0 (3LO) app in the Atlassian Developer Console t
    - `offline_access`
 6. Save the app and copy the **Client ID** and **Client Secret**.
 
-## 4. Configure Environment Variables
+## 4. Create a Figma OAuth App (Optional - for Figma Integration)
+
+If you plan to use the Figma integration features (like creating shell stories from Figma designs), you'll need to set up a Figma OAuth app.
+
+### Steps:
+1. Go to [Figma Developer Portal](https://www.figma.com/developers/apps) and sign in.
+2. Click **Create new app**.
+3. Enter an app name (e.g., `Jira MCP Auth Bridge Local`).
+4. Set the **Redirect URI** to:
+   - `http://localhost:3000/auth/callback/figma`
+5. Add the following **OAuth scopes**:
+   - `file_content:read` (to read Figma file content)
+   - `file_comments:read` (to read Figma file comments)
+6. Save the app and copy the **Client ID** and **Client Secret**.
+7. Add these to your `.env` file:
+   ```env
+   FIGMA_CLIENT_ID=your-figma-client-id-here
+   FIGMA_CLIENT_SECRET=your-figma-client-secret-here
+   FIGMA_OAUTH_SCOPES="file_content:read,file_comments:read"
+   ```
+8. Optionally, add an icon and description, and publish the app to your local organization
+
+## 5. Configure Environment Variables
 
 1. Copy `.env.example` to `.env`:
    ```bash
@@ -49,6 +71,11 @@ You must register a new OAuth 2.0 (3LO) app in the Atlassian Developer Console t
    - `VITE_JIRA_SCOPE` (should be `read:jira-work write:jira-work offline_access`)
    - `SESSION_SECRET` and `JWT_SECRET` (set to random secure strings for local dev)
 
+3. If you set up Figma integration, also add the Figma credentials:
+   - `FIGMA_CLIENT_ID` (from Figma Developer Portal)
+   - `FIGMA_CLIENT_SECRET` (from Figma Developer Portal)
+   - `FIGMA_OAUTH_SCOPES` (should be `"file_content:read,file_comments:read"`)
+
 Example:
 ```env
 VITE_JIRA_CLIENT_ID=your-client-id-here
@@ -57,9 +84,14 @@ VITE_JIRA_CALLBACK_URL=http://localhost:3000/callback
 VITE_JIRA_SCOPE="read:jira-work write:jira-work offline_access"
 SESSION_SECRET=changeme_in_dev
 JWT_SECRET=changeme_in_dev
+
+# Optional Figma integration
+FIGMA_CLIENT_ID=your-figma-client-id-here
+FIGMA_CLIENT_SECRET=your-figma-client-secret-here
+FIGMA_OAUTH_SCOPES="file_content:read,file_comments:read"
 ```
 
-## 5. Run the App Locally
+## 6. Run the App Locally
 
 ```bash
 npm run start-local
@@ -67,16 +99,16 @@ npm run start-local
 
 The server will start on `http://localhost:3000`.
 
-## 6. Testing Token Expiration (Optional)
+## 7. Testing Token Expiration (Optional)
 To test token refresh flows, you can force short-lived tokens:
 ```bash
 TEST_SHORT_AUTH_TOKEN_EXP=60 npm run start-local
 ```
 
-## 7. Running Integration Tests (Optional)
+## 8. Running Integration Tests (Optional)
 See the `README.md` and `specs/` directory for integration test instructions.
 
-## 8. Contributing Code
+## 9. Contributing Code
 - Please follow the code style and documentation patterns in the repo.
 - Update `server/readme.md` with any API or file changes.
 - Open a pull request with a clear description of your changes.
