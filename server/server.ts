@@ -28,6 +28,7 @@ import {
 import { atlassianProvider } from './providers/atlassian/index.js';
 import { figmaProvider } from './providers/figma/index.js';
 import { logEnvironmentInfo } from './debug-helpers.js';
+import { registerRestApiRoutes } from './api/index.js';
 
 // configurations
 dotenv.config();
@@ -163,9 +164,13 @@ app.get('/', (req, res) => {
     <ul>
       <li><a href="/mcp">MCP Endpoint</a> - <code>${baseUrl}/mcp</code></li>
       <li><a href="/.well-known/oauth-authorization-server">OAuth Server Metadata</a></li>
-      <li><a href="/.well-known/oauth-authorization-server">OAuth Server Metadata</a></li>
       <li><a href="/.well-known/oauth-protected-resource">Protected Resource Metadata</a></li>
       <li><a href="/get-access-token">Manual Token Retrieval</a></li>
+    </ul>
+    <h2>REST API Endpoints (PAT Authentication)</h2>
+    <ul>
+      <li><strong>POST /api/write-shell-stories</strong> - Generate shell stories from Figma designs</li>
+      <li><strong>POST /api/write-next-story</strong> - Write next Jira story from shell stories</li>
     </ul>
   `);
 });
@@ -198,6 +203,9 @@ app.post('/mcp', handleMcpPost);
 app.get('/mcp', handleSessionRequest);
 // Handle DELETE requests for session termination
 app.delete('/mcp', handleSessionRequest);
+
+// --- REST API Endpoints (PAT Authentication) ---
+registerRestApiRoutes(app);
 
 app.post('/domain', async (req: Request, res: Response) => {
   logger.info(`[domain] - ${req.body.domain}`);

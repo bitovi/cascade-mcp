@@ -17,6 +17,8 @@
 
 import * as path from 'path';
 import * as fs from 'fs/promises';
+import type { AtlassianClient } from '../../../atlassian/atlassian-api-client.js';
+import type { FigmaClient } from '../../../figma/figma-api-client.js';
 import type { FigmaNodeMetadata } from '../../../figma/figma-helpers.js';
 import { 
   parseFigmaUrl, 
@@ -112,8 +114,8 @@ interface JiraIssue {
  */
 export interface FigmaScreenSetupParams {
   epicKey: string;               // Jira epic key
-  atlassianToken: string;        // Atlassian access token
-  figmaToken: string;            // Figma access token
+  atlassianClient: AtlassianClient;  // Atlassian API client with auth in closure
+  figmaClient: FigmaClient;          // Figma API client with auth in closure
   tempDirPath: string;           // Where to save notes files and YAML
   cloudId?: string;              // Optional explicit cloud ID
   siteName?: string;             // Optional site name
@@ -154,7 +156,7 @@ export interface FigmaScreenSetupResult {
 export async function setupFigmaScreens(
   params: FigmaScreenSetupParams
 ): Promise<FigmaScreenSetupResult> {
-  const { epicKey, atlassianToken, figmaToken, tempDirPath, cloudId, siteName, notify } = params;
+  const { epicKey, atlassianClient, figmaClient, tempDirPath, cloudId, siteName, notify } = params;
   
   console.log('Setting up Figma screens...');
   
@@ -166,11 +168,11 @@ export async function setupFigmaScreens(
   }
   
   // Resolve cloud ID (use explicit cloudId/siteName or first accessible site)
-  const siteInfo = await resolveCloudId(atlassianToken, cloudId, siteName);
+  const siteInfo = await resolveCloudId(atlassianClient, cloudId, siteName);
   console.log('  Resolved Jira site:', { cloudId: siteInfo.cloudId, siteName: siteInfo.siteName });
   
   // Fetch the epic issue
-  const issueResponse = await getJiraIssue(siteInfo.cloudId, epicKey, undefined, atlassianToken);
+  const issueResponse = await getJiraIssue(atlassianClient, siteInfo.cloudId, epicKey, undefined);
   handleJiraAuthError(issueResponse, 'Fetch epic');
   
   if (!issueResponse.ok) {
@@ -278,7 +280,7 @@ export async function setupFigmaScreens(
       }
       
       // Fetch specific node data using efficient /nodes endpoint
-      const nodeData = await fetchFigmaNode(urlInfo.fileKey, apiNodeId, figmaToken);
+      const nodeData = await fetchFigmaNode(figmaClient, urlInfo.fileKey, apiNodeId);
       
       // Get frames and notes based on node type
       const framesAndNotes = getFramesAndNotesForNode({ document: nodeData }, apiNodeId);

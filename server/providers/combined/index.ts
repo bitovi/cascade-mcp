@@ -18,7 +18,7 @@ export const combinedProvider = {
   displayName: 'Combined Tools',
   description: 'Tools that integrate multiple providers (Jira + Figma, etc.)',
   
-  registerTools: (mcp: McpServer) => {
+  registerTools: (mcp: McpServer, authContext: any) => {
     console.log('Registering combined provider tools');
     registerWriteShellStoriesTool(mcp);
     registerWriteNextStoryTool(mcp);

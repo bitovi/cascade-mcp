@@ -10,7 +10,10 @@
     "prepare": "husky",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:e2e:mcp-sdk:mock": "TEST_USE_MOCK_ATLASSIAN=true jest specs/mcp-sdk --testTimeout=30000 --runInBand --testMatch='**/specs/**/*.test.js' --testMatch='**/specs/**/*.test.ts' --testPathIgnorePatterns='/node_modules/'"
+    "test:e2e:mcp-sdk:mock": "TEST_USE_MOCK_ATLASSIAN=true jest specs/mcp-sdk --testTimeout=30000 --runInBand --testMatch='**/specs/**/*.test.js' --testMatch='**/specs/**/*.test.ts' --testPathIgnorePatterns='/node_modules/'",
+    "test:e2e:rest-api": "jest specs/support-direct-api-requests.test.js --testTimeout=600000 --runInBand --testMatch='**/specs/**/*.test.js' --testPathIgnorePatterns='/node_modules/'",
+    "validate-pat-tokens": "node scripts/validate-pat-tokens.cjs",
+    "test-figma-token": "node scripts/test-figma-token.cjs"
   },
   "lint-staged": {
     "**/*": "prettier --write --ignore-unknown"
@@ -19,6 +22,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.68.0",
     "@atlaskit/adf-schema": "^50.2.3",
     "@atlaskit/editor-markdown-transformer": "^5.16.5",
     "@modelcontextprotocol/sdk": "^1.15.1",
@@ -53,6 +57,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/morgan": "^1.9.10",
     "@types/node": "^22.14.0",
+    "@types/supertest": "^6.0.3",
     "@types/uuid": "^10.0.0",
     "commander": "^12.1.0",
     "husky": "^9.1.4",
@@ -61,6 +66,7 @@
     "openid-client": "^5.7.1",
     "prettier": "3.5.3",
     "semver": "^7.6.3",
+    "supertest": "^7.1.4",
     "ts-jest": "^29.4.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.2"
@@ -82,18 +88,20 @@
       "^.+\\.ts$": [
         "ts-jest",
         {
-          "useESM": true
+          "useESM": true,
+          "tsconfig": "tsconfig.jest.json"
         }
       ],
       "^.+\\.js$": [
         "ts-jest",
         {
-          "useESM": true
+          "useESM": true,
+          "tsconfig": "tsconfig.jest.json"
         }
       ]
     },
     "transformIgnorePatterns": [
-      "node_modules/(?!(@modelcontextprotocol|node-fetch|marklassian|marked)/)"
+      "node_modules/(?!(@modelcontextprotocol|node-fetch|marklassian|marked|jose)/)"
     ],
     "moduleNameMapper": {
       "^(\\.{1,2}/.*)\\.js$": "$1"

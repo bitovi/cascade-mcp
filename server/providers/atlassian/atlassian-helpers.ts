@@ -6,6 +6,7 @@
 import { logger } from '../../observability/logger.ts';
 import { sanitizeObjectWithJWTs } from '../../tokens.ts';
 import type { ADFDocument } from './markdown-converter.ts';
+import type { AtlassianClient } from './atlassian-api-client.js';
 
 // Atlassian site information structure
 export interface AtlassianSite {
@@ -86,12 +87,11 @@ export function handleJiraAuthError(response: Response, operation: string): void
  * @throws Error if no sites are accessible or site name not found
  */
 export async function resolveCloudId(
-  token: string, 
+  client: AtlassianClient,
   cloudId?: string, 
   siteName?: string
 ): Promise<ResolvedSiteInfo> {
   logger.info('Starting cloud ID resolution', {
-    ...getTokenLogInfo(token, 'atlassianToken'),
     providedCloudId: cloudId,
     providedSiteName: siteName,
   });
@@ -107,15 +107,9 @@ export async function resolveCloudId(
     reason: siteName ? 'siteName lookup' : 'auto-detection',
     siteName: siteName || 'none',
     apiUrl: 'https://api.atlassian.com/oauth/token/accessible-resources',
-    ...getTokenLogInfo(token, 'usingToken'),
   });
   
-  const siteRes = await fetch('https://api.atlassian.com/oauth/token/accessible-resources', {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/json',
-    },
-  });
+  const siteRes = await client.fetch('https://api.atlassian.com/oauth/token/accessible-resources');
 
   logger.info('Atlassian accessible-resources API response', {
     status: siteRes.status,
@@ -181,8 +175,13 @@ export async function resolveCloudId(
     };
   }
 }
-export async function getJiraIssue(targetCloudId: string, issueKey: string, fields: string | undefined, token: string) {
-  let issueUrl = `https://api.atlassian.com/ex/jira/${targetCloudId}/rest/api/3/issue/${issueKey}`;
+export async function getJiraIssue(
+  client: AtlassianClient,
+  targetCloudId: string,
+  issueKey: string,
+  fields: string | undefined
+) {
+  let issueUrl = `${client.getJiraBaseUrl(targetCloudId)}/issue/${issueKey}`;
 
   // Add fields parameter if specified
   if (fields) {
@@ -190,24 +189,14 @@ export async function getJiraIssue(targetCloudId: string, issueKey: string, fiel
     issueUrl += `?${params.toString()}`;
   }
 
-  // Determine the appropriate authentication method
-  const { authType, authorization } = getAuthHeader(token);
-
-  logger.info('Making Jira API request for issue details', sanitizeObjectWithJWTs({
+  logger.info('Making Jira API request for issue details', {
     issueKey,
     cloudId: targetCloudId,
     fetchUrl: issueUrl,
-    authType,
-    requestToken: token
-  }));
-
-  // Get issue details using direct fetch API
-  const issueRes = await fetch(issueUrl, {
-    headers: {
-      Authorization: authorization,
-      Accept: 'application/json',
-    },
   });
+
+  // Get issue details using client
+  const issueRes = await client.fetch(issueUrl);
 
   logger.info('Issue fetch response', {
     status: issueRes.status,
