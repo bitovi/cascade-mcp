@@ -1,16 +1,37 @@
- # Cascading MCP Tools
+# Cascading MCP Tools
 
 <img width="60" height="60" alt="cascade-mcp" src="https://github.com/user-attachments/assets/79a3f9d3-d323-4948-a563-e6788b32cda9" align="left" /> Cascading MCP Tools provides a collection of MCP (Model Context Protocol) capabilities for [Bitovi's Cascading AI Enablement](https://bitovi.atlassian.net/wiki/spaces/AIEnabledDevelopment/pages/1523351554/Cascading+v1+Desktop+AI+implements+Figma+and+Jira). This service enables AI agents to work with design and project management tools through OAuth-authenticated integrations.
 
 <br clear="all" />
 
-**Key Capabilities:**
+Supported tools at the `https://cascade.bitovi.com/mcp` endpoint:
 
-- **Jira Integration**: Fetch issues, attachments, and images from Jira work items with full OAuth authentication
-- **Figma Integration**: Access Figma designs, download images, and analyze screen layouts
-- **Combined Tools**: Generate user stories from Figma designs and write them directly to Jira epics
-- **Multi-Provider OAuth**: Seamless authentication flow supporting both Atlassian and Figma
-- **Session Management**: Per-session MCP servers with dynamic tool registration based on user permissions
+**Combined Tools** (Multi-provider workflows):
+- **[`write-shell-stories`](./server/providers/combined/tools/writing-shell-stories/README.md)** - Generate shell stories from Figma designs linked in a Jira epic (analyzes screens, downloads assets, creates prioritized user stories using AI)
+- **[`write-epics-next-story`](./server/providers/combined/tools/write-next-story/README.md)** - Write the next Jira story from shell stories in an epic (validates dependencies, generates full story content, creates Jira issue with acceptance criteria)
+
+**Atlassian/Jira Tools**:
+- **[`atlassian-get-sites`](./server/providers/atlassian/tools/atlassian-get-sites.md)** - Get list of accessible Atlassian sites for the authenticated user
+- **[`atlassian-get-issue`](./server/providers/atlassian/tools/atlassian-get-issue.md)** - Retrieve complete details of a Jira issue by ID or key, including description, attachments, comments, and full field data
+- **[`atlassian-get-attachments`](./server/providers/atlassian/tools/atlassian-get-attachments.md)** - Fetch Jira attachments by attachment ID (returns base64-encoded content)
+- **[`atlassian-update-issue-description`](./server/providers/atlassian/tools/atlassian-update-issue-description.md)** - Update a Jira issue description with markdown content (automatically converted to ADF)
+- **[`search`](./server/providers/atlassian/tools/atlassian-search.md)** - Search Jira issues using JQL (Jira Query Language) with standardized document format output
+- **[`fetch`](./server/providers/atlassian/tools/atlassian-fetch.md)** - Fetch Jira issue details by issue key/ID in standardized document format (ChatGPT-compatible)
+
+**Figma Tools**:
+- **[`figma-get-user`](./server/providers/figma/tools/figma-get-user.md)** - Get information about the authenticated Figma user (test tool for OAuth validation)
+- **[`figma-get-image-download`](./server/providers/figma/tools/figma-get-image-download.md)** - Download images from Figma design URLs (returns base64-encoded image and metadata)
+- **[`figma-get-metadata-for-layer`](./server/providers/figma/tools/figma-get-metadata-for-layer.md)** - Get detailed metadata for a specific Figma layer including positioning and visual properties
+- **[`figma-get-layers-for-page`](./server/providers/figma/tools/figma-get-layers-for-page.md)** - List all top-level layers from a Figma page with layer IDs, names, types, and download URLs
+
+**Utility Tools**:
+- **[`utility-test-sampling`](./server/providers/utility/tools/utility-test-sampling.md)** - Test sampling functionality by sending prompts to the agent and logging the interaction (enables testing of agent capabilities and inter-MCP tool communication)
+
+Read the [documentation](./docs/rest-api.md) on accessing the following REST apis:
+
+- `POST /api/write-shell-stories`
+- `POST /api/write-epics-next-story`
+
 
 ## Use
 
@@ -28,13 +49,9 @@ Select the `HTTP` option:
 
 > <img width="1293" height="534" alt="image" src="https://github.com/user-attachments/assets/9cc34977-1178-4a97-a4d7-0253a34d28bd" />
 
-Paste the following URL and hit enter: `https://cascade.bitovi.com/mcp`
+Paste the following URL and hit enter: `https://cascade.bitovi.com/mcp`.
+Then, add `cascade-mcp` as the name and hit enter.
 
-> <img width="867" height="130" alt="image" src="https://github.com/user-attachments/assets/38395afc-b03d-4aff-a7e3-9f74ed902563" />
-
-Add `cascade-mcp` as the name and hit enter:
-
-> <img width="866" height="124" alt="image" src="https://github.com/user-attachments/assets/6bb9be89-8521-48e1-97e5-8f0fc51b240f" />
 
 You can use the following JSON too if the `Add Server` button did not work for you:
 

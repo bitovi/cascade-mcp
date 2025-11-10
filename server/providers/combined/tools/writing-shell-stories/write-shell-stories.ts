@@ -39,11 +39,11 @@ export function registerWriteShellStoriesTool(mcp: McpServer): void {
       description: 'Generate shell stories from Figma designs linked in a Jira epic. Analyzes screens, downloads assets, and creates prioritized user stories. Uses epic description content to guide prioritization and scope decisions.',
       inputSchema: {
         epicKey: z.string()
-          .describe('The Jira epic key (e.g., "PROJ-123", "USER-10"). The epic description should contain Figma design URLs and optional context about priorities, scope, and constraints.'),
+          .describe('Jira epic key (e.g., "PROJ-123" from https://bitovi.atlassian.net/browse/PROJ-123). Epic description must contain Figma design URLs and may include context about priorities, scope, and constraints.'),
         cloudId: z.string().optional()
           .describe('The cloud ID to specify the Jira site. If not provided, will use the first accessible site.'),
         siteName: z.string().optional()
-          .describe('The name of the Jira site to use (alternative to cloudId). Will search for a site with this name.'),
+          .describe('Jira site subdomain (e.g., "bitovi" from https://bitovi.atlassian.net). Alternative to cloudId.'),
       },
     },
     async ({ epicKey, cloudId, siteName }: WriteShellStoriesParams, context) => {
