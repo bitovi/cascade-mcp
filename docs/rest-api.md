@@ -55,7 +55,7 @@ X-Anthropic-Token: sk-ant-api03-...
 
 ## Endpoints
 
-### 1. Write Shell Stories
+### Write Shell Stories
 
 Generates prioritized shell stories from Figma designs linked in a Jira epic.
 
@@ -146,7 +146,7 @@ console.log(`Generated ${result.storyCount} shell stories`);
 
 ---
 
-### 2. Write Next Story
+### Write Next Story
 
 Writes the next Jira story from shell stories in an epic. Validates dependencies, generates full story content, creates Jira issue, and updates epic with completion marker.
 
@@ -326,49 +326,6 @@ For high-volume usage, consider:
 5. **Monitor token usage** - Watch for unexpected API calls
 6. **Validate tokens before deployment** - Run `npm run validate-pat-tokens` to verify permissions
 
-## Testing
-
-### Validate Your Tokens
-
-Before using the REST API, validate that your tokens have the correct permissions:
-
-```bash
-npm run validate-pat-tokens
-```
-
-This script will:
-- ✅ Verify both PAT tokens are valid and not expired
-- ✅ Check you have access to your Jira workspace
-- ✅ Confirm you have CREATE_ISSUES permission
-- ✅ Verify the Figma token can read file content
-- ✅ Display your user info and permissions
-
-**Required Environment Variables** (in `.env` file):
-```bash
-JIRA_TEST_PAT="base64-encoded-email:token"
-FIGMA_TEST_PAT="figd_..."
-ANTHROPIC_API_KEY="sk-ant-..."
-JIRA_TEST_CLOUD_ID="your-cloud-id"
-```
-
-### End-to-End Test
-
-Run the full E2E test to verify both endpoints work:
-
-```bash
-npm run test:e2e:rest-api
-```
-
-This test will:
-- ✅ Start the local server
-- ✅ Create a test epic in the PLAY project
-- ✅ Call `/api/write-shell-stories` with the epic key
-- ✅ Verify shell stories were generated
-- ✅ Call `/api/write-next-story` to create the first story
-- ✅ Verify the story was created successfully
-- ✅ Leave the epic for manual exploration
-
-**Expected duration:** ~2-3 minutes (includes AI generation)
 
 ## Troubleshooting
 
