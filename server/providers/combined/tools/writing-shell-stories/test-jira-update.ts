@@ -8,6 +8,7 @@ import type { McpServer } from '../../../../mcp-core/mcp-types.js';
 import { getAuthInfoSafe } from '../../../../mcp-core/auth-helpers.js';
 import { resolveCloudId, getJiraIssue, handleJiraAuthError } from '../../../atlassian/atlassian-helpers.js';
 import { convertMarkdownToAdf, validateAdf } from '../../../atlassian/markdown-converter.js';
+import { createAtlassianClient } from '../../../atlassian/atlassian-api-client.js';
 
 /**
  * Sample shell stories markdown for testing
@@ -93,14 +94,17 @@ export function registerTestJiraUpdateTool(mcp: McpServer): void {
       }
       
       try {
+        // Create Atlassian API client
+        const client = createAtlassianClient(token);
+        
         // Resolve cloud ID
         console.log('  Resolving cloud ID...');
-        const siteInfo = await resolveCloudId(token, cloudId, siteName);
+        const siteInfo = await resolveCloudId(client, cloudId, siteName);
         console.log('  ✅ Cloud ID resolved:', siteInfo.cloudId);
         
         // Fetch current epic
         console.log('  Fetching current epic description...');
-        const issueResponse = await getJiraIssue(siteInfo.cloudId, epicKey, undefined, token);
+        const issueResponse = await getJiraIssue(client, siteInfo.cloudId, epicKey, undefined);
         
         if (issueResponse.status === 404) {
           return {

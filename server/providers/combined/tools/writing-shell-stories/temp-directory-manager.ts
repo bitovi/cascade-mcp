@@ -137,18 +137,40 @@ async function cleanupOldDirectories(): Promise<void> {
 /**
  * Start periodic cleanup of old directories
  */
+let cleanupIntervalHandle: NodeJS.Timeout | null = null;
+
 function startPeriodicCleanup(): void {
-  setInterval(() => {
+  // Don't start multiple intervals
+  if (cleanupIntervalHandle) {
+    return;
+  }
+  
+  cleanupIntervalHandle = setInterval(() => {
     cleanupOldDirectories().catch(error => {
       console.error('Error during periodic temp directory cleanup:', error);
     });
   }, CLEANUP_INTERVAL_MS);
   
+  // Unref the timer so it doesn't keep the process alive in test environments
+  cleanupIntervalHandle.unref();
+  
   console.log('Started periodic temp directory cleanup (every 5 minutes, max age 24 hours)');
 }
 
-// Start cleanup on module load
-startPeriodicCleanup();
+/**
+ * Stop periodic cleanup (useful for tests)
+ */
+export function stopPeriodicCleanup(): void {
+  if (cleanupIntervalHandle) {
+    clearInterval(cleanupIntervalHandle);
+    cleanupIntervalHandle = null;
+  }
+}
+
+// Start cleanup on module load (only in non-test environments)
+if (process.env.NODE_ENV !== 'test' && !process.env.JEST_WORKER_ID) {
+  startPeriodicCleanup();
+}
 
 /**
  * List all active temp directories (for debugging)

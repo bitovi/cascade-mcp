@@ -6,6 +6,7 @@
  */
 
 import { logger } from '../../observability/logger.js';
+import type { FigmaClient } from './figma-api-client.js';
 
 /**
  * Parsed Figma URL information
@@ -81,21 +82,18 @@ export function convertNodeIdToApiFormat(urlNodeId: string): string {
  * @throws Error if request fails
  */
 export async function fetchFigmaFile(
+  client: FigmaClient,
   fileKey: string,
-  token: string,
   timeoutMs: number = 60000
 ): Promise<any> {
-  const figmaApiUrl = `https://api.figma.com/v1/files/${fileKey}`;
+  const figmaApiUrl = `${client.getBaseUrl()}/files/${fileKey}`;
   console.log('  Fetching Figma file:', fileKey);
   
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   
   try {
-    const response = await fetch(figmaApiUrl, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+    const response = await client.fetch(figmaApiUrl, {
       signal: controller.signal,
     });
     
@@ -130,35 +128,28 @@ export async function fetchFigmaFile(
 }
 
 /**
- * Fetch specific Figma node(s) using the /nodes endpoint (more efficient than fetching full file)
- * 
- * By default, this returns the node AND all its children (full subtree).
- * This is more efficient than fetchFigmaFile() when you only need a specific node.
- * 
- * @param fileKey - Figma file key
- * @param nodeId - Node ID in API format (e.g., "123:456")
- * @param token - Figma access token
- * @param timeoutMs - Request timeout in milliseconds (default 60000)
+ * Fetch a specific node from a Figma file (with all children/frames)
+ * @param client - Figma API client
+ * @param fileKey - The Figma file key
+ * @param nodeId - The node ID to fetch (in API format with colon)
+ * @param timeoutMs - Timeout in milliseconds
  * @returns Figma node data with full subtree
  * @throws Error if request fails or node not found
  */
 export async function fetchFigmaNode(
+  client: FigmaClient,
   fileKey: string,
   nodeId: string,
-  token: string,
   timeoutMs: number = 60000
 ): Promise<any> {
-  const figmaApiUrl = `https://api.figma.com/v1/files/${fileKey}/nodes?ids=${encodeURIComponent(nodeId)}`;
+  const figmaApiUrl = `${client.getBaseUrl()}/files/${fileKey}/nodes?ids=${encodeURIComponent(nodeId)}`;
   console.log('  Fetching Figma node:', { fileKey, nodeId });
   
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   
   try {
-    const response = await fetch(figmaApiUrl, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+    const response = await client.fetch(figmaApiUrl, {
       signal: controller.signal,
     });
     
@@ -245,20 +236,17 @@ export function extractNodeMetadata(node: any): FigmaNodeMetadata {
 }
 
 /**
- * Get metadata for a specific Figma layer/node
- * 
- * This is a convenience function that combines parsing, fetching, and finding.
- * 
- * @param url - Figma URL
- * @param nodeId - Node ID in URL format (e.g., "123-456")
- * @param token - Figma access token
+ * Get metadata for a specific node by fetching the file
+ * @param client - Figma API client
+ * @param url - Figma file URL
+ * @param nodeId - Node ID to extract metadata for (in URL format with dashes)
  * @returns Node metadata
  * @throws Error if URL is invalid, file can't be fetched, or node not found
  */
 export async function getNodeMetadata(
+  client: FigmaClient,
   url: string,
-  nodeId: string,
-  token: string
+  nodeId: string
 ): Promise<FigmaNodeMetadata> {
   // Parse URL
   const urlInfo = parseFigmaUrl(url);
@@ -267,7 +255,7 @@ export async function getNodeMetadata(
   }
   
   // Fetch file data
-  const fileData = await fetchFigmaFile(urlInfo.fileKey, token);
+  const fileData = await fetchFigmaFile(client, urlInfo.fileKey);
   
   // Convert node ID to API format
   const apiNodeId = convertNodeIdToApiFormat(nodeId);
@@ -407,17 +395,17 @@ export interface FigmaImageDownloadResult {
  * 
  * This fetches the image URL from Figma API, then downloads the actual image.
  * 
+ * @param client - Figma API client
  * @param fileKey - Figma file key
  * @param nodeId - Node ID in API format (e.g., "123:456")
- * @param token - Figma access token
  * @param options - Download options (format, scale)
  * @returns Image data as base64 with metadata
  * @throws Error if download fails
  */
 export async function downloadFigmaImage(
+  client: FigmaClient,
   fileKey: string,
   nodeId: string,
-  token: string,
   options: FigmaImageDownloadOptions = {}
 ): Promise<FigmaImageDownloadResult> {
   const { format = 'png', scale = 1 } = options;
@@ -425,7 +413,7 @@ export async function downloadFigmaImage(
   console.log(`  Downloading Figma image: ${nodeId} (${format}, ${scale}x)`);
   
   // Step 1: Get image URL from Figma API
-  const figmaApiUrl = `https://api.figma.com/v1/images/${fileKey}`;
+  const figmaApiUrl = `${client.getBaseUrl()}/images/${fileKey}`;
   const params = new URLSearchParams({
     ids: nodeId,
     format,
@@ -436,10 +424,7 @@ export async function downloadFigmaImage(
   const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
   
   try {
-    const response = await fetch(`${figmaApiUrl}?${params}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+    const response = await client.fetch(`${figmaApiUrl}?${params}`, {
       signal: controller.signal,
     });
     

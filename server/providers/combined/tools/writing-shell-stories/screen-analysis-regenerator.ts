@@ -10,8 +10,8 @@
 
 import * as path from 'path';
 import * as fs from 'fs/promises';
-import { CreateMessageResultSchema } from "@modelcontextprotocol/sdk/types.js";
-import type { McpServer } from '../../../../mcp-core/mcp-types.js';
+import type { FigmaClient } from '../../../figma/figma-api-client.js';
+import type { GenerateTextFn } from '../../../../llm-client/types.js';
 import type { FigmaNodeMetadata } from '../../../figma/figma-helpers.js';
 import { downloadFigmaImage } from '../../../figma/figma-helpers.js';
 import { writeNotesForScreen } from './note-text-extractor.js';
@@ -34,12 +34,12 @@ export interface ScreenToAnalyze {
  * Parameters for regenerating screen analyses
  */
 export interface RegenerateAnalysesParams {
-  mcp: McpServer;
+  generateText: GenerateTextFn;   // LLM client for generating analysis
+  figmaClient: FigmaClient;        // Figma API client with auth in closure
   screens: ScreenToAnalyze[];
   allFrames: FigmaNodeMetadata[];
   allNotes: FigmaNodeMetadata[];
   figmaFileKey: string;
-  figmaToken: string;
   tempDirPath: string;
   epicContext?: string;   // Optional epic description content for context
   notify?: (message: string) => Promise<void>;  // Optional progress callback
@@ -67,7 +67,7 @@ export interface RegenerateAnalysesResult {
 export async function regenerateScreenAnalyses(
   params: RegenerateAnalysesParams
 ): Promise<RegenerateAnalysesResult> {
-  const { mcp, screens, allFrames, allNotes, figmaFileKey, figmaToken, tempDirPath, epicContext, notify } = params;
+  const { generateText, figmaClient, screens, allFrames, allNotes, figmaFileKey, tempDirPath, epicContext, notify } = params;
   
   console.log(`Regenerating analysis for ${screens.length} screens...`);
   
@@ -82,9 +82,9 @@ export async function regenerateScreenAnalyses(
   } | null> {
     try {
       const imageResult = await downloadFigmaImage(
+        figmaClient,
         figmaFileKey,
         frameId,
-        figmaToken,
         { format: 'png', scale: 1 }
       );
       
@@ -190,34 +190,20 @@ export async function regenerateScreenAnalyses(
           epicContext
         );
 
-        // Send sampling request with image (while next image downloads)
-        const samplingResponse = await mcp.server.request({
-          "method": "sampling/createMessage",
-          "params": {
-            "messages": [
-              {
-                "role": "user",
-                "content": {
-                  "type": "text",
-                  "text": analysisPrompt
-                }
-              },
-              {
-                "role": "user",
-                "content": {
-                  "type": "image",
-                  "data": imageResult.base64Data,
-                  "mimeType": "image/png"
-                }
-              }
-            ],
-            "speedPriority": 0.5,
-            "systemPrompt": SCREEN_ANALYSIS_SYSTEM_PROMPT,
-            "maxTokens": SCREEN_ANALYSIS_MAX_TOKENS
-          }
-        }, CreateMessageResultSchema);
+        // Generate analysis using injected LLM client (with image)
+        const analysisResponse = await generateText({
+          prompt: analysisPrompt,
+          image: {
+            type: 'image',
+            data: imageResult.base64Data,
+            mimeType: 'image/png'
+          },
+          systemPrompt: SCREEN_ANALYSIS_SYSTEM_PROMPT,
+          maxTokens: SCREEN_ANALYSIS_MAX_TOKENS,
+          speedPriority: 0.5
+        });
         
-        const analysisText = samplingResponse.content?.text as string;
+        const analysisText = analysisResponse.text;
         if (!analysisText) {
           throw new Error('No analysis content received from AI');
         }

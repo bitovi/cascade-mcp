@@ -82,7 +82,7 @@ export function createMcpServer(authContext: AuthContext): McpServer {
   // Register combined tools only if BOTH providers are available
   if (authContext.atlassian && authContext.figma) {
     console.log('  Registering combined tools (atlassian + figma)');
-    combinedProvider.registerTools(mcp);
+    combinedProvider.registerTools(mcp, authContext);
     registeredProviders.push('combined');
   }
 

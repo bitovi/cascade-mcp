@@ -4,6 +4,7 @@ import { getAuthInfoSafe, handleJiraAuthError } from '../../../mcp-core/auth-hel
 import { resolveCloudId } from '../atlassian-helpers.ts';
 import { convertMarkdownToAdf, validateAdf, type ADFDocument } from '../markdown-converter.ts';
 import type { McpServer } from '../../../mcp-core/mcp-types.ts';
+import { createAtlassianClient } from '../atlassian-api-client.ts';
 
 // Tool parameters interface
 interface UpdateIssueDescriptionParams {
@@ -92,10 +93,13 @@ export function registerAtlassianUpdateIssueDescriptionTool(mcp: McpServer): voi
           };
         }
 
+        // Create Atlassian API client
+        const client = createAtlassianClient(token);
+        
         // Resolve the target cloud ID
         let siteInfo;
         try {
-          siteInfo = await resolveCloudId(token, cloudId, siteName);
+          siteInfo = await resolveCloudId(client, cloudId, siteName);
         } catch (error: any) {
           logger.error('Failed to resolve cloud ID:', error);
           return { 

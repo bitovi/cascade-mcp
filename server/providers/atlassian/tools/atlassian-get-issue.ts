@@ -9,6 +9,7 @@ import { resolveCloudId } from '../atlassian-helpers.ts';
 import { sanitizeObjectWithJWTs } from '../../../tokens.ts';
 import type { McpServer } from '../../../mcp-core/mcp-types.ts';
 import { getJiraIssue } from '../atlassian-helpers.ts';
+import { createAtlassianClient } from '../atlassian-api-client.ts';
 
 // Tool parameters interface
 interface GetJiraIssueParams {
@@ -88,10 +89,13 @@ export function registerAtlassianGetIssueTool(mcp: McpServer): void {
       }));
 
       try {
+        // Create Atlassian API client
+        const client = createAtlassianClient(token);
+        
         // Resolve the target cloud ID using the utility function
         let siteInfo;
         try {
-          siteInfo = await resolveCloudId(token, cloudId, siteName);
+          siteInfo = await resolveCloudId(client, cloudId, siteName);
         } catch (error: any) {
           logger.error('Failed to resolve cloud ID:', error);
           return { 
@@ -105,7 +109,7 @@ export function registerAtlassianGetIssueTool(mcp: McpServer): void {
         const targetCloudId = siteInfo.cloudId;
 
         // Build the API URL
-        const issueRes = await getJiraIssue(targetCloudId, issueKey, fields, token);
+        const issueRes = await getJiraIssue(client, targetCloudId, issueKey, fields);
 
         if (issueRes.status === 404) {
           logger.warn('Issue not found', { issueKey });

@@ -6,12 +6,8 @@
  */
 
 import { readFile } from 'fs/promises';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { resolveServerPath } from '../../../../utils/file-paths.js';
 import type { ParsedShellStory } from './shell-story-parser.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 /**
  * System prompt for story generation
@@ -42,7 +38,9 @@ export const STORY_GENERATION_MAX_TOKENS = 16000;
  * @returns Content of story-writing-guidelines.md
  */
 async function loadStoryWritingGuidelines(): Promise<string> {
-  const guidelinesPath = path.join(__dirname, 'story-writing-guidelines.md');
+  const guidelinesPath = resolveServerPath(
+    'providers/combined/tools/write-next-story/story-writing-guidelines.md'
+  );
   return await readFile(guidelinesPath, 'utf-8');
 }
 
