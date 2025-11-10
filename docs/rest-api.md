@@ -7,8 +7,7 @@ The Cascade MCP service provides REST API endpoints for generating Jira stories 
 ## Base URL
 
 ```
-http://localhost:3000  # Development
-https://your-domain.com  # Production
+https://cascade.bitovi.com  # Production
 ```
 
 ## Authentication
