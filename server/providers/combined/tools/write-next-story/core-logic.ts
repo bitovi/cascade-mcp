@@ -50,9 +50,11 @@ export interface ExecuteWriteNextStoryParams {
  */
 export interface ExecuteWriteNextStoryResult {
   success: boolean;
-  issueKey: string;
-  issueSelf: string;
-  storyTitle: string;
+  complete?: boolean;      // True when all stories are written
+  message?: string;        // Completion message when complete=true
+  issueKey?: string;       // Created issue key (present when complete=false)
+  issueSelf?: string;      // Created issue URL (present when complete=false)
+  storyTitle?: string;     // Created story title (present when complete=false)
   epicKey: string;
 }
 
@@ -97,14 +99,66 @@ export async function executeWriteNextStory(
   console.log(`  Parsed ${shellStories.length} shell stories`);
   
   if (shellStories.length === 0) {
-    throw new Error(`No shell stories found in epic ${epicKey}.`);
+    throw new Error(`
+📝 **No Shell Stories Found**
+
+**What happened:**
+Epic ${epicKey} has a "## Shell Stories" section, but no stories could be parsed from it
+
+**Possible causes:**
+- Shell stories are not in the expected markdown format
+- Story IDs are missing backticks (must be \`st001\`, \`st002\`, etc.)
+- Missing the ⟩ separator between title and description
+- Stories don't start with \`- \` (dash-space)
+- Shell stories section is empty
+
+**Expected format:**
+Each story must follow this format:
+\`\`\`
+- \`st001\` **Story Title** ⟩ Brief description
+  * SCREENS: [Screen Name](figma-url)
+  * DEPENDENCIES: st002, st003
+  * ✅ What's included
+  * ❌ What's excluded
+  * ❓ Open questions
+\`\`\`
+
+**Required elements:**
+- Start with \`- \` (dash-space)
+- Story ID in backticks: \`st001\`, \`st002\`, etc.
+- Title (can be bold with \`**Title**\`)
+- Separator: ⟩ (right angle quotation mark)
+- Description text after separator
+
+**How to fix:**
+1. Run \`write-shell-stories\` tool to generate properly formatted stories
+2. If manually editing, ensure each story follows the format above
+3. Check for missing backticks around story IDs (\`st001\` not st001)
+4. Verify the ⟩ separator exists between title and description
+5. Make sure stories start with \`- \` (dash-space)
+
+**Technical details:**
+- Epic: ${epicKey}
+- Shell Stories section exists but parsing returned 0 stories
+- Check shell story formatting in epic description
+`.trim());
   }
   
   // Step 4: Find next unwritten story
   const nextStory = await findNextUnwrittenStory(shellStories, notify);
   
   if (!nextStory) {
-    throw new Error(`All stories in epic ${epicKey} have been written! 🎉\n\nTotal stories: ${shellStories.length}`);
+    // All stories complete - return success result
+    const completionMessage = `All stories in epic ${epicKey} have been written! 🎉\n\nTotal stories: ${shellStories.length}`;
+    console.log(`  ${completionMessage}`);
+    await notify(completionMessage);
+    
+    return {
+      success: true,
+      complete: true,
+      message: completionMessage,
+      epicKey
+    };
   }
   
   console.log(`  Next story to write: ${nextStory.id} - ${nextStory.title}`);
@@ -177,7 +231,26 @@ export async function extractShellStoriesFromSetup(
   const shellStoriesMatch = setupResult.epicMarkdown.match(/## Shell Stories\n([\s\S]*?)(?=\n## |$)/);
   
   if (!shellStoriesMatch) {
-    throw new Error(`Epic ${setupResult.epicKey} does not contain a "## Shell Stories" section.`);
+    throw new Error(`
+📝 **Shell Stories Section Missing**
+
+**What happened:**
+Epic ${setupResult.epicKey} does not contain a "## Shell Stories" section
+
+**Possible causes:**
+- Shell stories have not been generated yet
+- The section header was renamed or deleted
+- Epic description was modified incorrectly
+
+**How to fix:**
+1. Run the \`write-shell-stories\` tool to generate shell stories
+2. Verify the epic description contains "## Shell Stories" as a markdown heading
+3. Check that the section wasn't accidentally deleted or renamed
+
+**Technical details:**
+- Epic: ${setupResult.epicKey}
+- Required section: "## Shell Stories"
+`.trim());
   }
 
   const shellStoriesContent = shellStoriesMatch[1].trim();
@@ -186,6 +259,12 @@ export async function extractShellStoriesFromSetup(
   // Parse shell stories
   await notify('Parsing shell stories...');
   const shellStories = parseShellStories(shellStoriesContent);
+  
+  // Log parsing details for debugging
+  if (shellStories.length === 0) {
+    console.warn('  ⚠️ Parsing returned 0 stories. First 200 chars of content:');
+    console.warn(`     "${shellStoriesContent.substring(0, 200)}..."`);
+  }
   
   return shellStories;
 }
@@ -227,11 +306,51 @@ export async function validateDependencies(
     const depStory = allStories.find(s => s.id === depId);
     
     if (!depStory) {
-      throw new Error(`Dependency ${depId} not found in shell stories for ${story.id}.`);
+      throw new Error(`
+🔗 **Dependency Not Found**
+
+**What happened:**
+Dependency "${depId}" referenced by story "${story.id}" does not exist in shell stories
+
+**Possible causes:**
+- The dependency ID was misspelled in the shell stories
+- The dependency was deleted or renamed
+- Shell stories were manually edited incorrectly
+
+**How to fix:**
+1. Verify the dependency ID "${depId}" exists in the "## Shell Stories" section
+2. Check for typos in the dependency reference
+3. If the dependency doesn't exist, remove it from story "${story.id}"
+4. Re-run \`write-shell-stories\` if stories were corrupted
+
+**Technical details:**
+- Story: ${story.id}
+- Missing dependency: ${depId}
+- Available stories: ${allStories.map(s => s.id).join(', ')}
+`.trim());
     }
     
     if (!depStory.jiraUrl) {
-      throw new Error(`Dependency ${depId} must be written before ${story.id}.\n\nPlease write story ${depId} first.`);
+      throw new Error(`
+🚧 **Dependency Not Yet Written**
+
+**What happened:**
+Story "${story.id}" depends on "${depId}", but that dependency hasn't been written to Jira yet
+
+**Possible causes:**
+- Stories are being written out of dependency order
+- A previous story creation failed
+
+**How to fix:**
+1. Run \`write-next-story\` again to write story "${depId}" first
+2. Keep running the tool until all dependencies are satisfied
+3. Dependencies will be written in the correct order automatically
+
+**Technical details:**
+- Story: ${story.id}
+- Unwritten dependency: ${depId}
+- The tool will automatically write dependencies in the correct order
+`.trim());
     }
     
     // Add dependencies of this dependency to check
@@ -324,10 +443,31 @@ export async function generateStoryContent(
   }
   
   if (analysisFiles.length === 0) {
-    throw new Error(
-      `No screen analysis files available for story ${story.id}.\n\n` +
-      `Attempted to regenerate ${missingScreens.length} missing files but failed.`
-    );
+    throw new Error(`
+📷 **Screen Analysis Files Missing**
+
+**What happened:**
+No screen analysis files are available for story ${story.id}
+
+**Possible causes:**
+- Figma images could not be downloaded
+- AI analysis failed for all screens
+- Temporary files were deleted
+- Network or API connectivity issues
+
+**How to fix:**
+1. Verify Figma file access and permissions
+2. Check that Figma token is still valid
+3. Ensure network connectivity to Figma API
+4. Retry the operation - analyses will be regenerated automatically
+5. Check Anthropic API key if AI analysis is failing
+
+**Technical details:**
+- Story: ${story.id}
+- Expected screens: ${story.screens.length}
+- Attempted to regenerate: ${missingScreens.length} files
+- All regeneration attempts failed
+`.trim());
   }
   
   console.log(`  Loaded ${analysisFiles.length} total analysis files`);
@@ -352,7 +492,30 @@ export async function generateStoryContent(
   });
   
   if (!response.text) {
-    throw new Error('No story content received from AI');
+    throw new Error(`
+🤖 **AI Story Generation Failed**
+
+**What happened:**
+No story content received from AI for story ${story.id}
+
+**Possible causes:**
+- AI service timeout or rate limit
+- Invalid prompt or context
+- Analysis files may be corrupted
+- Network connectivity issues
+
+**How to fix:**
+1. Wait a few minutes and retry the operation
+2. Verify your Anthropic API key is still valid
+3. Check that screen analysis files contain valid content
+4. Ensure network connectivity to Anthropic API
+
+**Technical details:**
+- Story: ${story.id}
+- Story title: ${story.title}
+- Analysis files loaded: ${analysisFiles.length}
+- AI response was empty or malformed
+`.trim());
   }
   
   console.log(`  ✅ Story generated (${response.text.length} characters)`);
@@ -385,7 +548,28 @@ export async function createJiraIssue(
   // Validate ADF
   const isValid = validateAdf(adfDocument);
   if (!isValid) {
-    throw new Error(`Invalid ADF document generated`);
+    throw new Error(`
+📄 **Invalid Story Format Generated**
+
+**What happened:**
+The AI-generated story content could not be converted to valid Jira format (ADF)
+
+**Possible causes:**
+- AI generated malformed markdown
+- Conversion process encountered unexpected content
+- Story content contains unsupported formatting
+
+**How to fix:**
+1. Retry the operation - the AI may generate valid content on retry
+2. Check if the story ${story.id} has unusual formatting requirements
+3. Review the shell story definition for issues
+4. Contact support if the problem persists
+
+**Technical details:**
+- Story: ${story.id}
+- ADF validation failed
+- Content length: ${storyContent.length} characters
+`.trim());
   }
   console.log(`  ✅ ADF validated successfully`);
   
@@ -400,7 +584,29 @@ export async function createJiraIssue(
   
   if (!metadataResponse.ok) {
     const errorText = await metadataResponse.text();
-    throw new Error(`Failed to get issue metadata: ${metadataResponse.status} ${errorText}`);
+    throw new Error(`
+🔧 **Failed to Fetch Jira Metadata**
+
+**What happened:**
+Could not retrieve issue type information from project ${projectKey}
+
+**Possible causes:**
+- Jira token expired or invalid
+- Project doesn't exist or was moved
+- Insufficient permissions on the project
+- Network connectivity issues
+
+**How to fix:**
+1. Verify the project key "${projectKey}" is correct
+2. Check that your Jira token hasn't expired
+3. Ensure you have "Create Issues" permission on project ${projectKey}
+4. Verify network connectivity to Jira
+
+**Technical details:**
+- Project: ${projectKey}
+- Status: ${metadataResponse.status}
+- Error: ${errorText}
+`.trim());
   }
   
   const metadata = await metadataResponse.json() as any;
@@ -415,7 +621,30 @@ export async function createJiraIssue(
   }
   
   if (!issueType) {
-    throw new Error(`Neither Story nor Task issue type found in project ${projectKey}. Available types: ${project?.issuetypes?.map((it: any) => it.name).join(', ')}`);
+    const availableTypes = project?.issuetypes?.map((it: any) => it.name).join(', ') || 'none';
+    throw new Error(`
+🎫 **No Suitable Issue Type Found**
+
+**What happened:**
+Project ${projectKey} doesn't have "Story" or "Task" issue types available
+
+**Possible causes:**
+- Project uses custom issue types
+- Issue types were renamed or removed
+- Insufficient permissions to create these issue types
+- Project configuration changed
+
+**How to fix:**
+1. Check your project's issue type configuration in Jira
+2. Ensure "Story" or "Task" issue types exist
+3. Verify you have permission to create these issue types
+4. Contact your Jira administrator if issue types were customized
+
+**Technical details:**
+- Project: ${projectKey}
+- Available issue types: ${availableTypes}
+- Looking for: "Story" or "Task"
+`.trim());
   }
   
   console.log(`  Found ${issueType.name} issue type with ID: ${issueType.id}`);
@@ -448,7 +677,33 @@ export async function createJiraIssue(
   if (!createResponse.ok) {
     const errorText = await createResponse.text();
     console.error(`  ❌ Jira API error response:`, errorText);
-    throw new Error(`Failed to create Jira issue: ${createResponse.status} ${createResponse.statusText}\n${errorText}`);
+    throw new Error(`
+❌ **Failed to Create Jira Issue**
+
+**What happened:**
+Could not create Jira story for "${story.title}"
+
+**Possible causes:**
+- Jira token expired or invalid
+- Insufficient permissions to create issues
+- Required fields are missing or invalid
+- Project configuration changed
+- Epic ${epicKey} doesn't exist or is not an Epic type
+
+**How to fix:**
+1. Verify your Jira token is still valid
+2. Check that you have "Create Issues" permission on project ${projectKey}
+3. Ensure epic ${epicKey} exists and is an Epic issue type
+4. Verify all required fields for ${projectKey} are satisfied
+5. Check Jira project settings for any required custom fields
+
+**Technical details:**
+- Story: ${story.id}
+- Title: ${story.title}
+- Epic: ${epicKey}
+- Status: ${createResponse.status} ${createResponse.statusText}
+- Error: ${errorText}
+`.trim());
   }
   
   const createdIssue = await createResponse.json() as { key: string; self: string };
@@ -525,7 +780,28 @@ export async function updateEpicWithCompletion(
   const shellStoriesMatch = epicMarkdown.match(/## Shell Stories\n([\s\S]*?)(?=\n## |$)/);
   
   if (!shellStoriesMatch) {
-    throw new Error(`Epic ${epicKey} does not contain a "## Shell Stories" section.`);
+    throw new Error(`
+📝 **Shell Stories Section Missing**
+
+**What happened:**
+Could not find "## Shell Stories" section in epic ${epicKey} when trying to mark story as complete
+
+**Possible causes:**
+- Epic description was modified manually
+- Shell Stories section was deleted
+- Section header was renamed
+
+**How to fix:**
+1. Check if epic ${epicKey} still has a "## Shell Stories" section
+2. If missing, restore it or re-run \`write-shell-stories\`
+3. Avoid manually editing the Shell Stories section
+
+**Technical details:**
+- Epic: ${epicKey}
+- Created story: ${createdIssue.key}
+- Story was created successfully but epic couldn't be updated
+- Required section: "## Shell Stories"
+`.trim());
   }
   
   const shellStoriesMarkdown = shellStoriesMatch[0];
@@ -550,7 +826,29 @@ export async function updateEpicWithCompletion(
   const updatedAdf = await convertMarkdownToAdf(updatedEpicMarkdown);
   
   if (!validateAdf(updatedAdf)) {
-    throw new Error('Invalid ADF generated from updated epic markdown');
+    throw new Error(`
+📄 **Invalid Epic Format Generated**
+
+**What happened:**
+Updated epic description could not be converted to valid Jira format (ADF)
+
+**Possible causes:**
+- Markdown conversion error when updating epic
+- Epic description contains unsupported formatting
+- Shell Stories section has invalid structure
+
+**How to fix:**
+1. Story ${createdIssue.key} was created successfully
+2. Manually add the Jira link to story ${story.id} in epic ${epicKey}
+3. Check epic description for formatting issues
+4. Contact support if the problem persists
+
+**Technical details:**
+- Epic: ${epicKey}
+- Created story: ${createdIssue.key}
+- Story ID: ${story.id}
+- ADF validation failed after updating epic markdown
+`.trim());
   }
   
   console.log(`  Converted updated epic to ADF`);
@@ -573,7 +871,32 @@ export async function updateEpicWithCompletion(
   
   if (!updateResponse.ok) {
     const errorText = await updateResponse.text();
-    throw new Error(`Failed to update epic: ${updateResponse.status} ${updateResponse.statusText}\n${errorText}`);
+    throw new Error(`
+❌ **Failed to Update Epic**
+
+**What happened:**
+Could not update epic ${epicKey} with completion marker for story ${story.id}
+
+**Possible causes:**
+- Jira token expired during operation
+- Insufficient permissions to edit the epic
+- Epic was locked or being edited by another user
+- Network connectivity issues
+
+**How to fix:**
+1. Story ${createdIssue.key} was created successfully
+2. Manually add the Jira link to story ${story.id} in epic ${epicKey}
+3. Verify you have "Edit Issues" permission on epic ${epicKey}
+4. Check if epic is locked or has edit restrictions
+5. Retry the operation
+
+**Technical details:**
+- Epic: ${epicKey}
+- Created story: ${createdIssue.key}
+- Story ID: ${story.id}
+- Status: ${updateResponse.status} ${updateResponse.statusText}
+- Error: ${errorText}
+`.trim());
   }
   
   console.log(`  ✅ Epic ${epicKey} updated successfully`);
@@ -593,7 +916,27 @@ function updateShellStoryInMarkdown(markdown: string, storyId: string, jiraUrl: 
   });
   
   if (storyLineIndex === -1) {
-    throw new Error(`Story ${storyId} not found in Shell Stories markdown`);
+    throw new Error(`
+🔍 **Story Not Found in Markdown**
+
+**What happened:**
+Could not find story "${storyId}" in the Shell Stories markdown
+
+**Possible causes:**
+- Story ID was changed or deleted
+- Epic description was manually edited
+- Shell Stories section structure was modified
+
+**How to fix:**
+1. Story ${jiraUrl} was created successfully
+2. Manually add the link to the story in epic's Shell Stories section
+3. Avoid manually editing the Shell Stories section structure
+
+**Technical details:**
+- Story ID: ${storyId}
+- Jira URL: ${jiraUrl}
+- Could not locate story in markdown for update
+`.trim());
   }
   
   const originalLine = lines[storyLineIndex];
