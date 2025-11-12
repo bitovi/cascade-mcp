@@ -175,10 +175,6 @@ export async function setupFigmaScreens(
   const issueResponse = await getJiraIssue(atlassianClient, siteInfo.cloudId, epicKey, undefined);
   handleJiraAuthError(issueResponse, 'Fetch epic');
   
-  if (!issueResponse.ok) {
-    throw new Error(`Failed to fetch epic ${epicKey}. Status: ${issueResponse.status} ${issueResponse.statusText}`);
-  }
-  
   const issue = await issueResponse.json() as JiraIssue;
   console.log('  Epic fetched successfully:', { key: issue.key, summary: issue.fields?.summary });
   

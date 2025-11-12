@@ -270,7 +270,29 @@ async function generateShellStoriesFromAnalyses(params: {
   const shellStoriesText = response.text;
   
   if (!shellStoriesText) {
-    throw new Error('No shell stories content received from AI');
+    throw new Error(`
+🤖 **AI Generation Failed**
+
+**What happened:**
+No shell stories content received from AI
+
+**Possible causes:**
+- AI service timeout or rate limit
+- Invalid prompt or context
+- Epic description may not contain valid Figma links
+- Network connectivity issues
+
+**How to fix:**
+1. Wait a few minutes and retry the operation
+2. Verify your Anthropic API key is still valid
+3. Check that the epic description contains accessible Figma design links
+4. Ensure the Figma files are not empty or corrupted
+
+**Technical details:**
+- AI response was empty or malformed
+- Screens analyzed: ${screens.length}
+- Analysis files loaded: ${analysisFiles.length}
+`.trim());
   }
   
   console.log(`    ✅ Shell stories generated (${shellStoriesText.length} characters)`);

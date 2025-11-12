@@ -6,6 +6,7 @@
 import { logger } from '../../observability/logger.ts';
 import { sanitizeObjectWithJWTs } from '../../tokens.ts';
 import type { ADFDocument } from './markdown-converter.ts';
+import { convertMarkdownToAdf } from './markdown-converter.ts';
 import type { AtlassianClient } from './atlassian-api-client.js';
 
 // Atlassian site information structure
@@ -47,10 +48,10 @@ function getTokenLogInfo(token?: string, prefix: string = 'Token'): Record<strin
 }
 
 /**
- * Handle Jira authentication errors from API responses
+ * Handle Jira API errors from HTTP responses
  * @param response - The fetch response object
  * @param operation - Description of the operation for logging
- * @throws Error if response indicates authentication failure
+ * @throws Error if response indicates any failure (401, 403, 404, 500, etc.)
  */
 export function handleJiraAuthError(response: Response, operation: string): void {
   if (response.status === 401) {
@@ -175,6 +176,63 @@ export async function resolveCloudId(
     };
   }
 }
+
+/**
+ * Add a comment to a Jira issue
+ * @param client - Atlassian API client
+ * @param cloudId - Cloud ID for the Jira site
+ * @param issueKey - Issue key (e.g., "PROJ-123")
+ * @param markdownText - Comment text in markdown format
+ * @returns Response from the Jira API
+ * @throws Error if comment posting fails
+ */
+export async function addIssueComment(
+  client: AtlassianClient,
+  cloudId: string,
+  issueKey: string,
+  markdownText: string
+): Promise<Response> {
+  logger.info('Adding comment to Jira issue', {
+    issueKey,
+    cloudId,
+    markdownLength: markdownText.length,
+  });
+
+  // Convert markdown to ADF
+  const adfBody = await convertMarkdownToAdf(markdownText);
+
+  // Construct comment URL
+  const commentUrl = `${client.getJiraBaseUrl(cloudId)}/issue/${issueKey}/comment`;
+
+  logger.info('Making Jira API request to post comment', {
+    issueKey,
+    cloudId,
+    commentUrl,
+    adfContentBlocks: adfBody.content?.length || 0,
+  });
+
+  // Post comment using client
+  const response = await client.fetch(commentUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ body: adfBody }),
+  });
+
+  logger.info('Comment post response', {
+    issueKey,
+    status: response.status,
+    statusText: response.statusText,
+    contentType: response.headers.get('content-type'),
+  });
+
+  // Handle errors
+  handleJiraAuthError(response, `Add comment to ${issueKey}`);
+
+  return response;
+}
+
 export async function getJiraIssue(
   client: AtlassianClient,
   targetCloudId: string,

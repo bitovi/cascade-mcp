@@ -6,11 +6,19 @@
  */
 
 import type { Request, Response } from 'express';
-import { createAtlassianClientWithPAT } from '../providers/atlassian/atlassian-api-client.js';
+import { createAtlassianClientWithPAT, type AtlassianClient } from '../providers/atlassian/atlassian-api-client.js';
 import { createFigmaClient } from '../providers/figma/figma-api-client.js';
 import { createAnthropicLLMClient } from '../llm-client/anthropic-client.js';
 import { executeWriteShellStories as defaultExecuteWriteShellStories, type ExecuteWriteShellStoriesParams } from '../providers/combined/tools/writing-shell-stories/core-logic.js';
 import type { ToolDependencies } from '../providers/combined/tools/types.js';
+import { resolveCloudId } from '../providers/atlassian/atlassian-helpers.js';
+import { logger } from '../observability/logger.js';
+import { 
+  handleApiError, 
+  validateApiHeaders, 
+  validateEpicKey,
+  type ErrorCommentContext 
+} from './api-error-helpers.js';
 
 /**
  * Dependencies that can be injected for testing
@@ -71,31 +79,23 @@ export async function handleWriteShellStories(req: Request, res: Response, deps:
   const createAtlassianClientFn = deps.createAtlassianClient || createAtlassianClientWithPAT;
   const createFigmaClientFn = deps.createFigmaClient || createFigmaClient;
   const createAnthropicLLMClientFn = deps.createAnthropicLLMClient || createAnthropicLLMClient;
+  
+  // Track context for error commenting (set after clients created)
+  let commentContext: ErrorCommentContext | null = null;
+  
   try {
     console.log('REST API: write-shell-stories called');
     
-    // Extract tokens from headers
-    const atlassianToken = req.headers['x-atlassian-token'] as string;
-    const figmaToken = req.headers['x-figma-token'] as string;
-    const anthropicApiKey = req.headers['x-anthropic-token'] as string;
+    // Extract and validate tokens from headers
+    const tokens = validateApiHeaders(req.headers, res);
+    if (!tokens) return; // Response already sent
     
-    // Validate tokens
-    if (!atlassianToken) {
-      return res.status(401).json({ success: false, error: 'Missing required header: X-Atlassian-Token' });
-    }
-    if (!figmaToken) {
-      return res.status(401).json({ success: false, error: 'Missing required header: X-Figma-Token' });
-    }
-    if (!anthropicApiKey) {
-      return res.status(401).json({ success: false, error: 'Missing required header: X-Anthropic-Token' });
-    }
+    const { atlassianToken, figmaToken, anthropicApiKey } = tokens;
     
     // Validate request body
-    const { epicKey, siteName, cloudId, sessionId } = req.body;
-    
-    if (!epicKey) {
-      return res.status(400).json({ success: false, error: 'Missing required field: epicKey' });
-    }
+    const { siteName, cloudId, sessionId } = req.body;
+    const epicKey = validateEpicKey(req.body, res);
+    if (!epicKey) return; // Response already sent
     
     console.log(`  Processing epic: ${epicKey}`);
     console.log(`  Site name: ${siteName || 'auto-detect'}`);
@@ -107,6 +107,15 @@ export async function handleWriteShellStories(req: Request, res: Response, deps:
     const figmaClient = createFigmaClientFn(figmaToken);
     const generateText = createAnthropicLLMClientFn(anthropicApiKey);
     
+    // Resolve cloudId BEFORE calling execute (needed for commenting)
+    console.log('  Resolving cloud ID...');
+    const { cloudId: resolvedCloudId } = await resolveCloudId(atlassianClient, cloudId, siteName);
+    console.log(`  Resolved cloud ID: ${resolvedCloudId}`);
+    
+    // Set comment context (can now comment if error occurs)
+    commentContext = { epicKey, cloudId: resolvedCloudId, client: atlassianClient };
+    logger.info('Comment context ready', { epicKey, cloudId: resolvedCloudId });
+    
     // Prepare dependencies with REST progress notifier
     const toolDeps = {
       atlassianClient,
@@ -115,11 +124,11 @@ export async function handleWriteShellStories(req: Request, res: Response, deps:
       notify: createRestProgressNotifier()
     };
     
-    // Call core logic
+    // Call core logic with resolved cloudId
     const result = await executeWriteShellStoriesFn(
       { 
         epicKey, 
-        cloudId, 
+        cloudId: resolvedCloudId,
         siteName, 
         sessionId
       },
@@ -133,21 +142,6 @@ export async function handleWriteShellStories(req: Request, res: Response, deps:
     });
     
   } catch (error: any) {
-    console.error('REST API: write-shell-stories failed:', error);
-    
-    // Handle specific error types
-    if (error.constructor.name === 'InvalidTokenError') {
-      return res.status(401).json({
-        success: false,
-        error: 'Invalid authentication tokens'
-      });
-    }
-    
-    // Generic error response
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Internal server error',
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
+    await handleApiError(error, res, commentContext);
   }
 }
