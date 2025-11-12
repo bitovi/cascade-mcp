@@ -72,14 +72,14 @@ async function tryPostErrorComment(
       errorType: error.constructor.name
     });
     
-    await addIssueComment(
+    const { commentId } = await addIssueComment(
       context.client,
       context.cloudId,
       context.epicKey,
       error.message  // Already markdown-formatted!
     );
     
-    logger.info('Successfully posted error comment', { epicKey: context.epicKey });
+    logger.info('Successfully posted error comment', { epicKey: context.epicKey, commentId });
   } catch (commentError: any) {
     if (commentError.status === 404) {
       logger.warn('Could not comment - epic may have been deleted', { epicKey: context.epicKey });

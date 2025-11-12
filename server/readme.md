@@ -37,6 +37,22 @@
   Implements specific Jira operations like fetching issues, sites, and updating descriptions.  
   *Example*: `tool-get-accessible-sites.ts::handler()` - Fetch Atlassian sites
 
+- **api/** - REST API Handlers  
+  Express route handlers for PAT-authenticated REST API endpoints.
+  - **api/write-shell-stories.ts** - Generate shell stories from Figma designs in a Jira epic
+  - **api/write-next-story.ts** - Write the next Jira story from shell stories
+  - **api/progress-comment-manager.ts** - Progress tracking via Jira comments
+  - **api/api-error-helpers.ts** - Shared error handling and validation
+
+- **api/progress-comment-manager.ts** - Progress Comment Management  
+  Manages creating and updating progress comments on Jira issues during long-running operations.
+  - **Lazy Initialization**: Comment created on first progress notification
+  - **Real-time Updates**: Continuously updates comment with new progress messages as numbered list
+  - **Error Handling**: Appends error details with two-part format (indicator + full details)
+  - **Graceful Degradation**: Falls back to console-only after 3 consecutive comment failures
+  - **Always Logs**: Console.log() backup ensures progress is always visible
+  *Example*: `createProgressCommentManager(context)` - Create manager for an operation
+
 ## Available MCP Tools
 
 ### Standard Atlassian Tools

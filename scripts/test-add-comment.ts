@@ -61,8 +61,8 @@ async function testAddComment() {
     // Test 1: Simple text comment
     console.log('3️⃣  Test 1: Posting simple text comment...');
     const simpleComment = 'This is a test comment from the addIssueComment function. ✅';
-    await addIssueComment(client, resolvedCloudId, epicKey, simpleComment);
-    console.log('   ✅ Simple comment posted\n');
+    const { commentId: commentId1 } = await addIssueComment(client, resolvedCloudId, epicKey, simpleComment);
+    console.log(`   ✅ Simple comment posted (ID: ${commentId1})\n`);
     
     // Test 2: Markdown formatted comment
     console.log('4️⃣  Test 2: Posting markdown formatted comment...');
@@ -90,8 +90,8 @@ function test() {
 ✅ This comment was posted using the \`addIssueComment\` helper function.
 `.trim();
     
-    await addIssueComment(client, resolvedCloudId, epicKey, markdownComment);
-    console.log('   ✅ Markdown comment posted\n');
+    const { commentId: commentId2 } = await addIssueComment(client, resolvedCloudId, epicKey, markdownComment);
+    console.log(`   ✅ Markdown comment posted (ID: ${commentId2})\n`);
     
     // Test 3: Error-style comment (simulates what would be posted on failure)
     console.log('5️⃣  Test 3: Posting error-style comment...');
@@ -117,8 +117,8 @@ This is a simulated error message to test error commenting
 - Test timestamp: ${new Date().toISOString()}
 `.trim();
     
-    await addIssueComment(client, resolvedCloudId, epicKey, errorComment);
-    console.log('   ✅ Error-style comment posted\n');
+    const { commentId: commentId3 } = await addIssueComment(client, resolvedCloudId, epicKey, errorComment);
+    console.log(`   ✅ Error-style comment posted (ID: ${commentId3})\n`);
     
     console.log('✅ All tests passed!');
     console.log(`\nCheck Jira issue ${epicKey} for the 3 test comments.`);

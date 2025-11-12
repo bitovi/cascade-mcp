@@ -74,7 +74,7 @@ export async function executeWriteShellStories(
   console.log('  Starting shell story generation for epic:', epicKey);
 
   // Send initial progress notification
-  await notify(`Starting shell story generation for epic ${epicKey}...`);
+  // await notify(`Starting shell story generation for epic ${epicKey}...`);
 
   // ==========================================
   // PHASE 1.5: Create temp directory for data
@@ -85,13 +85,12 @@ export async function executeWriteShellStories(
   const { path: tempDirPath } = await getTempDir(sessionId, epicKey);
   
   console.log('  Temp directory ready:', tempDirPath);
-  await notify(`Using temp directory: ${path.basename(tempDirPath)}`);
 
   // ==========================================
   // PHASE 1-3: Fetch epic, extract context, setup Figma screens
   // ==========================================
   console.log('  Phase 1-3: Setting up epic and Figma screens...');
-  await notify('Phase 1-3: Fetching epic and Figma metadata...');
+  await notify('📝 Preparation: Fetching epic and Figma metadata...');
   
   const setupResult = await setupFigmaScreens({
     epicKey,
@@ -117,7 +116,7 @@ export async function executeWriteShellStories(
   } = setupResult;
   
   console.log(`  Phase 1-3 complete: ${figmaUrls.length} Figma URLs, ${screens.length} screens, ${allNotes.length} notes`);
-  await notify(`✅ Phase 1-3 Complete: ${screens.length} screens ready`);
+  await notify(`✅ Preparation Complete: ${screens.length} screens ready`);
 
   // ==========================================
   // PHASE 4: Download images and analyze screens
@@ -125,7 +124,7 @@ export async function executeWriteShellStories(
   console.log('  Phase 4: Downloading images and analyzing screens...');
   
   // Add steps for all screens to be analyzed
-  await notify(`Phase 4: Starting analysis of ${screens.length} screens...`, screens.length);
+  await notify(`📝 AI Screen Analysis: Starting analysis of ${screens.length} screens...`, screens.length);
   
   const { analyzedScreens } = await regenerateScreenAnalyses({
     generateText,
@@ -143,7 +142,7 @@ export async function executeWriteShellStories(
   });
   
   console.log(`  Phase 4 complete: ${analyzedScreens}/${screens.length} screens analyzed`);
-  await notify(`✅ Phase 4 Complete: Analyzed ${analyzedScreens} screens`);
+  await notify(`✅ AI Screen Analysis: Analyzed ${analyzedScreens} screens`);
 
   // ==========================================
   // PHASE 5: Generate shell stories from analyses
@@ -160,7 +159,7 @@ export async function executeWriteShellStories(
   // ==========================================
   // PHASE 6: Write shell stories back to Jira epic
   // ==========================================
-  await notify('📝 Phase 6: Updating Jira epic...');
+  await notify('📝 Jira Update: Updating Jira epic...');
   
   let shellStoriesContent = '';
   if (shellStoriesResult.shellStoriesPath) {
@@ -214,7 +213,7 @@ async function generateShellStoriesFromAnalyses(params: {
   
   console.log('  Phase 5: Generating shell stories from analyses...');
   
-  await notify('Phase 5: Generating shell stories from screen analyses...');
+  await notify('📝 Shell Story Generation: Generating shell stories from screen analyses...');
   
   // Read screens.yaml for screen ordering
   const screensYamlContent = await fs.readFile(yamlPath, 'utf-8');
@@ -310,7 +309,7 @@ No shell stories content received from AI
   const storyMatches = shellStoriesText.match(/^- `?st\d+/gm);
   const storyCount = storyMatches ? storyMatches.length : 0;
   
-  await notify(`✅ Phase 5 Complete: Generated ${storyCount} shell stories`);
+  await notify(`✅ Shell Story Generation Complete: Generated ${storyCount} shell stories`);
   
   return { storyCount, analysisCount: analysisFiles.length, shellStoriesPath };
 }
@@ -400,7 +399,7 @@ async function updateEpicWithShellStories({
     handleJiraAuthError(updateResponse, `Update epic ${epicKey} description`);
     
     console.log('    ✅ Epic description updated successfully');
-    await notify(`✅ Phase 6 Complete: Epic updated with shell stories`);
+    //await notify(`✅ Jira Update Complete: Epic updated with shell stories`);
     
   } catch (error: any) {
     console.log(`    ⚠️ Error updating epic: ${error.message}`);

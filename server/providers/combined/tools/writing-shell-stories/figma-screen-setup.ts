@@ -178,6 +178,15 @@ export async function setupFigmaScreens(
   const issue = await issueResponse.json() as JiraIssue;
   console.log('  Epic fetched successfully:', { key: issue.key, summary: issue.fields?.summary });
   
+
+
+  // ==========================================
+  // Step 2: Extract epic context (excluding Shell Stories)
+  // ==========================================
+  if (notify) {
+    await notify('Extracting epic content...');
+  }
+
   const projectKey = issue.fields?.project?.key;
   if (!projectKey) {
     throw new Error(`Epic ${epicKey} has no project key.`);
@@ -202,12 +211,7 @@ export async function setupFigmaScreens(
     throw new Error(`No Figma URLs found in epic ${epicKey}. Please add Figma design links to the epic description.`);
   }
   
-  // ==========================================
-  // Step 2: Extract epic context (excluding Shell Stories)
-  // ==========================================
-  if (notify) {
-    await notify('Extracting epic content...');
-  }
+
   
   let epicContext = '';
   let contentWithoutShellStories: ADFNode[] = [];
@@ -338,7 +342,7 @@ export async function setupFigmaScreens(
   // Step 4: Generate screens.yaml
   // ==========================================
   if (notify) {
-    await notify('Generating screens.yaml...');
+    await notify('Saving preparation data...');
   }
   
   const yamlContent = generateScreensYaml(screens, unassociatedNotes);
@@ -350,9 +354,6 @@ export async function setupFigmaScreens(
   // ==========================================
   // Step 5: Write notes files for each screen
   // ==========================================
-  if (notify) {
-    await notify('Writing notes files...');
-  }
   
   let downloadedNotes = 0;
   for (const screen of screens) {

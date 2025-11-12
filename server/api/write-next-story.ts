@@ -28,6 +28,10 @@ import {
   validateEpicKey,
   type ErrorCommentContext 
 } from './api-error-helpers.js';
+import { 
+  createProgressCommentManager,
+  type ProgressCommentManager 
+} from './progress-comment-manager.js';
 
 /**
  * Dependencies that can be injected for testing
@@ -37,16 +41,6 @@ export interface WriteNextStoryHandlerDeps {
   createAtlassianClient?: typeof createAtlassianClientWithPAT;
   createFigmaClient?: typeof createFigmaClient;
   createAnthropicLLMClient?: typeof createAnthropicLLMClient;
-}
-
-/**
- * Simple progress notifier for REST API
- * Logs progress to console instead of sending to MCP client
- */
-function createRestProgressNotifier() {
-  return async (message: string) => {
-    console.log(`[Progress] ${message}`);
-  };
 }
 
 /**
@@ -95,6 +89,7 @@ export async function handleWriteNextStory(req: Request, res: Response, deps: Wr
   
   // Track context for error commenting (set after clients created)
   let commentContext: ErrorCommentContext | null = null;
+  let progressManager: ProgressCommentManager | null = null;
   
   try {
     console.log('REST API: write-next-story called');
@@ -128,12 +123,18 @@ export async function handleWriteNextStory(req: Request, res: Response, deps: Wr
     commentContext = { epicKey, cloudId: resolvedCloudId, client: atlassianClient };
     logger.info('Comment context ready', { epicKey, cloudId: resolvedCloudId });
     
-    // Prepare dependencies with REST progress notifier
+    // Create progress comment manager
+    progressManager = createProgressCommentManager({
+      ...commentContext,
+      operationName: 'Write Next Story'
+    });
+    
+    // Prepare dependencies with progress comment notifier
     const toolDeps = {
       atlassianClient,
       figmaClient,
       generateText,
-      notify: createRestProgressNotifier()
+      notify: progressManager.getNotifyFunction()
     };
     
     // Call core logic with resolved cloudId
@@ -147,6 +148,13 @@ export async function handleWriteNextStory(req: Request, res: Response, deps: Wr
       toolDeps
     );
     
+    // Notify success based on result type
+    if (result.complete) {
+      await progressManager.notify(`✅ All stories in epic ${epicKey} have been written!`);
+    } else {
+      await progressManager.notify(`✅ Successfully created story: ${result.storyTitle} (${result.issueKey})`);
+    }
+    
     // Return success response
     res.json({
       ...result,
@@ -154,6 +162,31 @@ export async function handleWriteNextStory(req: Request, res: Response, deps: Wr
     });
     
   } catch (error: any) {
-    await handleApiError(error, res, commentContext);
+    console.error('REST API: write-next-story failed:', error);
+    
+    // Handle auth errors (no comment)
+    if (error.constructor.name === 'InvalidTokenError') {
+      return res.status(401).json({
+        success: false,
+        error: error.message
+      });
+    }
+    
+    // If progress manager exists, append error to progress comment
+    // This replaces the separate error comment functionality
+    if (progressManager) {
+      await progressManager.appendError(error.message);
+    } else if (commentContext) {
+      // Fallback: If manager wasn't created yet, use old error comment system
+      await handleApiError(error, res, commentContext);
+      return;
+    }
+    
+    // Return error response
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 }

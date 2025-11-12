@@ -28,6 +28,12 @@ export interface ResolvedSiteInfo {
   siteUrl: string;
 }
 
+// Result from adding a comment to a Jira issue
+export interface CommentResult {
+  commentId: string;
+  response: Response;
+}
+
 /**
  * Helper function to safely log token information without exposing sensitive data
  * @param token - The token to log info about
@@ -183,7 +189,7 @@ export async function resolveCloudId(
  * @param cloudId - Cloud ID for the Jira site
  * @param issueKey - Issue key (e.g., "PROJ-123")
  * @param markdownText - Comment text in markdown format
- * @returns Response from the Jira API
+ * @returns CommentResult with commentId and response
  * @throws Error if comment posting fails
  */
 export async function addIssueComment(
@@ -191,7 +197,7 @@ export async function addIssueComment(
   cloudId: string,
   issueKey: string,
   markdownText: string
-): Promise<Response> {
+): Promise<CommentResult> {
   logger.info('Adding comment to Jira issue', {
     issueKey,
     cloudId,
@@ -229,6 +235,76 @@ export async function addIssueComment(
 
   // Handle errors
   handleJiraAuthError(response, `Add comment to ${issueKey}`);
+
+  // Parse response to extract comment ID
+  const responseJson = await response.json() as { id: string };
+  const commentId = responseJson.id;
+
+  logger.info('Comment created successfully', {
+    issueKey,
+    commentId,
+  });
+
+  return { commentId, response };
+}
+
+/**
+ * Update an existing comment on a Jira issue
+ * @param client - Atlassian API client
+ * @param cloudId - Cloud ID for the Jira site
+ * @param issueKey - Issue key (e.g., "PROJ-123")
+ * @param commentId - ID of the comment to update
+ * @param markdownText - Updated comment text in markdown format
+ * @returns Response from the Jira API
+ * @throws Error if comment update fails
+ */
+export async function updateIssueComment(
+  client: AtlassianClient,
+  cloudId: string,
+  issueKey: string,
+  commentId: string,
+  markdownText: string
+): Promise<Response> {
+  logger.info('Updating comment on Jira issue', {
+    issueKey,
+    cloudId,
+    commentId,
+    markdownLength: markdownText.length,
+  });
+
+  // Convert markdown to ADF
+  const adfBody = await convertMarkdownToAdf(markdownText);
+
+  // Construct comment update URL
+  const commentUrl = `${client.getJiraBaseUrl(cloudId)}/issue/${issueKey}/comment/${commentId}`;
+
+  logger.info('Making Jira API request to update comment', {
+    issueKey,
+    cloudId,
+    commentId,
+    commentUrl,
+    adfContentBlocks: adfBody.content?.length || 0,
+  });
+
+  // Update comment using client
+  const response = await client.fetch(commentUrl, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ body: adfBody }),
+  });
+
+  logger.info('Comment update response', {
+    issueKey,
+    commentId,
+    status: response.status,
+    statusText: response.statusText,
+    contentType: response.headers.get('content-type'),
+  });
+
+  // Handle errors
+  handleJiraAuthError(response, `Update comment ${commentId} on ${issueKey}`);
 
   return response;
 }
