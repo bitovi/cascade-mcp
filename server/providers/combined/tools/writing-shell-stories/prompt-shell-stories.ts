@@ -159,21 +159,25 @@ ${analysisSection}
 6. **PROMOTE MINUSES INTO CANDIDATE STORIES**
    • Turn meaningful - items into new top-level stories. Add them to the prioritized list.
    • CRITICAL: Only promote deferrals that reference actual UI elements or functionality visible in the screens. Do not create speculative stories for features that don't exist in the designs.
+   • GUARD CHECK: Before promoting a - item, verify the feature exists in screen analysis:
+     ◦ Can you point to the screen where this feature is visible?
+     ◦ Or does epic explicitly command "implement [feature]"?
+     ◦ If neither: DO NOT promote to a story - remove the - bullet entirely
 
-6. **UPDATE STORY TITLE**
+7. **UPDATE STORY TITLE**
    • Rewrite the story title to match the narrowed scope (e.g., "Add promotion to cart (basic success flow)" instead of "Add promotion").
 
-7. **REPEAT**
-   • For the next highest-priority story, repeat steps 3–6 until all major flows and incremental user-value slices are represented as shell stories.
+8. **REPEAT**
+   • For the next highest-priority story, repeat steps 3–7 until all major flows and incremental user-value slices are represented as shell stories.
 
-8. **PRE-REVIEW EVIDENCE CHECK**
+9. **PRE-REVIEW EVIDENCE CHECK**
    • Before the systematic review, do a quick scan:
    • List all UI elements mentioned in each analysis file
    • List all interactive behaviors described in each analysis file
    • Verify every story bullet references something from these lists
    • Flag any bullets that seem to add functionality beyond what's documented
 
-9. **REVIEW FOR INCREMENTAL CONSISTENCY (SYSTEMATIC VERIFICATION)**
+10. **REVIEW FOR INCREMENTAL CONSISTENCY (SYSTEMATIC VERIFICATION)**
    • MANDATORY: Create a systematic checklist and work through each story methodically. Do NOT skip this step or do a superficial review.
 
    A) Cross-check deferrals (feature-by-feature audit):
@@ -225,22 +229,22 @@ ${analysisSection}
       • Verify each story can be completed independently in 1-2 sprints
       • Ensure the progression makes sense from a user value perspective
 
-10. **REMOVE DRAFT SECTIONS**
+11. **REMOVE DRAFT SECTIONS**
     • Delete the "Initial Story Name List" section entirely
     • Delete the "Prioritized Stories (by Customer Value...)" section entirely
     • Verify only "Final Prioritized Stories" section remains
 
-11. **VERIFY STORY NUMBERING**
+12. **VERIFY STORY NUMBERING**
     • Confirm all stories are numbered sequentially (st001, st002, st003...)
     • Update any dependency references to match final story IDs
     • Verify all ❌ bullets referencing deferred features have correct story IDs (e.g., "see st015")
 
-12. **FINAL STRUCTURE VALIDATION**
+13. **FINAL STRUCTURE VALIDATION**
     • Confirm file contains exactly one story list
     • Verify each story has all required sub-bullets (SCREENS, DEPENDENCIES, +, -, ¿)
     • Ensure no incomplete or draft story entries remain
 
-13. **FINAL EVIDENCE VERIFICATION**
+14. **FINAL EVIDENCE VERIFICATION**
     • Re-read each story as if you're a developer who only has the screen analysis files
     • Can you implement every + bullet based solely on the provided documentation?
     • If any bullet requires assumptions or guesswork, revise it or convert to a ¿ question
@@ -286,6 +290,7 @@ ${analysisSection}
 
 • Output ONLY the final prioritized stories with complete details
 • Do NOT include the initial story list in the final output
+• Do NOT add any headings before the story list (no "Final Prioritized Stories" or similar)
 • One top-level bullet per story: \`- \`st{story number}\` **{short descriptive title}** ⟩ {one sentence description of the story}\`
 • Sub-bullets for each story (use proper markdown nested bullets with 2-space indentation and emoji symbols):
   * SCREENS: {Figma URLs formatted as markdown links with screen names as link text}

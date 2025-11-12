@@ -2,11 +2,13 @@
 
 ## Problem Statement
 
-The current single-prompt shell story generation process (13 steps) is complex and error-prone:
+The current single-prompt shell story generation process (14 steps) is complex and error-prone:
 - AI sometimes forgets to create deferred implementation stories
 - AI sometimes replaces stories instead of appending them
+- **AI hallucinates features not present in screens or epic context** (e.g., adding "- Filtering (defer)" to stories where filtering UI doesn't exist)
 - Long prompt with many instructions increases chance of mistakes
 - Difficult to debug which phase is causing issues
+- Epic context guidance gets misinterpreted as feature requirements, leading to speculative stories
 
 ## Proposed Solutions
 
@@ -25,7 +27,7 @@ Split into conceptually distinct phases that mirror human workflow.
 
 **Input**: 
 - Epic description
-- Screen analysis file list (titles only, not full content)
+- Screen analysis files
 - Figma metadata summaries
 
 **Output**: Simple numbered list
@@ -45,6 +47,7 @@ st016: Implement Data Export
 - Shorter prompt = less context to track
 - Epic context and prioritization are global decisions made together
 - Creates stable story numbering that won't change
+- **Anti-hallucination: Must cite ANALYSIS screens for each story, making fabricated stories obvious**
 
 #### **Prompt 2: Story Detailing**
 **Goal**: Add ANALYSIS, DEPENDENCIES, +, -, ¿ bullets to each story
@@ -87,6 +90,7 @@ st001: User Login - Basic authentication flow
 - Full screen analysis content only loaded when needed
 - Can focus on evidence-based detailing
 - Story list is fixed, only adding details
+- **Anti-hallucination: Guard checks enforce that + and - bullets reference features from loaded analysis files only**
 
 #### **Handling Prompt 2 Discovered Stories**
 
@@ -153,6 +157,7 @@ Split the planning phase further for even better focus.
 - Simple task: "Find all stories"
 - Already includes ANALYSIS references for context
 - No prioritization complexity
+- **Anti-hallucination: Forces explicit citation of which screens contain each feature, evidence trail from the start**
 
 #### **Prompt 2: Story Prioritizer**
 **Goal**: Order stories by user value
@@ -204,6 +209,7 @@ st015: Implement Advanced Filtering
 - Only loads relevant screen analyses
 - Very focused context
 - Easy to retry individual stories
+- **Anti-hallucination: Physical constraint - AI can ONLY reference features from the 2-3 analysis files loaded for this story**
 
 #### **Handling Prompt 3 Discovered Stories**
 
@@ -262,6 +268,284 @@ async function detailStory(story, allStories) {
 | **Debugging** | Two points of failure | Three points, but easier to isolate |
 | **Story Quality** | Good | Potentially better (more focused attention per story) |
 | **Epic Context** | Fresh in Prompts 1-2 | Fresh in Prompts 1-2, might fade by Prompt 3 |
+| **Hallucination Prevention** | Good (guard checks in Prompt 2) | Excellent (physical context constraint per story) |
+
+## Hallucination Prevention
+
+A critical benefit of splitting prompts is preventing the AI from creating stories or deferrals for features that don't exist in screens or epic context.
+
+### The Hallucination Problem
+
+**Current Single-Prompt Issue:**
+```
+Epic says: "Defer filtering, sorting, and location map until the end"
+
+AI processes st011: Application Agreement Tab
+- Screen shows: Pricing configuration, no filtering/sorting/maps
+- AI thinks: "Epic mentioned filtering, I should defer it here"
+- Result: st011 gets "- Filtering (defer to st013)" even though filtering UI doesn't exist on this screen
+```
+
+This creates noise and confusion - stories reference features that aren't relevant to them.
+
+### How Option A (Two-Prompt Split) Prevents Hallucination
+
+#### **Prompt 1: Story Planning**
+```markdown
+TASK: Generate story list with ANALYSIS citations
+
+OUTPUT REQUIREMENT:
+- st001: Display Basic Applicant List
+  * ANALYSIS: applicants-new
+- st011: Display Application Agreement Tab
+  * ANALYSIS: application-agreement-fixed, application-agreement-rate
+- st013: Implement Filtering Feature (epic deferred)
+  * ANALYSIS: applicants-new, applicants-in-progress  ← Must cite screens!
+```
+
+**Prevention Mechanism:**
+- Forces AI to cite which screens contain each feature
+- If AI tries to create `st014: Advanced AI Recommendations` without citing screens, it's immediately detectable
+- ANALYSIS bullets act as an evidence trail
+
+**Example Validation:**
+```
+Story: st013: Implement Filtering Feature
+ANALYSIS: applicants-new, applicants-in-progress
+
+✅ Valid - Filtering UI appears in these screens
+❌ Invalid - If no filtering UI in these screens, prompt fails validation
+```
+
+#### **Prompt 2: Story Detailing**
+```markdown
+TASK: Add details to st011 using ONLY its cited screens
+
+INPUT CONTEXT:
+- Story: st011: Display Application Agreement Tab
+- ANALYSIS: application-agreement-fixed, application-agreement-rate
+- Loaded files: application-agreement-fixed.md, application-agreement-rate.md
+
+AI searches loaded context for features to defer...
+Searches: No filtering, no sorting, no maps found
+Result: Clean story with only agreement-related bullets
+```
+
+**Prevention Mechanism:**
+- Only loads analysis files cited in story's ANALYSIS bullets
+- Guard check in Step 6: "Before adding - bullet, can you point to screen where feature is visible?"
+- Step 10.D validates every bullet against loaded screen content
+- Physical scoping: Can only reference what's loaded
+
+**Guard Check Example:**
+```markdown
+AI attempts: "- Filtering (defer to st013)"
+
+Guard Check Triggers:
+Q: "Can you point to the screen where filtering is visible?"
+A: Searches application-agreement-fixed.md and application-agreement-rate.md
+   Result: No filtering UI found
+Action: DO NOT add this - bullet, remove it entirely
+```
+
+### How Option B (Three-Prompt Split) Is Even Better
+
+#### **Prompt 1: Story Gatherer**
+```markdown
+TASK: List every feature you see + epic-commanded features
+
+OUTPUT:
+- Display Application Agreement Tab
+  ANALYSIS: application-agreement-fixed, application-agreement-rate
+  VISIBLE FEATURES: Pricing config, rate table, term controls
+  
+- Implement Filtering (epic commanded)
+  ANALYSIS: applicants-new, applicants-in-progress
+  EPIC DIRECTIVE: "Defer filtering until end"
+  VISIBLE FEATURES: Filter dropdowns, status buttons
+```
+
+**Prevention Mechanism:**
+- Separates feature discovery from prioritization
+- Explicit listing of visible features per story
+- Epic directives distinguished from screen observations
+
+#### **Prompt 3: Per-Story Detailer**
+```markdown
+TASK: Detail ONLY st011 using ONLY its 2 analysis files
+
+LOADED CONTEXT (physically constrained):
+- application-agreement-fixed.md (15KB)
+- application-agreement-rate.md (12KB)
+
+AI cannot possibly reference filtering/sorting/maps because:
+- Those files aren't loaded
+- No information about those features in context
+- Physical impossibility to hallucinate what isn't present
+```
+
+**Prevention Mechanism:**
+- **Strongest constraint**: AI literally cannot see other features
+- Minimal context = minimal hallucination surface area
+- Per-story isolation = one story's hallucination doesn't spread to others
+- Parallelization allows independent validation per story
+
+**Example Flow:**
+```typescript
+// Detailing st011: Application Agreement Tab
+const story = {
+  id: "st011",
+  analyses: ["application-agreement-fixed", "application-agreement-rate"]
+};
+
+// Load ONLY these 2 files (total ~27KB)
+const context = loadAnalyses(story.analyses);
+
+// AI works with minimal, focused context
+// Cannot reference filtering (not loaded)
+// Cannot reference sorting (not loaded)
+// Cannot reference maps (not loaded)
+
+// Output: Clean story with only agreement-specific bullets
+```
+
+### Comparison of Anti-Hallucination Mechanisms
+
+| Mechanism | Single Prompt | Option A | Option B |
+|-----------|---------------|----------|----------|
+| **Context Size** | All analyses (~200KB) | All analyses (~200KB) | Per-story (~30KB) |
+| **Evidence Trail** | Post-hoc validation | ANALYSIS citations upfront | ANALYSIS + loaded files list |
+| **Scope Enforcement** | Instructions only | Guard checks + loaded context | Physical file constraint |
+| **Validation Points** | 3 steps (8, 10.D, 13) | 2 prompts × 2 steps each | 3 prompts with isolated validation |
+| **Cascading Errors** | High (one mistake spreads) | Medium (Prompt 1 errors affect all) | Low (per-story isolation) |
+| **Debuggability** | Hard to trace | Moderate (2 artifacts) | Easy (per-story artifacts) |
+
+### Real-World Example: Agreement Tab Story
+
+**Current Single Prompt (Hallucination):**
+```markdown
+st011: Display Application Agreement Tab
+- ANALYSIS: application-agreement-fixed, application-agreement-rate
+- DEPENDENCIES: st001
+- + Pricing configuration table
+- + Rate selection dropdown
+- ❌ Status filtering (defer to st013)  ← HALLUCINATED
+- ❌ Sorting by columns (defer to st014)  ← HALLUCINATED
+- ❌ Location map integration (defer to st015)  ← HALLUCINATED
+- ¿ How to validate pricing rules?
+```
+
+**Option A (Guard Check Prevention):**
+```markdown
+st011: Display Application Agreement Tab
+- ANALYSIS: application-agreement-fixed, application-agreement-rate
+- DEPENDENCIES: st001
+- + Pricing configuration table
+- + Rate selection dropdown
+- ¿ How to validate pricing rules?
+
+Guard Check Results:
+- "Status filtering" - NOT FOUND in application-agreement-* files → REMOVED
+- "Sorting" - NOT FOUND in application-agreement-* files → REMOVED
+- "Location map" - NOT FOUND in application-agreement-* files → REMOVED
+```
+
+**Option B (Physical Constraint Prevention):**
+```
+Prompt 3 Input Context (only these files loaded):
+---
+application-agreement-fixed.md:
+# Page Structure
+Shows pricing configuration table with fixed rate options...
+
+application-agreement-rate.md:
+# Page Structure  
+Shows rate selection dropdown and term controls...
+---
+
+AI searches for features to defer: Finds only pricing/rate features
+Result: No filtering/sorting/maps mentioned because they're not in loaded context
+```
+
+### Implementation: Adding Hallucination Guards
+
+Both options require specific prompt changes:
+
+**Option A - Prompt 2 Guard Check (Step 6):**
+```markdown
+6. **PROMOTE MINUSES INTO CANDIDATE STORIES**
+   • Turn meaningful - items into new top-level stories
+   • GUARD CHECK: Before promoting a - item, verify feature exists:
+     ◦ Search THIS story's ANALYSIS files for the feature
+     ◦ Can you quote the section describing this feature?
+     ◦ Or does epic explicitly command "implement [feature]"?
+     ◦ If neither: DO NOT promote - remove the - bullet entirely
+   
+   EXAMPLE VALIDATION:
+   Story: st011 (ANALYSIS: application-agreement-fixed, application-agreement-rate)
+   Attempted - bullet: "Filtering (defer to st013)"
+   
+   Check: Search application-agreement-*.md for "filter" or "filtering"
+   Result: Not found
+   Action: Remove this - bullet (feature not in story's screens)
+```
+
+**Option B - Prompt 3 Context Constraint:**
+```typescript
+// Build prompt with explicit file list
+const prompt = `
+You are detailing story st011: Display Application Agreement Tab
+
+LOADED ANALYSIS FILES (these are your ONLY sources):
+1. application-agreement-fixed.md
+2. application-agreement-rate.md
+
+CRITICAL RULE:
+- Only add + or - bullets for features explicitly described in these 2 files
+- Do NOT reference features from other stories
+- Do NOT assume features that "should" exist
+- If a feature isn't in these 2 files, it doesn't exist for this story
+
+[Full content of 2 files follows...]
+`;
+```
+
+### Success Metrics for Hallucination Prevention
+
+Track these metrics before/after split:
+
+| Metric | Single Prompt | Target (Split) |
+|--------|---------------|----------------|
+| **Stories with hallucinated - bullets** | 12/17 (71%) | <20% |
+| **False deferrals per story** | 3.2 avg | <0.5 avg |
+| **Stories requiring manual cleanup** | 8/17 (47%) | <3/17 (18%) |
+| **Evidence validation failures** | 45% of bullets | <10% of bullets |
+| **User-reported "irrelevant deferral" issues** | 5 per epic | <1 per epic |
+
+### Future Enhancement: Automated Validation
+
+Add post-generation validation:
+```typescript
+async function validateStoryEvidence(story, analysisFiles) {
+  for (const bullet of story.plusBullets) {
+    const evidence = findEvidence(bullet.text, analysisFiles);
+    if (!evidence) {
+      console.warn(`❌ No evidence for: ${bullet.text}`);
+      bullet.flagged = true;
+    }
+  }
+  
+  for (const bullet of story.minusBullets) {
+    const evidence = findEvidence(bullet.feature, story.analysisFiles);
+    if (!evidence) {
+      console.warn(`❌ Hallucinated deferral: ${bullet.feature} not in ${story.id}'s screens`);
+      bullet.flagged = true;
+    }
+  }
+}
+```
+
+This automated check could run after generation to flag suspicious bullets for human review.
 
 ## Recommendations
 
@@ -270,8 +554,9 @@ async function detailStory(story, allStories) {
 **Rationale**:
 1. Significant improvement over current single-prompt with manageable complexity
 2. Clean conceptual split: planning vs. detailing
-3. Solves the immediate problems (deferred stories, story replacement)
+3. Solves the immediate problems (deferred stories, story replacement, **feature hallucination**)
 4. Easier to implement and debug
+5. **ANALYSIS citations provide evidence trail, guard checks prevent fabricated deferrals**
 
 **Implementation Priority**:
 1. Create `prompt-shell-stories-planning.ts` (steps 1-3, 11)
@@ -285,11 +570,13 @@ If Option A still has issues:
 - Story Gatherer makes story discovery even simpler
 - Per-story detailing allows parallelization for speed
 - Better memory efficiency (only load relevant analyses per story)
+- **Strongest hallucination prevention (physical context constraint)**
 
 **Trigger Points for Upgrade**:
 - Prompt 1 consistently misses stories
 - Prompt 2 discovers many new stories (indicates Prompt 1 insufficient)
 - Very large epics with 30+ stories where context size becomes issue
+- **Hallucination rate still >20% with Option A (Option B's physical constraint would help)**
 
 ---
 
@@ -387,6 +674,8 @@ Track these to validate improvement:
 3. **Completeness**: Average number of stories discovered vs. expected
 4. **Evidence Quality**: % of + bullets that have clear evidence in analyses
 5. **Manual Edits**: How many stories need human correction after generation
+6. **Hallucination Rate**: % of stories with irrelevant - bullets (features not in their screens)
+7. **False Deferral Count**: Average number of incorrect deferrals per story
 
 Compare before/after split implementation.
 
@@ -469,6 +758,8 @@ export function generateStoryPlanningPrompt(
 - "Only create implementation stories for features that actually appear in the screen analyses" (prevents speculative stories)
 - "Do NOT add detailed bullets yet - this is planning phase only"
 - Epic context section emphasizes creating implementation stories at END of list
+- **"Each story MUST cite ANALYSIS screens - if you cannot cite a screen, the story is invalid"**
+- **"Distinguish between epic commands ('implement X') and epic context ('X is important') - only commands create stories"**
 
 #### File 2: `prompt-story-detailing.ts`
 
@@ -496,6 +787,8 @@ export function generateStoryDetailingPrompt(
 
 • Only add - bullets for features that appear in THIS story's screen analyses
 • Do NOT add global deferrals to unrelated stories
+• GUARD CHECK: Before adding any - bullet, search the story's ANALYSIS files for the feature
+• If feature not found in story's screens, DO NOT add the - bullet
 • Example violations to AVOID:
   ❌ Adding "- Filtering (defer)" to Agreement Tab story when filtering isn't on Agreement tab
   ❌ Adding "- Location map (defer)" to every story when location map only appears in Location tab story

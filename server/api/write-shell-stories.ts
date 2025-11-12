@@ -19,6 +19,10 @@ import {
   validateEpicKey,
   type ErrorCommentContext 
 } from './api-error-helpers.js';
+import { 
+  createProgressCommentManager,
+  type ProgressCommentManager 
+} from './progress-comment-manager.js';
 
 /**
  * Dependencies that can be injected for testing
@@ -28,16 +32,6 @@ export interface WriteShellStoriesHandlerDeps {
   createAtlassianClient?: typeof createAtlassianClientWithPAT;
   createFigmaClient?: typeof createFigmaClient;
   createAnthropicLLMClient?: typeof createAnthropicLLMClient;
-}
-
-/**
- * Simple progress notifier for REST API
- * Logs progress to console instead of sending to MCP client
- */
-function createRestProgressNotifier() {
-  return async (message: string) => {
-    console.log(`[Progress] ${message}`);
-  };
 }
 
 /**
@@ -82,6 +76,7 @@ export async function handleWriteShellStories(req: Request, res: Response, deps:
   
   // Track context for error commenting (set after clients created)
   let commentContext: ErrorCommentContext | null = null;
+  let progressManager: ProgressCommentManager | null = null;
   
   try {
     console.log('REST API: write-shell-stories called');
@@ -116,12 +111,18 @@ export async function handleWriteShellStories(req: Request, res: Response, deps:
     commentContext = { epicKey, cloudId: resolvedCloudId, client: atlassianClient };
     logger.info('Comment context ready', { epicKey, cloudId: resolvedCloudId });
     
-    // Prepare dependencies with REST progress notifier
+    // Create progress comment manager
+    progressManager = createProgressCommentManager({
+      ...commentContext,
+      operationName: 'Write Shell Stories'
+    });
+    
+    // Prepare dependencies with progress comment notifier
     const toolDeps = {
       atlassianClient,
       figmaClient,
       generateText,
-      notify: createRestProgressNotifier()
+      notify: progressManager.getNotifyFunction()
     };
     
     // Call core logic with resolved cloudId
@@ -135,6 +136,9 @@ export async function handleWriteShellStories(req: Request, res: Response, deps:
       toolDeps
     );
     
+    // Notify success
+    await progressManager.notify(`✅ Jira Update Complete: Successfully generated ${result.storyCount} shell stories`);
+    
     // Return success response
     res.json({
       ...result,
@@ -142,6 +146,31 @@ export async function handleWriteShellStories(req: Request, res: Response, deps:
     });
     
   } catch (error: any) {
-    await handleApiError(error, res, commentContext);
+    console.error('REST API: write-shell-stories failed:', error);
+    
+    // Handle auth errors (no comment)
+    if (error.constructor.name === 'InvalidTokenError') {
+      return res.status(401).json({
+        success: false,
+        error: error.message
+      });
+    }
+    
+    // If progress manager exists, append error to progress comment
+    // This replaces the separate error comment functionality
+    if (progressManager) {
+      await progressManager.appendError(error.message);
+    } else if (commentContext) {
+      // Fallback: If manager wasn't created yet, use old error comment system
+      await handleApiError(error, res, commentContext);
+      return;
+    }
+    
+    // Return error response
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 }
