@@ -11,18 +11,47 @@ import type { FigmaClient } from './figma-api-client.js';
 /**
  * Create a user-friendly rate limit error message
  * @param technicalDetails - Technical error details from API response
+ * @param retryAfterSeconds - Seconds to wait before retrying (from retry-after header)
+ * @param rateLimitType - Figma rate limit type (from x-figma-rate-limit-type header)
  * @returns Formatted error message
  */
-export function createRateLimitErrorMessage(technicalDetails: string): string {
-  return (
-    `Figma API rate limit exceeded. Please wait a few minutes before trying again.\n\n` +
-    `Figma limits the number of API requests to prevent abuse. Your account has temporarily hit this limit.\n\n` +
-    `What you can do:\n` +
-    `• Wait 5-15 minutes for the rate limit to reset\n` +
-    `• If you're making multiple requests, space them out over time\n` +
-    `• Check if other tools/scripts are using your Figma token simultaneously\n\n` +
-    `Technical details: ${technicalDetails}`
-  );
+export function createRateLimitErrorMessage(
+  technicalDetails: string, 
+  retryAfterSeconds?: number,
+  rateLimitType?: string
+): string {
+  let waitTime = '5-15 minutes';
+  
+  if (retryAfterSeconds) {
+    const hours = Math.floor(retryAfterSeconds / 3600);
+    const minutes = Math.floor((retryAfterSeconds % 3600) / 60);
+    
+    if (hours >= 24) {
+      const days = Math.floor(hours / 24);
+      waitTime = `~${days} day${days > 1 ? 's' : ''} (${hours} hours)`;
+    } else if (hours > 0) {
+      waitTime = `~${hours} hour${hours > 1 ? 's' : ''}`;
+    } else if (minutes > 15) {
+      waitTime = `~${minutes} minutes`;
+    }
+  }
+  
+  const tierInfo = rateLimitType 
+    ? `
+- Your token is on the "${rateLimitType}" rate limit tier - consider checking your Figma plan settings`
+    : '';
+  
+  return `Figma API rate limit exceeded.
+
+Figma limits API requests to prevent abuse. Your account/token has hit this limit.
+
+What you can do:
+- Wait ${waitTime} for the rate limit to reset${tierInfo}
+- Check if other tools/scripts are using your Figma token simultaneously
+- Consider generating a new Personal Access Token with appropriate rate limits
+- Contact Figma support if this seems incorrect for your plan
+
+Technical details: ${technicalDetails}`;
 }
 
 /**
@@ -120,15 +149,29 @@ export async function fetchFigmaFile(
     
     if (!response.ok) {
       const errorText = await response.text();
+      
+      // Extract all response headers for debugging
+      const headers: Record<string, string> = {};
+      response.headers.forEach((value, key) => {
+        headers[key] = value;
+      });
+      
       logger.error('Figma API error response', {
         status: response.status,
         statusText: response.statusText,
+        headers: headers,
         body: errorText,
       });
       
       // Handle rate limiting with user-friendly message
       if (response.status === 429) {
-        throw new Error(createRateLimitErrorMessage(errorText));
+        const retryAfter = response.headers.get('retry-after');
+        const rateLimitType = response.headers.get('x-figma-rate-limit-type');
+        throw new Error(createRateLimitErrorMessage(
+          errorText, 
+          retryAfter ? parseInt(retryAfter, 10) : undefined,
+          rateLimitType || undefined
+        ));
       }
       
       throw new Error(`Figma API error: ${response.status} ${response.statusText} - ${errorText}`);
@@ -182,15 +225,29 @@ export async function fetchFigmaNode(
     
     if (!response.ok) {
       const errorText = await response.text();
+      
+      // Extract all response headers for debugging
+      const headers: Record<string, string> = {};
+      response.headers.forEach((value, key) => {
+        headers[key] = value;
+      });
+      
       logger.error('Figma API error response', {
         status: response.status,
         statusText: response.statusText,
+        headers: headers,
         body: errorText,
       });
       
       // Handle rate limiting with user-friendly message
       if (response.status === 429) {
-        throw new Error(createRateLimitErrorMessage(errorText));
+        const retryAfter = response.headers.get('retry-after');
+        const rateLimitType = response.headers.get('x-figma-rate-limit-type');
+        throw new Error(createRateLimitErrorMessage(
+          errorText, 
+          retryAfter ? parseInt(retryAfter, 10) : undefined,
+          rateLimitType || undefined
+        ));
       }
       
       throw new Error(`Figma API error: ${response.status} ${response.statusText} - ${errorText}`);
@@ -469,7 +526,13 @@ export async function downloadFigmaImage(
       
       // Handle rate limiting with user-friendly message
       if (response.status === 429) {
-        throw new Error(createRateLimitErrorMessage(errorText));
+        const retryAfter = response.headers.get('retry-after');
+        const rateLimitType = response.headers.get('x-figma-rate-limit-type');
+        throw new Error(createRateLimitErrorMessage(
+          errorText, 
+          retryAfter ? parseInt(retryAfter, 10) : undefined,
+          rateLimitType || undefined
+        ));
       }
       
       throw new Error(`Figma images API error: ${response.status} ${response.statusText}`);
