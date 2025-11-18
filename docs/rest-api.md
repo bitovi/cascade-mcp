@@ -47,6 +47,7 @@ X-Anthropic-Token: sk-ant-api03-...
 3. Copy the token (starts with `figd_...`)
 4. Required scopes:
    - File content - Read only
+   - File comments - Read only
 
 **Anthropic API Key:**
 1. Go to https://console.anthropic.com/settings/keys
