@@ -100,6 +100,13 @@ export async function regenerateScreenAnalyses(
       return imageResult;
     } catch (error: any) {
       console.log(`  ⚠️  Failed to download image for ${screen.name}: ${error.message}`);
+      
+      // If this is a rate limit error, propagate it to the user
+      if (error.message && error.message.includes('Figma API rate limit exceeded')) {
+        throw error;
+      }
+      
+      // For other errors, return null and continue with remaining screens
       return null;
     }
   }
