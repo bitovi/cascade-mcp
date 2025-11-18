@@ -42,14 +42,14 @@ export interface FigmaClient {
  * ```typescript
  * const client = createFigmaClient(token);
  * 
- * // Fetch with auth automatically included (X-Figma-Token header)
+ * // Fetch with auth automatically included (Authorization Bearer header)
  * const response = await client.fetch(
  *   `${client.getBaseUrl()}/files/${fileKey}/nodes?ids=${nodeId}`,
  *   { method: 'GET' }
  * );
  * ```
  * 
- * @note Figma uses X-Figma-Token header for authentication, not Authorization Bearer
+ * @note OAuth tokens use Authorization Bearer, PATs use X-Figma-Token
  * @see https://www.figma.com/developers/api#authentication
  */
 export function createFigmaClient(accessToken: string): FigmaClient {
@@ -62,16 +62,22 @@ export function createFigmaClient(accessToken: string): FigmaClient {
   return {
     fetch: async (url: string, options: RequestInit = {}) => {
       // Token is captured in this closure!
-      // Figma uses X-Figma-Token header, not Authorization Bearer
+      // OAuth tokens use Authorization Bearer header (figu_ prefix)
+      // PATs use X-Figma-Token header (figd_ prefix)
+      const isOAuthToken = accessToken.startsWith('figu_');
       const headers = {
         ...options.headers,
-        'X-Figma-Token': accessToken,
+        ...(isOAuthToken 
+          ? { 'Authorization': `Bearer ${accessToken}` }
+          : { 'X-Figma-Token': accessToken }
+        ),
       };
       
       console.log('🔍 Figma fetch call:', {
         url: url.substring(0, 80) + '...',
         hasToken: !!accessToken,
         tokenInHeader: accessToken?.substring(0, 20) + '...',
+        headerType: isOAuthToken ? 'Authorization Bearer' : 'X-Figma-Token',
         allHeaders: Object.keys(headers),
       });
       

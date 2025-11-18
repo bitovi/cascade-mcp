@@ -257,18 +257,215 @@ async function detailStory(story, allStories) {
 
 ---
 
+### **Option C: Three-Prompt Split (Composite, Generate, Validate)**
+
+A different approach that creates a single normalized context before story generation.
+
+#### **Prompt 1: Feature Compositor**
+**Goal**: Consolidate all screen analyses into a single normalized feature catalog
+
+**Steps**:
+1. Read all screen analysis files
+2. Extract every unique feature and behavior
+3. For each feature, list which screens contain it
+4. Assign reference IDs to each feature
+5. Remove duplication (feature mentioned in multiple screens → single entry)
+
+**Input**:
+- All screen analysis files
+- Epic context
+
+**Output**: Normalized feature catalog
+```markdown
+# Feature Catalog
+
+[F001] User Authentication
+- Screens: login-screen, header
+- Description: Email/password input fields with validation
+- Behavior: Submit triggers backend auth, shows loading state
+
+[F002] Dashboard Overview
+- Screens: dashboard
+- Description: User statistics cards (total users, active sessions, revenue)
+- Behavior: Auto-refreshes every 30 seconds
+
+[F003] Status Filtering
+- Screens: applicants-new, applicants-in-progress
+- Description: Dropdown with "All", "New", "In Progress", "Complete" options
+- Behavior: Filters table on selection
+
+[F004] Pricing Configuration
+- Screens: application-agreement-fixed, application-agreement-rate
+- Description: Table with rate options and terms
+- Behavior: User selects pricing tier
+
+[F005] Location Map (epic deferred)
+- Screens: application-map
+- Description: Interactive map showing applicant locations
+- Behavior: Click marker shows applicant details
+```
+
+**Benefits**:
+- **Deduplication**: Feature mentioned across 5 screens → appears once with all screen references
+- **Significantly smaller context**: Instead of 5 full analyses (~200KB), you have 1 catalog (~50KB)
+- **Clear feature inventory**: Easy to see what exists and where
+- **Reference IDs**: Enable precise citation in stories
+
+#### **Prompt 2: Story Generator (with Citations)**
+**Goal**: Generate complete shell stories with reference IDs for every feature mentioned
+
+**Steps**:
+- Very similar to current single-prompt approach (all 14 steps)
+- BUT: Must cite [F###] reference ID for every feature in + and - bullets
+- Create deferred implementation stories at the end
+
+**Input**:
+- Feature catalog from Prompt 1
+- Epic context
+- Screens.yaml for ordering
+
+**Output**: Shell stories with reference IDs
+```markdown
+# Final Prioritized Stories
+
+st001: User Login - Basic authentication flow
+- ANALYSIS: login-screen
+- DEPENDENCIES: none
+- + [F001] Email/password input fields
+- + [F001] "Login" button with validation
+- + [F001] Loading state during auth
+- - [F001] OAuth providers (defer to st017)
+- ¿ Password reset flow in this story?
+
+st002: Dashboard View - Show user overview
+- ANALYSIS: dashboard
+- DEPENDENCIES: st001
+- + [F002] User statistics cards
+- + [F002] Auto-refresh every 30s
+- ¿ Should cards be configurable?
+
+...
+
+st011: Display Application Agreement Tab
+- ANALYSIS: application-agreement-fixed, application-agreement-rate
+- DEPENDENCIES: st001
+- + [F004] Pricing configuration table
+- + [F004] Rate selection controls
+- ¿ How to validate pricing rules?
+
+st015: Implement Status Filtering
+- ANALYSIS: applicants-new, applicants-in-progress
+- DEPENDENCIES: st001, st002
+- + [F003] Status filter dropdown
+- + [F003] Table filtering on selection
+- ¿ Persist filter state in URL?
+
+st016: Implement Location Map
+- ANALYSIS: application-map
+- DEPENDENCIES: st001
+- + [F005] Interactive map display
+- + [F005] Applicant markers
+- + [F005] Click marker shows details
+```
+
+**Benefits**:
+- **Traceable**: Every feature has explicit citation back to catalog
+- **Validation-ready**: Can verify every [F###] exists in catalog
+- **Familiar workflow**: Uses proven 14-step process (no new prompt design)
+- **Context efficient**: ~50KB catalog vs ~200KB full analyses
+
+#### **Prompt 3: Validator & Cleanup**
+**Goal**: Verify citations and remove reference IDs for clean output
+
+**Steps**:
+1. **Validation Phase**:
+   - Check every [F###] reference exists in catalog
+   - Verify features in story match the story's cited screens
+   - Flag hallucinated deferrals (e.g., st011 references [F003] but F003 isn't on agreement screens)
+   - Suggest fixes for any issues found
+
+2. **Cleanup Phase**:
+   - Remove all [F###] reference IDs (user doesn't need to see them)
+   - Final formatting check
+   - Ensure story numbering is sequential
+
+**Input**:
+- Shell stories with reference IDs (from Prompt 2)
+- Feature catalog (for validation)
+
+**Output**: Clean shell stories
+```markdown
+# Final Prioritized Stories
+
+st001: User Login - Basic authentication flow
+- ANALYSIS: login-screen
+- DEPENDENCIES: none
+- + Email/password input fields
+- + "Login" button with validation
+- + Loading state during auth
+- - OAuth providers (defer to st017)
+- ¿ Password reset flow in this story?
+
+st002: Dashboard View - Show user overview
+- ANALYSIS: dashboard
+- DEPENDENCIES: st001
+- + User statistics cards
+- + Auto-refresh every 30s
+- ¿ Should cards be configurable?
+```
+
+**Benefits**:
+- **Automated validation**: Catches hallucinations before they reach the user
+- **Clean output**: No technical artifacts in final stories
+- **Self-documenting**: Validation errors explain what's wrong
+- **Safety net**: If Prompt 2 makes mistakes, Prompt 3 catches them
+
+#### **Hallucination Prevention Mechanism**
+
+**Example of Caught Hallucination:**
+
+```markdown
+Prompt 2 Output (with error):
+st011: Display Application Agreement Tab
+- + [F004] Pricing configuration
+- - [F003] Status filtering (defer to st015)  ← ERROR!
+
+Prompt 3 Validation:
+❌ Error in st011: References [F003] (Status Filtering)
+   Feature catalog shows [F003] appears on: applicants-new, applicants-in-progress
+   Story st011 analyzes screens: application-agreement-fixed, application-agreement-rate
+   These don't overlap! [F003] is not visible on st011's screens.
+   
+   SUGGESTED FIX: Remove this - bullet (feature not in story's screens)
+
+Prompt 3 Output (corrected):
+st011: Display Application Agreement Tab
+- + Pricing configuration
+(- bullet removed, no status filtering deferral)
+```
+
+**Why This Works:**
+1. **Prompt 1** creates single source of truth: "Feature X exists on screens A, B, C"
+2. **Prompt 2** must cite feature IDs, making hallucinations explicit
+3. **Prompt 3** validates: "Does st011 reference [F003]? Yes. Is [F003] on st011's screens? No. → Flag error"
+
+---
+
 ## Comparison
 
-| Aspect | Option A (2-Prompt) | Option B (3-Prompt) |
-|--------|---------------------|---------------------|
-| **Complexity** | Medium | High |
-| **AI Calls** | 2 | 3+ (can parallelize Prompt 3) |
-| **Context Size** | Prompt 2 loads all analyses | Prompt 3 loads only relevant analyses |
-| **Story Discovery** | All upfront in Prompt 1 | Gradual (Prompt 1 initial, Prompt 3 refinement) |
-| **Debugging** | Two points of failure | Three points, but easier to isolate |
-| **Story Quality** | Good | Potentially better (more focused attention per story) |
-| **Epic Context** | Fresh in Prompts 1-2 | Fresh in Prompts 1-2, might fade by Prompt 3 |
-| **Hallucination Prevention** | Good (guard checks in Prompt 2) | Excellent (physical context constraint per story) |
+| Aspect | Option A (2-Prompt) | Option B (3-Prompt) | Option C (3-Prompt Composite) |
+|--------|---------------------|---------------------|-------------------------------|
+| **Complexity** | Medium | High | Medium |
+| **AI Calls** | 2 | 3+ (can parallelize Prompt 3) | 3 (sequential) |
+| **Context Size** | Prompt 2 loads all analyses | Prompt 3 loads only relevant analyses | Prompt 2 uses compressed catalog (~50KB) |
+| **Story Discovery** | All upfront in Prompt 1 | Gradual (Prompt 1 initial, Prompt 3 refinement) | All in Prompt 2 (like current) |
+| **Debugging** | Two points of failure | Three points, but easier to isolate | Three points with validation layer |
+| **Story Quality** | Good | Potentially better (more focused attention per story) | Good (proven 14-step process) |
+| **Epic Context** | Fresh in Prompts 1-2 | Fresh in Prompts 1-2, might fade by Prompt 3 | Fresh in Prompts 2-3 |
+| **Hallucination Prevention** | Good (guard checks in Prompt 2) | Excellent (physical context constraint per story) | Excellent (automated validation) |
+| **Deduplication** | None (repeated features in analyses) | None | **Yes (features appear once in catalog)** |
+| **Validation** | Manual | Manual per story | **Automated** |
+| **Familiar Workflow** | New prompt design | New prompt design | **Reuses current 14-step prompt** |
 
 ## Hallucination Prevention
 
@@ -549,7 +746,32 @@ This automated check could run after generation to flag suspicious bullets for h
 
 ## Recommendations
 
-### **Start with Option A (Two-Prompt Split)**
+### **Primary Recommendation: Option C (Composite + Generate + Validate)**
+
+**Rationale**:
+1. **Best hallucination prevention**: Automated validation catches errors before they reach users
+2. **Most context-efficient**: Feature catalog (~50KB) vs full analyses (~200KB)
+3. **Reuses proven workflow**: Keeps current 14-step process in Prompt 2 (minimal prompt redesign)
+4. **Deduplication benefit**: Features mentioned across multiple screens appear once → clearer context
+5. **Traceable citations**: [F###] IDs make hallucinations explicit and verifiable
+6. **Self-correcting**: Prompt 3 validation can fix Prompt 2 errors automatically
+
+**Implementation Priority**:
+1. Create `feature-compositor.ts` - Extracts and deduplicates features from analyses
+2. Modify existing `prompt-shell-stories.ts` - Add requirement to cite [F###] for all features
+3. Create `story-validator.ts` - Validates citations and removes IDs
+4. Test with real epic
+
+**Key Advantage Over Options A & B**:
+- **Option A**: Relies on guard checks (AI self-policing) → can still fail
+- **Option B**: Physical constraint (can't reference unloaded files) → complex orchestration
+- **Option C**: Automated validation (programmatic check) → catches errors reliably
+
+---
+
+### **Alternative: Start with Option A (Two-Prompt Split)**
+
+If Option C's feature catalog proves difficult to generate reliably:
 
 **Rationale**:
 1. Significant improvement over current single-prompt with manageable complexity
@@ -566,7 +788,7 @@ This automated check could run after generation to flag suspicious bullets for h
 
 ### **Consider Option B as Future Enhancement**
 
-If Option A still has issues:
+If Option A/C still has issues:
 - Story Gatherer makes story discovery even simpler
 - Per-story detailing allows parallelization for speed
 - Better memory efficiency (only load relevant analyses per story)
@@ -576,9 +798,516 @@ If Option A still has issues:
 - Prompt 1 consistently misses stories
 - Prompt 2 discovers many new stories (indicates Prompt 1 insufficient)
 - Very large epics with 30+ stories where context size becomes issue
-- **Hallucination rate still >20% with Option A (Option B's physical constraint would help)**
+- **Hallucination rate still >20% with Option A/C (Option B's physical constraint would help)**
 
 ---
+
+## Implementation Strategy: Pluggable Generation Approaches
+
+To enable experimentation and A/B testing of different shell story generation strategies, we'll use a **strategy pattern** that allows easy switching between approaches.
+
+### Strategy Interface
+
+Each generation strategy implements a common interface:
+
+```typescript
+/**
+ * Common interface for shell story generation strategies
+ */
+export interface ShellStoryGenerationStrategy {
+  /**
+   * Generate shell stories from screen analyses
+   * 
+   * @param params - Input context (screens, analyses, epic context)
+   * @param deps - Injected dependencies (generateText, notify)
+   * @returns Shell stories content, count, and metadata
+   */
+  generateShellStories(
+    params: ShellStoryGenerationInput,
+    deps: ToolDependencies
+  ): Promise<ShellStoryGenerationResult>;
+}
+
+export interface ShellStoryGenerationInput {
+  screens: Array<{ name: string; url: string; notes: string[] }>;
+  tempDirPath: string;
+  yamlPath: string;
+  epicContext?: string;
+}
+
+export interface ShellStoryGenerationResult {
+  shellStoriesContent: string;      // The generated markdown content
+}
+```
+
+### File Organization
+
+```
+server/providers/combined/tools/writing-shell-stories/
+├── core-logic.ts                      # Main orchestration (Phases 1-6)
+├── strategy-interface.ts              # Strategy interface definition
+├── strategy-one-prompt/               # Current single-prompt approach
+│   ├── index.ts                       # Strategy implementation
+│   ├── prompt-shell-stories.ts        # Moved from parent directory
+│   └── generator.ts                   # Generation logic (extracted from core-logic.ts)
+├── strategy-two-prompt/               # Option A: Two-prompt split
+│   ├── index.ts                       # Strategy implementation
+│   ├── prompt-story-planning.ts       # Prompt 1: Planning
+│   ├── prompt-story-detailing.ts      # Prompt 2: Detailing
+│   └── generator.ts                   # Two-prompt generation logic
+├── strategy-three-prompt/             # Option B: Three-prompt split (future)
+│   ├── index.ts                       # Strategy implementation
+│   ├── prompt-story-gatherer.ts       # Prompt 1: Gather
+│   ├── prompt-story-prioritizer.ts    # Prompt 2: Prioritize
+│   ├── prompt-story-detailer.ts       # Prompt 3: Detail
+│   └── generator.ts                   # Three-prompt generation logic
+└── ...other files (screen-setup, temp-directory, etc.)
+```
+
+### Strategy Selection in core-logic.ts
+
+```typescript
+// In core-logic.ts, Phase 5
+import type { ShellStoryGenerationStrategy } from './strategy-interface.js';
+import { OnePromptStrategy } from './strategy-one-prompt/index.js';
+import { TwoPromptStrategy } from './strategy-two-prompt/index.js';
+// import { ThreePromptStrategy } from './strategy-three-prompt/index.js';
+
+// ==========================================
+// PHASE 5: Generate shell stories from analyses
+// ==========================================
+
+// Select strategy (can be controlled by environment variable or config)
+const strategy: ShellStoryGenerationStrategy = new OnePromptStrategy();
+// const strategy: ShellStoryGenerationStrategy = new TwoPromptStrategy();
+// const strategy: ShellStoryGenerationStrategy = new ThreePromptStrategy();
+
+const shellStoriesResult = await strategy.generateShellStories(
+  {
+    screens,
+    tempDirPath,
+    yamlPath,
+    epicContext
+  },
+  {
+    generateText,
+    notify
+  }
+);
+
+// Orchestration layer handles file I/O for artifacts
+const shellStoriesPath = path.join(tempDirPath, 'shell-stories.md');
+await fs.writeFile(shellStoriesPath, shellStoriesResult.shellStoriesContent, 'utf-8');
+console.log(`    ✅ Saved shell stories: shell-stories.md`);
+
+// Orchestration layer calculates metrics if needed
+const storyMatches = shellStoriesResult.shellStoriesContent.match(/^- `?st\d+/gm);
+const storyCount = storyMatches ? storyMatches.length : 0;
+console.log(`    Generated ${storyCount} shell stories`);
+
+// Continue with core-logic.ts operations using the content
+const shellStoriesContent = shellStoriesResult.shellStoriesContent;
+```
+
+### Example: One-Prompt Strategy Implementation
+
+**File: `strategy-one-prompt/index.ts`**
+```typescript
+import type { 
+  ShellStoryGenerationStrategy,
+  ShellStoryGenerationInput,
+  ShellStoryGenerationResult
+} from '../strategy-interface.js';
+import type { ToolDependencies } from '../../types.js';
+import { generateShellStoriesOnePrompt } from './generator.js';
+
+export class OnePromptStrategy implements ShellStoryGenerationStrategy {
+  async generateShellStories(
+    params: ShellStoryGenerationInput,
+    deps: ToolDependencies
+  ): Promise<ShellStoryGenerationResult> {
+    console.log('  Using one-prompt strategy');
+    return generateShellStoriesOnePrompt(params, deps);
+  }
+}
+```
+
+**File: `strategy-one-prompt/generator.ts`**
+```typescript
+// This is the code you currently have in core-logic.ts lines 197-319
+// Moved here for isolation
+
+import * as path from 'path';
+import * as fs from 'fs/promises';
+import type { 
+  ShellStoryGenerationInput,
+  ShellStoryGenerationResult
+} from '../strategy-interface.js';
+import type { ToolDependencies } from '../../types.js';
+import {
+  generateShellStoryPrompt,
+  SHELL_STORY_SYSTEM_PROMPT,
+  SHELL_STORY_MAX_TOKENS
+} from './prompt-shell-stories.js';
+
+export async function generateShellStoriesOnePrompt(
+  params: ShellStoryGenerationInput,
+  deps: ToolDependencies
+): Promise<ShellStoryGenerationResult> {
+  const { screens, tempDirPath, yamlPath, epicContext } = params;
+  const { generateText, notify } = deps;
+  
+  console.log('  Phase 5: Generating shell stories from analyses (one-prompt)...');
+  
+  await notify('📝 Shell Story Generation: Generating shell stories from screen analyses...');
+  
+  // Read screens.yaml for screen ordering
+  const screensYamlContent = await fs.readFile(yamlPath, 'utf-8');
+  
+  // Read all analysis files
+  const analysisFiles: Array<{ screenName: string; content: string }> = [];
+  for (const screen of screens) {
+    const analysisPath = path.join(tempDirPath, `${screen.name}.analysis.md`);
+    try {
+      const content = await fs.readFile(analysisPath, 'utf-8');
+      analysisFiles.push({ screenName: screen.name, content });
+      console.log(`    ✅ Read analysis: ${screen.name}.analysis.md`);
+    } catch (error: any) {
+      console.log(`    ⚠️ Could not read analysis for ${screen.name}: ${error.message}`);
+    }
+  }
+  
+  console.log(`  Loaded ${analysisFiles.length}/${screens.length} analysis files`);
+  
+  if (analysisFiles.length === 0) {
+    await notify('⚠️ No analysis files found - skipping shell story generation');
+    return { storyCount: 0, analysisCount: 0, shellStoriesPath: null };
+  }
+  
+  // Generate shell story prompt
+  const shellStoryPrompt = generateShellStoryPrompt(
+    screensYamlContent,
+    analysisFiles,
+    epicContext
+  );
+  
+  // Save prompt to temp directory for debugging
+  const promptPath = path.join(tempDirPath, 'shell-stories-prompt.md');
+  await fs.writeFile(promptPath, shellStoryPrompt, 'utf-8');
+  console.log(`    ✅ Saved prompt: shell-stories-prompt.md`);
+  
+  console.log(`    🤖 Requesting shell story generation from AI...`);
+  console.log(`       Prompt length: ${shellStoryPrompt.length} characters`);
+  console.log(`       System prompt length: ${SHELL_STORY_SYSTEM_PROMPT.length} characters`);
+  console.log(`       Max tokens: ${SHELL_STORY_MAX_TOKENS}`);
+  if (epicContext && epicContext.length > 0) {
+    console.log(`       Epic context: ${epicContext.length} characters`);
+  }
+  
+  // Request shell story generation via injected LLM client
+  console.log('    ⏳ Waiting for Anthropic API response...');
+  const response = await generateText({
+    systemPrompt: SHELL_STORY_SYSTEM_PROMPT,
+    prompt: shellStoryPrompt,
+    maxTokens: SHELL_STORY_MAX_TOKENS
+  });
+  
+  const shellStoriesText = response.text;
+  
+  if (!shellStoriesText) {
+    throw new Error(`
+🤖 **AI Generation Failed**
+
+**What happened:**
+No shell stories content received from AI
+
+**Possible causes:**
+- AI service timeout or rate limit
+- Invalid prompt or context
+- Epic description may not contain valid Figma links
+- Network connectivity issues
+
+**How to fix:**
+1. Wait a few minutes and retry the operation
+2. Verify your Anthropic API key is still valid
+3. Check that the epic description contains accessible Figma design links
+4. Ensure the Figma files are not empty or corrupted
+
+**Technical details:**
+- AI response was empty or malformed
+- Screens analyzed: ${screens.length}
+- Analysis files loaded: ${analysisFiles.length}
+`.trim());
+  }
+  
+  console.log(`    ✅ Shell stories generated (${shellStoriesText.length} characters)`);
+  if (response.metadata) {
+    console.log(`       Tokens used: ${response.metadata.tokensUsed}, Stop reason: ${response.metadata.stopReason}`);
+  }
+  
+  await notify(`✅ Shell Story Generation Complete`);
+  
+  return { 
+    shellStoriesContent: shellStoriesText
+  };
+}
+```
+
+### Example: Two-Prompt Strategy Implementation
+
+**File: `strategy-two-prompt/index.ts`**
+```typescript
+import type { 
+  ShellStoryGenerationStrategy,
+  ShellStoryGenerationInput,
+  ShellStoryGenerationResult
+} from '../strategy-interface.js';
+import type { ToolDependencies } from '../../types.js';
+import { generateShellStoriesTwoPrompt } from './generator.js';
+
+export class TwoPromptStrategy implements ShellStoryGenerationStrategy {
+  async generateShellStories(
+    params: ShellStoryGenerationInput,
+    deps: ToolDependencies
+  ): Promise<ShellStoryGenerationResult> {
+    console.log('  Using two-prompt strategy (planning + detailing)');
+    return generateShellStoriesTwoPrompt(params, deps);
+  }
+}
+```
+
+**File: `strategy-two-prompt/generator.ts`**
+```typescript
+import * as path from 'path';
+import * as fs from 'fs/promises';
+import type { 
+  ShellStoryGenerationInput,
+  ShellStoryGenerationResult
+} from '../strategy-interface.js';
+import type { ToolDependencies } from '../../types.js';
+import {
+  generateStoryPlanningPrompt,
+  STORY_PLANNING_SYSTEM_PROMPT,
+  STORY_PLANNING_MAX_TOKENS
+} from './prompt-story-planning.js';
+import {
+  generateStoryDetailingPrompt,
+  STORY_DETAILING_SYSTEM_PROMPT,
+  STORY_DETAILING_MAX_TOKENS
+} from './prompt-story-detailing.js';
+
+export async function generateShellStoriesTwoPrompt(
+  params: ShellStoryGenerationInput,
+  deps: ToolDependencies
+): Promise<ShellStoryGenerationResult> {
+  const { screens, tempDirPath, yamlPath, epicContext } = params;
+  const { generateText, notify } = deps;
+  
+  console.log('  Phase 5: Generating shell stories (two-prompt approach)...');
+  
+  // Read screens.yaml for screen ordering
+  const screensYamlContent = await fs.readFile(yamlPath, 'utf-8');
+  
+  // Read all analysis files
+  const analysisFiles: Array<{ screenName: string; content: string }> = [];
+  for (const screen of screens) {
+    const analysisPath = path.join(tempDirPath, `${screen.name}.analysis.md`);
+    try {
+      const content = await fs.readFile(analysisPath, 'utf-8');
+      analysisFiles.push({ screenName: screen.name, content });
+    } catch (error: any) {
+      console.log(`    ⚠️ Could not read analysis for ${screen.name}: ${error.message}`);
+    }
+  }
+  
+  if (analysisFiles.length === 0) {
+    await notify('⚠️ No analysis files found - skipping shell story generation');
+    return { storyCount: 0, analysisCount: 0, shellStoriesPath: null };
+  }
+  
+  // ==========================================
+  // PROMPT 1: Story Planning
+  // ==========================================
+  console.log('  Phase 5.1: Planning story list...');
+  await notify('📝 Shell Story Planning: Creating story list...');
+  
+  // Generate analysis summaries (first 20 lines of each file)
+  const analysisSummaries = analysisFiles.map(({ screenName, content }) => {
+    const lines = content.split('\n');
+    const summary = lines.slice(0, 20).join('\n');
+    return { screenName, summary };
+  });
+  
+  const planningPrompt = generateStoryPlanningPrompt(
+    screensYamlContent,
+    analysisSummaries,
+    epicContext
+  );
+  
+  // Save planning prompt for debugging
+  await fs.writeFile(
+    path.join(tempDirPath, 'shell-stories-planning-prompt.md'),
+    planningPrompt,
+    'utf-8'
+  );
+  
+  console.log(`    🤖 Requesting story planning from AI...`);
+  const planningResponse = await generateText({
+    systemPrompt: STORY_PLANNING_SYSTEM_PROMPT,
+    prompt: planningPrompt,
+    maxTokens: STORY_PLANNING_MAX_TOKENS
+  });
+  
+  const storyList = planningResponse.text;
+  
+  if (!storyList) {
+    throw new Error('Story planning failed: No story list generated');
+  }
+  
+  console.log(`    ✅ Story list generated (${storyList.length} characters)`);
+  
+  // Save story list for debugging
+  await fs.writeFile(
+    path.join(tempDirPath, 'story-list.md'),
+    storyList,
+    'utf-8'
+  );
+  
+  // ==========================================
+  // PROMPT 2: Story Detailing
+  // ==========================================
+  console.log('  Phase 5.2: Adding story details...');
+  await notify('📝 Shell Story Detailing: Adding details to stories...');
+  
+  const detailingPrompt = generateStoryDetailingPrompt(
+    storyList,
+    analysisFiles,
+    epicContext
+  );
+  
+  // Save detailing prompt for debugging
+  await fs.writeFile(
+    path.join(tempDirPath, 'shell-stories-detailing-prompt.md'),
+    detailingPrompt,
+    'utf-8'
+  );
+  
+  console.log(`    🤖 Requesting story detailing from AI...`);
+  const detailingResponse = await generateText({
+    systemPrompt: STORY_DETAILING_SYSTEM_PROMPT,
+    prompt: detailingPrompt,
+    maxTokens: STORY_DETAILING_MAX_TOKENS
+  });
+  
+  const shellStoriesText = detailingResponse.text;
+  
+  if (!shellStoriesText) {
+    throw new Error('Story detailing failed: No detailed stories generated');
+  }
+  
+  console.log(`    ✅ Shell stories detailed (${shellStoriesText.length} characters)`);
+  if (detailingResponse.metadata) {
+    console.log(`       Total tokens used: ${(planningResponse.metadata?.tokensUsed || 0) + (detailingResponse.metadata?.tokensUsed || 0)}`);
+  }
+  
+  await notify(`✅ Shell Story Generation Complete`);
+  
+  return { 
+    shellStoriesContent: shellStoriesText
+  };
+}
+```
+
+### Benefits of Strategy Pattern
+
+1. **Easy Experimentation**: Comment/uncomment one line to switch strategies
+   ```typescript
+   // const strategy = new OnePromptStrategy();
+   const strategy = new TwoPromptStrategy();
+   ```
+
+2. **Isolated Testing**: Each strategy can be tested independently
+3. **Clean Comparison**: Same interface means apples-to-apples comparison
+4. **Gradual Migration**: Can ship new strategies alongside old ones
+5. **A/B Testing Ready**: Environment variable can control which strategy to use
+6. **Debugging**: Each strategy saves its own intermediate artifacts with distinct names
+
+### Environment-Based Selection (Optional Enhancement)
+
+```typescript
+// In core-logic.ts
+function getShellStoryStrategy(): ShellStoryGenerationStrategy {
+  const strategyName = process.env.SHELL_STORY_STRATEGY || 'one-prompt';
+  
+  switch (strategyName) {
+    case 'one-prompt':
+      return new OnePromptStrategy();
+    case 'two-prompt':
+      return new TwoPromptStrategy();
+    case 'three-prompt':
+      return new ThreePromptStrategy();
+    default:
+      console.warn(`Unknown strategy "${strategyName}", defaulting to one-prompt`);
+      return new OnePromptStrategy();
+  }
+}
+
+// Usage
+const strategy = getShellStoryStrategy();
+const shellStoriesResult = await strategy.generateShellStories(params, deps);
+```
+
+```bash
+# Run with different strategies
+SHELL_STORY_STRATEGY=one-prompt npm run start-local
+SHELL_STORY_STRATEGY=two-prompt npm run start-local
+SHELL_STORY_STRATEGY=three-prompt npm run start-local
+```
+
+### Migration Steps
+
+1. **Step 1**: Create strategy interface and one-prompt implementation
+   - Move current code to `strategy-one-prompt/`
+   - Verify everything still works
+
+2. **Step 2**: Implement two-prompt strategy
+   - Create `strategy-two-prompt/` with new prompts
+   - Test by commenting/uncommenting strategy selection
+
+3. **Step 3**: Compare strategies on real epics
+   - Run same epic through both strategies
+   - Collect metrics (hallucination rate, story count, token usage)
+   - Choose winner or keep both
+
+4. **Step 4** (Optional): Add environment variable selection
+   - Only if both strategies prove useful
+   - Allows users to choose their preference
+
+### Debugging Artifacts Per Strategy
+
+Each strategy saves distinct files to temp directory:
+
+**One-Prompt Strategy:**
+- `shell-stories-prompt.md` - The single prompt
+- `shell-stories.md` - Final output
+
+**Two-Prompt Strategy:**
+- `shell-stories-planning-prompt.md` - Prompt 1
+- `story-list.md` - Intermediate story list
+- `shell-stories-detailing-prompt.md` - Prompt 2
+- `shell-stories.md` - Final output
+
+**Three-Prompt Strategy (future):**
+- `shell-stories-gather-prompt.md` - Prompt 1
+- `discovered-stories.md` - Unsorted stories
+- `shell-stories-prioritize-prompt.md` - Prompt 2
+- `prioritized-stories.md` - Sorted stories
+- `shell-stories-detail-st001-prompt.md` - Prompt 3 for st001
+- `shell-stories-detail-st002-prompt.md` - Prompt 3 for st002
+- ...
+- `shell-stories.md` - Final output
+
+This makes it easy to debug which stage of which strategy is causing issues.
 
 ## Implementation Notes
 
