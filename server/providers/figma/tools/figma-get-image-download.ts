@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { logger } from '../../../observability/logger.js';
 import { getAuthInfoSafe } from '../../../mcp-core/auth-helpers.js';
 import type { McpServer } from '../../../mcp-core/mcp-types.js';
+import { createRateLimitErrorMessage } from '../figma-helpers.js';
 
 // Tool parameters interface
 interface FigmaGetImageDownloadParams {
@@ -111,6 +112,19 @@ export function registerFigmaGetImageDownloadTool(mcp: McpServer): void {
           if (!response.ok) {
             const errorText = await response.text();
             console.log('  ❌ Figma API error:', errorText);
+            
+            // Handle rate limiting with user-friendly message
+            if (response.status === 429) {
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: `Error: ${createRateLimitErrorMessage(errorText)}`,
+                  },
+                ],
+              };
+            }
+            
             return {
               content: [
                 {

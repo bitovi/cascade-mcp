@@ -293,6 +293,13 @@ export async function setupFigmaScreens(
       
     } catch (error: any) {
       console.log(`    ⚠️  Error fetching Figma file: ${error.message}`);
+      
+      // If this is a rate limit error, propagate it to the user
+      if (error.message && error.message.includes('Figma API rate limit exceeded')) {
+        throw error;
+      }
+      
+      // For other errors, continue trying remaining URLs
     }
   }
   

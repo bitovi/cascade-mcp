@@ -9,6 +9,23 @@ import { logger } from '../../observability/logger.js';
 import type { FigmaClient } from './figma-api-client.js';
 
 /**
+ * Create a user-friendly rate limit error message
+ * @param technicalDetails - Technical error details from API response
+ * @returns Formatted error message
+ */
+export function createRateLimitErrorMessage(technicalDetails: string): string {
+  return (
+    `Figma API rate limit exceeded. Please wait a few minutes before trying again.\n\n` +
+    `Figma limits the number of API requests to prevent abuse. Your account has temporarily hit this limit.\n\n` +
+    `What you can do:\n` +
+    `• Wait 5-15 minutes for the rate limit to reset\n` +
+    `• If you're making multiple requests, space them out over time\n` +
+    `• Check if other tools/scripts are using your Figma token simultaneously\n\n` +
+    `Technical details: ${technicalDetails}`
+  );
+}
+
+/**
  * Parsed Figma URL information
  */
 export interface FigmaUrlInfo {
@@ -108,6 +125,12 @@ export async function fetchFigmaFile(
         statusText: response.statusText,
         body: errorText,
       });
+      
+      // Handle rate limiting with user-friendly message
+      if (response.status === 429) {
+        throw new Error(createRateLimitErrorMessage(errorText));
+      }
+      
       throw new Error(`Figma API error: ${response.status} ${response.statusText} - ${errorText}`);
     }
     
@@ -164,6 +187,12 @@ export async function fetchFigmaNode(
         statusText: response.statusText,
         body: errorText,
       });
+      
+      // Handle rate limiting with user-friendly message
+      if (response.status === 429) {
+        throw new Error(createRateLimitErrorMessage(errorText));
+      }
+      
       throw new Error(`Figma API error: ${response.status} ${response.statusText} - ${errorText}`);
     }
     
@@ -437,6 +466,12 @@ export async function downloadFigmaImage(
         statusText: response.statusText,
         body: errorText,
       });
+      
+      // Handle rate limiting with user-friendly message
+      if (response.status === 429) {
+        throw new Error(createRateLimitErrorMessage(errorText));
+      }
+      
       throw new Error(`Figma images API error: ${response.status} ${response.statusText}`);
     }
     

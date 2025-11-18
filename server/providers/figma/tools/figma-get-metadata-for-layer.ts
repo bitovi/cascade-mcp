@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { logger } from '../../../observability/logger.js';
 import { getAuthInfoSafe } from '../../../mcp-core/auth-helpers.js';
 import type { McpServer } from '../../../mcp-core/mcp-types.js';
+import { createRateLimitErrorMessage } from '../figma-helpers.js';
 
 // Tool parameters interface
 interface GetMetadataForLayerParams {
@@ -156,6 +157,17 @@ export function registerFigmaGetMetadataForLayerTool(mcp: McpServer): void {
               statusText: response.statusText,
               body: errorText 
             });
+            
+            // Handle rate limiting with user-friendly message
+            if (response.status === 429) {
+              return {
+                content: [{
+                  type: 'text',
+                  text: `Error: ${createRateLimitErrorMessage(errorText)}`
+                }]
+              };
+            }
+            
             return {
               content: [{
                 type: 'text',
