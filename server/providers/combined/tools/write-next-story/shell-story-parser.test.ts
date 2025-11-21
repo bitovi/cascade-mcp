@@ -15,7 +15,8 @@ describe('parseShellStories', () => {
   * SCREENS: [promo-add-form](https://www.figma.com/design/abc/Project?node-id=123-456)
   * DEPENDENCIES: none
   * ☐ User can enter a valid promotion code
-  * ❌ Support for stacking multiple promotions
+  * ⏬ Support for stacking multiple promotions (low priority - implement in st015)
+  * ❌ Promotion auto-suggestions (out of scope)
   * ❓ What error messages should display?
 `;
 
@@ -31,7 +32,8 @@ describe('parseShellStories', () => {
         screens: ['https://www.figma.com/design/abc/Project?node-id=123-456'],
         dependencies: [],
         included: ['User can enter a valid promotion code'],
-        excluded: ['Support for stacking multiple promotions'],
+        lowPriority: ['Support for stacking multiple promotions (low priority - implement in st015)'],
+        excluded: ['Promotion auto-suggestions (out of scope)'],
         questions: ['What error messages should display?'],
       });
     });

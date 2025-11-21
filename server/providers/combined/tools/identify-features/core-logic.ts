@@ -125,7 +125,7 @@ export async function executeIdentifyFeatures(
  * Phase 5: Generate scope analysis from screen analyses
  * 
  * Reads all screen analysis files and uses AI to identify and categorize features
- * into in-scope (✅), out-of-scope (❌), and questions (❓), grouped by workflow areas.
+ * into in-scope (☐), already done (✅), low priority (⏬), out-of-scope (❌), and questions (❓), grouped by workflow areas.
  * 
  * @returns Object with scopeAnalysisContent, featureAreasCount, and questionsCount
  */

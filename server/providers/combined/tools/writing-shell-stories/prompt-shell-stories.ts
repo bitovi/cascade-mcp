@@ -61,7 +61,7 @@ ${epicContext}
 **Use epic context as reference for:**
 - Understanding project priorities and sequencing preferences
 - Identifying features that are out of scope (don't create stories for these)
-- Noting features to implement later (create implementation stories at the end)
+- Identifying low priority features to implement at the end (create implementation stories for these)
 - Understanding business constraints and requirements
 
 **Epic context does NOT mean:**
@@ -215,11 +215,11 @@ ${analysisSection}
       • Re-number stories as needed to maintain logical progression
       • Update dependencies in existing stories to reference new story IDs
 
-   F) Verify deferred features have implementation stories:
+   F) Verify low priority features have implementation stories:
       • For any feature that was deferred with - bullets (whether from epic context or natural progressive enhancement):
         ◦ Verify there's a corresponding implementation story later in the list
         ◦ Ensure - bullets reference the correct story ID
-      • If epic context suggests deferring a feature and it appears in screens:
+      • If epic context marks a feature as low priority (⏬) and it appears in screens:
         ◦ Ensure early stories defer it where visible
         ◦ Ensure there's an implementation story at the end
       • If a feature has - bullets but NO implementation story, ADD one now
@@ -296,7 +296,8 @@ ${analysisSection}
   * SCREENS: {Figma URLs formatted as markdown links with screen names as link text}
   * DEPENDENCIES: {list of story IDs this story depends on, or \`none\`}
   * ☐ Included behavior and functionality (including shared components introduced here)
-  * ❌ Deferred/excluded functionality
+  * ⏬ Low priority functionality (visible but implement in later stories)
+  * ❌ Deferred/excluded functionality (out of scope for this epic)
   * ❓ Open questions
 • Replace the entire "Final Prioritized Stories" section when updating, do not append
 • Ensure no duplicate or partial story lists remain in the output
@@ -309,8 +310,8 @@ ${analysisSection}
   * ☐ User can enter a valid promotion code and apply it
   * ☐ Success state shows updated cart total with discount
   * ☐ Error modal component introduced for invalid codes
-  * ❌ Support for stacking multiple promotions (defer)
-  * ❌ Promotion auto-suggestions (defer)
+  * ⏬ Support for stacking multiple promotions (low priority - implement in st015)
+  * ❌ Promotion auto-suggestions (out of scope for this epic)
   * ❓ What error messages should display for expired or invalid codes?
 
 Now generate the shell stories following this process exactly.`;

@@ -92,11 +92,6 @@ export function createProgressCommentManager(
     try {
       if (commentId === null) {
         // Create initial comment (lazy initialization)
-        logger.info('Creating progress comment', { 
-          epicKey: context.epicKey,
-          operationName: context.operationName 
-        });
-        
         const startTime = Date.now();
         const result = await addIssueComment(
           context.client,
@@ -107,20 +102,8 @@ export function createProgressCommentManager(
         const duration = Date.now() - startTime;
         
         commentId = result.commentId;
-        
-        logger.info('Progress comment created', { 
-          epicKey: context.epicKey,
-          commentId,
-          duration 
-        });
       } else {
         // Update existing comment
-        logger.info('Updating progress comment', { 
-          epicKey: context.epicKey,
-          commentId,
-          messageCount: messages.length 
-        });
-        
         const startTime = Date.now();
         await updateIssueComment(
           context.client,
@@ -130,13 +113,6 @@ export function createProgressCommentManager(
           markdown
         );
         const duration = Date.now() - startTime;
-        
-        logger.info('Progress comment updated', { 
-          epicKey: context.epicKey,
-          commentId,
-          messageCount: messages.length,
-          duration 
-        });
       }
       
       // Success - reset failure counter

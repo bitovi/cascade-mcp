@@ -126,6 +126,7 @@ Generate a complete Jira story following the Story Writing Guidelines and Comple
 
 **Content Requirements**:
 - Use the shell story's ☐ bullets for included functionality
+- Use the shell story's ⏬ bullets to note low priority features (add to Out of Scope with reference to later story)
 - Use the shell story's ❌ bullets for Out of Scope section
 - Use the shell story's ❓ bullets to inform Developer Notes (note uncertainties)
 - Reference Figma screens from the shell story's SCREENS list as regular markdown links

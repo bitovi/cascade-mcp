@@ -2,8 +2,8 @@
  * Feature Identification Prompt
  * 
  * Generates comprehensive prompts for AI to identify and categorize features from screen analyses.
- * Features are grouped by user workflow and categorized as in-scope (✅), out-of-scope (❌),
- * or questions (❓).
+ * Features are grouped by user workflow and categorized as in-scope (☐), already done (✅),
+ * low priority (⏬), out-of-scope (❌), or questions (❓).
  */
 
 /**
@@ -18,15 +18,27 @@ FUNDAMENTAL RULE: EVIDENCE-BASED ONLY
 - If a UI element is visible but its purpose/behavior is unclear, list it as a ❓ question
 
 CATEGORIZATION RULES:
-- ☐ In-Scope: Features explicitly listed as in-scope in epic context AND not listed as existing/out-of-scope
-  - Only mark features ☐ if they are new capabilities being added
+- ☐ In-Scope: Features explicitly listed as in-scope in epic context AND not listed as existing/out-of-scope/low-priority
+  - Only mark features ☐ if they are new capabilities being added at normal priority
   - When epic provides scope context, existing UI elements may be shown for context but aren't new features
   - If epic mentions a feature under "Out of Scope" or describes it as existing, do NOT mark it ☐
+  - If epic says "delay X until end" or "implement X later", do NOT mark it ☐ (use ⏬ instead)
 - ✅ Already Done: Existing functionality mentioned in epic context that provides context but isn't new work
   - These features are visible in screens but explicitly stated as already implemented
   - Keep descriptions brief since they're not part of new work
-- ❌ Out-of-Scope: Features explicitly mentioned in epic context as deferred/excluded, OR features marked as future/optional in analyses
-- ❓ Questions: Ambiguous behaviors, unclear requirements, missing information, or features that could be either in/out of scope
+- ⏬ Low Priority: Features explicitly mentioned in epic to implement later/at the end (in scope but lower priority)
+  - Epic says "delay until end", "do at the end", "implement last", "lower priority"
+  - These WILL be implemented in this epic, just after core features
+  - Keep brief, note when they'll be implemented: "Status filters (low priority - delay until end per epic)"
+  - If visible in screens but not mentioned in epic, assume ☐ In-Scope instead
+- ❌ Out-of-Scope: Features explicitly excluded from epic OR marked for future epics
+  - Epic says "out of scope", "not included", "future epic", "exclude", "won't implement"
+  - These will NOT be implemented in this epic
+  - Keep brief: "OAuth authentication (future epic)"
+  - NO LONGER includes features to be "deferred" within this epic (use ⏬ for those)
+- ❓ Questions: Ambiguous behaviors, unclear requirements, missing information
+  - Mark ambiguous features as questions rather than guessing
+  - Include enough context for the question
 - **PRIORITY**: Epic context scope statements are primary source of truth and override screen analysis interpretations
 
 GROUPING RULES:
@@ -38,8 +50,9 @@ GROUPING RULES:
 
 FEATURE DESCRIPTION VERBOSITY:
 - ☐ In-Scope: Concise for obvious features (e.g., "Email/password login"), detailed for complex features (e.g., "Multi-step form with validation, error handling, and progress indicators")
+- ⏬ Low Priority: Same detail level as ☐ In-Scope (concise for obvious, detailed for complex), plus timing note (e.g., "Status filters with dropdown options for Active/Pending/Complete (low priority - delay until end per epic)")
 - ✅ Already Done: Keep brief since they're not part of new work (e.g., "Checkbox interaction to toggle task status")
-- ❌ Out-of-Scope: Keep brief since they won't be implemented (e.g., "OAuth authentication (deferred)")
+- ❌ Out-of-Scope: Keep brief since they won't be implemented in this epic (e.g., "OAuth authentication (future epic)")
 
 QUESTION DEDUPLICATION:
 - If a question is relevant to multiple areas, list it only in the first area where it appears
@@ -80,17 +93,28 @@ ${epicContext}
 **Use epic context as primary source of truth for:**
 - Identifying features explicitly marked as in-scope or out-of-scope
 - Understanding project priorities and goals
-- Recognizing features deferred to future phases
-- Distinguishing between "out-of-scope = existing" vs "out-of-scope = future work"
-  - If epic says "We already have X" under out-of-scope, that's EXISTING functionality (mark ✅)
-  - If epic says "Future: X" or "Not included: X" under out-of-scope, that's DEFERRED functionality (mark ❌)
+- Identifying low priority features within this epic (⏬)
+- Recognizing features excluded entirely or moved to future epics (❌)
+- Distinguishing between "existing", "low priority", and "out-of-scope":
+  - If epic says "We already have X", that's EXISTING functionality (mark ✅)
+  - If epic says "delay X until end" or "do X last", that's LOW PRIORITY (mark ⏬)
+  - If epic says "Future epic: X" or "Not included: X", that's OUT OF SCOPE (mark ❌)
   - Existing features visible in screens provide context but aren't new work
-  - Deferred features might not be visible yet or marked as "future phase" in analyses
+  - Low priority features WILL be implemented in this epic, just later
+  - Out-of-scope features will NOT be implemented in this epic
 - Business constraints and requirements
 
+**CRITICAL: Low Priority ≠ Out of Scope**
+- If epic says "delay X until end" → X is IN SCOPE, mark ⏬ (implement later this epic)
+- If epic says "X out of scope" → X is NOT in scope, mark ❌ (won't implement this epic)
+- When in doubt, check if epic discusses HOW to implement the feature (even if "later")
+  - If yes → probably ⏬ Low Priority
+  - If no → probably ❌ Out of Scope or ❓ Question
+
 **Epic context ALWAYS WINS:**
-- If epic says a feature is out-of-scope and existing, mark it ✅ even if UI is prominent
-- If epic says a feature is out-of-scope and deferred, mark it ❌ even if UI exists
+- If epic says a feature is existing, mark it ✅ even if UI is prominent
+- If epic says "delay until end", mark it ⏬ even if UI shows it as primary
+- If epic says a feature is out-of-scope, mark it ❌ even if UI exists
 - If epic says a feature is in-scope, mark it ☐ even if implementation details are unclear
 - When in doubt about scope, refer to epic context first
 
@@ -141,13 +165,13 @@ ${analysisSection}
 - Note all UI elements, features, and behaviors described
 - Screen analyses may contain preliminary categorizations using:
   - ☐ In-Scope features (new work identified from epic context)
+  - ⏬ Low Priority features (implement later in epic)
   - ✅ Already Done features (existing functionality)
-  - ❌ Out-of-Scope features (deferred/excluded)
+  - ❌ Out-of-Scope features (excluded from epic)
   - ❓ Questions (unclear requirements)
   - ⚠️ SCOPE MISMATCH flags (UI contradicts epic scope)
-  - ⏸️ DEFERRED flags (delayed features)
 - Use these categorizations as initial signals, but verify against epic context
-- Pay attention to notes about deferred/future features
+- Pay attention to notes about low priority vs out-of-scope features
 
 **Step 3: Identify feature areas by independent capabilities**
 - Split features into separate areas if they can be implemented independently
@@ -168,18 +192,29 @@ ${analysisSection}
 - Prefer more granular areas over broad groupings
 
 **Step 4: Categorize features within each area**
-- ☐ In-Scope: Epic context says it's in-scope AND not listed as existing/out-of-scope
-  - Only mark features ☐ if they are new capabilities being added
+- ☐ In-Scope: Epic context says it's in-scope AND not listed as existing/out-of-scope/low-priority
+  - Only mark features ☐ if they are new capabilities being added at normal priority
+  - If visible in screens but not mentioned in epic, assume ☐ In-Scope
   - Concise for obvious features: "Email/password login"
   - Detailed for complex features: "Multi-step form with validation, error handling, and progress indicators"
-- ✅ Already Done: Epic mentions this as existing functionality (e.g., under "Out of Scope: We already have X")
+- ✅ Already Done: Epic mentions this as existing functionality
   - Keep brief: "Checkbox interaction to toggle task status"
   - These provide context but aren't part of new work
-- ❌ Out-of-Scope: Epic context says it's deferred/excluded, OR marked as future in analyses
-  - Keep brief: "OAuth authentication (deferred)"
-- ❓ Questions: Behavior unclear, requirements ambiguous, or could be either in/out of scope
+- ⏬ Low Priority: Epic says "delay until end", "implement last", "lower priority"
+  - These WILL be implemented in this epic, just later
+  - Same detail level as ☐ In-Scope: concise for obvious, detailed for complex
+  - Add timing note: "Status filters with dropdown for Active/Pending/Complete (low priority - delay until end per epic)"
+  - Do NOT ask questions about whether to remove/hide/disable low priority features
+  - Do NOT ask questions about incremental implementation strategies
+  - Only ask questions if the feature itself is unclear (same as ☐ features)
+- ❌ Out-of-Scope: Epic says "out of scope", "not included", "future epic"
+  - These will NOT be implemented in this epic
+  - Keep brief: "OAuth authentication (future epic)"
+- ❓ Questions: Feature behavior unclear, requirements ambiguous, missing specifications
   - Mark ambiguous features as questions rather than guessing
   - Include enough context: "Should filters persist across sessions?"
+  - Do NOT ask about implementation timing or phasing (that's determined by ☐ vs ⏬)
+  - Do NOT ask whether low priority features should be removed/hidden
 
 **Step 5: Link screens to feature areas**
 - For each feature area, list all Figma screen URLs that contain related UI
@@ -203,8 +238,9 @@ ${analysisSection}
 
 - ☐ {In-scope feature - work to be done, concise for obvious, detailed for complex}
 - ☐ {Another in-scope feature}
+- ⏬ {Low priority feature - in scope but implement at end}
 - ✅ {Existing functionality - already implemented, brief description}
-- ❌ {Out-of-scope feature - deferred, brief description}
+- ❌ {Out-of-scope feature - not part of this epic, brief description}
 - ❓ {Question about this area - with context}
 - ❓ {Another question}
 
@@ -213,6 +249,7 @@ ${analysisSection}
 [Screen Name](figma-url)
 
 - ☐ {In-scope feature}
+- ⏬ {Low priority feature}
 - ✅ {Existing functionality}
 - ❌ {Out-of-scope feature}
 - ❓ {Question about this area}

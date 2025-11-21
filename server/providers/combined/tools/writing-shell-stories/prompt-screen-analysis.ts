@@ -46,24 +46,25 @@ ${hasEpicContext ? epicContext : 'No epic context available for this analysis.'}
 **How to use epic context:**
 - Categorize features using these emojis:
   - ☐ In-Scope: Features explicitly listed as in-scope in epic context (new work to be done)
+  - ⏬ Low Priority: Features marked to "delay until end" or "implement last" (WILL be implemented later in this epic)
   - ✅ Already Done: Existing functionality mentioned in epic as already implemented (provides context but not new work)
-  - ❌ Out-of-Scope: Features marked as deferred/excluded in epic context (will NOT be implemented in this epic)
+  - ❌ Out-of-Scope: Features explicitly excluded or marked for future epics (will NOT be implemented in this epic)
   - ❓ Questions: Unclear behavior, ambiguous requirements, or features that could be either in/out of scope
-- Flag contradictions and deferrals:
+- Flag contradictions and priorities:
   - ⚠️ SCOPE MISMATCH: When UI shows features marked as out of scope in epic (these will NOT be implemented)
-  - ⏸️ DEFERRED: When features are marked to "delay until end" (these WILL be implemented in later stories)
+  - ⏬ Low Priority: When features are marked to "delay until end" (these WILL be implemented in later stories)
 - Example 1: "☐ Text search capability for filtering tasks by name"
 - Example 2: "✅ Checkbox interaction to toggle task status (existing functionality)"
-- Example 3: "❌ OAuth authentication (deferred to future epic)"
+- Example 3: "❌ OAuth authentication (future epic)"
 - Example 4: "⚠️ SCOPE MISMATCH: Admin panel visible but epic marks as out of scope"
-- Example 5: "⏸️ DEFERRED: Pagination controls visible but epic explicitly delays until end"
+- Example 5: "⏬ Low Priority: Pagination controls visible but epic explicitly delays until end"
 - Example 6: "❓ Should filters persist across sessions? Not specified in epic or design notes"
 - Note discrepancies between screen designs and epic priorities
 - Reference epic constraints when documenting features
 - Epic priorities take precedence over screen designs when there are contradictions
 - Keep ☐ descriptions concise for obvious features, detailed for complex features
+- IMPORTANT: Low priority features (⏬) should still be documented fully - they will be implemented later in this epic
 - Keep ✅ and ❌ descriptions brief since they're not part of this epic's work
-- IMPORTANT: Deferred features (⏸️) should still be documented fully - they will be implemented later
 
 ## Page Structure
 
@@ -138,11 +139,12 @@ Document the actual content shown:
 - Categorize features using epic context guidance:
   - ☐ In-Scope: New capabilities to be built (concise for obvious, detailed for complex)
   - ✅ Already Done: Existing functionality providing context (keep brief)
-  - ❌ Out-of-Scope: Deferred or excluded features (keep brief)
+  - ⏬ Low Priority: Implement later in epic (keep brief with timing note)
+  - ❌ Out-of-Scope: Excluded or future epic features (keep brief)
   - ❓ Questions: Unclear behavior or ambiguous requirements
-- Flag contradictions and deferrals:
+- Flag contradictions and priorities:
   - ⚠️ SCOPE MISMATCH: When visible features contradict epic scope
-  - ⏸️ DEFERRED: When features are marked to delay until end
+  - ⏬ Low Priority: When features are marked to delay until end
 - Clearly distinguish what comes from visual analysis vs. design notes vs. epic context`;
 }
 
