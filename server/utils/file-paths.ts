@@ -57,6 +57,20 @@ export function getServerDir(): string {
 }
 
 /**
+ * Get the project root directory path
+ * 
+ * This assumes the helper is located at `/server/utils/file-paths.ts`
+ * and returns the project root directory (parent of `/server`).
+ * 
+ * @returns Absolute path to the project root directory
+ */
+export function getProjectRoot(): string {
+  const serverDir = getServerDir();
+  // From /server, go up one level to project root
+  return path.dirname(serverDir);
+}
+
+/**
  * Resolve a path relative to the server directory
  * 
  * @param relativePath - Path relative to /server directory

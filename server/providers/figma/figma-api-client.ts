@@ -81,6 +81,11 @@ export function createFigmaClient(accessToken: string): FigmaClient {
         allHeaders: Object.keys(headers),
       });
       
+      // For 403 debugging - log full token temporarily
+      if (process.env.DEBUG_FIGMA_TOKEN === 'true') {
+        console.log('🔐 FULL FIGMA TOKEN (DEBUG MODE):', accessToken);
+      }
+      
       return fetch(url, {
         ...options,
         headers,

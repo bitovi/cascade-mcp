@@ -9,7 +9,8 @@ import { z } from 'zod';
 import { logger } from '../../../observability/logger.js';
 import { getAuthInfoSafe } from '../../../mcp-core/auth-helpers.js';
 import type { McpServer } from '../../../mcp-core/mcp-types.js';
-import { createRateLimitErrorMessage } from '../figma-helpers.js';
+import { createFigmaClient } from '../figma-api-client.js';
+import { fetchFigmaFile } from '../figma-helpers.js';
 
 // Tool parameters interface
 interface FigmaGetLayersForPageParams {
@@ -161,73 +162,13 @@ export function registerFigmaGetLayersForPageTool(mcp: McpServer): void {
         const pageId: string | null = extractPageIdFromUrl(url);
         console.log('  Extracted page ID:', pageId || 'none (will use first page)');
 
-        // 4. Call Figma API to get file data
-        const figmaApiUrl = `https://api.figma.com/v1/files/${fileKey}`;
-        console.log('  Calling Figma API:', figmaApiUrl);
+        // 4. Create Figma client and fetch file data using helper (includes enhanced 403 logging)
+        const figmaClient = createFigmaClient(token);
+        const data = await fetchFigmaFile(figmaClient, fileKey);
 
-        // Add timeout to prevent hanging
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-
-        let data: any;
-        try {
-          const response = await fetch(figmaApiUrl, {
-            headers: {
-              'Authorization': `Bearer ${token}`, // OAuth Bearer token per Q10
-            },
-            signal: controller.signal,
-          });
-
-          clearTimeout(timeoutId);
-
-          console.log('  Figma API response:', response.status, response.statusText);
-
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.log('  ❌ Figma API error:', errorText);
-            
-            // Handle rate limiting with user-friendly message
-            if (response.status === 429) {
-              return {
-                content: [
-                  {
-                    type: 'text',
-                    text: `Error: ${createRateLimitErrorMessage(errorText)}`,
-                  },
-                ],
-              };
-            }
-            
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: `Error: Figma API error: ${response.status} ${response.statusText} - ${errorText}`,
-                },
-              ],
-            };
-          }
-
-          data = await response.json();
-          console.log('  ✅ Figma API response received');
-          console.log('  File name:', data.name);
-          console.log('  Pages found:', data.document?.children?.length || 0);
-        } catch (fetchError: any) {
-          clearTimeout(timeoutId);
-          if (fetchError.name === 'AbortError') {
-            console.log('  ❌ Request timed out');
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: 'Error: Figma API request timed out after 10 seconds',
-                },
-              ],
-            };
-          }
-          console.log('  ❌ Fetch error:', fetchError);
-          throw fetchError;
-        }
+        console.log('  ✅ Figma API response received');
+        console.log('  File name:', data.name);
+        console.log('  Pages found:', data.document?.children?.length || 0);
 
         // Check for Figma API errors in response
         if (data.err) {

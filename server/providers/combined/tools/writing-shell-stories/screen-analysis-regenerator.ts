@@ -4,8 +4,8 @@
  * Shared utility for regenerating missing screen analysis files.
  * Used by both write-shell-stories and write-next-story tools.
  * 
- * Uses pipelined downloading: starts downloading next image while analyzing current screen
- * for optimal performance with multiple screens.
+ * Uses batch downloading: fetches all image URLs in one request, then downloads
+ * from CDN in parallel for optimal rate limit efficiency.
  */
 
 import * as path from 'path';
@@ -13,7 +13,7 @@ import * as fs from 'fs/promises';
 import type { FigmaClient } from '../../../figma/figma-api-client.js';
 import type { GenerateTextFn } from '../../../../llm-client/types.js';
 import type { FigmaNodeMetadata } from '../../../figma/figma-helpers.js';
-import { downloadFigmaImage } from '../../../figma/figma-helpers.js';
+import { downloadFigmaImagesBatch } from '../../../figma/figma-helpers.js';
 import { writeNotesForScreen } from './note-text-extractor.js';
 import {
   generateScreenAnalysisPrompt,
@@ -58,6 +58,7 @@ export interface RegenerateAnalysesResult {
  * Regenerate missing screen analysis files
  * 
  * Downloads Figma images and generates AI analysis for the specified screens.
+ * Skips screens that already have analysis files in the temp directory (cache).
  * Uses pipelining: starts downloading next image while analyzing current screen.
  * Saves both images (.png) and analysis files (.analysis.md) to temp directory.
  * 
@@ -69,57 +70,104 @@ export async function regenerateScreenAnalyses(
 ): Promise<RegenerateAnalysesResult> {
   const { generateText, figmaClient, screens, allFrames, allNotes, figmaFileKey, tempDirPath, epicContext, notify } = params;
   
-  console.log(`Regenerating analysis for ${screens.length} screens...`);
+  // Check which screens already have analysis files (cache) - only if DEV_CACHE_DIR is set
+  const screensToAnalyze: ScreenToAnalyze[] = [];
+  const cachedScreens: string[] = [];
+  
+  if (process.env.DEV_CACHE_DIR) {
+    for (const screen of screens) {
+      const analysisPath = path.join(tempDirPath, `${screen.name}.analysis.md`);
+      try {
+        await fs.access(analysisPath);
+        // File exists - skip this screen
+        cachedScreens.push(screen.name);
+      } catch {
+        // File doesn't exist - need to analyze
+        screensToAnalyze.push(screen);
+      }
+    }
+    
+    if (cachedScreens.length > 0) {
+      console.log(`    ♻️  Cached: ${cachedScreens.join(', ')}`);
+    }
+    
+    // If all screens are cached, return early
+    if (screensToAnalyze.length === 0) {
+      console.log(`  ✅ All ${screens.length} screens already analyzed (using cache)`);
+      return { downloadedImages: 0, analyzedScreens: 0, downloadedNotes: 0 };
+    }
+  } else {
+    // No dev cache - analyze all screens
+    screensToAnalyze.push(...screens);
+  }
   
   let downloadedImages = 0;
   let analyzedScreens = 0;
   let downloadedNotes = 0;
   
-  // Helper to download image for a screen
-  async function downloadScreenImage(screen: ScreenToAnalyze, frameId: string): Promise<{
-    base64Data: string;
-    byteSize: number;
-  } | null> {
-    try {
-      const imageResult = await downloadFigmaImage(
-        figmaClient,
-        figmaFileKey,
-        frameId,
-        { format: 'png', scale: 1 }
-      );
-      
-      const imageSizeKB = Math.round(imageResult.byteSize / 1024);
-      
-      // Save image to temp directory
-      const imagePath = path.join(tempDirPath, `${screen.name}.png`);
-      const imageBuffer = Buffer.from(imageResult.base64Data, 'base64');
-      await fs.writeFile(imagePath, imageBuffer);
-      
-      console.log(`  ✅ Downloaded image: ${screen.name}.png (${imageSizeKB}KB)`);
-      
-      return imageResult;
-    } catch (error: any) {
-      console.log(`  ⚠️  Failed to download image for ${screen.name}: ${error.message}`);
-      
-      // If this is a rate limit error, propagate it to the user
-      if (error.message && error.message.includes('Figma API rate limit exceeded')) {
-        throw error;
-      }
-      
-      // For other errors, return null and continue with remaining screens
-      return null;
-    }
+  // ==========================================
+  // Phase A: Batch download ALL images upfront
+  // ==========================================
+  
+  if (notify) {
+    await notify(`📥 Batch downloading ${screensToAnalyze.length} images...`);
   }
   
-  // Pipeline: Start downloading the first image
-  let nextImagePromise: Promise<{ base64Data: string; byteSize: number } | null> | null = null;
+  // Map screens to their frame IDs
+  const screenFrameMap = new Map<string, { screen: ScreenToAnalyze; frameId: string; originalIndex: number }>();
+  const frameIds: string[] = [];
   
-  for (let i = 0; i < screens.length; i++) {
-    const screen = screens[i];
-    console.log(`  Processing screen ${i + 1}/${screens.length}: ${screen.name}`);
+  for (const screen of screensToAnalyze) {
+    const frame = allFrames.find(f => screen.url.includes(f.id.replace(/:/g, '-')));
+    
+    if (!frame) {
+      console.log(`  ⚠️  Frame not found for screen: ${screen.name}`);
+      continue;
+    }
+    
+    const originalIndex = screens.indexOf(screen);
+    screenFrameMap.set(frame.id, { screen, frameId: frame.id, originalIndex });
+    frameIds.push(frame.id);
+  }
+  
+  // Batch download all images
+  let imagesMap: Map<string, any> = new Map();
+  
+  try {
+    imagesMap = await downloadFigmaImagesBatch(
+      figmaClient,
+      figmaFileKey,
+      frameIds,
+      { format: 'png', scale: 1 }
+    );
     
     if (notify) {
-      await notify(`Analyzing screen: ${screen.name} (${i + 1}/${screens.length})`);
+      await notify(`✅ Downloaded ${Array.from(imagesMap.values()).filter(v => v !== null).length} images. Starting AI analysis...`);
+    }
+    
+  } catch (error: any) {
+    console.log(`  ⚠️  Batch download failed: ${error.message}`);
+    
+    // If this is a rate limit error, propagate it to the user
+    if (error.message && error.message.includes('Figma API rate limit exceeded')) {
+      throw error;
+    }
+    
+    // For other errors, return what we have
+    return { downloadedImages, analyzedScreens, downloadedNotes };
+  }
+  
+  // ==========================================
+  // Phase B: Analyze screens with pre-downloaded images
+  // ==========================================
+  
+  for (let i = 0; i < screensToAnalyze.length; i++) {
+    const screen = screensToAnalyze[i];
+    const originalIndex = screens.indexOf(screen);
+    
+    console.log(`    🤖 Analyzing: ${screen.name}`);
+    if (notify) {
+      await notify(`🤖 Analyzing: ${screen.name}`);
     }
     
     // Find the frame for this screen
@@ -140,98 +188,76 @@ export async function regenerateScreenAnalyses(
         tempDirPath
       );
       if (notesWritten > 0) {
-        console.log(`  ✅ Prepared notes: ${screen.name}.notes.md (${notesWritten} notes)`);
         downloadedNotes++;
       }
     }
     
-    // Step 2: Download current image (or await previous download if pipelined)
-    let imageResult: { base64Data: string; byteSize: number } | null = null;
+    // Step 2: Get pre-downloaded image
+    const imageResult = imagesMap.get(frame.id);
     
-    if (i === 0) {
-      // First screen: download directly
-      imageResult = await downloadScreenImage(screen, frame.id);
-    } else {
-      // Subsequent screens: await the previous iteration's prefetch
-      imageResult = await nextImagePromise!;
+    if (!imageResult) {
+      console.log(`  ⚠️  No image for ${screen.name}`);
+      continue;
     }
     
-    if (imageResult) {
-      downloadedImages++;
-    }
+    // Save image to temp directory
+    const imagePath = path.join(tempDirPath, `${screen.name}.png`);
+    const imageBuffer = Buffer.from(imageResult.base64Data, 'base64');
+    await fs.writeFile(imagePath, imageBuffer);
     
-    // Step 3: Start downloading NEXT image while we analyze CURRENT (pipeline optimization)
-    const nextScreen = screens[i + 1];
-    if (nextScreen) {
-      const nextFrame = allFrames.find(f => 
-        nextScreen.url.includes(f.id.replace(/:/g, '-'))
-      );
-      
-      if (nextFrame) {
-        // Start next download in background (don't await)
-        nextImagePromise = downloadScreenImage(nextScreen, nextFrame.id);
-      }
-    }
+    downloadedImages++;
     
-    // Step 4: Run AI analysis on CURRENT screen (while next image downloads in parallel)
-    if (imageResult) {
+    // Step 3: Run AI analysis on screen
+    try {
+      // Read notes content if available
+      let notesContent = '';
+      const notesPath = path.join(tempDirPath, `${screen.name}.notes.md`);
       try {
-        console.log(`  🤖 Analyzing screen with AI...`);
-        
-        // Read notes content if available
-        let notesContent = '';
-        const notesPath = path.join(tempDirPath, `${screen.name}.notes.md`);
-        try {
-          notesContent = await fs.readFile(notesPath, 'utf-8');
-        } catch {
-          // No notes file, that's okay
-        }
-        
-        // Generate analysis prompt using helper
-        const screenPosition = `${i + 1} of ${screens.length}`;
-        const analysisPrompt = generateScreenAnalysisPrompt(
-          screen.name,
-          screen.url,
-          screenPosition,
-          notesContent || undefined,
-          epicContext
-        );
-
-        // Generate analysis using injected LLM client (with image)
-        const analysisResponse = await generateText({
-          prompt: analysisPrompt,
-          image: {
-            type: 'image',
-            data: imageResult.base64Data,
-            mimeType: 'image/png'
-          },
-          systemPrompt: SCREEN_ANALYSIS_SYSTEM_PROMPT,
-          maxTokens: SCREEN_ANALYSIS_MAX_TOKENS,
-          speedPriority: 0.5
-        });
-        
-        const analysisText = analysisResponse.text;
-        if (!analysisText) {
-          throw new Error('No analysis content received from AI');
-        }
-        
-        console.log(`  ✅ AI analysis complete (${analysisText.length} characters)`);
-        
-        // Step 5: Save analysis result with Figma URL prepended
-        const analysisWithUrl = `**Figma URL:** ${screen.url}\n\n${analysisText}`;
-        const analysisPath = path.join(tempDirPath, `${screen.name}.analysis.md`);
-        await fs.writeFile(analysisPath, analysisWithUrl, 'utf-8');
-        
-        console.log(`  ✅ Saved analysis: ${screen.name}.analysis.md`);
-        analyzedScreens++;
-        
-      } catch (error: any) {
-        console.log(`  ⚠️  Failed to analyze ${screen.name}: ${error.message}`);
+        notesContent = await fs.readFile(notesPath, 'utf-8');
+      } catch {
+        // No notes file, that's okay
       }
+      
+      // Generate analysis prompt using helper
+      const screenPosition = `${originalIndex + 1} of ${screens.length}`;
+      const analysisPrompt = generateScreenAnalysisPrompt(
+        screen.name,
+        screen.url,
+        screenPosition,
+        notesContent || undefined,
+        epicContext
+      );
+
+      // Generate analysis using injected LLM client (with image)
+      const analysisResponse = await generateText({
+        prompt: analysisPrompt,
+        image: {
+          type: 'image',
+          data: imageResult.base64Data,
+          mimeType: 'image/png'
+        },
+        systemPrompt: SCREEN_ANALYSIS_SYSTEM_PROMPT,
+        maxTokens: SCREEN_ANALYSIS_MAX_TOKENS,
+        speedPriority: 0.5
+      });
+      
+      const analysisText = analysisResponse.text;
+      if (!analysisText) {
+        throw new Error('No analysis content received from AI');
+      }
+      
+      // Step 4: Save analysis result with Figma URL prepended
+      const analysisWithUrl = `**Figma URL:** ${screen.url}\n\n${analysisText}`;
+      const analysisPath = path.join(tempDirPath, `${screen.name}.analysis.md`);
+      await fs.writeFile(analysisPath, analysisWithUrl, 'utf-8');
+      
+      analyzedScreens++;
+      
+    } catch (error: any) {
+      console.log(`  ⚠️  Failed to analyze ${screen.name}: ${error.message}`);
     }
   }
   
-  console.log(`  Regeneration complete: ${downloadedImages}/${screens.length} images, ${analyzedScreens} analyses, ${downloadedNotes} note files`);
-  
   return { downloadedImages, analyzedScreens, downloadedNotes };
 }
+

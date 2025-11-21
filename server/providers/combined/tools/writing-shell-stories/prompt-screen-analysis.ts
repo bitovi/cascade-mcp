@@ -44,14 +44,26 @@ ${notesContent ? notesContent : 'No design notes available for this screen.'}
 ${hasEpicContext ? epicContext : 'No epic context available for this analysis.'}
 
 **How to use epic context:**
-- Flag features marked as "out of scope" using: ⚠️ SCOPE MISMATCH (these will NOT be implemented)
-- Flag features marked as "delay until end" using: ⏸️ DEFERRED (these WILL be implemented in later stories)
-- Example 1: "⏸️ DEFERRED: Pagination controls visible but epic explicitly delays until end"
-- Example 2: "⚠️ SCOPE MISMATCH: Admin panel visible but epic marks as out of scope"
+- Categorize features using these emojis:
+  - ☐ In-Scope: Features explicitly listed as in-scope in epic context (new work to be done)
+  - ✅ Already Done: Existing functionality mentioned in epic as already implemented (provides context but not new work)
+  - ❌ Out-of-Scope: Features marked as deferred/excluded in epic context (will NOT be implemented in this epic)
+  - ❓ Questions: Unclear behavior, ambiguous requirements, or features that could be either in/out of scope
+- Flag contradictions and deferrals:
+  - ⚠️ SCOPE MISMATCH: When UI shows features marked as out of scope in epic (these will NOT be implemented)
+  - ⏸️ DEFERRED: When features are marked to "delay until end" (these WILL be implemented in later stories)
+- Example 1: "☐ Text search capability for filtering tasks by name"
+- Example 2: "✅ Checkbox interaction to toggle task status (existing functionality)"
+- Example 3: "❌ OAuth authentication (deferred to future epic)"
+- Example 4: "⚠️ SCOPE MISMATCH: Admin panel visible but epic marks as out of scope"
+- Example 5: "⏸️ DEFERRED: Pagination controls visible but epic explicitly delays until end"
+- Example 6: "❓ Should filters persist across sessions? Not specified in epic or design notes"
 - Note discrepancies between screen designs and epic priorities
 - Reference epic constraints when documenting features
 - Epic priorities take precedence over screen designs when there are contradictions
-- IMPORTANT: Deferred features should still be documented fully - they will be implemented later
+- Keep ☐ descriptions concise for obvious features, detailed for complex features
+- Keep ✅ and ❌ descriptions brief since they're not part of this epic's work
+- IMPORTANT: Deferred features (⏸️) should still be documented fully - they will be implemented later
 
 ## Page Structure
 
@@ -123,10 +135,14 @@ Document the actual content shown:
 - Identify potential user workflows
 - Note any error states or validation visible
 - Document loading states or empty states shown
-- Check epic context for scope and deferral guidance:
-  - If a feature is visible but marked for deferral in epic, note it with: "⏸️ DEFERRED: [Epic indicates this should be delayed]"
-  - If a feature contradicts epic scope, note it with: "⚠️ SCOPE MISMATCH: [Epic marks this as out of scope]"
-  - Reference epic constraints when documenting complex features
+- Categorize features using epic context guidance:
+  - ☐ In-Scope: New capabilities to be built (concise for obvious, detailed for complex)
+  - ✅ Already Done: Existing functionality providing context (keep brief)
+  - ❌ Out-of-Scope: Deferred or excluded features (keep brief)
+  - ❓ Questions: Unclear behavior or ambiguous requirements
+- Flag contradictions and deferrals:
+  - ⚠️ SCOPE MISMATCH: When visible features contradict epic scope
+  - ⏸️ DEFERRED: When features are marked to delay until end
 - Clearly distinguish what comes from visual analysis vs. design notes vs. epic context`;
 }
 

@@ -58,8 +58,10 @@ export function parseShellStories(shellStoriesContent: string): ParsedShellStory
     const storyId = storyIdMatch[1];
     
     // Extract title and description using ⟩ separator
-    // First, get everything after the story ID
-    const afterId = firstLine.substring(firstLine.indexOf('`', 1) + 1).trim();
+    // First, get everything after the story ID (after the closing backtick)
+    // Find the position of the closing backtick by getting the end of the match
+    const storyIdEndPos = storyIdMatch.index! + storyIdMatch[0].length;
+    const afterId = firstLine.substring(storyIdEndPos).trim();
     
     // Split by ⟩ separator
     const separatorMatch = afterId.match(/^(.+?)\s*⟩\s*(.+)$/);
@@ -110,8 +112,8 @@ export function parseShellStories(shellStoriesContent: string): ParsedShellStory
         if (depsText.toLowerCase() !== 'none') {
           dependencies.push(...depsText.split(',').map(d => d.trim()).filter(d => d));
         }
-      } else if (line.startsWith('* ✅') || line.startsWith('- ✅')) {
-        included.push(line.replace(/^[*-]\s*✅\s*/, ''));
+      } else if (line.startsWith('* ☐') || line.startsWith('- ☐')) {
+        included.push(line.replace(/^[*-]\s*☐\s*/, ''));
       } else if (line.startsWith('* ❌') || line.startsWith('- ❌')) {
         excluded.push(line.replace(/^[*-]\s*❌\s*/, ''));
       } else if (line.startsWith('* ❓') || line.startsWith('- ❓')) {

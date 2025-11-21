@@ -265,26 +265,11 @@ export async function updateIssueComment(
   commentId: string,
   markdownText: string
 ): Promise<Response> {
-  logger.info('Updating comment on Jira issue', {
-    issueKey,
-    cloudId,
-    commentId,
-    markdownLength: markdownText.length,
-  });
-
   // Convert markdown to ADF
   const adfBody = await convertMarkdownToAdf(markdownText);
 
   // Construct comment update URL
   const commentUrl = `${client.getJiraBaseUrl(cloudId)}/issue/${issueKey}/comment/${commentId}`;
-
-  logger.info('Making Jira API request to update comment', {
-    issueKey,
-    cloudId,
-    commentId,
-    commentUrl,
-    adfContentBlocks: adfBody.content?.length || 0,
-  });
 
   // Update comment using client
   const response = await client.fetch(commentUrl, {
@@ -293,14 +278,6 @@ export async function updateIssueComment(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ body: adfBody }),
-  });
-
-  logger.info('Comment update response', {
-    issueKey,
-    commentId,
-    status: response.status,
-    statusText: response.statusText,
-    contentType: response.headers.get('content-type'),
   });
 
   // Handle errors

@@ -109,9 +109,9 @@ ${analysisSection}
 
 ## EVIDENCE-BASED CORRECTIONS
 
-✅ "Search input field and search button (UI elements visible)"
-✅ "Status dropdown filter (shows 'Active', 'Pending', 'Archived' options)"
-✅ "Form submission (behavior not described - needs clarification)"
+☐ "Search input field and search button (UI elements visible)"
+☐ "Status dropdown filter (shows 'Active', 'Pending', 'Archived' options)"
+☐ "Form submission (behavior not described - needs clarification)"
 
 ## PROCESS (follow in order)
 
@@ -295,7 +295,7 @@ ${analysisSection}
 • Sub-bullets for each story (use proper markdown nested bullets with 2-space indentation and emoji symbols):
   * SCREENS: {Figma URLs formatted as markdown links with screen names as link text}
   * DEPENDENCIES: {list of story IDs this story depends on, or \`none\`}
-  * ✅ Included behavior and functionality (including shared components introduced here)
+  * ☐ Included behavior and functionality (including shared components introduced here)
   * ❌ Deferred/excluded functionality
   * ❓ Open questions
 • Replace the entire "Final Prioritized Stories" section when updating, do not append
@@ -306,9 +306,9 @@ ${analysisSection}
 - \`st001\` **Add Promotion to Cart** ⟩ Allow users to apply a promotion code to their shopping cart
   * SCREENS: [promo-add-form](https://www.figma.com/design/aBc123XyZ/Project-Name?node-id=123-456), [promo-success](https://www.figma.com/design/aBc123XyZ/Project-Name?node-id=123-457), [promo-error](https://www.figma.com/design/aBc123XyZ/Project-Name?node-id=123-458)
   * DEPENDENCIES: none
-  * ✅ User can enter a valid promotion code and apply it
-  * ✅ Success state shows updated cart total with discount
-  * ✅ Error modal component introduced for invalid codes
+  * ☐ User can enter a valid promotion code and apply it
+  * ☐ Success state shows updated cart total with discount
+  * ☐ Error modal component introduced for invalid codes
   * ❌ Support for stacking multiple promotions (defer)
   * ❌ Promotion auto-suggestions (defer)
   * ❓ What error messages should display for expired or invalid codes?

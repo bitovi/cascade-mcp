@@ -342,8 +342,8 @@ async function updateEpicWithShellStories({
   console.log('  Phase 6: Updating epic with shell stories...');
 
   try {
-    // Prepare new description content with shell stories section
-    const shellStoriesSection = `## Shell Stories\n\n${shellStoriesMarkdown}`;
+    // Clean up AI-generated content and prepare section
+    const shellStoriesSection = prepareShellStoriesSection(shellStoriesMarkdown);
     
     // Convert the new section to ADF
     console.log('    Converting shell stories section to ADF...');
@@ -405,4 +405,27 @@ async function updateEpicWithShellStories({
     console.log(`    ⚠️ Error updating epic: ${error.message}`);
     await notify(`⚠️ Error updating epic: ${error.message}`);
   }
+}
+
+/**
+ * Prepare shell stories section for Jira epic
+ * 
+ * Strips any leading headers from AI-generated content to avoid double headers.
+ * The AI sometimes adds headers like "# Task Search and Filter - Shell Stories"
+ * even though we instruct it not to.
+ * 
+ * @param shellStoriesMarkdown - Raw markdown from AI generation
+ * @returns Cleaned markdown with "## Shell Stories" header
+ */
+function prepareShellStoriesSection(shellStoriesMarkdown: string): string {
+  let cleanedMarkdown = shellStoriesMarkdown.trim();
+  
+  // Remove any leading H1 headers (# ...)
+  cleanedMarkdown = cleanedMarkdown.replace(/^#\s+.*?\n+/m, '');
+  
+  // Remove any leading H2 headers (## ...) that might say "Shell Stories"
+  cleanedMarkdown = cleanedMarkdown.replace(/^##\s+.*?\n+/m, '');
+  
+  // Return with proper section header
+  return `## Shell Stories\n\n${cleanedMarkdown}`;
 }

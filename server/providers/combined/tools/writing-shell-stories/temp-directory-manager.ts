@@ -11,6 +11,7 @@ import { dir } from 'tmp-promise';
 import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs/promises';
+import { getProjectRoot } from '../../../../utils/file-paths.js';
 
 interface TempDirInfo {
   path: string;
@@ -35,6 +36,35 @@ const MAX_AGE_MS = 24 * 60 * 60 * 1000;
  */
 function getLookupKey(sessionId: string, epicKey: string): string {
   return `${sessionId}:${epicKey}`;
+}
+
+/**
+ * Get the base directory for cache files
+ * 
+ * In development mode with DEV_CACHE_DIR set, uses that directory.
+ * Otherwise, uses OS temp directory.
+ * 
+ * @returns Absolute path to base cache directory
+ */
+function getBaseCacheDir(): string {
+  const devCacheDir = process.env.DEV_CACHE_DIR;
+  
+  if (!devCacheDir) {
+    // No override - use OS temp directory
+    return os.tmpdir();
+  }
+  
+  // Check if path is absolute
+  if (path.isAbsolute(devCacheDir)) {
+    console.log('  Using absolute DEV_CACHE_DIR:', devCacheDir);
+    return devCacheDir;
+  }
+  
+  // Relative path - resolve from project root
+  const projectRoot = getProjectRoot();
+  const resolvedPath = path.resolve(projectRoot, devCacheDir);
+  console.log('  Using relative DEV_CACHE_DIR:', devCacheDir, '→', resolvedPath);
+  return resolvedPath;
 }
 
 /**
@@ -72,16 +102,41 @@ export async function getTempDir(
     }
   }
   
-  // Create new temp directory with deterministic prefix
-  const tempDirPrefix = `shell-stories-${sessionId}-${epicKey}`;
-  
-  const { path: tempDirPath, cleanup } = await dir({
-    prefix: tempDirPrefix,
-    unsafeCleanup: true, // Remove directory even if not empty
-    tmpdir: os.tmpdir()
-  });
-  
-  console.log('  Created new temp directory:', tempDirPath);
+  // Determine base directory and create temp directory
+  const baseCacheDir = getBaseCacheDir();
+  let tempDirPath: string;
+  let cleanup: () => Promise<void>;
+
+  if (process.env.DEV_CACHE_DIR) {
+    // Manual directory creation for dev mode
+    tempDirPath = path.join(baseCacheDir, sessionId, epicKey);
+    
+    // Create directory if it doesn't exist
+    await fs.mkdir(tempDirPath, { recursive: true });
+    
+    console.log('  Created/reused dev cache directory:', tempDirPath);
+    
+    // Create cleanup function (for consistency, but won't auto-delete in dev mode)
+    cleanup = async () => {
+      console.log('  Cleanup called for dev cache directory:', tempDirPath);
+      // Note: In dev mode, we don't actually delete the directory
+      // This preserves artifacts for debugging across sessions
+    };
+  } else {
+    // Production mode - use tmp-promise with OS temp directory
+    const tempDirPrefix = `shell-stories-${sessionId}-${epicKey}`;
+    
+    const tmpResult = await dir({
+      prefix: tempDirPrefix,
+      unsafeCleanup: true,
+      tmpdir: baseCacheDir
+    });
+    
+    tempDirPath = tmpResult.path;
+    cleanup = tmpResult.cleanup;
+    
+    console.log('  Created new temp directory:', tempDirPath);
+  }
   
   // Store in active directories map
   const now = Date.now();
@@ -167,8 +222,8 @@ export function stopPeriodicCleanup(): void {
   }
 }
 
-// Start cleanup on module load (only in non-test environments)
-if (process.env.NODE_ENV !== 'test' && !process.env.JEST_WORKER_ID) {
+// Start cleanup on module load (only in non-test environments and when not using DEV_CACHE_DIR)
+if (process.env.NODE_ENV !== 'test' && !process.env.JEST_WORKER_ID && !process.env.DEV_CACHE_DIR) {
   startPeriodicCleanup();
 }
 

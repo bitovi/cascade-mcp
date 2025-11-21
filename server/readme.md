@@ -41,6 +41,7 @@
   Express route handlers for PAT-authenticated REST API endpoints.
   - **api/write-shell-stories.ts** - Generate shell stories from Figma designs in a Jira epic
   - **api/write-next-story.ts** - Write the next Jira story from shell stories
+  - **api/identify-features.ts** - Identify in-scope/out-of-scope features from Figma designs
   - **api/progress-comment-manager.ts** - Progress tracking via Jira comments
   - **api/api-error-helpers.ts** - Shared error handling and validation
 
@@ -61,6 +62,21 @@
 - **atlassian-get-attachments** - Fetch issue attachments by ID
 - **atlassian-update-issue-description** - Update issue description with markdown (converts to ADF)
 
+### Combined Provider Tools
+Advanced workflow tools that integrate multiple services:
+
+- **identify-features** - Generate scope analysis from Figma designs
+  - Analyzes screens against epic requirements to identify in-scope/out-of-scope features
+  - Categorizes features as: ✅ confirmed, ❌ out-of-scope, ❓ needs-clarification
+  - Updates epic description with structured scope analysis
+  - Parameters: `epicKey`, `figmaUrl`, optional `cloudId`
+  - Example: `identify-features({ epicKey: "PLAY-123", figmaUrl: "https://..." })`
+
+- **write-shell-stories** - Generate shell user stories from Figma designs
+  - Creates structured user stories for each screen in Figma
+  - Updates epic description with screen analyses and story templates
+  - Parameters: `epicKey`, `figmaUrl`, optional `cloudId`
+
 ### ChatGPT-Compatible Tools
 These tools follow OpenAI's MCP specification patterns for optimal ChatGPT integration:
 
@@ -79,9 +95,39 @@ These tools follow OpenAI's MCP specification patterns for optimal ChatGPT integ
 **Key Differences:**
 - **Standard tools**: Return full Jira API responses with ADF formatting
 - **ChatGPT tools**: Return simplified document format with markdown text
-- **Both are always available** - use based on client needs (VS Code Copilot vs ChatGPT)
+- **Combined tools**: Multi-service workflows with AI-powered analysis
+- **All tools are always available** - use based on client needs (VS Code Copilot vs ChatGPT)
 
 ## Key Authentication Patterns
+
+### Environment Variables
+
+#### DEV_CACHE_DIR (Optional - Development Only)
+
+Override the default OS temp directory for cache files.
+
+- **Relative paths**: Resolved from project root (e.g., `./cache`)
+- **Absolute paths**: Used as-is (e.g., `/tmp/dev-cache`)
+- **Default**: OS temp directory when not set
+
+Example:
+```bash
+export DEV_CACHE_DIR=./cache
+npm run start-local
+```
+
+Cache structure with override:
+```
+<project-root>/cache/
+  ├── {sessionId}/
+  │   ├── {epicKey}/
+  │   │   ├── screens.yaml
+  │   │   ├── {screen-name}.png
+  │   │   ├── {screen-name}.analysis.md
+  │   │   └── ...
+```
+
+**Note**: In dev mode, directories are NOT automatically cleaned up. This preserves debugging artifacts across sessions.
 
 ### JWT Token Structure
 ```javascript

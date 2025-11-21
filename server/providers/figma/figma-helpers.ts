@@ -9,17 +9,65 @@ import { logger } from '../../observability/logger.js';
 import type { FigmaClient } from './figma-api-client.js';
 
 /**
- * Create a user-friendly rate limit error message
- * @param technicalDetails - Technical error details from API response
- * @param retryAfterSeconds - Seconds to wait before retrying (from retry-after header)
- * @param rateLimitType - Figma rate limit type (from x-figma-rate-limit-type header)
+ * Custom error for unrecoverable Figma API errors
+ * These should be immediately re-thrown and not retried
+ */
+export class FigmaUnrecoverableError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode: number
+  ) {
+    super(message);
+    this.name = 'FigmaUnrecoverableError';
+    // Maintains proper stack trace for where our error was thrown (only available on V8)
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, FigmaUnrecoverableError);
+    }
+  }
+}
+
+/**
+ * Create a user-friendly 403 Forbidden error message
+ * @param url - The Figma API URL that was called
+ * @param response - The fetch Response object
  * @returns Formatted error message
  */
-export function createRateLimitErrorMessage(
-  technicalDetails: string, 
-  retryAfterSeconds?: number,
-  rateLimitType?: string
+export function create403ErrorMessage(
+  url: string,
+  response: Response
 ): string {
+
+  return `Figma API access denied (403 Forbidden) for ${url}.
+
+This means the authenticated Figma user doesn't have the required permission level to view this file.
+
+Common causes:
+- File is not shared with your Figma account
+- You need "Can view" or higher access level
+- File is in a private workspace/team you're not a member of
+- Your access level was recently changed or revoked
+
+Solution: Ask the file owner to share it with your Figma account (the one you used for OAuth) with at least "Can view" permissions.`;
+}
+
+/**
+ * Create a user-friendly rate limit error message
+ * @param url - The Figma API URL that was called
+ * @param response - The fetch Response object
+ * @param errorText - Error text from response body
+ * @returns Formatted error message
+ */
+export async function createRateLimitErrorMessage(
+  url: string,
+  response: Response,
+  errorText: string
+): Promise<string> {
+  const retryAfterHeader = response.headers.get('retry-after');
+  const rateLimitType = response.headers.get('x-figma-rate-limit-type');
+  const planTier = response.headers.get('x-figma-plan-tier');
+  
+  const retryAfterSeconds = retryAfterHeader ? parseInt(retryAfterHeader, 10) : undefined;
+  
   let waitTime = '5-15 minutes';
   
   if (retryAfterSeconds) {
@@ -36,22 +84,25 @@ export function createRateLimitErrorMessage(
     }
   }
   
-  const tierInfo = rateLimitType 
-    ? `
-- Your token is on the "${rateLimitType}" rate limit tier - consider checking your Figma plan settings`
-    : '';
+  let seatInfo = '';
+  if (rateLimitType) {
+    const seatType = rateLimitType === 'low' 
+      ? 'View or Collab seat'
+      : 'Dev or Full seat';
+    seatInfo = `\n- Your seat type: "${rateLimitType}" - ${seatType}`;
+  }
   
-  return `Figma API rate limit exceeded.
+  let planInfo = '';
+  if (planTier) {
+    planInfo = `\n- Your plan tier: ${planTier}`;
+  }
+  
+  return `Figma API rate limit exceeded. Your account/token has hit this limit.
+Figma responded that you have to wait ${waitTime} to make requests again.
+${seatInfo}${planInfo}.
 
-Figma limits API requests to prevent abuse. Your account/token has hit this limit.
-
-What you can do:
-- Wait ${waitTime} for the rate limit to reset${tierInfo}
-- Check if other tools/scripts are using your Figma token simultaneously
-- Consider generating a new Personal Access Token with appropriate rate limits
-- Contact Figma support if this seems incorrect for your plan
-
-Technical details: ${technicalDetails}`;
+See https://developers.figma.com/docs/rest-api/rate-limits/ for more information. 
+Technical details: ${errorText}`;
 }
 
 /**
@@ -133,7 +184,6 @@ export async function fetchFigmaFile(
   timeoutMs: number = 60000
 ): Promise<any> {
   const figmaApiUrl = `${client.getBaseUrl()}/files/${fileKey}`;
-  console.log('  Fetching Figma file:', fileKey);
   
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -145,8 +195,6 @@ export async function fetchFigmaFile(
     
     clearTimeout(timeoutId);
     
-    console.log('  Figma API response:', { status: response.status, ok: response.ok });
-    
     if (!response.ok) {
       const errorText = await response.text();
       
@@ -155,6 +203,18 @@ export async function fetchFigmaFile(
       response.headers.forEach((value, key) => {
         headers[key] = value;
       });
+      
+      // Special handling for 403 Forbidden errors - log to console for visibility
+      if (response.status === 403) {
+        console.error('\n🚨 FIGMA 403 FORBIDDEN ERROR');
+        console.error('  Function: fetchFigmaFile');
+        console.error('  File Key:', fileKey);
+        console.error('  URL:', figmaApiUrl);
+        console.error('  Status:', response.status, response.statusText);
+        console.error('  Response Body:', errorText);
+        console.error('  Response Headers:', JSON.stringify(headers, null, 2));
+        console.error('');
+      }
       
       logger.error('Figma API error response', {
         status: response.status,
@@ -165,20 +225,20 @@ export async function fetchFigmaFile(
       
       // Handle rate limiting with user-friendly message
       if (response.status === 429) {
-        const retryAfter = response.headers.get('retry-after');
-        const rateLimitType = response.headers.get('x-figma-rate-limit-type');
-        throw new Error(createRateLimitErrorMessage(
-          errorText, 
-          retryAfter ? parseInt(retryAfter, 10) : undefined,
-          rateLimitType || undefined
-        ));
+        const message = await createRateLimitErrorMessage(figmaApiUrl, response, errorText);
+        throw new FigmaUnrecoverableError(message, response.status);
+      }
+      
+      // Handle 403 Forbidden as unrecoverable (authentication/permission issue)
+      if (response.status === 403) {
+        throw new FigmaUnrecoverableError(create403ErrorMessage(figmaApiUrl, response), response.status);
       }
       
       throw new Error(`Figma API error: ${response.status} ${response.statusText} - ${errorText}`);
     }
     
     const data = await response.json();
-    console.log('  Figma file data received successfully');
+    console.log(`    🎨 ${figmaApiUrl} (${response.status})`);
     return data;
     
   } catch (error: any) {
@@ -209,7 +269,6 @@ export async function fetchFigmaNode(
   timeoutMs: number = 60000
 ): Promise<any> {
   const figmaApiUrl = `${client.getBaseUrl()}/files/${fileKey}/nodes?ids=${encodeURIComponent(nodeId)}`;
-  console.log('  Fetching Figma node:', { fileKey, nodeId });
   
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -221,8 +280,6 @@ export async function fetchFigmaNode(
     
     clearTimeout(timeoutId);
     
-    console.log('  Figma nodes API response:', { status: response.status, ok: response.ok });
-    
     if (!response.ok) {
       const errorText = await response.text();
       
@@ -231,6 +288,19 @@ export async function fetchFigmaNode(
       response.headers.forEach((value, key) => {
         headers[key] = value;
       });
+      
+      // Special handling for 403 Forbidden errors - log to console for visibility
+      if (response.status === 403) {
+        console.error('\n🚨 FIGMA 403 FORBIDDEN ERROR');
+        console.error('  Function: fetchFigmaNode');
+        console.error('  File Key:', fileKey);
+        console.error('  Node ID:', nodeId);
+        console.error('  URL:', figmaApiUrl);
+        console.error('  Status:', response.status, response.statusText);
+        console.error('  Response Body:', errorText);
+        console.error('  Response Headers:', JSON.stringify(headers, null, 2));
+        console.error('');
+      }
       
       logger.error('Figma API error response', {
         status: response.status,
@@ -241,13 +311,13 @@ export async function fetchFigmaNode(
       
       // Handle rate limiting with user-friendly message
       if (response.status === 429) {
-        const retryAfter = response.headers.get('retry-after');
-        const rateLimitType = response.headers.get('x-figma-rate-limit-type');
-        throw new Error(createRateLimitErrorMessage(
-          errorText, 
-          retryAfter ? parseInt(retryAfter, 10) : undefined,
-          rateLimitType || undefined
-        ));
+        const message = await createRateLimitErrorMessage(figmaApiUrl, response, errorText);
+        throw new FigmaUnrecoverableError(message, response.status);
+      }
+      
+      // Handle 403 Forbidden as unrecoverable (authentication/permission issue)
+      if (response.status === 403) {
+        throw new FigmaUnrecoverableError(create403ErrorMessage(figmaApiUrl, response), response.status);
       }
       
       throw new Error(`Figma API error: ${response.status} ${response.statusText} - ${errorText}`);
@@ -262,7 +332,7 @@ export async function fetchFigmaNode(
       throw new Error(`Node ${nodeId} not found in file ${fileKey}`);
     }
     
-    console.log('  Figma node data received successfully');
+    console.log(`    🎨 ${figmaApiUrl} (${response.status})`);
     return nodeData.document;
     
   } catch (error: any) {
@@ -496,8 +566,6 @@ export async function downloadFigmaImage(
 ): Promise<FigmaImageDownloadResult> {
   const { format = 'png', scale = 1 } = options;
   
-  console.log(`  Downloading Figma image: ${nodeId} (${format}, ${scale}x)`);
-  
   // Step 1: Get image URL from Figma API
   const figmaApiUrl = `${client.getBaseUrl()}/images/${fileKey}`;
   const params = new URLSearchParams({
@@ -524,15 +592,21 @@ export async function downloadFigmaImage(
         body: errorText,
       });
       
+      // Extract all response headers for debugging
+      const headers: Record<string, string> = {};
+      response.headers.forEach((value, key) => {
+        headers[key] = value;
+      });
+      
       // Handle rate limiting with user-friendly message
       if (response.status === 429) {
-        const retryAfter = response.headers.get('retry-after');
-        const rateLimitType = response.headers.get('x-figma-rate-limit-type');
-        throw new Error(createRateLimitErrorMessage(
-          errorText, 
-          retryAfter ? parseInt(retryAfter, 10) : undefined,
-          rateLimitType || undefined
-        ));
+        const message = await createRateLimitErrorMessage(`${figmaApiUrl}?${params}`, response, errorText);
+        throw new FigmaUnrecoverableError(message, response.status);
+      }
+      
+      // Handle 403 Forbidden as unrecoverable (authentication/permission issue)
+      if (response.status === 403) {
+        throw new FigmaUnrecoverableError(create403ErrorMessage(`${figmaApiUrl}?${params}`, response), response.status);
       }
       
       throw new Error(`Figma images API error: ${response.status} ${response.statusText}`);
@@ -548,8 +622,6 @@ export async function downloadFigmaImage(
     if (!imageUrl) {
       throw new Error(`No image URL returned for node ${nodeId}`);
     }
-    
-    console.log(`    Got image URL from Figma API`);
     
     // Step 2: Download the actual image from Figma CDN
     const imageController = new AbortController();
@@ -596,6 +668,414 @@ export async function downloadFigmaImage(
     
     if (error.name === 'AbortError') {
       throw new Error('Figma API request timed out after 60 seconds');
+    }
+    
+    throw error;
+  }
+}
+
+/**
+ * Batch size configuration for chunking large requests
+ */
+const MAX_BATCH_SIZE = 50;
+
+/**
+ * Fetch multiple nodes from a Figma file in a single request (or multiple chunked requests)
+ * 
+ * This function batches node fetches to reduce API calls and improve rate limit efficiency.
+ * For large batches (>50 nodes), automatically chunks into multiple requests.
+ * 
+ * @param client - Figma API client
+ * @param fileKey - The Figma file key
+ * @param nodeIds - Array of node IDs to fetch (in API format with colon, e.g., "123:456")
+ * @param options - Optional configuration for timeout and batch size
+ * @returns Map of node IDs to node data (document property). Nodes not found will have null values.
+ * @throws FigmaUnrecoverableError for rate limits (429) or auth issues (403)
+ * @throws Error for other failures
+ * 
+ * @example
+ * ```typescript
+ * const nodeIds = ["123:456", "789:012", "345:678"];
+ * const nodesMap = await fetchFigmaNodesBatch(client, fileKey, nodeIds);
+ * 
+ * for (const [nodeId, nodeData] of nodesMap.entries()) {
+ *   if (nodeData) {
+ *     // Process node...
+ *   } else {
+ *     // Node not found
+ *   }
+ * }
+ * ```
+ */
+export async function fetchFigmaNodesBatch(
+  client: FigmaClient,
+  fileKey: string,
+  nodeIds: string[],
+  options: { timeoutMs?: number; maxBatchSize?: number } = {}
+): Promise<Map<string, any>> {
+  const timeoutMs = options.timeoutMs || 60000;
+  const maxBatchSize = options.maxBatchSize || MAX_BATCH_SIZE;
+  
+  // Handle empty array
+  if (nodeIds.length === 0) {
+    return new Map();
+  }
+  
+  // Chunk large requests (iterative, not recursive)
+  if (nodeIds.length > maxBatchSize) {
+    console.log(`  📦 Chunking ${nodeIds.length} nodes into batches of ${maxBatchSize}...`);
+    
+    const allResults = new Map<string, any>();
+    const chunks: string[][] = [];
+    
+    // Create chunks
+    for (let i = 0; i < nodeIds.length; i += maxBatchSize) {
+      chunks.push(nodeIds.slice(i, i + maxBatchSize));
+    }
+    
+    console.log(`    Processing ${chunks.length} chunks...`);
+    
+    // Fetch each chunk sequentially (to avoid overwhelming API)
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      console.log(`    Fetching chunk ${i + 1}/${chunks.length} (${chunk.length} nodes)...`);
+      
+      // Make single batch request for this chunk
+      const chunkResults = await fetchFigmaNodesBatchSingle(client, fileKey, chunk, timeoutMs);
+      
+      // Merge into combined results
+      for (const [nodeId, nodeData] of chunkResults.entries()) {
+        allResults.set(nodeId, nodeData);
+      }
+    }
+    
+    console.log(`    ✅ Fetched ${allResults.size}/${nodeIds.length} nodes across ${chunks.length} chunks`);
+    return allResults;
+  }
+  
+  // Single batch request (no chunking needed)
+  return fetchFigmaNodesBatchSingle(client, fileKey, nodeIds, timeoutMs);
+}
+
+/**
+ * Internal helper: Fetch a single batch of nodes (no chunking)
+ * 
+ * @param client - Figma API client
+ * @param fileKey - The Figma file key
+ * @param nodeIds - Array of node IDs (max 50 recommended)
+ * @param timeoutMs - Request timeout in milliseconds
+ * @returns Map of node IDs to node data
+ */
+async function fetchFigmaNodesBatchSingle(
+  client: FigmaClient,
+  fileKey: string,
+  nodeIds: string[],
+  timeoutMs: number
+): Promise<Map<string, any>> {
+  const figmaApiUrl = `${client.getBaseUrl()}/files/${fileKey}/nodes?ids=${encodeURIComponent(nodeIds.join(','))}`;
+  
+  console.log(`  Fetching batch of ${nodeIds.length} nodes from ${fileKey}...`);
+  
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  
+  try {
+    const response = await client.fetch(figmaApiUrl, {
+      signal: controller.signal,
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      
+      // Extract headers for debugging
+      const headers: Record<string, string> = {};
+      response.headers.forEach((value, key) => {
+        headers[key] = value;
+      });
+      
+      // Special handling for 403 Forbidden errors
+      if (response.status === 403) {
+        console.error('\n🚨 FIGMA 403 FORBIDDEN ERROR');
+        console.error('  Function: fetchFigmaNodesBatchSingle');
+        console.error('  File Key:', fileKey);
+        console.error('  Node IDs:', nodeIds.join(', '));
+        console.error('  URL:', figmaApiUrl);
+        console.error('  Status:', response.status, response.statusText);
+        console.error('  Response Body:', errorText);
+        console.error('  Response Headers:', JSON.stringify(headers, null, 2));
+        console.error('');
+      }
+      
+      logger.error('Figma API error response', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: headers,
+        body: errorText,
+      });
+      
+      // Handle rate limiting
+      if (response.status === 429) {
+        const message = await createRateLimitErrorMessage(figmaApiUrl, response, errorText);
+        throw new FigmaUnrecoverableError(message, response.status);
+      }
+      
+      // Handle 403 Forbidden
+      if (response.status === 403) {
+        throw new FigmaUnrecoverableError(create403ErrorMessage(figmaApiUrl, response), response.status);
+      }
+      
+      throw new Error(`Figma API error: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+    
+    const data = await response.json() as any;
+    
+    // Parse response: { nodes: { "123:456": { document: {...} }, "789:012": { document: {...} } } }
+    const nodesMap = new Map<string, any>();
+    
+    if (data.nodes) {
+      for (const [nodeId, nodeInfo] of Object.entries(data.nodes)) {
+        // nodeInfo could be null if node not found
+        if (nodeInfo && typeof nodeInfo === 'object' && 'document' in nodeInfo) {
+          nodesMap.set(nodeId, (nodeInfo as any).document);
+        } else {
+          // Node not found or invalid - store null
+          nodesMap.set(nodeId, null);
+        }
+      }
+    }
+    
+    console.log(`  ✅ Batch fetch complete: ${nodesMap.size}/${nodeIds.length} nodes retrieved`);
+    return nodesMap;
+    
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    
+    if (error.name === 'AbortError') {
+      logger.error('Figma API request timed out');
+      throw new Error(`Figma API request timed out after ${timeoutMs}ms`);
+    }
+    
+    throw error;
+  }
+}
+
+/**
+ * Download multiple images from Figma in a single API request
+ * 
+ * This function batches image URL requests to reduce API calls and improve rate limit efficiency.
+ * Makes one API request to get all image URLs, then downloads from CDN in parallel.
+ * For large batches (>50 images), automatically chunks the API requests.
+ * 
+ * @param client - Figma API client
+ * @param fileKey - Figma file key
+ * @param nodeIds - Array of node IDs in API format (e.g., "123:456")
+ * @param options - Download options (format, scale)
+ * @returns Map of node IDs to image data. Nodes that couldn't be rendered will have null values.
+ * @throws FigmaUnrecoverableError for rate limits (429) or auth issues (403)
+ * @throws Error for other failures
+ * 
+ * @example
+ * ```typescript
+ * const nodeIds = ["123:456", "789:012"];
+ * const imagesMap = await downloadFigmaImagesBatch(client, fileKey, nodeIds, { format: 'png', scale: 1 });
+ * 
+ * for (const [nodeId, imageResult] of imagesMap.entries()) {
+ *   if (imageResult) {
+ *     // Save or process image...
+ *     const buffer = Buffer.from(imageResult.base64Data, 'base64');
+ *   }
+ * }
+ * ```
+ */
+export async function downloadFigmaImagesBatch(
+  client: FigmaClient,
+  fileKey: string,
+  nodeIds: string[],
+  options: FigmaImageDownloadOptions = {}
+): Promise<Map<string, FigmaImageDownloadResult | null>> {
+  const { format = 'png', scale = 1 } = options;
+  
+  // Handle empty array
+  if (nodeIds.length === 0) {
+    return new Map();
+  }
+  
+  // Chunk large requests (iterative, not recursive)
+  if (nodeIds.length > MAX_BATCH_SIZE) {
+    console.log(`  📦 Chunking ${nodeIds.length} image requests into batches of ${MAX_BATCH_SIZE}...`);
+    
+    const allResults = new Map<string, FigmaImageDownloadResult | null>();
+    const chunks: string[][] = [];
+    
+    // Create chunks
+    for (let i = 0; i < nodeIds.length; i += MAX_BATCH_SIZE) {
+      chunks.push(nodeIds.slice(i, i + MAX_BATCH_SIZE));
+    }
+    
+    console.log(`    Processing ${chunks.length} chunks...`);
+    
+    // Fetch each chunk sequentially
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      console.log(`    Fetching chunk ${i + 1}/${chunks.length} (${chunk.length} images)...`);
+      
+      const chunkResults = await downloadFigmaImagesBatchSingle(client, fileKey, chunk, { format, scale });
+      
+      // Merge into combined results
+      for (const [nodeId, imageData] of chunkResults.entries()) {
+        allResults.set(nodeId, imageData);
+      }
+    }
+    
+    console.log(`    ✅ Downloaded ${allResults.size}/${nodeIds.length} images across ${chunks.length} chunks`);
+    return allResults;
+  }
+  
+  // Single batch request
+  return downloadFigmaImagesBatchSingle(client, fileKey, nodeIds, { format, scale });
+}
+
+/**
+ * Internal helper: Download a single batch of images (no chunking)
+ */
+async function downloadFigmaImagesBatchSingle(
+  client: FigmaClient,
+  fileKey: string,
+  nodeIds: string[],
+  options: FigmaImageDownloadOptions
+): Promise<Map<string, FigmaImageDownloadResult | null>> {
+  const { format = 'png', scale = 1 } = options;
+  
+  console.log(`  Downloading batch of ${nodeIds.length} images (${format}, ${scale}x)...`);
+  
+  // Step 1: Get image URLs from Figma API
+  const figmaApiUrl = `${client.getBaseUrl()}/images/${fileKey}`;
+  const params = new URLSearchParams({
+    ids: nodeIds.join(','),
+    format,
+    scale: scale.toString(),
+  });
+  
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60000);
+  
+  try {
+    const response = await client.fetch(`${figmaApiUrl}?${params}`, {
+      signal: controller.signal,
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      
+      // Extract headers for debugging
+      const headers: Record<string, string> = {};
+      response.headers.forEach((value, key) => {
+        headers[key] = value;
+      });
+      
+      logger.error('Figma images API error', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: headers,
+        body: errorText,
+      });
+      
+      // Handle rate limiting
+      if (response.status === 429) {
+        const message = await createRateLimitErrorMessage(`${figmaApiUrl}?${params}`, response, errorText);
+        throw new FigmaUnrecoverableError(message, response.status);
+      }
+      
+      // Handle 403 Forbidden
+      if (response.status === 403) {
+        throw new FigmaUnrecoverableError(create403ErrorMessage(`${figmaApiUrl}?${params}`, response), response.status);
+      }
+      
+      throw new Error(`Figma images API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json() as any;
+    
+    if (data.err) {
+      throw new Error(`Figma API error: ${data.err}`);
+    }
+    
+    if (!data.images) {
+      throw new Error('No images field in Figma API response');
+    }
+    
+    console.log(`    🎨 Batch downloading ${nodeIds.length} images (${response.status})`);
+    
+    // Step 2: Download images from CDN in parallel
+    const downloadPromises = nodeIds.map(async (nodeId): Promise<[string, FigmaImageDownloadResult | null]> => {
+      const imageUrl = data.images[nodeId];
+      
+      if (!imageUrl) {
+        console.log(`    ⚠️  No image URL for node ${nodeId} (couldn't be rendered)`);
+        return [nodeId, null];
+      }
+      
+      try {
+        const imageController = new AbortController();
+        const imageTimeoutId = setTimeout(() => imageController.abort(), 30000);
+        
+        const imageResponse = await fetch(imageUrl, {
+          signal: imageController.signal,
+        });
+        
+        clearTimeout(imageTimeoutId);
+        
+        if (!imageResponse.ok) {
+          console.log(`    ⚠️  Failed to download image for ${nodeId}: ${imageResponse.status}`);
+          return [nodeId, null];
+        }
+        
+        const imageBlob = await imageResponse.blob();
+        
+        // Convert to base64
+        const arrayBuffer = await imageBlob.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const base64Data = buffer.toString('base64');
+        
+        return [nodeId, {
+          base64Data,
+          mimeType: imageBlob.type || 'image/png',
+          byteSize: imageBlob.size,
+          imageUrl,
+        }];
+        
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          console.log(`    ⚠️  Image download timed out for ${nodeId}`);
+        } else {
+          console.log(`    ⚠️  Error downloading image for ${nodeId}: ${error.message}`);
+        }
+        return [nodeId, null];
+      }
+    });
+    
+    const results = await Promise.all(downloadPromises);
+    const imagesMap = new Map(results);
+    
+    const successCount = Array.from(imagesMap.values()).filter(v => v !== null).length;
+    const totalSize = Array.from(imagesMap.values())
+      .filter(v => v !== null)
+      .reduce((sum, v) => sum + v!.byteSize, 0);
+    
+    console.log(`  ✅ Downloaded ${successCount}/${nodeIds.length} images (${Math.round(totalSize / 1024)}KB total)`);
+    
+    return imagesMap;
+    
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    
+    if (error.name === 'AbortError') {
+      logger.error('Figma API request timed out');
+      throw new Error('Figma images API request timed out after 60 seconds');
     }
     
     throw error;
