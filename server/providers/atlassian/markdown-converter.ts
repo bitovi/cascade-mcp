@@ -249,6 +249,92 @@ export function countADFSectionsByHeading(content: ADFNode[], headingText: strin
   return count;
 }
 
+/**
+ * Extract a section from ADF content by heading text
+ * 
+ * Returns both the extracted section and the remaining content.
+ * Similar to removeADFSectionByHeading() but preserves the section for use elsewhere.
+ * 
+ * @param content - Array of ADF nodes to search
+ * @param headingText - Text to search for in headings (case-insensitive)
+ * @returns Object with section nodes and remaining content
+ */
+export function extractADFSection(
+  content: ADFNode[],
+  headingText: string
+): {
+  section: ADFNode[];
+  remainingContent: ADFNode[];
+} {
+  // Look for heading node with matching text (reuse logic from removeADFSectionByHeading)
+  let sectionStartIndex = -1;
+  let sectionLevel = -1;
+  
+  for (let i = 0; i < content.length; i++) {
+    const node = content[i];
+    
+    if (node.type === 'heading') {
+      const hasMatchingText = node.content?.some((contentNode: ADFNode) => 
+        contentNode.type === 'text' && 
+        contentNode.text?.toLowerCase().includes(headingText.toLowerCase())
+      );
+      
+      if (hasMatchingText) {
+        sectionStartIndex = i;
+        sectionLevel = node.attrs?.level || 2;
+        logger.info(`Found "${headingText}" section for extraction`, { 
+          index: i, 
+          level: sectionLevel 
+        });
+        break;
+      }
+    }
+  }
+  
+  // If section not found, return empty section and all content as remaining
+  if (sectionStartIndex === -1) {
+    logger.info(`Section "${headingText}" not found, returning all as remaining content`);
+    return {
+      section: [],
+      remainingContent: content
+    };
+  }
+  
+  // Find where the section ends
+  let sectionEndIndex = content.length;
+  
+  for (let i = sectionStartIndex + 1; i < content.length; i++) {
+    const node = content[i];
+    
+    if (node.type === 'heading') {
+      const headingLevel = node.attrs?.level || 2;
+      
+      if (headingLevel <= sectionLevel) {
+        sectionEndIndex = i;
+        logger.info(`"${headingText}" section ends at index ${i}`);
+        break;
+      }
+    }
+  }
+  
+  // Extract section and remaining content
+  const section = content.slice(sectionStartIndex, sectionEndIndex);
+  const remainingContent = [
+    ...content.slice(0, sectionStartIndex),
+    ...content.slice(sectionEndIndex)
+  ];
+  
+  logger.info(`Extracted "${headingText}" section`, {
+    sectionNodes: section.length,
+    remainingNodes: remainingContent.length
+  });
+  
+  return {
+    section,
+    remainingContent
+  };
+}
+
 
 /**
  * Convert ADF (Atlassian Document Format) to Markdown

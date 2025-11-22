@@ -1,5 +1,5 @@
 /**
- * Core business logic for identify-features tool
+ * Core business logic for analyze-feature-scope tool
  * 
  * This module contains the pure business logic for generating scope analysis from Figma designs.
  * It is independent of MCP-specific concerns (authentication, context, etc.) and can be used
@@ -14,7 +14,7 @@ import {
   generateFeatureIdentificationPrompt,
   FEATURE_IDENTIFICATION_SYSTEM_PROMPT,
   FEATURE_IDENTIFICATION_MAX_TOKENS
-} from './strategies/prompt-feature-identification-2.js';
+} from './strategies/prompt-scope-analysis-2.js';
 import {
   convertMarkdownToAdf,
   validateAdf,
@@ -24,9 +24,9 @@ import {
 import { handleJiraAuthError } from '../../../atlassian/atlassian-helpers.js';
 
 /**
- * Parameters for executing the identify-features workflow
+ * Parameters for executing the analyze-feature-scope workflow
  */
-export interface ExecuteIdentifyFeaturesParams {
+export interface ExecuteAnalyzeFeatureScopeParams {
   epicKey: string;
   cloudId?: string;
   siteName?: string;
@@ -34,9 +34,9 @@ export interface ExecuteIdentifyFeaturesParams {
 }
 
 /**
- * Result from executing the identify-features workflow
+ * Result from executing the analyze-feature-scope workflow
  */
-export interface ExecuteIdentifyFeaturesResult {
+export interface ExecuteAnalyzeFeatureScopeResult {
   success: boolean;
   scopeAnalysisContent: string;
   featureAreasCount: number;
@@ -46,7 +46,7 @@ export interface ExecuteIdentifyFeaturesResult {
 }
 
 /**
- * Execute the identify-features workflow
+ * Execute the analyze-feature-scope workflow
  * 
  * This is the core business logic that can be called from both MCP handlers and REST API endpoints.
  * It uses dependency injection to abstract away authentication and LLM provider concerns.
@@ -55,10 +55,10 @@ export interface ExecuteIdentifyFeaturesResult {
  * @param deps - Injected dependencies (clients, LLM, notifier)
  * @returns Result with scope analysis content and metadata
  */
-export async function executeIdentifyFeatures(
-  params: ExecuteIdentifyFeaturesParams,
+export async function executeAnalyzeFeatureScope(
+  params: ExecuteAnalyzeFeatureScopeParams,
   deps: ToolDependencies
-): Promise<ExecuteIdentifyFeaturesResult> {
+): Promise<ExecuteAnalyzeFeatureScopeResult> {
   const { epicKey, cloudId, siteName, sessionId = 'default' } = params;
   const { atlassianClient, figmaClient, generateText, notify } = deps;
 
@@ -305,7 +305,7 @@ async function updateEpicWithScopeAnalysis({
       return;
     }
     
-    handleJiraAuthError(updateResponse, `Update epic ${epicKey} description`);
+    await handleJiraAuthError(updateResponse, `Update epic ${epicKey} description`);
     
     console.log('    ✅ Epic updated');
     

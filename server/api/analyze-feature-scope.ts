@@ -1,8 +1,8 @@
 /**
- * REST API Handler for Identify Features
+ * REST API Handler for Analyze Feature Scope
  * 
  * Accepts PAT (Personal Access Token) authentication via headers and delegates to core logic.
- * This endpoint analyzes Figma screens to generate a scope analysis document.
+ * This endpoint analyzes Figma screens to generate a comprehensive scope analysis document.
  */
 
 import type { Request, Response } from 'express';
@@ -25,9 +25,9 @@ import {
 } from './progress-comment-manager.js';
 
 /**
- * POST /api/identify-features
+ * POST /api/analyze-feature-scope
  * 
- * Analyze Figma screens to identify in-scope and out-of-scope features
+ * Analyze Figma screens to generate comprehensive scope analysis with in-scope and out-of-scope features
  * 
  * Headers:
  *   X-Atlassian-Token: <base64(email:token)>  (Atlassian PAT)
@@ -53,7 +53,7 @@ import {
  *   "epicKey": "PROJ-123"
  * }
  */
-export async function handleIdentifyFeatures(req: Request, res: Response) {
+export async function handleAnalyzeFeatureScope(req: Request, res: Response) {
   // Track context for error commenting (set after clients created)
   let commentContext: ErrorCommentContext | null = null;
   let progressManager: ProgressCommentManager | null = null;
@@ -63,7 +63,7 @@ export async function handleIdentifyFeatures(req: Request, res: Response) {
     const epicKey = validateEpicKey(req.body, res);
     if (!epicKey) return; // Response already sent
     
-    console.log(`Tool call: identify-features {epicKey: "${epicKey}"}`);
+    console.log(`Tool call: analyze-feature-scope {epicKey: "${epicKey}"}`);
     
     // Extract and validate tokens from headers
     const tokens = validateApiHeaders(req.headers, res);
@@ -86,7 +86,7 @@ export async function handleIdentifyFeatures(req: Request, res: Response) {
     // Create progress comment manager
     progressManager = createProgressCommentManager({
       ...commentContext,
-      operationName: 'Identify Features'
+      operationName: 'Analyze Feature Scope'
     });
     
     // Prepare dependencies with progress comment notifier
@@ -118,7 +118,7 @@ export async function handleIdentifyFeatures(req: Request, res: Response) {
     });
     
   } catch (error: any) {
-    console.error('REST API: identify-features failed:', error);
+    console.error('REST API: analyze-feature-scope failed:', error);
     
     // Handle auth errors (no comment)
     if (error.constructor.name === 'InvalidTokenError') {

@@ -190,7 +190,7 @@ export function registerAtlassianUpdateIssueDescriptionTool(mcp: McpServer): voi
           };
         }
 
-        handleJiraAuthError(updateResponse, `Update issue ${issueKey} description`);
+        await handleJiraAuthError(updateResponse, `Update issue ${issueKey} description`);
 
         // Success response (usually 204 No Content)
         logger.info('Issue description updated successfully', {

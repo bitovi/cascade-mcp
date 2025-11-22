@@ -1,7 +1,7 @@
 /**
- * Feature Identification Prompt
+ * Scope Analysis Prompt (Strategy 1)
  * 
- * Generates comprehensive prompts for AI to identify and categorize features from screen analyses.
+ * Generates comprehensive prompts for AI to analyze feature scope from screen analyses.
  * Features are grouped by user workflow and categorized as in-scope (✅), out-of-scope (❌),
  * or questions (❓).
  */

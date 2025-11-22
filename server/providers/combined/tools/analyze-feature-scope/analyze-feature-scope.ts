@@ -1,8 +1,8 @@
 /**
- * MCP Tool Handler for Identify Features
+ * MCP Tool Handler for Analyze Feature Scope
  * 
- * Analyzes Figma screen designs to identify in-scope features, out-of-scope features,
- * and questions, grouped by feature areas.
+ * Analyzes Figma screen designs to generate comprehensive scope analysis,
+ * identifying in-scope features, out-of-scope features, and questions, grouped by feature areas.
  */
 
 import { z } from 'zod';
@@ -12,27 +12,27 @@ import { createAtlassianClient } from '../../../atlassian/atlassian-api-client.j
 import { createFigmaClient } from '../../../figma/figma-api-client.js';
 import { createMcpLLMClient } from '../../../../llm-client/mcp-sampling-client.js';
 import { createProgressNotifier } from '../writing-shell-stories/progress-notifier.js';
-import { executeIdentifyFeatures } from './core-logic.js';
+import { executeAnalyzeFeatureScope } from './core-logic.js';
 
 /**
  * Tool parameters interface
  */
-interface IdentifyFeaturesParams {
+interface AnalyzeFeatureScopeParams {
   epicKey: string;
   cloudId?: string;
   siteName?: string;
 }
 
 /**
- * Register the identify-features tool with the MCP server
+ * Register the analyze-feature-scope tool with the MCP server
  * @param mcp - MCP server instance
  */
-export function registerIdentifyFeaturesTool(mcp: McpServer): void {
+export function registerAnalyzeFeatureScopeTool(mcp: McpServer): void {
   mcp.registerTool(
-    'identify-features',
+    'analyze-feature-scope',
     {
-      title: 'Identify Features from Figma',
-      description: 'Analyze Figma screens in a Jira epic to identify in-scope features, out-of-scope features, and questions, grouped by feature areas with workflow-based organization. Creates a Scope Analysis section in the epic.',
+      title: 'Analyze Feature Scope from Figma',
+      description: 'Analyze Figma screens in a Jira epic to generate comprehensive scope analysis, identifying in-scope features, out-of-scope features, and questions, grouped by feature areas with workflow-based organization. Creates a Scope Analysis section in the epic.',
       inputSchema: {
         epicKey: z.string()
           .describe('Jira epic key (e.g., "PROJ-123"). Epic description must contain Figma design URLs.'),
@@ -42,11 +42,11 @@ export function registerIdentifyFeaturesTool(mcp: McpServer): void {
           .describe('Jira site subdomain (e.g., "bitovi" from https://bitovi.atlassian.net). Alternative to cloudId.'),
       },
     },
-    async ({ epicKey, cloudId, siteName }: IdentifyFeaturesParams, context) => {
-      console.log('identify-features called', { epicKey, cloudId, siteName });
+    async ({ epicKey, cloudId, siteName }: AnalyzeFeatureScopeParams, context) => {
+      console.log('analyze-feature-scope called', { epicKey, cloudId, siteName });
 
       // Get auth info for both Atlassian and Figma
-      const authInfo = getAuthInfoSafe(context, 'identify-features');
+      const authInfo = getAuthInfoSafe(context, 'analyze-feature-scope');
       
       // Extract tokens
       const atlassianToken = authInfo?.atlassian?.access_token;
@@ -103,7 +103,7 @@ export function registerIdentifyFeaturesTool(mcp: McpServer): void {
         const sessionId = authInfo.sessionId || 'default';
         
         // Execute core logic
-        const result = await executeIdentifyFeatures(
+        const result = await executeAnalyzeFeatureScope(
           {
             epicKey,
             cloudId,
@@ -121,10 +121,8 @@ export function registerIdentifyFeaturesTool(mcp: McpServer): void {
         return {
           content: [
             {
-              type: 'text',
-              text: `# Feature Identification Complete ✅
-
-**Epic**: ${epicKey}
+            type: 'text',
+            text: `# Feature Scope Analysis Complete ✅**Epic**: ${epicKey}
 **Feature Areas**: ${result.featureAreasCount}
 **Questions**: ${result.questionsCount}
 **Screens Analyzed**: ${result.screensAnalyzed}
@@ -151,12 +149,12 @@ ${result.scopeAnalysisContent}
           ]
         };
       } catch (error: any) {
-        console.error('identify-features failed:', error);
+        console.error('analyze-feature-scope failed:', error);
         return {
           content: [
             {
               type: 'text',
-              text: `# Feature Identification Failed ❌\n\n**Error**: ${error.message}\n\n**Details**: ${error.stack || 'No stack trace available'}`,
+              text: `# Feature Scope Analysis Failed ❌\n\n**Error**: ${error.message}\n\n**Details**: ${error.stack || 'No stack trace available'}`,
             },
           ],
           isError: true,

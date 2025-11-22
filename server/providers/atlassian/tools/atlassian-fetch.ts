@@ -136,7 +136,7 @@ export function registerAtlassianFetchTool(mcp: McpServer): void {
         });
 
         // Handle Jira authentication errors
-        handleJiraAuthError(response, `Fetch issue ${issueKey}`);
+        await handleJiraAuthError(response, `Fetch issue ${issueKey}`);
 
         if (response.status === 404) {
           logger.warn('Issue not found', { issueKey });

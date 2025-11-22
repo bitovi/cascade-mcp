@@ -1,13 +1,13 @@
 /**
- * Feature Identification Prompt
+ * Scope Analysis Prompt
  * 
- * Generates comprehensive prompts for AI to identify and categorize features from screen analyses.
+ * Generates comprehensive prompts for AI to analyze feature scope from screen analyses.
  * Features are grouped by user workflow and categorized as in-scope (✅), out-of-scope (❌),
  * or questions (❓).
  */
 
 /**
- * System prompt for feature identification
+ * System prompt for scope analysis
  * Sets the role and fundamental constraints for the AI
  */
 export const FEATURE_IDENTIFICATION_SYSTEM_PROMPT = `You are an expert product analyst identifying and categorizing features from Figma screen analyses.
@@ -45,18 +45,18 @@ OUTPUT REQUIREMENT:
 - Do NOT include explanations, prefaces, or process notes`;
 
 /**
- * Maximum tokens for feature identification
+ * Maximum tokens for scope analysis
  * Scope analysis is typically shorter than shell stories
  */
 export const FEATURE_IDENTIFICATION_MAX_TOKENS = 8000;
 
 /**
- * Generate feature identification prompt
+ * Generate scope analysis prompt
  * 
  * @param screensYaml - Content of screens.yaml file (screen ordering)
  * @param analysisFiles - Array of { screenName, content, url } for each analysis file
  * @param epicContext - Optional epic description content (excluding Scope Analysis section)
- * @returns Complete prompt for feature identification
+ * @returns Complete prompt for scope analysis
  */
 export function generateFeatureIdentificationPrompt(
   screensYaml: string,

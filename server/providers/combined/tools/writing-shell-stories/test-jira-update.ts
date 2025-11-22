@@ -115,7 +115,7 @@ export function registerTestJiraUpdateTool(mcp: McpServer): void {
           };
         }
         
-        handleJiraAuthError(issueResponse, `Fetch epic ${epicKey}`);
+        await handleJiraAuthError(issueResponse, `Fetch epic ${epicKey}`);
         
         const issue = await issueResponse.json() as JiraIssue;
         const currentDescription = issue.fields?.description;
@@ -205,7 +205,7 @@ export function registerTestJiraUpdateTool(mcp: McpServer): void {
           };
         }
         
-        handleJiraAuthError(updateResponse, `Update epic ${epicKey}`);
+        await handleJiraAuthError(updateResponse, `Update epic ${epicKey}`);
         
         console.log('  ✅ Epic updated successfully!');
         

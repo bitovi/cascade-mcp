@@ -41,7 +41,7 @@
   Express route handlers for PAT-authenticated REST API endpoints.
   - **api/write-shell-stories.ts** - Generate shell stories from Figma designs in a Jira epic
   - **api/write-next-story.ts** - Write the next Jira story from shell stories
-  - **api/identify-features.ts** - Identify in-scope/out-of-scope features from Figma designs
+  - **api/analyze-feature-scope.ts** - Analyze feature scope from Figma designs (generates scope analysis)
   - **api/progress-comment-manager.ts** - Progress tracking via Jira comments
   - **api/api-error-helpers.ts** - Shared error handling and validation
 
@@ -65,17 +65,20 @@
 ### Combined Provider Tools
 Advanced workflow tools that integrate multiple services:
 
-- **identify-features** - Generate scope analysis from Figma designs
+- **analyze-feature-scope** - Generate comprehensive scope analysis from Figma designs
   - Analyzes screens against epic requirements to identify in-scope/out-of-scope features
-  - Categorizes features as: ✅ confirmed, ❌ out-of-scope, ❓ needs-clarification
-  - Updates epic description with structured scope analysis
+  - Categorizes features as: ✅ confirmed, ❌ out-of-scope, ❓ needs-clarification, ⏬ low-priority
+  - Updates epic description with structured scope analysis grouped by feature areas
   - Parameters: `epicKey`, `figmaUrl`, optional `cloudId`
-  - Example: `identify-features({ epicKey: "PLAY-123", figmaUrl: "https://..." })`
+  - Example: `analyze-feature-scope({ epicKey: "PLAY-123", figmaUrl: "https://..." })`
+  - **Run this first** before write-shell-stories to establish scope
 
 - **write-shell-stories** - Generate shell user stories from Figma designs
-  - Creates structured user stories for each screen in Figma
-  - Updates epic description with screen analyses and story templates
-  - Parameters: `epicKey`, `figmaUrl`, optional `cloudId`
+  - **PREREQUISITE**: Epic must have a "## Scope Analysis" section (run analyze-feature-scope first)
+  - Creates prioritized shell stories based on scope analysis categorizations
+  - Organizes features into incremental delivery plan (stories)
+  - Updates epic description with shell stories section
+  - Parameters: `epicKey`, optional `cloudId` or `siteName`
 
 ### ChatGPT-Compatible Tools
 These tools follow OpenAI's MCP specification patterns for optimal ChatGPT integration:
@@ -154,6 +157,19 @@ Cache structure with override:
 - **401 Responses**: Include `WWW-Authenticate` header with OAuth metadata
 - **Token Expiration**: Tools throw `InvalidTokenError` for automatic refresh
 - **Session Management**: Proper cleanup prevents memory leaks
+
+### Content Size Limits
+
+Jira Cloud has a **43,838 character limit** for description fields (applies to the entire JSON representation of the ADF document).
+
+**Automatic Handling in `write-shell-stories`**:
+- When adding Shell Stories would exceed this limit, the tool automatically moves the `## Scope Analysis` section to a comment
+- **Priority**: Shell Stories remain in the description (required by `write-next-story` tool)
+- **Preservation**: Scope Analysis is preserved in a comment with a note explaining the move
+- **Safety Margin**: Uses a 2KB buffer (41,838 chars) to account for serialization variations
+- **Error Handling**: If content exceeds the safe limit, logs a warning but attempts the update anyway (Jira will reject if truly too large)
+
+This ensures both sections are preserved while keeping the description within Jira's limits.
 
 ## Integration Points
 

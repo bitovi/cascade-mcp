@@ -149,7 +149,7 @@ export function registerAtlassianSearchTool(mcp: McpServer): void {
         });
 
         // Handle Jira authentication errors
-        handleJiraAuthError(response, `Search with JQL: ${jql}`);
+        await handleJiraAuthError(response, `Search with JQL: ${jql}`);
 
         if (!response.ok) {
           logger.error('Search request failed', {

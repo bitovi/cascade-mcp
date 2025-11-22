@@ -147,7 +147,7 @@ export function registerAtlassianGetAttachmentsTool(mcp: McpServer): void {
               return { error: `Attachment ${id} not found`, id };
             }
 
-            handleJiraAuthError(attachmentRes, `Fetch attachment ${id}`);
+            await handleJiraAuthError(attachmentRes, `Fetch attachment ${id}`);
 
             const blob = await attachmentRes.blob();
             logger.info(`Attachment ${id} blob received`, {

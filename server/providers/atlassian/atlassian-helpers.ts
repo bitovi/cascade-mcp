@@ -59,28 +59,63 @@ function getTokenLogInfo(token?: string, prefix: string = 'Token'): Record<strin
  * @param operation - Description of the operation for logging
  * @throws Error if response indicates any failure (401, 403, 404, 500, etc.)
  */
-export function handleJiraAuthError(response: Response, operation: string): void {
-  if (response.status === 401) {
-    logger.error(`Jira API authentication failed for operation: ${operation}`, {
-      status: response.status,
-      statusText: response.statusText,
+export async function handleJiraAuthError(response: Response, operation: string): Promise<void> {
+  // Helper to extract response headers
+  const getResponseHeaders = (res: Response): Record<string, string> => {
+    const headers: Record<string, string> = {};
+    res.headers.forEach((value, key) => {
+      headers[key] = value;
     });
-    throw new Error(`Jira authentication failed for ${operation}. Please re-authenticate.`);
-  }
-  
-  if (response.status === 403) {
-    logger.error(`Jira API authorization failed for operation: ${operation}`, {
-      status: response.status,
-      statusText: response.statusText,
-    });
-    throw new Error(`Jira authorization failed for ${operation}. Insufficient permissions.`);
-  }
-  
+    return headers;
+  };
+
+  // Helper to safely read response body (if available)
+  const getResponseBody = async (res: Response): Promise<any> => {
+    try {
+      // Clone response to avoid consuming the body
+      const cloned = res.clone();
+      const contentType = cloned.headers.get('content-type') || '';
+      
+      if (contentType.includes('application/json')) {
+        return await cloned.json();
+      } else {
+        const text = await cloned.text();
+        return text.substring(0, 500); // Limit text size
+      }
+    } catch (error) {
+      return { error: 'Could not read response body', details: String(error) };
+    }
+  };
+
   if (!response.ok) {
-    logger.error(`Jira API request failed for operation: ${operation}`, {
+    const headers = getResponseHeaders(response);
+    const body = await getResponseBody(response);
+    
+    const errorDetails = {
       status: response.status,
       statusText: response.statusText,
-    });
+      headers,
+      responseBody: body,
+      url: response.url,
+    };
+    
+    if (response.status === 401) {
+      logger.error(`Jira API authentication failed for operation: ${operation}`, errorDetails);
+      throw new Error(`Jira authentication failed for ${operation}. Please re-authenticate.`);
+    }
+    
+    if (response.status === 403) {
+      logger.error(`Jira API authorization failed for operation: ${operation}`, errorDetails);
+      throw new Error(`Jira authorization failed for ${operation}. Insufficient permissions.`);
+    }
+    
+    // Check for specific Jira error codes in the response body
+    if (response.status === 400 && body?.errors?.description === 'CONTENT_LIMIT_EXCEEDED') {
+      logger.error(`Jira content limit exceeded for operation: ${operation}`, errorDetails);
+      throw new Error(`Jira content limit exceeded for ${operation}. The description is too large. Consider reducing content or splitting into multiple issues.`);
+    }
+    
+    logger.error(`Jira API request failed for operation: ${operation}`, errorDetails);
     throw new Error(`Jira API request failed for ${operation}: ${response.status} ${response.statusText}`);
   }
 }
@@ -125,7 +160,7 @@ export async function resolveCloudId(
     operation: 'Fetch accessible sites',
   });
 
-  handleJiraAuthError(siteRes, 'Fetch accessible sites');
+  await handleJiraAuthError(siteRes, 'Fetch accessible sites');
 
   const sites = await siteRes.json() as AtlassianAccessibleResourcesResponse;
   logger.info('Retrieved accessible sites', {
@@ -234,7 +269,7 @@ export async function addIssueComment(
   });
 
   // Handle errors
-  handleJiraAuthError(response, `Add comment to ${issueKey}`);
+  await handleJiraAuthError(response, `Add comment to ${issueKey}`);
 
   // Parse response to extract comment ID
   const responseJson = await response.json() as { id: string };
@@ -281,7 +316,7 @@ export async function updateIssueComment(
   });
 
   // Handle errors
-  handleJiraAuthError(response, `Update comment ${commentId} on ${issueKey}`);
+  await handleJiraAuthError(response, `Update comment ${commentId} on ${issueKey}`);
 
   return response;
 }

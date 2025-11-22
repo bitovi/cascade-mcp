@@ -310,7 +310,7 @@ export async function setupFigmaScreens(
   
   // Fetch the epic issue
   const issueResponse = await getJiraIssue(atlassianClient, siteInfo.cloudId, epicKey, undefined);
-  handleJiraAuthError(issueResponse, 'Fetch epic');
+  await handleJiraAuthError(issueResponse, 'Fetch epic');
   
   const issue = await issueResponse.json() as JiraIssue;
   
