@@ -12,13 +12,13 @@
  * System prompt for shell story generation
  * Sets the role and fundamental constraints for the AI
  */
-export const SHELL_STORY_SYSTEM_PROMPT = `You are an expert product manager creating shell stories from Figma screen analyses.
+export const SHELL_STORY_SYSTEM_PROMPT = `You are an expert product manager creating shell stories from scope analysis.
 
-FUNDAMENTAL RULE: EVIDENCE-BASED ONLY
-- Every story element (+ and - bullets) MUST reference actual UI elements, behaviors, or functionality explicitly described in the screen analysis files
-- Do NOT infer, assume, or speculate about features that "should" exist
-- If a UI element is visible but its behavior is not described, mark it as a ¿ question rather than implementing assumed functionality
-- When in doubt, defer to ¿ questions rather than making assumptions
+FUNDAMENTAL RULE: SCOPE-BASED PLANNING
+- Every story must map to features identified in the scope analysis
+- Use scope analysis categorizations (☐/⏬/❌/❓) to guide story inclusion and priority
+- Stories describe WHAT to build (features) not HOW to build them (implementation details)
+- Do NOT create stories for ❌ Out-of-Scope or ✅ Already Done features
 
 OUTPUT REQUIREMENT:
 - Output ONLY the final prioritized stories with complete details in markdown format
@@ -35,60 +35,65 @@ export const SHELL_STORY_MAX_TOKENS = 16000;
  * Generate shell story creation prompt
  * 
  * @param screensYaml - Content of screens.yaml file (screen ordering)
- * @param analysisFiles - Array of { screenName, content } for each analysis file
- * @param epicContext - Optional epic description content (excluding Shell Stories section)
+ * @param analysisFiles - Array of screen analysis files (unused but kept for backward compatibility)
+ * @param scopeAnalysis - Extracted scope analysis section from epic
+ * @param remainingContext - Epic context without scope analysis section
  * @returns Complete prompt for shell story generation
  */
 export function generateShellStoryPrompt(
   screensYaml: string,
   analysisFiles: Array<{ screenName: string; content: string }>,
-  epicContext?: string
+  scopeAnalysis: string,
+  remainingContext: string
 ): string {
-  const analysisSection = analysisFiles
-    .map(({ screenName, content }) => {
-      return `### ${screenName}.analysis.md\n\n${content}`;
-    })
-    .join('\n\n---\n\n');
 
-  // Build epic context section if provided
-  const epicContextSection = epicContext && epicContext.trim()
-    ? `**EPIC CONTEXT (from Epic Description):**
+  const epicContextSection = `**SCOPE ANALYSIS (from Epic Description):**
+
+<scope_analysis>
+${scopeAnalysis}
+</scope_analysis>
+
+**Use scope analysis as your primary guide:**
+- ☐ In-Scope features → Create stories (normal priority)
+- ⏬ Low Priority features → Create stories at end of epic
+- ❌ Out-of-Scope features → Skip entirely (don't create stories)
+- ✅ Already Done features → Skip (existing functionality)
+- ❓ Questions → Include in relevant story bullets
+- Feature areas help identify related features (but stories should be incremental, not area-complete)
+- Figma screen links show which screens are involved
+
+${remainingContext ? `**ADDITIONAL EPIC CONTEXT:**
 
 <epic_context>
-${epicContext}
+${remainingContext}
 </epic_context>
 
-**Use epic context as reference for:**
-- Understanding project priorities and sequencing preferences
-- Identifying features that are out of scope (don't create stories for these)
-- Noting features to implement later (create implementation stories at the end)
-- Understanding business constraints and requirements
+**Use epic context for:**
+- Understanding project priorities and business constraints
+- Recognizing scope boundaries and sequencing preferences
 
-**Epic context does NOT mean:**
-- Defer features globally to every story (only defer where feature is visible in that story's screens)
-- Override evidence-based approach (screen analysis remains primary source of truth)
+` : ''}
+`;
 
-`
-    : '';
-
-  return `You are an expert product manager. When I give you screen analysis outputs (images and their detailed analysis files), think and work exactly as follows to produce a prioritized list of shell stories.
+  return `You are an expert product manager creating shell stories from scope analysis. Think and work exactly as follows to produce a prioritized list of shell stories.
 
 ## GOAL
 
-• Produce "shell stories": lightweight, rough outlines that describe scope and surface risks before creating tickets.
-• Each shell story must explicitly link to its supporting images and analysis files.
+• Produce "shell stories": lightweight, rough outlines that organize features from scope analysis into an incremental delivery plan.
+• Each shell story must explicitly link to its supporting Figma screens.
 • Stories should be incremental: the smallest units of functionality that deliver real user value.
-• A single story may span multiple screens (if they are part of one flow), or a single screen may represent multiple incremental stories.
+• A single story may span multiple screens (if they are part of one flow), or multiple stories may implement features from one feature area.
 • The total number of stories is not fixed — there may be as few as 3 or as many as 20+, depending on the functionality and value breakdown.
-• Shared components (like modals, spinners, error messages, headers) should be first introduced within the story that needs them, as + bullets. Do not duplicate them across stories unnecessarily.
+• Shared components (like modals, spinners, error messages, headers) should be first introduced within the story that needs them. Do not duplicate them across stories unnecessarily.
 • Output ONLY the markdown list described in OUTPUT FORMAT (no prefaces, no explanations).
 
-## FUNDAMENTAL RULE: EVIDENCE-BASED ONLY
+## FUNDAMENTAL RULE: SCOPE-BASED PLANNING
 
-• Every story element (+ and - bullets) MUST reference actual UI elements, behaviors, or functionality explicitly described in the screen analysis files
-• Do NOT infer, assume, or speculate about features that "should" exist
-• If a UI element is visible but its behavior is not described, mark it as a ¿ question rather than implementing assumed functionality
-• When in doubt, defer to ¿ questions rather than making assumptions
+• Every story must map to features identified in the scope analysis
+• Use scope analysis categorizations (☐/⏬/❌/❓) to guide story inclusion and priority
+• Stories describe WHAT to build (features) not HOW to build them (implementation details)
+• When scope analysis has ❓ questions, include them in relevant story bullets
+• Do NOT create stories for ❌ Out-of-Scope or ✅ Already Done features
 
 ## INPUTS (provided below)
 
@@ -97,40 +102,30 @@ ${epicContextSection}**SCREEN ORDERING (from screens.yaml):**
 ${screensYaml}
 \`\`\`
 
-**SCREEN ANALYSIS FILES:**
-
-${analysisSection}
-
-## EVIDENCE VIOLATIONS (DO NOT DO)
-
-❌ "Search functionality for finding applications" (when only search UI is visible)
-❌ "Advanced filtering options" (when only basic filters are shown)
-❌ "Real-time validation" (when form validation behavior isn't described)
-
-## EVIDENCE-BASED CORRECTIONS
-
-✅ "Search input field and search button (UI elements visible)"
-✅ "Status dropdown filter (shows 'Active', 'Pending', 'Archived' options)"
-✅ "Form submission (behavior not described - needs clarification)"
+**Note:** Figma screen URLs are included in the scope analysis feature areas. Use these for the SCREENS bullets in each story.
 
 ## PROCESS (follow in order)
 
-1. **REVIEW EPIC CONTEXT (IF PROVIDED)**
-   • Read epic context to understand priorities, constraints, and scope preferences
-   • Note any features marked as "out of scope" - don't create stories for these
-   • Note any features suggested to "defer" or "delay until end" - keep in mind for later stories
-   • Use as reference, not strict rules to apply to every story
+1. **REVIEW SCOPE ANALYSIS**
+   • Read the "## Scope Analysis" section from epic context
+   • Note all feature areas and their categorizations:
+     - ☐ In-Scope features → Create stories (normal priority)
+     - ⏬ Low Priority features → Create stories at end
+     - ❌ Out-of-Scope features → Skip entirely
+     - ✅ Already Done → Skip (existing functionality)
+     - ❓ Questions → Include in relevant story bullets
+   • Feature areas help identify related features (but stories should be incremental, not area-complete)
+   • Figma screen links show which screens are involved
+   • Use screens.yaml for screen ordering/naming reference
 
-2. **INITIAL STORY NAME LIST**
-   • Get the list of screen names from screens.yaml to determine which analysis files to review.
-   • Review all screen analysis files and screen images that can be loaded from the analysis file's Figma Image Url value.
-   • Identify distinct user-visible flows and functionality.
-   • Break them into incremental units of value — each story should represent the smallest useful slice a user could benefit from.
-   • IMPORTANT: Prefer to not implement every UI element visible in a screen at once. Start with core functionality and defer advanced features to separate stories.
-   • Note features mentioned in epic context as "out of scope" (don't create stories) or "defer/delay" (create implementation stories later)
-   • Group screens into candidate stories when they form part of the same flow (e.g., add form + success + error).
-   • If one screen contains multiple incremental steps of value, split it into multiple stories.
-   • Do NOT force a fixed count. The correct number of stories depends on the functionality — sometimes 3, sometimes 20+.
+2. **MAP FEATURES TO STORIES**
+   • Identify core features across all feature areas that deliver immediate value
+   • Create stories that implement basic functionality, sometimes across multiple feature areas
+   • Then create stories that enhance/polish those features
+   • Use feature area names as story title hints when relevant
+   • Consider dependencies between features when sequencing
+   • Keep stories small while still delivering meaningful user value
+   • Do NOT force a fixed count - sometimes 3 stories, sometimes 20+
 
 3. **PRIORITIZE**
    • Reorder stories by:
@@ -138,31 +133,30 @@ ${analysisSection}
      - Dependencies (sequence stories so that later ones build on earlier ones)
      - Blockers (unblock future stories early)
      - Risk (tackle high-risk elements earlier)
-   • If epic context mentions deferring features, ensure those implementation stories go toward the end
+   • ⏬ Low Priority features should appear in later stories (not necessarily at the very end)
+   • Prefer implementing basic versions of many features before polishing any one feature area
 
-4. **CROSS-REFERENCE SCREENS & ANALYSIS (CRITICAL)**
-   • For each story, collect all relevant screens and analysis files across the flow.
-   • Extract Figma URLs from each analysis file's "Figma Image URL" field
-   • Add direct links to Figma screens:
-     - SCREENS: Markdown links using screen name as link text and Figma URL as target
+4. **ADD FIGMA SCREEN LINKS**
+   • For each story, identify which screens are involved
+   • Extract Figma URLs from scope analysis feature areas
+   • Add SCREENS bullet with markdown links (screen name as link text, Figma URL as target)
 
-5. **PARTIALLY REFINE THE FIRST STORY**
+5. **REFINE THE FIRST STORY**
    • Add sub-bullets under the first story:
-     - SCREENS: (Figma links found in step 4)
+     - SCREENS: (Figma links from scope analysis)
      - DEPENDENCIES: Other story IDs this story depends on (or \`none\`)
-     - + Items that MUST be included now (core behaviors, functionality, flows, and any shared components required)
-     - - Items to defer to later stories (advanced features, enhancements, complex interactions that aren't essential for basic user value)
-     - ¿ Open questions (scope, behavior, technical assumptions)
+     - ☐ Features from scope analysis to include now (core functionality)
+     - ⏬ Features from scope analysis to defer to later stories (enhancements, lower priority)
+     - ❌ Features explicitly out of scope
+     - ❓ Questions from scope analysis or new questions about implementation
    • Focus on progressive enhancement: what's the simplest valuable implementation?
-   • Defer features that are visible in THIS story's screens but are lower priority or more complex than the core use case
+   • Include only essential features in ☐ bullets for this story
 
-6. **PROMOTE MINUSES INTO CANDIDATE STORIES**
-   • Turn meaningful - items into new top-level stories. Add them to the prioritized list.
-   • CRITICAL: Only promote deferrals that reference actual UI elements or functionality visible in the screens. Do not create speculative stories for features that don't exist in the designs.
-   • GUARD CHECK: Before promoting a - item, verify the feature exists in screen analysis:
-     ◦ Can you point to the screen where this feature is visible?
-     ◦ Or does epic explicitly command "implement [feature]"?
-     ◦ If neither: DO NOT promote to a story - remove the - bullet entirely
+6. **PROMOTE LOW PRIORITY ITEMS INTO STORIES**
+   • Turn meaningful ⏬ items into new top-level stories
+   • Add them to the prioritized list
+   • Only promote deferrals that reference features from scope analysis
+   • Do NOT create speculative stories for features not in scope analysis
 
 7. **UPDATE STORY TITLE**
    • Rewrite the story title to match the narrowed scope (e.g., "Add promotion to cart (basic success flow)" instead of "Add promotion").
@@ -170,100 +164,67 @@ ${analysisSection}
 8. **REPEAT**
    • For the next highest-priority story, repeat steps 3–7 until all major flows and incremental user-value slices are represented as shell stories.
 
-9. **PRE-REVIEW EVIDENCE CHECK**
-   • Before the systematic review, do a quick scan:
-   • List all UI elements mentioned in each analysis file
-   • List all interactive behaviors described in each analysis file
-   • Verify every story bullet references something from these lists
-   • Flag any bullets that seem to add functionality beyond what's documented
+9. **CREATE STORIES FOR DEFERRED FEATURES (MANDATORY)**
+   • CRITICAL: This step ensures no ⏬ deferrals are orphaned
+   • For any feature that was deferred with ⏬ bullets:
+     ◦ Verify there's a corresponding implementation story later in the list
+     ◦ Ensure ⏬ bullets reference the correct story ID
+   • **If a feature has ⏬ bullets but NO implementation story, ADD one now**
+   • For each new implementation story:
+     ◦ Create story at end of list with sequential numbering
+     ◦ Use the ⏬ bullet text as the story's main feature
+     ◦ Add SCREENS from the story that deferred it
+     ◦ Set DEPENDENCIES to the story that deferred it (if needed)
+     ◦ Add relevant ☐ bullets for implementation
+   • Update all ⏬ bullets to reference the correct new story IDs
+   • Example transformation:
+     - Original st006 has: ⏬ Request history tracking (implement in st015)
+     - Create: st017 Add Request History Tracking ⟩ Track and display history of information requests
+     - Update st006 to: ⏬ Request history tracking (implement in st017)
 
-10. **REVIEW FOR INCREMENTAL CONSISTENCY (SYSTEMATIC VERIFICATION)**
-   • MANDATORY: Create a systematic checklist and work through each story methodically. Do NOT skip this step or do a superficial review.
+10. **REVIEW FOR SCOPE COVERAGE**
+   • Verify all ☐ In-Scope features from scope analysis have stories
+   • Verify all ⏬ Low Priority features now have corresponding implementation stories
+   • Verify NO ⏬ bullets reference non-existent story IDs
+   • Verify NO ❌ Out-of-Scope features have stories
+   • Verify NO ✅ Already Done features have stories
+   • Verify ❓ questions are included in relevant story bullets
+   • Ensure stories follow incremental value delivery (core features first, enhancements later)
+   • Verify story dependencies create a logical build order
+   • **CRITICAL CHECK: The FINAL story in the epic must have ZERO ⏬ bullets** (all deferred work must be implemented by subsequent stories)
 
-   A) Cross-check deferrals (feature-by-feature audit):
-      • For EVERY feature implemented in any story st002+, verify there's a corresponding - bullet in an earlier story
-      • Create a mapping: "st008 implements sorting" → "st001 must defer sorting"
-      • If a deferral is missing, ADD it to the earlier story or justify why it's not needed
-      • Example: If \`st008\` implements "sorting functionality", ensure \`st001\` has "- Sorting functionality (defer to st008)"
-
-   B) Validate minimalism (first-screen audit):
-      • For each screen's FIRST story, list ALL visible UI elements from the screen analysis
-      • Verify only CORE elements are included in + bullets
-      • Move non-essential elements to - bullets (advanced features, nice-to-haves, complex interactions)
-      • Guideline: Ask "Could a user get value from this story if we ONLY implemented the + items?"
-
-   C) Check progressive enhancement (dependency audit):
-      • Verify story dependencies create a logical build order
-      • Ensure no "big bang" stories that implement too much at once
-      • Check that shared components are introduced in the first story that needs them, not duplicated
-
-   D) Validate evidence basis (screen-evidence audit):
-      • For EVERY + and - bullet in every story:
-        ◦ Verify the feature appears in THIS story's screen analysis files
-        ◦ If you cannot find the feature in this story's screens, remove the bullet entirely
-        ◦ For visible UI elements without described behaviors, convert to ¿ questions
-      • ANTI-PATTERN: Do not write "search functionality" if only "search bar" is described
-      • CORRECT PATTERN: Write "search input field (UI element)" and ask "¿ What search behavior should this implement?"
-      • CRITICAL: Only add - bullets for features that are VISIBLE in this story's screens
-        ◦ Example CORRECT: Story about applicant list screen that shows filter buttons → "- Advanced filtering (defer to st008)"
-        ◦ Example WRONG: Story about agreement pricing screen that has no filters → Don't add "- Filtering (defer)" bullet
-        ◦ Rule: If the feature isn't in this story's screen analysis files, don't mention it in - bullets
-
-   E) Add missing stories if needed:
-      • IMPORTANT: Feel empowered to add new stories if the review reveals gaps
-      • If an essential feature was missed or a story is too large, split it or add new ones
-      • Re-number stories as needed to maintain logical progression
-      • Update dependencies in existing stories to reference new story IDs
-
-   F) Verify deferred features have implementation stories:
-      • For any feature that was deferred with - bullets (whether from epic context or natural progressive enhancement):
-        ◦ Verify there's a corresponding implementation story later in the list
-        ◦ Ensure - bullets reference the correct story ID
-      • If epic context suggests deferring a feature and it appears in screens:
-        ◦ Ensure early stories defer it where visible
-        ◦ Ensure there's an implementation story at the end
-      • If a feature has - bullets but NO implementation story, ADD one now
-
-   G) Final consistency check:
-      • Read through the entire story list as if you're a developer planning sprints
-      • Verify each story can be completed independently in 1-2 sprints
-      • Ensure the progression makes sense from a user value perspective
-
-11. **REMOVE DRAFT SECTIONS**
-    • Delete the "Initial Story Name List" section entirely
-    • Delete the "Prioritized Stories (by Customer Value...)" section entirely
-    • Verify only "Final Prioritized Stories" section remains
-
-12. **VERIFY STORY NUMBERING**
+11. **VERIFY STORY NUMBERING**
     • Confirm all stories are numbered sequentially (st001, st002, st003...)
     • Update any dependency references to match final story IDs
+    • Update all ⏬ bullets to reference correct implementation story IDs
     • Verify all ❌ bullets referencing deferred features have correct story IDs (e.g., "see st015")
 
-13. **FINAL STRUCTURE VALIDATION**
+12. **FINAL STRUCTURE VALIDATION**
     • Confirm file contains exactly one story list
-    • Verify each story has all required sub-bullets (SCREENS, DEPENDENCIES, +, -, ¿)
+    • Verify each story has all required sub-bullets (SCREENS, DEPENDENCIES, ☐, ⏬, ❌, ❓)
     • Ensure no incomplete or draft story entries remain
 
-14. **FINAL EVIDENCE VERIFICATION**
-    • Re-read each story as if you're a developer who only has the screen analysis files
-    • Can you implement every + bullet based solely on the provided documentation?
-    • If any bullet requires assumptions or guesswork, revise it or convert to a ¿ question
-    • Ensure no story promises functionality that isn't clearly evidenced in the source material
+13. **FINAL SCOPE VALIDATION**
+    • Re-read scope analysis and verify all in-scope features are addressed
+    • Confirm story bullets reference features from scope analysis
+    • Verify ❓ questions are included where scope analysis had uncertainties
+    • Ensure no stories implement ❌ Out-of-Scope features
 
 
 ## QUALITY RULES
 
-• Always include SCREENS bullets linking to Figma designs (extract URLs from analysis file "Figma Image URL" fields).
-• A story may span multiple screens, or multiple stories may come from a single screen.
+• Always include SCREENS bullets with Figma links (extract URLs from scope analysis feature areas).
+• A story may span multiple screens, or multiple stories may implement features from one feature area.
 • Always focus on incremental user value: stories must represent the smallest useful functionality.
-• Shared components must be introduced as + bullets inside the first story that needs them.
-• Stories should follow progressive enhancement: start with the simplest valuable functionality, then add filters, pagination, advanced options, and polish in later stories.
-• CRITICAL: Just because a UI element appears in a screen does not mean it must be implemented in the first story using that screen. Defer complex features to later stories even if they're visible in early designs.
-• EVIDENCE-BASED ONLY: Every story bullet must cite specific text from screen analysis files. When UI elements are visible but behaviors aren't described, use ¿ questions instead of assumed functionality.
-• NO SPECULATION: Do not implement features that "should" exist or "users would expect" unless explicitly documented in the analysis.
-• DEFER ONLY VISIBLE FEATURES: Only defer functionality that is actually shown in screens but excluded from current scope. Don't defer imaginary features.
+• Shared components must be introduced as ☐ bullets inside the first story that needs them.
+• Stories should follow progressive enhancement: start with core features, then add enhancements and polish in later stories.
+• Use scope analysis categorizations (☐/⏬/❌/❓) to guide story content and priority.
+• Stories describe WHAT to build (features from scope analysis) not HOW to build them (implementation details).
+• Only create stories for ☐ In-Scope and ⏬ Low Priority features. Skip ❌ Out-of-Scope and ✅ Already Done.
+• **CRITICAL: Every ⏬ bullet with "(implement in stXXX)" MUST have a corresponding stXXX story that implements it**
+• **CRITICAL: The final story in the epic MUST have ZERO ⏬ bullets** (all deferred work must be accounted for in subsequent implementation stories)
 • FLEXIBLE STORY COUNT: The review process may reveal the need for additional stories. Feel free to add, split, or reorganize stories to achieve better incremental value delivery. Quality trumps hitting a specific story count.
-• Do not ask clarifying questions; capture unknowns as ¿ bullets.
+• Do not ask clarifying questions; capture unknowns as ❓ bullets.
 • Prefer vertical slices over technical subtasks unless enabling work is required.
 • Rename story titles whenever scope narrows.
 • Output ONLY the markdown list.
@@ -295,8 +256,9 @@ ${analysisSection}
 • Sub-bullets for each story (use proper markdown nested bullets with 2-space indentation and emoji symbols):
   * SCREENS: {Figma URLs formatted as markdown links with screen names as link text}
   * DEPENDENCIES: {list of story IDs this story depends on, or \`none\`}
-  * ✅ Included behavior and functionality (including shared components introduced here)
-  * ❌ Deferred/excluded functionality
+  * ☐ Included behavior and functionality (including shared components introduced here)
+  * ⏬ Low priority functionality (visible but implement in later stories)
+  * ❌ Deferred/excluded functionality (out of scope for this epic)
   * ❓ Open questions
 • Replace the entire "Final Prioritized Stories" section when updating, do not append
 • Ensure no duplicate or partial story lists remain in the output
@@ -306,11 +268,11 @@ ${analysisSection}
 - \`st001\` **Add Promotion to Cart** ⟩ Allow users to apply a promotion code to their shopping cart
   * SCREENS: [promo-add-form](https://www.figma.com/design/aBc123XyZ/Project-Name?node-id=123-456), [promo-success](https://www.figma.com/design/aBc123XyZ/Project-Name?node-id=123-457), [promo-error](https://www.figma.com/design/aBc123XyZ/Project-Name?node-id=123-458)
   * DEPENDENCIES: none
-  * ✅ User can enter a valid promotion code and apply it
-  * ✅ Success state shows updated cart total with discount
-  * ✅ Error modal component introduced for invalid codes
-  * ❌ Support for stacking multiple promotions (defer)
-  * ❌ Promotion auto-suggestions (defer)
+  * ☐ User can enter a valid promotion code and apply it
+  * ☐ Success state shows updated cart total with discount
+  * ☐ Error modal component introduced for invalid codes
+  * ⏬ Support for stacking multiple promotions (low priority - implement in st015)
+  * ❌ Promotion auto-suggestions (out of scope for this epic)
   * ❓ What error messages should display for expired or invalid codes?
 
 Now generate the shell stories following this process exactly.`;

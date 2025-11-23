@@ -118,7 +118,7 @@ Each story must follow this format:
 - \`st001\` **Story Title** ⟩ Brief description
   * SCREENS: [Screen Name](figma-url)
   * DEPENDENCIES: st002, st003
-  * ✅ What's included
+  * ☐ What's included
   * ❌ What's excluded
   * ❓ Open questions
 \`\`\`
@@ -480,7 +480,7 @@ No screen analysis files are available for story ${story.id}
   console.log(`  Using ${dependencyStories.length} dependency stories for context`);
   
   // Generate prompt
-  const storyPrompt = await generateStoryPrompt(story, dependencyStories, analysisFiles);
+  const storyPrompt = await generateStoryPrompt(story, dependencyStories, analysisFiles, setupResult.epicContext);
   console.log(`  Generated prompt (${storyPrompt.length} characters)`);
   
   // Request story generation via LLM

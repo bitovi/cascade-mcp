@@ -115,11 +115,12 @@ export function registerFigmaGetImageDownloadTool(mcp: McpServer): void {
             
             // Handle rate limiting with user-friendly message
             if (response.status === 429) {
+              const message = await createRateLimitErrorMessage(fullUrl, response, errorText);
               return {
                 content: [
                   {
                     type: 'text',
-                    text: `Error: ${createRateLimitErrorMessage(errorText)}`,
+                    text: `Error: ${message}`,
                   },
                 ],
               };

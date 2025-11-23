@@ -53,12 +53,6 @@ export interface FigmaClient {
  * @see https://www.figma.com/developers/api#authentication
  */
 export function createFigmaClient(accessToken: string): FigmaClient {
-  console.log('Creating Figma client with token:', {
-    hasToken: !!accessToken,
-    tokenLength: accessToken?.length,
-    tokenPreview: accessToken?.substring(0, 10) + '...',
-  });
-  
   return {
     fetch: async (url: string, options: RequestInit = {}) => {
       // Token is captured in this closure!
@@ -73,13 +67,10 @@ export function createFigmaClient(accessToken: string): FigmaClient {
         ),
       };
       
-      console.log('🔍 Figma fetch call:', {
-        url: url.substring(0, 80) + '...',
-        hasToken: !!accessToken,
-        tokenInHeader: accessToken?.substring(0, 20) + '...',
-        headerType: isOAuthToken ? 'Authorization Bearer' : 'X-Figma-Token',
-        allHeaders: Object.keys(headers),
-      });
+      // For 403 debugging - log full token temporarily
+      if (process.env.DEBUG_FIGMA_TOKEN === 'true') {
+        console.log('🔐 FULL FIGMA TOKEN (DEBUG MODE):', accessToken);
+      }
       
       return fetch(url, {
         ...options,

@@ -7,6 +7,7 @@ import {
   validateAdf, 
   removeADFSectionByHeading, 
   countADFSectionsByHeading,
+  extractADFSection,
   convertAdfToMarkdown,
   type ADFDocument 
 } from './markdown-converter.js';
@@ -193,6 +194,115 @@ describe('Markdown to ADF Converter', () => {
       expect(countADFSectionsByHeading(content, 'Shell Stories')).toBe(2);
       expect(countADFSectionsByHeading(content, 'Other')).toBe(1);
       expect(countADFSectionsByHeading(content, 'Nonexistent')).toBe(0);
+    });
+  });
+
+  describe('extractADFSection', () => {
+    test('should extract section by heading', () => {
+      const content = [
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Introduction' }]
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Intro text' }]
+        },
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Scope Analysis' }]
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Scope text' }]
+        },
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Next Section' }]
+        }
+      ];
+      
+      const { section, remainingContent } = extractADFSection(content, 'Scope Analysis');
+      
+      expect(section).toHaveLength(2); // Heading + paragraph
+      expect(section[0].type).toBe('heading');
+      expect(remainingContent).toHaveLength(3); // Introduction + intro text + Next Section
+    });
+    
+    test('should handle missing section', () => {
+      const content = [
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Introduction' }]
+        }
+      ];
+      
+      const { section, remainingContent } = extractADFSection(content, 'Nonexistent');
+      
+      expect(section).toHaveLength(0);
+      expect(remainingContent).toEqual(content);
+    });
+
+    test('should extract section at end of document', () => {
+      const content = [
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'First Section' }]
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'First text' }]
+        },
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Scope Analysis' }]
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Last paragraph' }]
+        }
+      ];
+      
+      const { section, remainingContent } = extractADFSection(content, 'Scope Analysis');
+      
+      expect(section).toHaveLength(2); // Heading + paragraph
+      expect(remainingContent).toHaveLength(2); // First section + first text
+    });
+
+    test('should respect heading hierarchy', () => {
+      const content = [
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Scope Analysis' }]
+        },
+        {
+          type: 'heading',
+          attrs: { level: 3 },
+          content: [{ type: 'text', text: 'Subsection' }]
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Sub text' }]
+        },
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Next Section' }]
+        }
+      ];
+      
+      const { section, remainingContent } = extractADFSection(content, 'Scope Analysis');
+      
+      // Should include H2, H3, and paragraph, but stop at next H2
+      expect(section).toHaveLength(3);
+      expect(remainingContent).toHaveLength(1); // Just "Next Section"
     });
   });
 

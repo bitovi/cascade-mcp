@@ -6,6 +6,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import session from 'express-session';
 import dotenv from 'dotenv';
 import morgan from 'morgan';
+import path from 'path';
 import {
   oauthMetadata,
   oauthProtectedResourceMetadata,
@@ -29,6 +30,7 @@ import { atlassianProvider } from './providers/atlassian/index.js';
 import { figmaProvider } from './providers/figma/index.js';
 import { logEnvironmentInfo } from './debug-helpers.js';
 import { registerRestApiRoutes } from './api/index.js';
+import { getProjectRoot } from './utils/file-paths.js';
 
 // configurations
 dotenv.config();
@@ -61,6 +63,21 @@ console.log(`Cookie settings: secure=auto, httpOnly=true, sameSite=lax, maxAge=2
 console.log(`Trust proxy: enabled (level 1)`);
 console.log(`WARNING: Using in-memory session store - sessions will be lost on restart`);
 console.log(`========== SESSION CONFIGURATION END ==========\n`);
+
+// Log DEV_CACHE_DIR configuration if set
+if (process.env.DEV_CACHE_DIR) {
+  console.log(`\n========== DEV CACHE CONFIGURATION ==========`);
+  const devCacheDir = process.env.DEV_CACHE_DIR;
+  if (path.isAbsolute(devCacheDir)) {
+    console.log(`DEV_CACHE_DIR: ${devCacheDir} (absolute path)`);
+  } else {
+    const projectRoot = getProjectRoot();
+    const resolvedPath = path.resolve(projectRoot, devCacheDir);
+    console.log(`DEV_CACHE_DIR: ${devCacheDir} → ${resolvedPath}`);
+  }
+  console.log(`Cache cleanup: DISABLED (directories preserved for debugging)`);
+  console.log(`========== DEV CACHE CONFIGURATION END ==========\n`);
+}
 
 const sessionMiddleware = session({
   secret: process.env.SESSION_SECRET || 'changeme',

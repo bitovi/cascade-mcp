@@ -50,15 +50,30 @@ async function loadStoryWritingGuidelines(): Promise<string> {
  * @param shellStory - The parsed shell story to write
  * @param dependencyStories - Array of dependency shell stories for context
  * @param analysisFiles - Array of { screenName, content } for screen analyses
+ * @param epicContext - Optional epic description for background context (does not change story scope)
  * @returns Complete prompt for story generation
  */
 export async function generateStoryPrompt(
   shellStory: ParsedShellStory,
   dependencyStories: ParsedShellStory[],
-  analysisFiles: Array<{ screenName: string; content: string }>
+  analysisFiles: Array<{ screenName: string; content: string }>,
+  epicContext?: string
 ): Promise<string> {
   // Load guidelines
   const guidelines = await loadStoryWritingGuidelines();
+  
+  // Build epic context section
+  const epicSection = epicContext
+    ? `## Epic Context (For Background Understanding Only)
+
+**IMPORTANT**: This epic context is provided to help you understand the broader project goals and constraints. However, you MUST NOT expand the scope of this story beyond what is defined in the shell story below. Write only what is specified in the shell story's included functionality (☐ bullets).
+
+${epicContext}
+
+---
+
+`
+    : '';
   
   // Build dependency context section
   const dependencySection = dependencyStories.length > 0
@@ -92,7 +107,7 @@ ${guidelines}
 
 ---
 
-${dependencySection}${analysisSection}
+${epicSection}${dependencySection}${analysisSection}
 ## Shell Story to Write
 
 **Story ID**: ${shellStory.id}
@@ -110,7 +125,8 @@ ${shellStory.rawContent}
 Generate a complete Jira story following the Story Writing Guidelines and Complete Story Example above.
 
 **Content Requirements**:
-- Use the shell story's ✅ bullets for included functionality
+- Use the shell story's ☐ bullets for included functionality
+- Use the shell story's ⏬ bullets to note low priority features (add to Out of Scope with reference to later story)
 - Use the shell story's ❌ bullets for Out of Scope section
 - Use the shell story's ❓ bullets to inform Developer Notes (note uncertainties)
 - Reference Figma screens from the shell story's SCREENS list as regular markdown links

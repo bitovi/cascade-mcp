@@ -23,8 +23,10 @@ import type { FigmaNodeMetadata } from '../../../figma/figma-helpers.js';
 import { 
   parseFigmaUrl, 
   fetchFigmaNode,
+  fetchFigmaNodesBatch,
   getFramesAndNotesForNode,
-  convertNodeIdToApiFormat
+  convertNodeIdToApiFormat,
+  FigmaUnrecoverableError
 } from '../../../figma/figma-helpers.js';
 import { resolveCloudId, getJiraIssue, handleJiraAuthError } from '../../../atlassian/atlassian-helpers.js';
 import { 
@@ -37,6 +39,144 @@ import {
 import { associateNotesWithFrames } from './screen-analyzer.js';
 import { generateScreensYaml } from './yaml-generator.js';
 import { writeNotesForScreen } from './note-text-extractor.js';
+
+/**
+ * Fetches Figma metadata (frames and notes) from multiple Figma URLs using batched requests.
+ * 
+ * This function performs semi-recursive accumulation of frames and notes with batching optimization:
+ * - Groups URLs by file key for efficient batching
+ * - Makes one batch API request per file key (instead of N sequential requests)
+ * - For each node, calls getFramesAndNotesForNode() which:
+ *   - If node is a CANVAS: Returns all direct child FRAME nodes (one level of recursion)
+ *   - If node is a FRAME: Returns that single frame
+ *   - Also extracts all Note instances at any level within the node
+ * - Accumulates all frames and notes across multiple URLs
+ * - Stores the first valid file key for later image download operations
+ * 
+ * Rate limit optimization: Reduces N requests to 1-3 requests (depending on file key distribution)
+ * 
+ * @param figmaUrls - Array of Figma URLs to process
+ * @param figmaClient - Figma API client with auth
+ * @returns Object containing accumulated metadata and the file key
+ */
+async function fetchFigmaMetadataFromUrls(
+  figmaUrls: string[],
+  figmaClient: FigmaClient
+): Promise<{ allFramesAndNotes: Array<{ url: string; metadata: FigmaNodeMetadata[] }>; figmaFileKey: string }> {
+  const allFramesAndNotes: Array<{ url: string; metadata: FigmaNodeMetadata[] }> = [];
+  let figmaFileKey = '';
+  
+  // Phase 1: Group URLs by fileKey and validate
+  const urlsByFileKey = new Map<string, Array<{ url: string; nodeId: string; index: number }>>();
+  
+  for (let i = 0; i < figmaUrls.length; i++) {
+    const figmaUrl = figmaUrls[i];
+    
+    // Parse URL
+    const urlInfo = parseFigmaUrl(figmaUrl);
+    if (!urlInfo) {
+      console.log('    ⚠️  Invalid Figma URL format, skipping');
+      continue;
+    }
+    
+    if (!urlInfo.nodeId) {
+      console.log('    ⚠️  Figma URL missing nodeId, skipping');
+      continue;
+    }
+    
+    const apiNodeId = convertNodeIdToApiFormat(urlInfo.nodeId);
+    
+    // Store first valid file key for image downloads later
+    if (!figmaFileKey) {
+      figmaFileKey = urlInfo.fileKey;
+    }
+    
+    // Group by file key for batching
+    if (!urlsByFileKey.has(urlInfo.fileKey)) {
+      urlsByFileKey.set(urlInfo.fileKey, []);
+    }
+    urlsByFileKey.get(urlInfo.fileKey)!.push({ url: figmaUrl, nodeId: apiNodeId, index: i });
+  }
+  
+  // Phase 2: Batch fetch per fileKey
+  for (const [fileKey, urlInfos] of urlsByFileKey) {
+    try {
+      // ✅ Single batch request for all nodes in this file
+      const nodeIds = urlInfos.map(u => u.nodeId);
+      const nodesMap = await fetchFigmaNodesBatch(figmaClient, fileKey, nodeIds);
+      
+      // Phase 3: Process each node to extract frames/notes
+      for (const { url, nodeId } of urlInfos) {
+        const nodeData = nodesMap.get(nodeId);
+        
+        if (!nodeData) {
+          console.log(`    ⚠️  Node ${nodeId} not found in response`);
+          continue;
+        }
+        
+        // Semi-recursive extraction: getFramesAndNotesForNode() extracts:
+        // - For CANVAS nodes: all direct child FRAME nodes (one level recursion)
+        // - For FRAME nodes: just that single frame
+        // - Notes at any level within the node
+        const framesAndNotes = getFramesAndNotesForNode({ document: nodeData }, nodeId);
+        
+        // Accumulate into array (maintains same structure as before)
+        allFramesAndNotes.push({
+          url,
+          metadata: framesAndNotes
+        });
+      }
+      
+    } catch (error: any) {
+      console.log(`    ⚠️  Error fetching batch from ${fileKey}: ${error.message}`);
+      
+      // Unrecoverable errors (403, 429) should be immediately re-thrown
+      // These already have user-friendly messages from the helper functions
+      if (error instanceof FigmaUnrecoverableError) {
+        throw error;
+      }
+      
+      // For other errors, continue trying remaining file keys
+    }
+  }
+  
+  return { allFramesAndNotes, figmaFileKey };
+}
+
+/**
+ * Separates frames and notes from combined Figma metadata.
+ * 
+ * This function accumulates frames and notes from multiple Figma nodes:
+ * - When a CANVAS node is passed to getFramesAndNotesForNode(), it returns all child frames
+ * - When a FRAME node is passed to getFramesAndNotesForNode(), it returns that single frame
+ * - Notes (INSTANCE type with name "Note") can appear at any level
+ * 
+ * This helper consolidates all accumulated metadata into separate arrays for processing.
+ * 
+ * @param allFramesAndNotes - Array of metadata from potentially multiple Figma URLs/nodes
+ * @returns Object containing separate arrays of frames and notes
+ */
+function separateFramesAndNotes(
+  allFramesAndNotes: Array<{ url: string; metadata: FigmaNodeMetadata[] }>
+): { frames: FigmaNodeMetadata[]; notes: FigmaNodeMetadata[] } {
+  const allFrames: FigmaNodeMetadata[] = [];
+  const allNotes: FigmaNodeMetadata[] = [];
+  
+  for (const item of allFramesAndNotes) {
+    // Frames are type === "FRAME"
+    const frames = item.metadata.filter(n => n.type === 'FRAME');
+    
+    // Notes are type === "INSTANCE" with name === "Note"
+    const notes = item.metadata.filter(n => 
+      n.type === 'INSTANCE' && n.name === 'Note'
+    );
+    
+    allFrames.push(...frames);
+    allNotes.push(...notes);
+  }
+  
+  return { frames: allFrames, notes: allNotes };
+}
 
 /**
  * Extract all Figma URLs from an ADF (Atlassian Document Format) document
@@ -158,8 +298,6 @@ export async function setupFigmaScreens(
 ): Promise<FigmaScreenSetupResult> {
   const { epicKey, atlassianClient, figmaClient, tempDirPath, cloudId, siteName, notify } = params;
   
-  console.log('Setting up Figma screens...');
-  
   // ==========================================
   // Step 1: Fetch epic and extract Figma URLs
   // ==========================================
@@ -169,14 +307,12 @@ export async function setupFigmaScreens(
   
   // Resolve cloud ID (use explicit cloudId/siteName or first accessible site)
   const siteInfo = await resolveCloudId(atlassianClient, cloudId, siteName);
-  console.log('  Resolved Jira site:', { cloudId: siteInfo.cloudId, siteName: siteInfo.siteName });
   
   // Fetch the epic issue
   const issueResponse = await getJiraIssue(atlassianClient, siteInfo.cloudId, epicKey, undefined);
-  handleJiraAuthError(issueResponse, 'Fetch epic');
+  await handleJiraAuthError(issueResponse, 'Fetch epic');
   
   const issue = await issueResponse.json() as JiraIssue;
-  console.log('  Epic fetched successfully:', { key: issue.key, summary: issue.fields?.summary });
   
 
 
@@ -202,10 +338,7 @@ export async function setupFigmaScreens(
   const epicMarkdown = convertAdfToMarkdown(description);
   
   const figmaUrls = extractFigmaUrlsFromADF(description);
-  console.log('  Figma URLs found:', figmaUrls.length);
-  figmaUrls.forEach((url, idx) => {
-    console.log(`    ${idx + 1}. ${url}`);
-  });
+  console.log(`  Found ${figmaUrls.length} Figma URLs`);
   
   if (figmaUrls.length === 0) {
     throw new Error(`No Figma URLs found in epic ${epicKey}. Please add Figma design links to the epic description.`);
@@ -237,10 +370,7 @@ export async function setupFigmaScreens(
     });
     epicContext = epicContext.trim();
     
-    console.log(`  Epic context extracted: ${epicContext.length} characters`);
-    if (epicContext.length > 0) {
-      console.log(`    Preview: ${epicContext.substring(0, 200)}${epicContext.length > 200 ? '...' : ''}`);
-    }
+    console.log(`    Epic context: ${epicContext.length} chars`);
   } catch (error: any) {
     console.log(`  ⚠️  Failed to extract epic context: ${error.message}`);
     console.log('  Continuing without epic context...');
@@ -251,81 +381,17 @@ export async function setupFigmaScreens(
   // ==========================================
   // Step 3: Fetch Figma metadata for all URLs
   // ==========================================
-  const allFramesAndNotes: Array<{ url: string; metadata: FigmaNodeMetadata[] }> = [];
-  let figmaFileKey = ''; // Store file key for later use
-  
-  for (let i = 0; i < figmaUrls.length; i++) {
-    const figmaUrl = figmaUrls[i];
-    console.log(`  Processing Figma URL ${i + 1}/${figmaUrls.length}: ${figmaUrl}`);
-    
-    // Parse URL
-    const urlInfo = parseFigmaUrl(figmaUrl);
-    if (!urlInfo) {
-      console.log('    ⚠️  Invalid Figma URL format, skipping');
-      continue;
-    }
-    
-    if (!urlInfo.nodeId) {
-      console.log('    ⚠️  Figma URL missing nodeId, skipping');
-      continue;
-    }
-    
-    try {
-      // Convert nodeId to API format (required for all URLs from Jira)
-      const apiNodeId = convertNodeIdToApiFormat(urlInfo.nodeId);
-      
-      // Store file key (use first valid file key found)
-      if (!figmaFileKey) {
-        figmaFileKey = urlInfo.fileKey;
-      }
-      
-      // Fetch specific node data using efficient /nodes endpoint
-      const nodeData = await fetchFigmaNode(figmaClient, urlInfo.fileKey, apiNodeId);
-      
-      // Get frames and notes based on node type
-      const framesAndNotes = getFramesAndNotesForNode({ document: nodeData }, apiNodeId);
-      console.log(`    Found ${framesAndNotes.length} frames/notes`);
-      
-      allFramesAndNotes.push({
-        url: figmaUrl,
-        metadata: framesAndNotes
-      });
-      
-    } catch (error: any) {
-      console.log(`    ⚠️  Error fetching Figma file: ${error.message}`);
-      
-      // If this is a rate limit error, propagate it to the user
-      if (error.message && error.message.includes('Figma API rate limit exceeded')) {
-        throw error;
-      }
-      
-      // For other errors, continue trying remaining URLs
-    }
-  }
+  const { allFramesAndNotes, figmaFileKey } = await fetchFigmaMetadataFromUrls(figmaUrls, figmaClient);
   
   // ==========================================
-  // Step 2: Combine and separate frames/notes
+  // Step 4: Combine and separate frames/notes
   // ==========================================
-  const allFrames: FigmaNodeMetadata[] = [];
-  const allNotes: FigmaNodeMetadata[] = [];
+  const { frames: allFrames, notes: allNotes } = separateFramesAndNotes(allFramesAndNotes);
   
-  for (const item of allFramesAndNotes) {
-    // Frames are type === "FRAME"
-    const frames = item.metadata.filter(n => n.type === 'FRAME');
-    
-    // Notes are type === "INSTANCE" with name === "Note"
-    const notes = item.metadata.filter(n => 
-      n.type === 'INSTANCE' && n.name === 'Note'
-    );
-    
-    allFrames.push(...frames);
-    allNotes.push(...notes);
-  }
-  
-  console.log(`  Found ${allFrames.length} frames and ${allNotes.length} notes`);
+  console.log(`    Found ${allFrames.length} frames, ${allNotes.length} notes`);
   
   // ==========================================
-  // Step 3: Associate notes with frames
+  // Step 5: Associate notes with frames
   // ==========================================
   if (notify) {
     await notify('Associating notes with screens...');
@@ -341,10 +407,6 @@ export async function setupFigmaScreens(
     baseUrl
   );
   
-  console.log(`  Associated notes with ${screens.length} screens`);
-  console.log(`  - ${screens.reduce((sum, s) => sum + s.notes.length, 0)} associated notes`);
-  console.log(`  - ${unassociatedNotes.length} unassociated notes`);
-  
   // ==========================================
   // Step 4: Generate screens.yaml
   // ==========================================
@@ -356,8 +418,6 @@ export async function setupFigmaScreens(
   const yamlPath = path.join(tempDirPath, 'screens.yaml');
   await fs.writeFile(yamlPath, yamlContent, 'utf-8');
   
-  console.log(`  ✅ screens.yaml written: ${yamlPath}`);
-  
   // ==========================================
   // Step 5: Write notes files for each screen
   // ==========================================
@@ -366,12 +426,9 @@ export async function setupFigmaScreens(
   for (const screen of screens) {
     const notesWritten = await writeNotesForScreen(screen, allNotes, tempDirPath);
     if (notesWritten > 0) {
-      console.log(`  ✅ Prepared notes: ${screen.name}.notes.md (${notesWritten} notes)`);
       downloadedNotes++;
     }
   }
-  
-  console.log(`  ✅ Setup complete: ${screens.length} screens, ${downloadedNotes} note files`);
   
   // Construct epic URL
   const epicUrl = `https://${siteInfo.siteName}.atlassian.net/browse/${epicKey}`;

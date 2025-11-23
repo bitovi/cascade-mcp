@@ -99,16 +99,44 @@ npm run start-local
 
 The server will start on `http://localhost:3000`.
 
-## 7. Testing Token Expiration (Optional)
+
+## 7. Development Cache Directory (Optional)
+
+For easier debugging, you can override the default temporary directory location:
+
+```bash
+# Use a local cache directory
+export DEV_CACHE_DIR=./cache
+npm run start-local
+```
+
+This will:
+- Store all cache artifacts in `<project-root>/cache/` instead of `/tmp`
+- Preserve artifacts across server restarts for inspection
+- Use consistent paths: `./cache/{sessionId}/{epicKey}/`
+- Skip automatic cleanup (directories persist until manually deleted)
+
+To inspect artifacts while debugging:
+```bash
+ls -la ./cache/default/PROJ-123/
+# Shows: screens.yaml, *.analysis.md, *.png, etc.
+```
+
+To clean up manually:
+```bash
+rm -rf ./cache
+```
+
+## 8. Testing Token Expiration (Optional)
 To test token refresh flows, you can force short-lived tokens:
 ```bash
 TEST_SHORT_AUTH_TOKEN_EXP=60 npm run start-local
 ```
 
-## 8. Running Integration Tests (Optional)
+## 9. Running Integration Tests (Optional)
 See the `README.md` and `specs/` directory for integration test instructions.
 
-## 9. Contributing Code
+## 10. Contributing Code
 - Please follow the code style and documentation patterns in the repo.
 - Update `server/readme.md` with any API or file changes.
 - Open a pull request with a clear description of your changes.

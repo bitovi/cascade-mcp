@@ -27,10 +27,35 @@ import {
 import { 
   convertMarkdownToAdf, 
   validateAdf,
+  extractADFSection,
+  convertAdfToMarkdown,
   type ADFNode,
   type ADFDocument
 } from '../../../atlassian/markdown-converter.js';
-import { handleJiraAuthError } from '../../../atlassian/atlassian-helpers.js';
+import { handleJiraAuthError, addIssueComment } from '../../../atlassian/atlassian-helpers.js';
+import { calculateAdfSize, wouldExceedLimit } from './size-helpers.js';
+
+/**
+ * Helper: Extract the "## Scope Analysis" section from epic context
+ */
+interface ParsedEpicContext {
+  scopeAnalysis: string | null;
+  remainingContext: string;
+}
+
+function extractScopeAnalysis(epicContext: string): ParsedEpicContext {
+  const scopeAnalysisMatch = epicContext.match(/## Scope Analysis\s+([\s\S]*?)(?=\n## |$)/i);
+  const scopeAnalysis = scopeAnalysisMatch ? scopeAnalysisMatch[1].trim() : null;
+  
+  const remainingContext = scopeAnalysis 
+    ? epicContext.replace(/## Scope Analysis\s+[\s\S]*?(?=\n## |$)/i, '').trim()
+    : epicContext;
+
+  return {
+    scopeAnalysis,
+    remainingContext
+  };
+}
 
 /**
  * Parameters for executing the write-shell-stories workflow
@@ -233,16 +258,32 @@ async function generateShellStoriesFromAnalyses(params: {
   
   console.log(`  Loaded ${analysisFiles.length}/${screens.length} analysis files`);
   
+  // Note: Analysis files are passed to generateShellStoryPrompt for backward compatibility
+  // but are not currently used. Shell stories are generated from scope analysis in epic context.
+  
   if (analysisFiles.length === 0) {
     await notify('⚠️ No analysis files found - skipping shell story generation');
     return { storyCount: 0, analysisCount: 0, shellStoriesPath: null };
+  }
+  
+  // Verify epic context exists (required for scope analysis)
+  if (!epicContext || !epicContext.trim()) {
+    throw new Error('Epic context with scope analysis is required for shell story generation. Please run the "analyze-feature-scope" tool first to generate scope analysis, then run this tool again.');
+  }
+  
+  // Extract scope analysis from epic context
+  const { scopeAnalysis, remainingContext } = extractScopeAnalysis(epicContext);
+  
+  if (!scopeAnalysis) {
+    throw new Error('Epic must contain a "## Scope Analysis" section. Please run the "analyze-feature-scope" tool first to generate scope analysis, then run this tool again.');
   }
   
   // Generate shell story prompt
   const shellStoryPrompt = generateShellStoryPrompt(
     screensYamlContent,
     analysisFiles,
-    epicContext
+    scopeAnalysis,
+    remainingContext
   );
   
   // Save prompt to temp directory for debugging
@@ -342,8 +383,8 @@ async function updateEpicWithShellStories({
   console.log('  Phase 6: Updating epic with shell stories...');
 
   try {
-    // Prepare new description content with shell stories section
-    const shellStoriesSection = `## Shell Stories\n\n${shellStoriesMarkdown}`;
+    // Clean up AI-generated content and prepare section
+    const shellStoriesSection = prepareShellStoriesSection(shellStoriesMarkdown);
     
     // Convert the new section to ADF
     console.log('    Converting shell stories section to ADF...');
@@ -357,12 +398,72 @@ async function updateEpicWithShellStories({
     
     console.log('    ✅ Shell stories converted to ADF');
     
+    // Check if combined size would exceed Jira's limit
+    const wouldExceed = wouldExceedLimit(contentWithoutShellStories, shellStoriesAdf);
+
+    let finalContent = contentWithoutShellStories;
+
+    if (wouldExceed) {
+      // Extract Scope Analysis section from content
+      const { section: scopeAnalysisSection, remainingContent } = extractADFSection(
+        contentWithoutShellStories,
+        'Scope Analysis'
+      );
+      
+      if (scopeAnalysisSection.length > 0) {
+        console.log('  ⚠️ Moving Scope Analysis to comment (content would exceed 43KB limit)');
+        await notify('⚠️ Moving Scope Analysis to comment to stay within 43KB limit...');
+        
+        // Wrap in document structure for conversion
+        const scopeAnalysisDoc: ADFDocument = {
+          version: 1,
+          type: 'doc',
+          content: scopeAnalysisSection
+        };
+        
+        // Convert to markdown
+        const scopeAnalysisMarkdown = convertAdfToMarkdown(scopeAnalysisDoc);
+        
+        // Post as comment
+        try {
+          await addIssueComment(
+            atlassianClient,
+            cloudId,
+            epicKey,
+            `**Note**: The Scope Analysis section was moved to this comment due to description size limits (43KB max).\n\n---\n\n${scopeAnalysisMarkdown}`
+          );
+        } catch (err: any) {
+          console.log(`    ⚠️ Failed to post comment: ${err.message}`);
+          // Continue anyway - we'll still update the description
+        }
+        
+        // Use remaining content (without Scope Analysis)
+        finalContent = remainingContent;
+      }
+    }
+
+    // After moving Scope Analysis, check size and warn if still large
+    const finalDoc: ADFDocument = {
+      version: 1,
+      type: 'doc',
+      content: [...finalContent, ...shellStoriesAdf.content]
+    };
+
+    const JIRA_LIMIT = 43838;
+    const SAFETY_MARGIN = 2000;
+    const finalSize = calculateAdfSize(finalDoc);
+
+    if (finalSize > (JIRA_LIMIT - SAFETY_MARGIN)) {
+      console.log(`  ⚠️ Warning: Epic description will be ${finalSize} characters (exceeds safe limit of ${JIRA_LIMIT - SAFETY_MARGIN}). Attempting update anyway...`);
+      await notify(`⚠️ Warning: Description is ${finalSize} chars (may exceed limit). Attempting update...`);
+    }
+    
     // Combine description (without old shell stories from Phase 1.6) with new shell stories section
     const updatedDescription: ADFDocument = {
       version: 1,
       type: 'doc',
       content: [
-        ...contentWithoutShellStories,
+        ...finalContent,
         ...shellStoriesAdf.content
       ]
     };
@@ -396,7 +497,7 @@ async function updateEpicWithShellStories({
       return;
     }
     
-    handleJiraAuthError(updateResponse, `Update epic ${epicKey} description`);
+    await handleJiraAuthError(updateResponse, `Update epic ${epicKey} description`);
     
     console.log('    ✅ Epic description updated successfully');
     //await notify(`✅ Jira Update Complete: Epic updated with shell stories`);
@@ -405,4 +506,27 @@ async function updateEpicWithShellStories({
     console.log(`    ⚠️ Error updating epic: ${error.message}`);
     await notify(`⚠️ Error updating epic: ${error.message}`);
   }
+}
+
+/**
+ * Prepare shell stories section for Jira epic
+ * 
+ * Strips any leading headers from AI-generated content to avoid double headers.
+ * The AI sometimes adds headers like "# Task Search and Filter - Shell Stories"
+ * even though we instruct it not to.
+ * 
+ * @param shellStoriesMarkdown - Raw markdown from AI generation
+ * @returns Cleaned markdown with "## Shell Stories" header
+ */
+function prepareShellStoriesSection(shellStoriesMarkdown: string): string {
+  let cleanedMarkdown = shellStoriesMarkdown.trim();
+  
+  // Remove any leading H1 headers (# ...)
+  cleanedMarkdown = cleanedMarkdown.replace(/^#\s+.*?\n+/m, '');
+  
+  // Remove any leading H2 headers (## ...) that might say "Shell Stories"
+  cleanedMarkdown = cleanedMarkdown.replace(/^##\s+.*?\n+/m, '');
+  
+  // Return with proper section header
+  return `## Shell Stories\n\n${cleanedMarkdown}`;
 }

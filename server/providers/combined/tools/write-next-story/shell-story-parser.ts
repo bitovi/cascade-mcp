@@ -15,7 +15,8 @@ export interface ParsedShellStory {
   timestamp?: string;      // ISO 8601 timestamp if written
   screens: string[];       // Figma URLs
   dependencies: string[];  // Array of story IDs
-  included: string[];      // ✅ bullets
+  included: string[];      // ☐ bullets
+  lowPriority: string[];   // ⏬ bullets
   excluded: string[];      // ❌ bullets
   questions: string[];     // ❓ bullets
   rawContent: string;      // Full markdown for this story
@@ -30,7 +31,8 @@ export interface ParsedShellStory {
  * - `st001` **[Title](url)** ⟩ Description _(timestamp)_
  *   * SCREENS: [screen1](url1), [screen2](url2)
  *   * DEPENDENCIES: st002, st003
- *   * ✅ Included item
+ *   * ☐ Included item
+ *   * ⏬ Low priority item
  *   * ❌ Excluded item
  *   * ❓ Question
  * 
@@ -58,8 +60,10 @@ export function parseShellStories(shellStoriesContent: string): ParsedShellStory
     const storyId = storyIdMatch[1];
     
     // Extract title and description using ⟩ separator
-    // First, get everything after the story ID
-    const afterId = firstLine.substring(firstLine.indexOf('`', 1) + 1).trim();
+    // First, get everything after the story ID (after the closing backtick)
+    // Find the position of the closing backtick by getting the end of the match
+    const storyIdEndPos = storyIdMatch.index! + storyIdMatch[0].length;
+    const afterId = firstLine.substring(storyIdEndPos).trim();
     
     // Split by ⟩ separator
     const separatorMatch = afterId.match(/^(.+?)\s*⟩\s*(.+)$/);
@@ -93,6 +97,7 @@ export function parseShellStories(shellStoriesContent: string): ParsedShellStory
     const screens: string[] = [];
     const dependencies: string[] = [];
     const included: string[] = [];
+    const lowPriority: string[] = [];
     const excluded: string[] = [];
     const questions: string[] = [];
     
@@ -110,8 +115,10 @@ export function parseShellStories(shellStoriesContent: string): ParsedShellStory
         if (depsText.toLowerCase() !== 'none') {
           dependencies.push(...depsText.split(',').map(d => d.trim()).filter(d => d));
         }
-      } else if (line.startsWith('* ✅') || line.startsWith('- ✅')) {
-        included.push(line.replace(/^[*-]\s*✅\s*/, ''));
+      } else if (line.startsWith('* ☐') || line.startsWith('- ☐')) {
+        included.push(line.replace(/^[*-]\s*☐\s*/, ''));
+      } else if (line.startsWith('* ⏬') || line.startsWith('- ⏬')) {
+        lowPriority.push(line.replace(/^[*-]\s*⏬\s*/, ''));
       } else if (line.startsWith('* ❌') || line.startsWith('- ❌')) {
         excluded.push(line.replace(/^[*-]\s*❌\s*/, ''));
       } else if (line.startsWith('* ❓') || line.startsWith('- ❓')) {
@@ -128,6 +135,7 @@ export function parseShellStories(shellStoriesContent: string): ParsedShellStory
       screens,
       dependencies,
       included,
+      lowPriority,
       excluded,
       questions,
       rawContent: block.trim(),

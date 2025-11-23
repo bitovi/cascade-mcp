@@ -7,7 +7,8 @@ import { z } from 'zod';
 import { logger } from '../../../observability/logger.js';
 import { getAuthInfoSafe } from '../../../mcp-core/auth-helpers.js';
 import type { McpServer } from '../../../mcp-core/mcp-types.js';
-import { createRateLimitErrorMessage } from '../figma-helpers.js';
+import { createFigmaClient } from '../figma-api-client.js';
+import { fetchFigmaFile } from '../figma-helpers.js';
 
 // Tool parameters interface
 interface GetMetadataForLayerParams {
@@ -127,71 +128,11 @@ export function registerFigmaGetMetadataForLayerTool(mcp: McpServer): void {
         const figmaNodeId = nodeId.replace(/-/g, ':');
         console.log('  Converted node ID:', { originalNodeId: nodeId, figmaNodeId });
 
-        // API call with timeout
-        const figmaApiUrl = `https://api.figma.com/v1/files/${fileKey}`;
-        console.log('  Making Figma API request...');
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
-
-        let data: any;
-        try {
-          const response = await fetch(figmaApiUrl, {
-            headers: { 
-              'Authorization': `Bearer ${token}`,
-            },
-            signal: controller.signal,
-          });
-
-          clearTimeout(timeoutId);
-
-          console.log('  Figma API response received:', { 
-            status: response.status, 
-            ok: response.ok 
-          });
-
-          if (!response.ok) {
-            const errorText = await response.text();
-            logger.error('Figma API error response', { 
-              status: response.status, 
-              statusText: response.statusText,
-              body: errorText 
-            });
-            
-            // Handle rate limiting with user-friendly message
-            if (response.status === 429) {
-              return {
-                content: [{
-                  type: 'text',
-                  text: `Error: ${createRateLimitErrorMessage(errorText)}`
-                }]
-              };
-            }
-            
-            return {
-              content: [{
-                type: 'text',
-                text: `Error: Figma API error: ${response.status} ${response.statusText} - ${errorText}`
-              }]
-            };
-          }
-
-          data = await response.json();
-          console.log('  Figma API response data received');
-        } catch (fetchError: any) {
-          clearTimeout(timeoutId);
-          if (fetchError.name === 'AbortError') {
-            logger.error('Figma API request timed out');
-            return {
-              content: [{
-                type: 'text',
-                text: 'Error: Figma API request timed out after 60 seconds'
-              }]
-            };
-          }
-          logger.error('Figma API fetch error', { error: fetchError });
-          throw fetchError;
-        }
+        // Create Figma client and fetch file data
+        const figmaClient = createFigmaClient(token);
+        console.log('  Fetching Figma file data...');
+        
+        const data = await fetchFigmaFile(figmaClient, fileKey);
 
         if (data.err) {
           return {

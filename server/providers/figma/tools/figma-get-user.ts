@@ -42,7 +42,8 @@ export function registerFigmaGetUserTool(mcp: McpServer): void {
         console.log('  Calling Figma /v1/me API...');
 
         // Call Figma API to get user info
-        const response = await fetch('https://api.figma.com/v1/me', {
+        const apiUrl = 'https://api.figma.com/v1/me';
+        const response = await fetch(apiUrl, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -58,11 +59,12 @@ export function registerFigmaGetUserTool(mcp: McpServer): void {
           
           // Handle rate limiting with user-friendly message
           if (response.status === 429) {
+            const message = await createRateLimitErrorMessage(apiUrl, response, errorText);
             return {
               content: [
                 {
                   type: 'text',
-                  text: `Error: ${createRateLimitErrorMessage(errorText)}`,
+                  text: `Error: ${message}`,
                 },
               ],
             };

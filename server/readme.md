@@ -41,6 +41,7 @@
   Express route handlers for PAT-authenticated REST API endpoints.
   - **api/write-shell-stories.ts** - Generate shell stories from Figma designs in a Jira epic
   - **api/write-next-story.ts** - Write the next Jira story from shell stories
+  - **api/analyze-feature-scope.ts** - Analyze feature scope from Figma designs (generates scope analysis)
   - **api/progress-comment-manager.ts** - Progress tracking via Jira comments
   - **api/api-error-helpers.ts** - Shared error handling and validation
 
@@ -61,6 +62,24 @@
 - **atlassian-get-attachments** - Fetch issue attachments by ID
 - **atlassian-update-issue-description** - Update issue description with markdown (converts to ADF)
 
+### Combined Provider Tools
+Advanced workflow tools that integrate multiple services:
+
+- **analyze-feature-scope** - Generate comprehensive scope analysis from Figma designs
+  - Analyzes screens against epic requirements to identify in-scope/out-of-scope features
+  - Categorizes features as: ✅ confirmed, ❌ out-of-scope, ❓ needs-clarification, ⏬ low-priority
+  - Updates epic description with structured scope analysis grouped by feature areas
+  - Parameters: `epicKey`, `figmaUrl`, optional `cloudId`
+  - Example: `analyze-feature-scope({ epicKey: "PLAY-123", figmaUrl: "https://..." })`
+  - **Run this first** before write-shell-stories to establish scope
+
+- **write-shell-stories** - Generate shell user stories from Figma designs
+  - **PREREQUISITE**: Epic must have a "## Scope Analysis" section (run analyze-feature-scope first)
+  - Creates prioritized shell stories based on scope analysis categorizations
+  - Organizes features into incremental delivery plan (stories)
+  - Updates epic description with shell stories section
+  - Parameters: `epicKey`, optional `cloudId` or `siteName`
+
 ### ChatGPT-Compatible Tools
 These tools follow OpenAI's MCP specification patterns for optimal ChatGPT integration:
 
@@ -79,9 +98,39 @@ These tools follow OpenAI's MCP specification patterns for optimal ChatGPT integ
 **Key Differences:**
 - **Standard tools**: Return full Jira API responses with ADF formatting
 - **ChatGPT tools**: Return simplified document format with markdown text
-- **Both are always available** - use based on client needs (VS Code Copilot vs ChatGPT)
+- **Combined tools**: Multi-service workflows with AI-powered analysis
+- **All tools are always available** - use based on client needs (VS Code Copilot vs ChatGPT)
 
 ## Key Authentication Patterns
+
+### Environment Variables
+
+#### DEV_CACHE_DIR (Optional - Development Only)
+
+Override the default OS temp directory for cache files.
+
+- **Relative paths**: Resolved from project root (e.g., `./cache`)
+- **Absolute paths**: Used as-is (e.g., `/tmp/dev-cache`)
+- **Default**: OS temp directory when not set
+
+Example:
+```bash
+export DEV_CACHE_DIR=./cache
+npm run start-local
+```
+
+Cache structure with override:
+```
+<project-root>/cache/
+  ├── {sessionId}/
+  │   ├── {epicKey}/
+  │   │   ├── screens.yaml
+  │   │   ├── {screen-name}.png
+  │   │   ├── {screen-name}.analysis.md
+  │   │   └── ...
+```
+
+**Note**: In dev mode, directories are NOT automatically cleaned up. This preserves debugging artifacts across sessions.
 
 ### JWT Token Structure
 ```javascript
@@ -108,6 +157,19 @@ These tools follow OpenAI's MCP specification patterns for optimal ChatGPT integ
 - **401 Responses**: Include `WWW-Authenticate` header with OAuth metadata
 - **Token Expiration**: Tools throw `InvalidTokenError` for automatic refresh
 - **Session Management**: Proper cleanup prevents memory leaks
+
+### Content Size Limits
+
+Jira Cloud has a **43,838 character limit** for description fields (applies to the entire JSON representation of the ADF document).
+
+**Automatic Handling in `write-shell-stories`**:
+- When adding Shell Stories would exceed this limit, the tool automatically moves the `## Scope Analysis` section to a comment
+- **Priority**: Shell Stories remain in the description (required by `write-next-story` tool)
+- **Preservation**: Scope Analysis is preserved in a comment with a note explaining the move
+- **Safety Margin**: Uses a 2KB buffer (41,838 chars) to account for serialization variations
+- **Error Handling**: If content exceeds the safe limit, logs a warning but attempts the update anyway (Jira will reject if truly too large)
+
+This ensures both sections are preserved while keeping the description within Jira's limits.
 
 ## Integration Points
 

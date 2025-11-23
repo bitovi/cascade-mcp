@@ -5,8 +5,11 @@
  * This tool orchestrates fetching Jira content, analyzing Figma designs,
  * and generating user stories through AI-powered sampling.
  * 
- * The tool uses epic description content (excluding the ## Shell Stories section)
- * to guide prioritization and scope decisions during story generation.
+ * PREREQUISITE: Epic must contain a "## Scope Analysis" section.
+ * Run the "analyze-feature-scope" tool first if this section doesn't exist.
+ * 
+ * The tool uses scope analysis from the epic description to organize features
+ * into an incremental delivery plan (shell stories).
  */
 
 import { z } from 'zod';

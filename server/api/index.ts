@@ -8,6 +8,8 @@
 import { Express } from 'express';
 import { handleWriteShellStories } from './write-shell-stories.js';
 import { handleWriteNextStory } from './write-next-story.js';
+import { handleIdentifyFeatures } from './identify-features.js';
+import { handleAnalyzeFeatureScope } from './analyze-feature-scope.js';
 
 /**
  * Register all REST API routes with the Express app
@@ -26,6 +28,16 @@ export function registerRestApiRoutes(app: Express): void {
   // Wrap handler to match Express signature (req, res) => void
   app.post('/api/write-next-story', (req, res) => handleWriteNextStory(req, res));
   console.log('  ✓ POST /api/write-next-story');
+  
+  // Analyze feature scope from Figma designs (new endpoint)
+  // Wrap handler to match Express signature (req, res) => void
+  app.post('/api/analyze-feature-scope', (req, res) => handleAnalyzeFeatureScope(req, res));
+  console.log('  ✓ POST /api/analyze-feature-scope');
+  
+  // Legacy endpoint for backward compatibility (redirects to analyze-feature-scope)
+  // Wrap handler to match Express signature (req, res) => void
+  app.post('/api/identify-features', (req, res) => handleAnalyzeFeatureScope(req, res));
+  console.log('  ✓ POST /api/identify-features (legacy - redirects to analyze-feature-scope)');
   
   console.log('REST API routes registered successfully');
 }

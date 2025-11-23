@@ -14,8 +14,9 @@ describe('parseShellStories', () => {
 - \`st001\` **Add Promotion to Cart** ⟩ Allow users to apply a promotion code to their shopping cart
   * SCREENS: [promo-add-form](https://www.figma.com/design/abc/Project?node-id=123-456)
   * DEPENDENCIES: none
-  * ✅ User can enter a valid promotion code
-  * ❌ Support for stacking multiple promotions
+  * ☐ User can enter a valid promotion code
+  * ⏬ Support for stacking multiple promotions (low priority - implement in st015)
+  * ❌ Promotion auto-suggestions (out of scope)
   * ❓ What error messages should display?
 `;
 
@@ -31,7 +32,8 @@ describe('parseShellStories', () => {
         screens: ['https://www.figma.com/design/abc/Project?node-id=123-456'],
         dependencies: [],
         included: ['User can enter a valid promotion code'],
-        excluded: ['Support for stacking multiple promotions'],
+        lowPriority: ['Support for stacking multiple promotions (low priority - implement in st015)'],
+        excluded: ['Promotion auto-suggestions (out of scope)'],
         questions: ['What error messages should display?'],
       });
     });
@@ -41,7 +43,7 @@ describe('parseShellStories', () => {
 - \`st002\` Display Cart Total ⟩ Show the current cart total with tax
   * SCREENS: [cart-view](https://www.figma.com/design/xyz/Project?node-id=789-012)
   * DEPENDENCIES: st001
-  * ✅ Display total amount
+  * ☐ Display total amount
 `;
 
       const result = parseShellStories(input);
@@ -62,7 +64,7 @@ describe('parseShellStories', () => {
 - \`st001\` **[Add Promotion to Cart](https://jira.company.com/browse/PROJ-123)** ⟩ Allow users to apply a promotion code _(2025-01-15T10:30:00Z)_
   * SCREENS: [promo-form](https://www.figma.com/design/abc/Project?node-id=123-456)
   * DEPENDENCIES: none
-  * ✅ Promotion code input field
+  * ☐ Promotion code input field
 `;
 
       const result = parseShellStories(input);
@@ -103,7 +105,7 @@ describe('parseShellStories', () => {
 - \`st005\` **Checkout Flow** ⟩ Complete the checkout process
   * SCREENS: [checkout](https://www.figma.com/design/abc/Project?node-id=999-000)
   * DEPENDENCIES: st001, st002, st003
-  * ✅ Payment processing
+  * ☐ Payment processing
 `;
 
       const result = parseShellStories(input);
@@ -132,17 +134,17 @@ describe('parseShellStories', () => {
 - \`st001\` **First Story** ⟩ The first story description
   * SCREENS: [screen1](https://figma.com/1)
   * DEPENDENCIES: none
-  * ✅ First feature
+  * ☐ First feature
 
 - \`st002\` **Second Story** ⟩ The second story description
   * SCREENS: [screen2](https://figma.com/2)
   * DEPENDENCIES: st001
-  * ✅ Second feature
+  * ☐ Second feature
 
 - \`st003\` **Third Story** ⟩ The third story description
   * SCREENS: [screen3](https://figma.com/3)
   * DEPENDENCIES: st001, st002
-  * ✅ Third feature
+  * ☐ Third feature
 `;
 
       const result = parseShellStories(input);
@@ -226,12 +228,12 @@ describe('parseShellStories', () => {
       expect(result[0].description).toBe('Description with "quotes" and \'apostrophes\'');
     });
 
-    it('should preserve rawContent for each story', () => {
+    it('should preserve raw content', () => {
       const input = `
 - \`st001\` **Test Story** ⟩ Test description
   * SCREENS: [screen](https://figma.com/1)
   * DEPENDENCIES: none
-  * ✅ Feature one
+  * ☐ Feature one
 `;
 
       const result = parseShellStories(input);
@@ -239,7 +241,7 @@ describe('parseShellStories', () => {
       expect(result).toHaveLength(1);
       expect(result[0].rawContent).toContain('`st001`');
       expect(result[0].rawContent).toContain('SCREENS:');
-      expect(result[0].rawContent).toContain('✅ Feature one');
+      expect(result[0].rawContent).toContain('☐ Feature one');
     });
   });
 
@@ -249,7 +251,7 @@ describe('parseShellStories', () => {
 - \`st001\` **Mixed Bullets** ⟩ Testing different bullet styles
   - SCREENS: [screen1](https://figma.com/1)
   - DEPENDENCIES: none
-  - ✅ Feature with dash
+  - ☐ Feature with dash
   * ❌ Exclusion with asterisk
   * ❓ Question with asterisk
 `;

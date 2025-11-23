@@ -44,7 +44,10 @@ describe('Progress Comment Manager', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockClient = { fetch: jest.fn() } as unknown as AtlassianClient;
+    mockClient = { 
+      fetch: jest.fn(),
+      getJiraBaseUrl: jest.fn(() => 'https://mock-jira-url.atlassian.net')
+    } as unknown as AtlassianClient;
     context.client = mockClient;
     
     // Spy on console methods
