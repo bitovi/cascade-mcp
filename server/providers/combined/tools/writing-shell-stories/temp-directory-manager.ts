@@ -25,11 +25,11 @@ interface TempDirInfo {
 // In-memory store of active temp directories
 const activeDirs = new Map<string, TempDirInfo>();
 
-// Cleanup interval (check every 5 minutes)
-const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
+// Cleanup interval (check every hour for cache cleanup)
+const CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
 
-// Max age before cleanup (24 hours)
-const MAX_AGE_MS = 24 * 60 * 60 * 1000;
+// Max age before cleanup (7 days for both epic-based and file-based caches)
+const CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * Generate lookup key from sessionId and epicKey
@@ -167,7 +167,7 @@ async function cleanupOldDirectories(): Promise<void> {
   for (const [key, dirInfo] of activeDirs.entries()) {
     const age = now - dirInfo.lastAccessed;
     
-    if (age > MAX_AGE_MS) {
+    if (age > CACHE_MAX_AGE_MS) {
       console.log(`Cleaning up old temp directory (${Math.round(age / 3600000)}h old):`, dirInfo.path);
       
       try {
@@ -186,6 +186,61 @@ async function cleanupOldDirectories(): Promise<void> {
   
   if (keysToDelete.length > 0) {
     console.log(`  Cleaned up ${keysToDelete.length} old temp director(ies)`);
+  }
+  
+  // ✅ NEW: Also cleanup file-based Figma caches (cache/figma-files/)
+  await cleanupFigmaFileCaches();
+}
+
+/**
+ * Clean up stale file-based Figma caches (cache/figma-files/)
+ * 
+ * Removes cache folders that haven't been accessed in over 7 days.
+ */
+async function cleanupFigmaFileCaches(): Promise<void> {
+  const baseCacheDir = process.env.DEV_CACHE_DIR;
+  if (!baseCacheDir) return;
+  
+  const figmaCacheDir = path.join(baseCacheDir, 'figma-files');
+  
+  // Check if figma-files directory exists
+  try {
+    await fs.access(figmaCacheDir);
+  } catch {
+    // Directory doesn't exist - nothing to clean up
+    return;
+  }
+  
+  const now = Date.now();
+  const entries = await fs.readdir(figmaCacheDir, { withFileTypes: true });
+  let cleanedCount = 0;
+  
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    
+    const cachePath = path.join(figmaCacheDir, entry.name);
+    const metadataPath = path.join(cachePath, '.figma-metadata.json');
+    
+    try {
+      const stats = await fs.stat(metadataPath);
+      const age = now - stats.mtimeMs;
+      
+      if (age > CACHE_MAX_AGE_MS) {
+        const daysOld = Math.floor(age / (24 * 60 * 60 * 1000));
+        console.log(`  🗑️  Cleaning up stale Figma cache: ${entry.name} (${daysOld} days old)`);
+        await fs.rm(cachePath, { recursive: true, force: true });
+        cleanedCount++;
+      }
+    } catch (error: any) {
+      // Error reading metadata or deleting - skip this entry
+      if (error.code !== 'ENOENT') {
+        console.log(`  ⚠️  Error cleaning up ${entry.name}: ${error.message}`);
+      }
+    }
+  }
+  
+  if (cleanedCount > 0) {
+    console.log(`  Cleaned up ${cleanedCount} stale Figma cache folder(s)`);
   }
 }
 
@@ -209,7 +264,7 @@ function startPeriodicCleanup(): void {
   // Unref the timer so it doesn't keep the process alive in test environments
   cleanupIntervalHandle.unref();
   
-  console.log('Started periodic temp directory cleanup (every 5 minutes, max age 24 hours)');
+  console.log('  🧹 Started cache cleanup task (7 day max age, checks hourly)');
 }
 
 /**
@@ -222,8 +277,9 @@ export function stopPeriodicCleanup(): void {
   }
 }
 
-// Start cleanup on module load (only in non-test environments and when not using DEV_CACHE_DIR)
-if (process.env.NODE_ENV !== 'test' && !process.env.JEST_WORKER_ID && !process.env.DEV_CACHE_DIR) {
+// Start cleanup on module load (only in non-test environments)
+// Note: Cleanup handles both epic-based and file-based caches
+if (process.env.NODE_ENV !== 'test' && !process.env.JEST_WORKER_ID) {
   startPeriodicCleanup();
 }
 

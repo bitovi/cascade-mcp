@@ -1,69 +1,204 @@
-# Identify Features Tool
+# analyze-feature-scope
 
-Analyzes Figma screen designs to generate a scope analysis document that categorizes features as in-scope (✅), out-of-scope (❌), or questions (❓), grouped by workflow-based feature areas.
+Quick prompt:
+
+> ```
+> MCP call analyze-feature-scope on https://bitovi.atlassian.net/browse/PROJ-123
+> ```
 
 ## Purpose
 
-Use this tool **before** generating shell stories to:
+The `analyze-feature-scope` tool generates a scope analysis document from Figma designs linked in a Jira epic. Use this tool **before** generating shell stories to establish clear scope boundaries and surface questions.
+
+**Primary use cases:**
 - Establish clear scope boundaries early in the planning process
-- Identify ambiguities and questions that need clarification
-- Group features logically by user workflow
+- Identify ambiguities and questions that need clarification before implementation
+- Group features logically by user workflow for better planning
 - Link features to specific Figma screens for traceability
 - Create alignment between stakeholders on what's in vs. out of scope
 
-## Usage
+**What problem it solves:**
+- **Unclear scope boundaries**: Teams often start implementation without clear agreement on what's included
+- **Late-stage scope creep**: Questions about "what's in scope?" emerge during development
+- **Misaligned expectations**: Designers, PMs, and developers have different assumptions about features
+- **Missing context**: Implementation starts before understanding which features are existing, new, low priority, or excluded
 
-### Via MCP (VS Code Copilot)
+## API Reference
 
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `epicKey` | string | ✅ Yes | Jira epic key (e.g., "PROJ-123" from `https://bitovi.atlassian.net/browse/PROJ-123`). Epic description must contain Figma design URLs and may include context about priorities, scope, and constraints. |
+| `cloudId` | string | ❌ Optional | The Atlassian cloud ID to specify which Jira site to use. If not provided, will use the first accessible site. |
+| `siteName` | string | ❌ Optional | Jira site subdomain (e.g., "bitovi" from `https://bitovi.atlassian.net`). Alternative to `cloudId`. |
+
+### Returns
+
+The tool returns a structured response with:
+
+```typescript
+{
+  content: [
+    {
+      type: 'text',
+      text: string  // Success message with summary and temp directory path
+    }
+  ]
+}
 ```
-Please identify features for epic PROJ-123
+
+**Success response includes:**
+- Number of feature areas identified
+- Number of screens analyzed
+- Path to temporary directory containing analysis artifacts
+- Link to updated Jira epic
+
+**Error response includes:**
+- Error message describing the failure
+- Authentication errors (missing Atlassian or Figma tokens)
+- Jira API errors (epic not found, permission denied)
+
+### Dependencies
+
+**Required MCP capabilities:**
+- **Sampling** ⚠️ (REQUIRED): This tool uses AI sampling to analyze Figma screens and generate scope analysis. Without sampling, the tool cannot perform screen analysis or feature identification.
+- **Multi-provider authentication**: Requires both Atlassian (Jira) and Figma OAuth tokens
+
+**Prerequisites:**
+- User must be authenticated with Atlassian
+- User must be authenticated with Figma
+- Epic must exist and be accessible by the authenticated user
+- Epic description must contain at least one valid Figma design URL
+
+## Usage Examples
+
+### Natural Language Prompts
+
+These prompts will reliably trigger the `analyze-feature-scope` tool:
+
+1. **"Analyze feature scope for epic PROJ-123"**
+2. **"Identify features in epic USER-456 from Figma designs"**
+3. **"Generate scope analysis for TEAM-789"**
+
+### Walkthrough: Core Use Case
+
+**Scenario**: You have a Jira epic with Figma design links and want to establish clear scope boundaries before writing stories.
+
+#### Step 1: Prepare your Jira epic
+
+Create or update a Jira epic with:
+- **Figma design URLs** in the description (required)
+- **Optional context** about priorities, scope, and constraints
+
+**Understanding Figma Links:**
+
+The tool accepts two types of Figma URLs:
+
+1. **Page URLs** (recommended) - Links to an entire Figma page:
+   ```
+   https://www.figma.com/design/yRyWXdNtJ8KwS1GVqRBL1O/Project-Name?node-id=123-456
+   ```
+   - When you link to a page, the tool automatically processes **all frames (screens)** and **all notes** on that page
+   - This is the easiest way to include multiple screens at once
+
+2. **Individual Frame/Note URLs** - Links to specific frames or notes:
+   ```
+   https://www.figma.com/design/yRyWXdNtJ8KwS1GVqRBL1O/Project-Name?node-id=789-012
+   ```
+   - Use this when you want to include only specific screens or notes
+   - You can mix page URLs and individual URLs in the same epic
+
+**What are Figma Notes?**
+
+Notes are Figma component instances with the name "Note" (type: INSTANCE). In the tool's context:
+- The tool looks for any component instance named exactly "Note" 
+- These are typically used in design systems to add annotations or context to designs
+- The tool extracts text content from these note components
+
+The tool:
+- Extracts text from all note components on included pages
+- Associates each note with its **nearest screen** (within 500px)
+- Uses note content to enhance AI analysis of screen behavior and purpose
+
+**Note Association:**
+- Notes are automatically linked to the closest frame/screen based on spatial distance
+- If a note is too far from any screen (>500px), it's listed as "unassociated" but still available for context
+- Add notes near screens in Figma to explain interactions, business logic, or design intent
+
+Example epic description:
+```markdown
+# User Dashboard Enhancement
+
+Design: https://www.figma.com/design/yRyWXdNtJ8KwS1GVqRBL1O/Dashboard-redesign?node-id=246-3414
+
+## Context
+- Priority: Focus on core dashboard widgets first
+- Out of scope: Advanced analytics (separate epic planned)
+- Existing: We already have basic user authentication and navigation
+- Low priority: Implement export functionality at the end
+- Constraint: Must support mobile devices
 ```
 
-### Via REST API
+#### Step 2: Call the tool
 
-```bash
-curl -X POST http://localhost:3000/api/identify-features \
-  -H "Content-Type: application/json" \
-  -H "X-Atlassian-Token: $(echo -n 'your-email@example.com:your-api-token' | base64)" \
-  -H "X-Figma-Token: figd_YOUR_FIGMA_TOKEN" \
-  -H "X-Anthropic-Token: sk-ant-YOUR_ANTHROPIC_KEY" \
-  -d '{
-    "epicKey": "PROJ-123"
-  }'
+Ask the AI agent:
+```
+"Analyze feature scope for epic PROJ-123"
 ```
 
-**Optional parameters:**
-- `cloudId`: Specific Atlassian cloud ID (auto-detected if not provided)
-- `siteName`: Jira site name (e.g., "bitovi" from bitovi.atlassian.net)
-- `sessionId`: Custom session ID for temp directory naming
+#### Step 3: What happens behind the scenes
 
-## Output
+The tool orchestrates a 6-phase workflow (typically 8-12 minutes total):
 
-The tool generates a "Scope Analysis" section in the epic description:
+1. **Preparation** (~2-3 minutes)
+   1. Fetches your epic and extracts Figma URLs
+   2. Downloads screen designs and associated notes from Figma
+   3. Organizes screens in the order they appear in your design
+
+2. **AI Screen Analysis** (~5-10 minutes for 5-10 screens)
+   1. Analyzes each screen's UI elements, interactions, and purpose using AI vision models
+   2. Reads any notes you've added in Figma to understand context
+   3. [View screen analysis prompt →](../writing-shell-stories/prompt-screen-analysis.ts)
+
+3. **Scope Analysis Generation** (~2-3 minutes)
+   1. Synthesizes all screen analyses into feature areas
+   2. Categorizes features based on epic context and screen analysis
+   3. Groups features by user workflow and functional areas
+   4. [View scope analysis prompt →](./strategies/prompt-scope-analysis-2.ts)
+
+4. **Jira Update** (~1-2 seconds)
+   1. Writes generated scope analysis back to your epic under a "## Scope Analysis" section
+   2. Preserves all existing epic content
+
+#### Step 4: Review the results
+
+The tool updates your Jira epic with a scope analysis like:
 
 ```markdown
 ## Scope Analysis
 
-### Authentication Flow
+### Dashboard Widget Display
 
-[Login Screen](figma-url) [Signup Screen](figma-url)
+[Dashboard Main](figma-url) [Widget Config](figma-url)
 
-- ✅ Email/password login
-- ✅ Form validation with real-time feedback
-- ❌ OAuth providers (Google, GitHub) - deferred to Phase 2
-- ❌ Multi-factor authentication - future enhancement
-- ❓ Should "Remember Me" persist across browser sessions?
-- ❓ What is the password reset flow?
+- ☐ Display user statistics in card format
+- ☐ Real-time data refresh for widgets
+- ⏬ Export dashboard data to CSV (low priority - delay until end per epic)
+- ✅ Basic navigation and user authentication
+- ❌ Advanced analytics dashboard (separate epic)
+- ❓ Should widgets be customizable by users?
+- ❓ What is the refresh interval for real-time data?
 
-### User Profile Management
+### Widget Interaction
 
-[Profile Settings](figma-url)
+[Widget Details](figma-url)
 
-- ✅ Display and edit user information
-- ✅ Avatar upload with preview
-- ❌ Password change functionality - separate epic
-- ❓ What image formats are supported for avatars?
-- ❓ Maximum file size for uploads?
+- ☐ Click to expand widget details
+- ☐ Hover state for interactive elements
+- ⏬ Drag-and-drop widget reordering (low priority - delay until end per epic)
+- ❌ Widget marketplace (future epic)
+- ❓ Should expanded widgets overlay or push content down?
 
 ### Remaining Questions
 
@@ -72,23 +207,98 @@ The tool generates a "Scope Analysis" section in the epic description:
 - ❓ What browsers need to be supported?
 ```
 
+#### Step 5: Answer questions and refine scope
+
+**⚠️ Important: The scope analysis is meant to be reviewed and refined before generating shell stories.**
+
+The generated scope analysis is a starting point. You should:
+
+1. **Answer open questions** (❓) by adding clarifications to the epic description:
+   ```markdown
+   # Before in epic:
+   ## Scope Analysis
+   - ❓ Should widgets be customizable by users?
+   
+   # After - add answer to Context section:
+   ## Context
+   - Widget customization: Yes, users can show/hide individual widgets
+   
+   ## Scope Analysis
+   - ☐ Widget customization (show/hide individual widgets)
+   ```
+
+2. **Adjust categorization** if the AI misinterpreted your epic context:
+   ```markdown
+   # If AI marked something wrong, edit directly in the Scope Analysis section:
+   # Before:
+   - ❌ User preferences (future epic)
+   
+   # After (if this should be in-scope):
+   - ☐ User preferences for dashboard layout
+   ```
+
+3. **Add missing features** if you identify gaps:
+   - Add them to the appropriate feature area
+   - Use the same format with appropriate emoji (☐ ✅ ⏬ ❌ ❓)
+
+4. **Clarify epic context** if you notice the AI had trouble categorizing features:
+   - Update your Context section to be more explicit about scope
+   - Re-run the tool to regenerate with better context
+
+Once refined, this scope analysis becomes the foundation for the [`write-shell-stories`](../writing-shell-stories/README.md) tool to create detailed implementation stories.
+
+### Setup Requirements
+
+Before using this tool, ensure:
+
+1. **Jira Epic exists** with Figma design links in the description
+2. **Figma designs are accessible** by your authenticated Figma account
+3. **Authentication is complete** for both Atlassian and Figma providers
+4. **Epic context (recommended)** includes priorities, scope constraints, existing features, and low-priority features to guide analysis
+
+### Related Tools
+
+Tools commonly used with `analyze-feature-scope`:
+
+- **`write-shell-stories`** - After establishing scope, use this tool to generate detailed implementation stories
+- **`atlassian-get-issue`** - Fetch the epic to review current content before analysis
+- **`atlassian-update-issue-description`** - Manually update epic descriptions if needed
+- **`figma-get-metadata-for-layer`** - Inspect individual Figma layers if you need more design detail
+- **`figma-get-image-download`** - Download specific Figma screens independently
+
 ## Feature Categorization
 
-### ✅ In-Scope
-- Features explicitly listed as in-scope in epic context
-- Features with complete UI and clear implementation path (when epic doesn't specify)
-- **Epic context is primary source of truth**: If epic says it's in-scope, it's marked ✅
+The tool uses five categories to classify features based on epic context and screen analysis:
+
+### ☐ In-Scope
+- Features explicitly listed as in-scope in epic context AND not listed as existing/out-of-scope/low-priority
+- Only marks features ☐ if they are new capabilities being added at normal priority
+- If visible in screens but not mentioned in epic, assumes ☐ In-Scope
+- **Verbosity**: Concise for obvious features ("Email/password login"), detailed for complex features ("Multi-step form with validation, error handling, and progress indicators")
+
+### ✅ Already Done
+- Existing functionality mentioned in epic context that provides context but isn't new work
+- These features are visible in screens but explicitly stated as already implemented
+- **Verbosity**: Keep brief since they're not part of new work ("Checkbox interaction to toggle task status")
+
+### ⏬ Low Priority
+- Features explicitly mentioned in epic to implement later/at the end (in scope but lower priority)
+- Epic says "delay until end", "do at the end", "implement last", "lower priority"
+- These WILL be implemented in this epic, just after core features
+- **Verbosity**: Same detail level as ☐ In-Scope, plus timing note ("Status filters with dropdown for Active/Pending/Complete (low priority - delay until end per epic)")
 
 ### ❌ Out-of-Scope
-- Features explicitly mentioned in epic context as deferred or excluded
-- Features marked as future/optional in screen analyses
-- **Epic context always wins**: If epic says out-of-scope, it's marked ❌ regardless of UI
+- Features explicitly excluded from epic OR marked for future epics
+- Epic says "out of scope", "not included", "future epic", "exclude", "won't implement"
+- These will NOT be implemented in this epic
+- **Verbosity**: Keep brief ("OAuth authentication (future epic)")
 
 ### ❓ Questions
-- Behaviors that are unclear or ambiguous
-- Requirements that need clarification
-- Features that could be either in-scope or out-of-scope
-- Missing information needed for implementation
+- Ambiguous behaviors, unclear requirements, missing information
+- Marks ambiguous features as questions rather than guessing
+- Includes enough context for the question ("Should filters persist across sessions?")
+
+**Key principle**: Epic context is the primary source of truth and overrides screen analysis interpretations.
 
 ## Feature Grouping
 
@@ -104,82 +314,183 @@ Features are organized by **user workflow**, not UI location or technical archit
 - "Sidebar Elements"
 - "Footer Links"
 
-## Workflow
+**Splitting criteria** - Features should be separate areas if:
+- Different user interactions (typing vs clicking, selecting vs toggling)
+- Different technical implementations (client-side vs server-side, different API calls)
+- Could be developed by different developers in parallel
+- Could be completed in different iterations
 
-1. **Epic Setup**: Ensure epic description contains Figma design links
-2. **Run Tool**: Execute `identify-features` on the epic
-3. **Review Output**: Check scope analysis in epic description
-4. **Answer Questions**: Update epic with clarifications and scope decisions
-5. **Generate Stories**: Use `write-shell-stories` to create detailed implementation stories based on finalized scope
+## Debugging & Limitations
 
-## Debug Artifacts
+### Common User-Facing Errors
 
-All tool execution creates debug files in a temp directory (shown in output):
+#### 1. Authentication Errors
 
-- `scope-analysis.md` - Generated scope analysis markdown
-- `scope-analysis-prompt.md` - Full prompt sent to AI (for debugging)
-- `screens.yaml` - Screen ordering and metadata
-- `*.analysis.md` - Individual screen analysis files
-- `*.png` - Downloaded Figma screen images
+**Error**: `"Error: No valid Atlassian access token found. Please authenticate with Atlassian first."`
 
-**Temp directory location**: `/tmp/write-shell-stories-<sessionId>-<epicKey>/`
-**Retention**: 24 hours (automatic cleanup)
+**Explanation**: The tool requires an active Atlassian OAuth session.
+
+**Solution**: Authenticate with Atlassian through the MCP client (VS Code Copilot). The client will prompt you to log in via OAuth.
+
+---
+
+**Error**: `"Error: No valid Figma access token found. Please authenticate with Figma first."`
+
+**Explanation**: The tool requires an active Figma OAuth session.
+
+**Solution**: Authenticate with Figma through the MCP client. You'll be prompted to authorize access to your Figma account.
+
+---
+
+#### 2. Epic Not Found
+
+**Error**: `"⚠️ Epic PROJ-123 not found"`
+
+**Explanation**: The specified epic key doesn't exist or you don't have permission to view it.
+
+**Solution**:
+- Verify the epic key is correct (case-sensitive)
+- Ensure your Atlassian account has permission to view the epic
+- Check that you're connected to the correct Jira site (use `cloudId` or `siteName` parameter)
+
+---
+
+#### 3. No Figma URLs Found
+
+**Error**: `"No Figma URLs found in epic description"`
+
+**Explanation**: The tool couldn't locate any Figma design links in the epic's description.
+
+**Solution**:
+- Add Figma design URLs to the epic description (e.g., `https://www.figma.com/design/...`)
+- Ensure URLs are properly formatted (must include `figma.com/design/`)
+- Verify the epic description is not empty
+
+---
+
+#### 4. Insufficient Permissions
+
+**Error**: `"⚠️ Insufficient permissions to update epic PROJ-123"`
+
+**Explanation**: Your Atlassian account doesn't have edit permissions for the epic.
+
+**Solution**:
+- Request edit permissions from your Jira administrator
+- Verify you're logged into the correct Atlassian account
+- Check if the epic is in a locked or archived state
+
+---
+
+#### 5. Figma Access Denied
+
+**Error**: `"Figma API error: 403 Forbidden"`
+
+**Explanation**: The Figma file is private and your account doesn't have access.
+
+**Solution**:
+- Request access to the Figma file from the file owner
+- Verify you're logged into the correct Figma account
+- Check if the Figma file has been deleted or moved
+
+---
+
+### Known Limitations
+
+#### 1. Figma File Scope
+
+**Limitation**: The tool only processes CANVAS-type pages (standard Figma pages). It does not process:
+- Figma prototypes or flows
+- Embedded videos or external content
+- Component libraries (unless they're placed as frames in a canvas)
+
+**Workaround**: Ensure your designs are organized as regular Figma pages with frames and notes.
+
+---
+
+#### 2. Screen Analysis Accuracy
+
+**Limitation**: AI analysis quality depends on:
+- Image clarity and resolution
+- Presence of explanatory notes in Figma
+- Complexity of the UI design
+- Clarity of epic context about scope
+
+**Workaround**: 
+- Add detailed notes in Figma explaining interactive behaviors
+- Use clear, high-contrast designs for better OCR/vision model accuracy
+- Provide explicit epic context about priorities, existing features, and out-of-scope items
+- Review generated analysis files in the temp directory and regenerate if needed
+
+---
+
+#### 3. Token Limits
+
+**Limitation**: Very large Figma files (50+ screens) may exceed AI token limits or take a long time to process.
+
+**Workaround**:
+- Break large projects into multiple epics
+- Link to specific Figma pages instead of entire files
+- Focus each epic on a specific feature area
+
+---
+
+#### 4. Evidence-Based Feature Identification
+
+**Limitation**: The tool strictly follows an "evidence-based" approach - it only identifies features for functionality explicitly shown in Figma screens or mentioned in epic context. This means:
+- No assumed or implied features
+- No "standard" behaviors unless documented
+- UI elements without described behaviors become questions (❓)
+
+**Workaround**: This is intentional behavior. Add detailed notes in Figma and epic context to document expected behaviors, interactions, and business logic.
+
+---
+
+### Troubleshooting Tips
+
+#### Tip 1: Improving Analysis Quality
+
+To get better scope analysis:
+- **Add explicit epic context** in a "Context" section:
+  - Priorities (e.g., "Priority: Mobile-first experience")
+  - Existing features (e.g., "Existing: User authentication and navigation")
+  - Out-of-scope features (e.g., "Out of scope: Admin features - separate epic")
+  - Low-priority features (e.g., "Low priority: Export functionality - implement at end")
+  - Constraints (e.g., "Constraint: Must work offline")
+- **Add Figma notes** near your screens explaining behaviors, interactions, and business logic
+- **Be explicit** - the more context you provide, the more accurate the categorization
+
+#### Tip 2: Try Again
+
+If the generated scope analysis isn't quite right:
+1. Update your epic context with clearer scope statements
+2. Re-run the tool - it will be faster the second time (reuses screen analysis from previous run within 24 hours)
+3. Each run may produce slightly different results due to AI variability
+
+#### Tip 3: Check Your Figma Links
+
+If the tool can't find your screens:
+- Verify the Figma URLs in your epic description are accessible
+- Make sure you're logged into the correct Figma account
+- Try copying the URL directly from your browser's address bar while viewing the design
+
+#### Tip 4: Start Simple
+
+If you're getting confusing categorizations:
+- Start with a smaller epic focused on one feature area
+- Link to specific Figma pages instead of entire files
+- Use fewer screens initially (5-10 is ideal for first attempts)
+- Provide very explicit epic context about what's in/out of scope
 
 ## Comparison with Write-Shell-Stories
 
 | Tool | Purpose | Output | When to Use |
 |------|---------|--------|-------------|
-| `identify-features` | Scope definition | Feature areas with ✅/❌/❓ | Beginning of project, scope questions exist |
+| `analyze-feature-scope` | Scope definition | Feature areas with ☐ ✅ ⏬ ❌ ❓ | Beginning of project, scope questions exist |
 | `write-shell-stories` | Implementation planning | Numbered shell stories with dependencies | After scope is clear, ready to create tickets |
 
 **Typical workflow:**
-1. Run `identify-features` to establish scope
-2. Review and answer questions
-3. Run `write-shell-stories` to generate implementation stories
-4. Shell stories automatically respect scope boundaries
-
-## Key Design Decisions
-
-Based on [specs/feature-identifier.md](../../../specs/feature-identifier.md):
-
-1. **Epic Context Priority**: Epic scope statements are primary source of truth and override screen analysis interpretations
-2. **Workflow-Based Grouping**: Features grouped by user workflows, not UI location
-3. **Mixed Verbosity**: Concise descriptions for obvious features, detailed for complex ones
-4. **Question Deduplication**: Each question listed only once in first relevant area
-5. **Ambiguous Features**: Marked as ❓ questions when unclear if in/out of scope
-6. **Caching**: Screen analyses cached for 24 hours for performance
-
-## Error Handling
-
-Common errors and solutions:
-
-### "No Figma links found in epic description"
-- **Cause**: Epic description doesn't contain valid Figma design URLs
-- **Solution**: Add Figma links to epic description in format: `https://www.figma.com/design/...`
-
-### "Insufficient permissions to update epic"
-- **Cause**: Authentication token lacks write permissions
-- **Solution**: Verify Atlassian PAT has `write:jira-work` scope
-
-### "Failed to convert scope analysis to ADF"
-- **Cause**: Generated markdown has invalid ADF conversion
-- **Solution**: Check `scope-analysis.md` in temp directory for malformed markdown
-
-### "AI response was empty"
-- **Cause**: AI service timeout, rate limit, or invalid prompt
-- **Solution**: Wait a few minutes and retry, or check Anthropic API key
-
-## Future Enhancements
-
-Planned improvements (see [specs/feature-identifier.md](../../../specs/feature-identifier.md)):
-
-1. **Integration with Write-Shell-Stories**: Automatically use scope analysis as input for story generation
-2. **Parallel Execution**: Option to run both tools together in one command
-3. **Structured JSON Output**: Alternative API response format for programmatic consumption
-4. **Manual Review Checkpoint**: Allow user to review feature catalog before generating analysis
-
-## Related Documentation
-
-- [Main Server README](../../readme.md) - All available tools and APIs
-- [REST API Documentation](../../../docs/rest-api.md) - API authentication and usage
-- [Feature Identifier Spec](../../../specs/feature-identifier.md) - Detailed implementation plan
+1. Run `analyze-feature-scope` to establish scope boundaries
+2. Review scope analysis and answer questions
+3. Update epic context with clarifications
+4. Run `write-shell-stories` to generate implementation stories
+5. Shell stories automatically respect scope boundaries established in analysis

@@ -132,6 +132,38 @@ export interface FigmaNodeMetadata {
 }
 
 /**
+ * Metadata returned from Figma /meta endpoint (Tier 3)
+ * Used for cache validation via file-level timestamps
+ */
+export interface FigmaFileMetadata {
+  fileKey: string;
+  name: string;
+  lastTouchedAt: string;  // ISO 8601 timestamp
+  version: string;
+  lastTouchedBy?: {
+    id: string;
+    handle: string;
+    img_url: string;
+  };
+}
+
+/**
+ * Metadata stored in cache for validation
+ * Stored in cache/figma-files/{fileKey}/.figma-metadata.json
+ */
+export interface FigmaMetadata {
+  fileKey: string;
+  lastTouchedAt: string;  // ISO 8601 timestamp from Figma /meta endpoint
+  cachedAt: string;       // ISO 8601 timestamp when we cached
+  version?: string;       // Optional: Figma version string
+  lastTouchedBy?: {       // Optional: User who made last change (for debugging)
+    id: string;
+    handle: string;
+    img_url: string;
+  };
+}
+
+/**
  * Parse a Figma URL to extract file key and optional node ID
  * 
  * Supports formats:
@@ -167,6 +199,72 @@ export function parseFigmaUrl(url: string): FigmaUrlInfo | null {
  */
 export function convertNodeIdToApiFormat(urlNodeId: string): string {
   return urlNodeId.replace(/-/g, ':');
+}
+
+/**
+ * Fetch lightweight metadata about a Figma file (Tier 3 endpoint)
+ * 
+ * Use this for cache validation - it's a lightweight request that only
+ * returns metadata without node data, and uses the more generous Tier 3
+ * rate limit quota (100/min vs 15/min for Tier 1).
+ * 
+ * @param client - Figma API client
+ * @param fileKey - The Figma file key
+ * @returns File metadata including last_touched_at timestamp
+ */
+export async function fetchFigmaFileMetadata(
+  client: FigmaClient,
+  fileKey: string
+): Promise<FigmaFileMetadata> {
+  const figmaApiUrl = `${client.getBaseUrl()}/files/${fileKey}/meta`;
+  
+  console.log(`  🎨 ${figmaApiUrl}`);
+  
+  try {
+    const response = await client.fetch(figmaApiUrl);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      
+      // Handle rate limiting
+      if (response.status === 429) {
+        const message = await createRateLimitErrorMessage(figmaApiUrl, response, errorText);
+        throw new FigmaUnrecoverableError(message, response.status);
+      }
+      
+      // Handle 403 Forbidden
+      if (response.status === 403) {
+        throw new FigmaUnrecoverableError(create403ErrorMessage(figmaApiUrl, response), response.status);
+      }
+      
+      throw new Error(`Figma API error: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+    
+    console.log(`  🎨 ${figmaApiUrl} (${response.status})`);
+    
+    const data = await response.json() as any;
+    
+    // Extract metadata from response: { file: { last_touched_at, version, ... } }
+    if (!data.file) {
+      throw new Error('Invalid response from Figma /meta endpoint - missing file object');
+    }
+    
+    return {
+      fileKey,
+      name: data.file.name,
+      lastTouchedAt: data.file.last_touched_at,
+      version: data.file.version,
+      lastTouchedBy: data.file.last_touched_by
+    };
+    
+  } catch (error: any) {
+    // Re-throw FigmaUnrecoverableError as-is
+    if (error instanceof FigmaUnrecoverableError) {
+      throw error;
+    }
+    
+    throw new Error(`Failed to fetch Figma file metadata: ${error.message}`);
+  }
 }
 
 /**
