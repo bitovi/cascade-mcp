@@ -16,9 +16,10 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import type { ToolDependencies } from '../types.js';
-import { getTempDir } from './temp-directory-manager.js';
+import { getDebugDir, getBaseCacheDir } from './temp-directory-manager.js';
+import { getFigmaFileCachePath } from '../../../figma/figma-cache.js';
 import { setupFigmaScreens } from './figma-screen-setup.js';
-import { regenerateScreenAnalyses } from './screen-analysis-regenerator.js';
+import { regenerateScreenAnalyses } from '../shared/screen-analysis-regenerator.js';
 import {
   generateShellStoryPrompt,
   SHELL_STORY_SYSTEM_PROMPT,
@@ -64,7 +65,6 @@ export interface ExecuteWriteShellStoriesParams {
   epicKey: string;
   cloudId?: string;
   siteName?: string;
-  sessionId?: string;
 }
 
 /**
@@ -75,7 +75,6 @@ export interface ExecuteWriteShellStoriesResult {
   shellStoriesContent: string;
   storyCount: number;
   screensAnalyzed: number;
-  tempDirPath: string;
 }
 
 /**
@@ -92,24 +91,14 @@ export async function executeWriteShellStories(
   params: ExecuteWriteShellStoriesParams,
   deps: ToolDependencies
 ): Promise<ExecuteWriteShellStoriesResult> {
-  const { epicKey, cloudId, siteName, sessionId = 'default' } = params;
+  const { epicKey, cloudId, siteName } = params;
   const { atlassianClient, figmaClient, generateText, notify } = deps;
   
   console.log('executeWriteShellStories called', { epicKey, cloudId, siteName });
   console.log('  Starting shell story generation for epic:', epicKey);
 
-  // Send initial progress notification
-  // await notify(`Starting shell story generation for epic ${epicKey}...`);
-
-  // ==========================================
-  // PHASE 1.5: Create temp directory for data
-  // ==========================================
-  console.log('  Creating temporary directory for shell story data...');
-  
-  // Get or create temp directory (with lookup and 24hr cleanup)
-  const { path: tempDirPath } = await getTempDir(sessionId, epicKey);
-  
-  console.log('  Temp directory ready:', tempDirPath);
+  // Get debug directory for artifacts (only in DEV mode)
+  const debugDir = await getDebugDir(epicKey);
 
   // ==========================================
   // PHASE 1-3: Fetch epic, extract context, setup Figma screens
@@ -121,7 +110,7 @@ export async function executeWriteShellStories(
     epicKey,
     atlassianClient,
     figmaClient,
-    tempDirPath,
+    debugDir,
     cloudId,
     siteName,
     notify: async (msg) => await notify(msg)
@@ -132,12 +121,12 @@ export async function executeWriteShellStories(
     allFrames,
     allNotes,
     figmaFileKey,
-    yamlPath,
     epicContext,
     contentWithoutShellStories,
     figmaUrls,
     cloudId: resolvedCloudId,
-    siteName: resolvedSiteName
+    siteName: resolvedSiteName,
+    yamlContent
   } = setupResult;
   
   console.log(`  Phase 1-3 complete: ${figmaUrls.length} Figma URLs, ${screens.length} screens, ${allNotes.length} notes`);
@@ -158,7 +147,6 @@ export async function executeWriteShellStories(
     allFrames,
     allNotes,
     figmaFileKey,
-    tempDirPath,
     epicContext,
     notify: async (message: string) => {
       // Show progress for each screen (auto-increments)
@@ -175,8 +163,9 @@ export async function executeWriteShellStories(
   const shellStoriesResult = await generateShellStoriesFromAnalyses({
     generateText, // Use injected LLM client
     screens,
-    tempDirPath,
-    yamlPath,
+    debugDir,
+    figmaFileKey,
+    yamlContent,
     notify,
     epicContext
   });
@@ -213,8 +202,7 @@ export async function executeWriteShellStories(
     success: true,
     shellStoriesContent,
     storyCount: shellStoriesResult.storyCount,
-    screensAnalyzed: shellStoriesResult.analysisCount,
-    tempDirPath
+    screensAnalyzed: shellStoriesResult.analysisCount
   };
 }
 
@@ -229,24 +217,28 @@ export async function executeWriteShellStories(
 async function generateShellStoriesFromAnalyses(params: {
   generateText: ToolDependencies['generateText'];
   screens: Array<{ name: string; url: string; notes: string[] }>;
-  tempDirPath: string;
-  yamlPath: string;
+  debugDir: string | null;
+  figmaFileKey: string;
+  yamlContent: string;
   notify: ToolDependencies['notify'];
   epicContext?: string;
 }): Promise<{ storyCount: number; analysisCount: number; shellStoriesPath: string | null }> {
-  const { generateText, screens, tempDirPath, yamlPath, notify, epicContext } = params;
+  const { generateText, screens, debugDir, figmaFileKey, yamlContent, notify, epicContext } = params;
   
   console.log('  Phase 5: Generating shell stories from analyses...');
   
   await notify('📝 Shell Story Generation: Generating shell stories from screen analyses...');
   
-  // Read screens.yaml for screen ordering
-  const screensYamlContent = await fs.readFile(yamlPath, 'utf-8');
+  // screens.yaml content is provided directly (always generated, optionally written to file)
+  const screensYamlContent = yamlContent;
   
-  // Read all analysis files
+  // Construct file cache path for analysis files (always available)
+  const fileCachePath = getFigmaFileCachePath(figmaFileKey);
+  
+  // Read all analysis files from file cache
   const analysisFiles: Array<{ screenName: string; content: string }> = [];
   for (const screen of screens) {
-    const analysisPath = path.join(tempDirPath, `${screen.name}.analysis.md`);
+    const analysisPath = path.join(fileCachePath, `${screen.name}.analysis.md`);
     try {
       const content = await fs.readFile(analysisPath, 'utf-8');
       analysisFiles.push({ screenName: screen.name, content });
@@ -286,10 +278,12 @@ async function generateShellStoriesFromAnalyses(params: {
     remainingContext
   );
   
-  // Save prompt to temp directory for debugging
-  const promptPath = path.join(tempDirPath, 'shell-stories-prompt.md');
-  await fs.writeFile(promptPath, shellStoryPrompt, 'utf-8');
-  console.log(`    ✅ Saved prompt: shell-stories-prompt.md`);
+  // Save prompt to debug directory for debugging (if enabled)
+  if (debugDir) {
+    const promptPath = path.join(debugDir, 'shell-stories-prompt.md');
+    await fs.writeFile(promptPath, shellStoryPrompt, 'utf-8');
+    console.log(`    ✅ Saved prompt: shell-stories-prompt.md`);
+  }
   
   console.log(`    🤖 Requesting shell story generation from AI...`);
   console.log(`       Prompt length: ${shellStoryPrompt.length} characters`);
@@ -340,11 +334,13 @@ No shell stories content received from AI
     console.log(`       Tokens used: ${response.metadata.tokensUsed}, Stop reason: ${response.metadata.stopReason}`);
   }
   
-  // Save shell stories to file
-  const shellStoriesPath = path.join(tempDirPath, 'shell-stories.md');
-  await fs.writeFile(shellStoriesPath, shellStoriesText, 'utf-8');
-  
-  console.log(`    ✅ Saved shell stories: shell-stories.md`);
+  // Save shell stories to file (if debug directory enabled)
+  let shellStoriesPath: string | null = null;
+  if (debugDir) {
+    shellStoriesPath = path.join(debugDir, 'shell-stories.md');
+    await fs.writeFile(shellStoriesPath, shellStoriesText, 'utf-8');
+    console.log(`    ✅ Saved shell stories: shell-stories.md`);
+  }
   
   // Count stories (rough estimate by counting "st" prefixes with or without backticks)
   const storyMatches = shellStoriesText.match(/^- `?st\d+/gm);

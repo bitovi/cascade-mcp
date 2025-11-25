@@ -20,9 +20,10 @@ import * as fs from 'fs/promises';
 import type { ToolDependencies } from '../types.js';
 import type { AtlassianClient } from '../../../atlassian/atlassian-api-client.js';
 import type { FigmaClient } from '../../../figma/figma-api-client.js';
-import { getTempDir } from '../writing-shell-stories/temp-directory-manager.js';
+import { getDebugDir, getBaseCacheDir } from '../writing-shell-stories/temp-directory-manager.js';
+import { getFigmaFileCachePath } from '../../../figma/figma-cache.js';
 import { setupFigmaScreens, type FigmaScreenSetupResult } from '../writing-shell-stories/figma-screen-setup.js';
-import { regenerateScreenAnalyses } from '../writing-shell-stories/screen-analysis-regenerator.js';
+import { regenerateScreenAnalyses } from '../shared/screen-analysis-regenerator.js';
 import { parseShellStories, type ParsedShellStory } from './shell-story-parser.js';
 import { 
   generateStoryPrompt, 
@@ -42,7 +43,6 @@ export interface ExecuteWriteNextStoryParams {
   epicKey: string;
   cloudId?: string;
   siteName?: string;
-  sessionId?: string;
 }
 
 /**
@@ -72,7 +72,7 @@ export async function executeWriteNextStory(
   params: ExecuteWriteNextStoryParams,
   deps: ToolDependencies
 ): Promise<ExecuteWriteNextStoryResult> {
-  const { epicKey, cloudId, siteName, sessionId = 'default' } = params;
+  const { epicKey, cloudId, siteName } = params;
   const { atlassianClient, figmaClient, generateText, notify } = deps;
   
   console.log('executeWriteNextStory called', { epicKey, cloudId, siteName });
@@ -80,13 +80,13 @@ export async function executeWriteNextStory(
 
   // Step 1: Setup Figma screens and fetch epic
   await notify(`Setting up epic and Figma screens...`);
-  const { path: tempDirPath } = await getTempDir(sessionId, epicKey);
+  const debugDir = await getDebugDir(epicKey);
   
   const setupResult = await setupFigmaScreens({
     epicKey,
     atlassianClient,
     figmaClient,
-    tempDirPath,
+    debugDir,
     cloudId,
     siteName,
     notify: async (msg) => await notify(msg)
@@ -172,7 +172,7 @@ Each story must follow this format:
     generateText,
     figmaClient,
     setupResult,
-    tempDirPath,
+    debugDir,
     nextStory,
     shellStories,
     notify
@@ -367,14 +367,19 @@ export async function generateStoryContent(
   generateText: ToolDependencies['generateText'],
   figmaClient: FigmaClient,
   setupResult: FigmaScreenSetupResult,
-  tempDirPath: string,
+  debugDir: string | null,
   story: ParsedShellStory,
   allStories: ParsedShellStory[],
   notify: ToolDependencies['notify']
 ): Promise<string> {
   await notify('Generating story content...');
   
-  console.log(`  Using temp directory: ${tempDirPath}`);
+  if (debugDir) {
+    console.log(`  Using debug directory: ${debugDir}`);
+  }
+  
+  // Construct file cache path for analysis files (always available)
+  const fileCachePath = getFigmaFileCachePath(setupResult.figmaFileKey);
   
   // Check which analysis files exist and which are missing
   const screenInfo: Array<{ url: string; name: string; exists: boolean }> = [];
@@ -388,15 +393,20 @@ export async function generateStoryContent(
     }
     
     const screenName = matchingScreen.name;
-    const analysisPath = path.join(tempDirPath, `${screenName}.analysis.md`);
     
-    try {
-      await fs.access(analysisPath);
-      screenInfo.push({ url: screenUrl, name: screenName, exists: true });
-      console.log(`  ✅ Found cached analysis: ${screenName}.analysis.md`);
-    } catch {
+    if (fileCachePath) {
+      const analysisPath = path.join(fileCachePath, `${screenName}.analysis.md`);
+      try {
+        await fs.access(analysisPath);
+        screenInfo.push({ url: screenUrl, name: screenName, exists: true });
+        console.log(`  ✅ Found cached analysis: ${screenName}.analysis.md`);
+      } catch {
+        screenInfo.push({ url: screenUrl, name: screenName, exists: false });
+        console.log(`  ⚠️  Missing analysis: ${screenName}.analysis.md`);
+      }
+    } else {
+      // No file cache - no cached analyses available
       screenInfo.push({ url: screenUrl, name: screenName, exists: false });
-      console.log(`  ⚠️  Missing analysis: ${screenName}.analysis.md`);
     }
   }
   
@@ -419,7 +429,6 @@ export async function generateStoryContent(
       allFrames: setupResult.allFrames,
       allNotes: setupResult.allNotes,
       figmaFileKey: setupResult.figmaFileKey,
-      tempDirPath,
       epicContext: setupResult.epicContext,
       notify: async (msg) => await notify(msg)
     });
@@ -427,11 +436,11 @@ export async function generateStoryContent(
     console.log(`  ✅ Regenerated ${missingScreens.length} analysis files`);
   }
   
-  // Load all analysis files
+  // Load all analysis files from file cache
   const analysisFiles: Array<{ screenName: string; content: string }> = [];
   
   for (const screen of screenInfo) {
-    const analysisPath = path.join(tempDirPath, `${screen.name}.analysis.md`);
+    const analysisPath = path.join(fileCachePath, `${screen.name}.analysis.md`);
     
     try {
       const analysisContent = await fs.readFile(analysisPath, 'utf-8');

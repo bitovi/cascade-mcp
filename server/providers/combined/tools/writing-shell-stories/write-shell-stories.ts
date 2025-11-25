@@ -95,16 +95,12 @@ export function registerWriteShellStoriesTool(mcp: McpServer): void {
         const generateText = createMcpLLMClient(context);
         const notify = createProgressNotifier(context, 7);
         
-        // Get sessionId from auth context (used for deterministic directory naming)
-        const sessionId = authInfo.sessionId || 'default';
-        
         // Execute core logic (tokens NOT passed - clients have them baked in!)
         const result = await executeWriteShellStories(
           {
             epicKey,
             cloudId,
-            siteName,
-            sessionId
+            siteName
           },
           {
             atlassianClient,

@@ -1,10 +1,14 @@
 /**
- * Write Next Story Tool
+ * Write Next Story Tool (DEPRECATED - FOR REFERENCE ONLY)
+ * 
+ * This file is no longer actively used. See write-next-story.ts and core-logic.ts instead.
  * 
  * Writes the next Jira story from a list of shell stories in an epic.
  * Validates dependencies, generates full story content, creates Jira issue,
  * and updates epic with completion marker.
  */
+
+// @ts-nocheck - Deprecated file, not actively maintained
 
 import { z } from 'zod';
 import * as fs from 'fs/promises';

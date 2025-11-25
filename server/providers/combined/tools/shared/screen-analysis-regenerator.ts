@@ -13,13 +13,14 @@ import * as fs from 'fs/promises';
 import type { FigmaClient } from '../../../figma/figma-api-client.js';
 import type { GenerateTextFn } from '../../../../llm-client/types.js';
 import type { FigmaNodeMetadata } from '../../../figma/figma-helpers.js';
-import { downloadFigmaImagesBatch } from '../../../figma/figma-helpers.js';
-import { writeNotesForScreen } from './note-text-extractor.js';
+import { downloadFigmaImagesBatch, fetchFigmaFileMetadata } from '../../../figma/figma-helpers.js';
+import { getFigmaFileCachePath, ensureValidCacheForFigmaFile, saveFigmaMetadata } from '../../../figma/figma-cache.js';
+import { writeNotesForScreen } from '../writing-shell-stories/note-text-extractor.js';
 import {
   generateScreenAnalysisPrompt,
   SCREEN_ANALYSIS_SYSTEM_PROMPT,
   SCREEN_ANALYSIS_MAX_TOKENS
-} from './prompt-screen-analysis.js';
+} from '../writing-shell-stories/prompt-screen-analysis.js';
 
 /**
  * Screen to analyze
@@ -40,7 +41,6 @@ export interface RegenerateAnalysesParams {
   allFrames: FigmaNodeMetadata[];
   allNotes: FigmaNodeMetadata[];
   figmaFileKey: string;
-  tempDirPath: string;
   epicContext?: string;   // Optional epic description content for context
   notify?: (message: string) => Promise<void>;  // Optional progress callback
 }
@@ -52,15 +52,17 @@ export interface RegenerateAnalysesResult {
   downloadedImages: number;
   analyzedScreens: number;
   downloadedNotes: number;
+  usedCache: boolean;  // Whether cached data was used
 }
 
 /**
  * Regenerate missing screen analysis files
  * 
  * Downloads Figma images and generates AI analysis for the specified screens.
- * Skips screens that already have analysis files in the temp directory (cache).
+ * Uses file-based caching (cache/figma-files/{fileKey}/) with Tier 3 timestamp validation.
+ * Skips screens that already have analysis files when cache is valid.
  * Uses pipelining: starts downloading next image while analyzing current screen.
- * Saves both images (.png) and analysis files (.analysis.md) to temp directory.
+ * Saves both images (.png) and analysis files (.analysis.md) to cache directory.
  * 
  * @param params - Configuration including screens to analyze and Figma context
  * @returns Counts of downloaded images, analyzed screens, and note files
@@ -68,42 +70,43 @@ export interface RegenerateAnalysesResult {
 export async function regenerateScreenAnalyses(
   params: RegenerateAnalysesParams
 ): Promise<RegenerateAnalysesResult> {
-  const { generateText, figmaClient, screens, allFrames, allNotes, figmaFileKey, tempDirPath, epicContext, notify } = params;
-  
-  // Check which screens already have analysis files (cache) - only if DEV_CACHE_DIR is set
-  const screensToAnalyze: ScreenToAnalyze[] = [];
-  const cachedScreens: string[] = [];
-  
-  if (process.env.DEV_CACHE_DIR) {
-    for (const screen of screens) {
-      const analysisPath = path.join(tempDirPath, `${screen.name}.analysis.md`);
-      try {
-        await fs.access(analysisPath);
-        // File exists - skip this screen
-        cachedScreens.push(screen.name);
-      } catch {
-        // File doesn't exist - need to analyze
-        screensToAnalyze.push(screen);
-      }
-    }
-    
-    if (cachedScreens.length > 0) {
-      console.log(`    ♻️  Cached: ${cachedScreens.join(', ')}`);
-    }
-    
-    // If all screens are cached, return early
-    if (screensToAnalyze.length === 0) {
-      console.log(`  ✅ All ${screens.length} screens already analyzed (using cache)`);
-      return { downloadedImages: 0, analyzedScreens: 0, downloadedNotes: 0 };
-    }
-  } else {
-    // No dev cache - analyze all screens
-    screensToAnalyze.push(...screens);
-  }
+  const { generateText, figmaClient, screens, allFrames, allNotes, figmaFileKey, epicContext, notify } = params;
   
   let downloadedImages = 0;
   let analyzedScreens = 0;
   let downloadedNotes = 0;
+  
+  // Use file-based cache path for Figma artifacts (always enabled)
+  const fileCachePath = getFigmaFileCachePath(figmaFileKey);
+  
+  // Step 1: Validate cache if it exists (using Tier 3 /meta endpoint)
+  await ensureValidCacheForFigmaFile(figmaClient, figmaFileKey);
+  
+  // Step 2: Check which screens need analysis (not in cache or cache invalid)
+  const screensToAnalyze: ScreenToAnalyze[] = [];
+  const cachedScreens: string[] = [];
+  
+  for (const screen of screens) {
+    const analysisPath = path.join(fileCachePath, `${screen.name}.analysis.md`);
+    try {
+      await fs.access(analysisPath);
+      // File exists - skip this screen
+      cachedScreens.push(screen.name);
+    } catch {
+      // File doesn't exist - need to analyze
+      screensToAnalyze.push(screen);
+    }
+  }
+  
+  // Log cached screens if any
+  if (cachedScreens.length > 0) {
+    console.log(`    ♻️  Cached: ${cachedScreens.join(', ')}`);
+  }
+  
+  // If all screens are cached, return early
+  if (screensToAnalyze.length === 0) {
+    return { downloadedImages: 0, analyzedScreens: 0, downloadedNotes: 0, usedCache: true };
+  }
   
   // ==========================================
   // Phase A: Batch download ALL images upfront
@@ -154,7 +157,7 @@ export async function regenerateScreenAnalyses(
     }
     
     // For other errors, return what we have
-    return { downloadedImages, analyzedScreens, downloadedNotes };
+    return { downloadedImages, analyzedScreens, downloadedNotes, usedCache: false };
   }
   
   // ==========================================
@@ -185,7 +188,7 @@ export async function regenerateScreenAnalyses(
       const notesWritten = await writeNotesForScreen(
         { name: screen.name, url: screen.url, notes: screen.notes },
         allNotes,
-        tempDirPath
+        fileCachePath  // Save to cache directory
       );
       if (notesWritten > 0) {
         downloadedNotes++;
@@ -200,8 +203,8 @@ export async function regenerateScreenAnalyses(
       continue;
     }
     
-    // Save image to temp directory
-    const imagePath = path.join(tempDirPath, `${screen.name}.png`);
+    // Save image to cache directory
+    const imagePath = path.join(fileCachePath, `${screen.name}.png`);
     const imageBuffer = Buffer.from(imageResult.base64Data, 'base64');
     await fs.writeFile(imagePath, imageBuffer);
     
@@ -211,7 +214,7 @@ export async function regenerateScreenAnalyses(
     try {
       // Read notes content if available
       let notesContent = '';
-      const notesPath = path.join(tempDirPath, `${screen.name}.notes.md`);
+      const notesPath = path.join(fileCachePath, `${screen.name}.notes.md`);
       try {
         notesContent = await fs.readFile(notesPath, 'utf-8');
       } catch {
@@ -246,9 +249,9 @@ export async function regenerateScreenAnalyses(
         throw new Error('No analysis content received from AI');
       }
       
-      // Step 4: Save analysis result with Figma URL prepended
+      // Step 4: Save analysis result to cache directory with Figma URL prepended
       const analysisWithUrl = `**Figma URL:** ${screen.url}\n\n${analysisText}`;
-      const analysisPath = path.join(tempDirPath, `${screen.name}.analysis.md`);
+      const analysisPath = path.join(fileCachePath, `${screen.name}.analysis.md`);
       await fs.writeFile(analysisPath, analysisWithUrl, 'utf-8');
       
       analyzedScreens++;
@@ -258,6 +261,15 @@ export async function regenerateScreenAnalyses(
     }
   }
   
-  return { downloadedImages, analyzedScreens, downloadedNotes };
+  // After successful analysis, save metadata to enable cache validation
+  try {
+    const fileMetadata = await fetchFigmaFileMetadata(figmaClient, figmaFileKey);
+    await saveFigmaMetadata(figmaFileKey, fileMetadata);
+  } catch (error: any) {
+    console.log(`    ⚠️  Failed to save cache metadata: ${error.message}`);
+    // Non-fatal - analysis succeeded, just couldn't save timestamp
+  }
+  
+  return { downloadedImages, analyzedScreens, downloadedNotes, usedCache: false };
 }
 

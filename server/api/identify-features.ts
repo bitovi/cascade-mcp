@@ -59,7 +59,7 @@ export async function handleIdentifyFeatures(req: Request, res: Response) {
   let progressManager: ProgressCommentManager | null = null;
   
   try {
-    const { siteName, cloudId, sessionId } = req.body;
+    const { siteName, cloudId } = req.body;
     const epicKey = validateEpicKey(req.body, res);
     if (!epicKey) return; // Response already sent
     
@@ -102,8 +102,7 @@ export async function handleIdentifyFeatures(req: Request, res: Response) {
       {
         epicKey,
         cloudId: resolvedCloudId,
-        siteName,
-        sessionId
+        siteName
       },
       toolDeps
     );
