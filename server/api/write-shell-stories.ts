@@ -51,8 +51,7 @@ export interface WriteShellStoriesHandlerDeps {
  * {
  *   "epicKey": "PROJ-123",
  *   "siteName": "my-jira-site",  // optional
- *   "cloudId": "uuid",            // optional
- *   "sessionId": "unique-id"      // optional - for temp directory naming
+ *   "cloudId": "uuid"             // optional
  * }
  * 
  * Response:
@@ -61,7 +60,6 @@ export interface WriteShellStoriesHandlerDeps {
  *   "shellStoriesContent": "...",
  *   "storyCount": 12,
  *   "screensAnalyzed": 8,
- *   "tempDirPath": "/tmp/...",
  *   "epicKey": "PROJ-123"
  * }
  * 
@@ -88,7 +86,7 @@ export async function handleWriteShellStories(req: Request, res: Response, deps:
     const { atlassianToken, figmaToken, anthropicApiKey } = tokens;
     
     // Validate request body
-    const { siteName, cloudId, sessionId } = req.body;
+    const { siteName, cloudId } = req.body;
     const epicKey = validateEpicKey(req.body, res);
     if (!epicKey) return; // Response already sent
     
@@ -130,8 +128,7 @@ export async function handleWriteShellStories(req: Request, res: Response, deps:
       { 
         epicKey, 
         cloudId: resolvedCloudId,
-        siteName, 
-        sessionId
+        siteName
       },
       toolDeps
     );

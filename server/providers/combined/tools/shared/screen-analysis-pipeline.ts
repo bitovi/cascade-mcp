@@ -5,18 +5,17 @@
  * Used by both write-shell-stories and identify-features tools.
  * 
  * Pipeline:
- * 1. Create temp directory
- * 2. Fetch epic and extract Figma links
- * 3. Setup Figma screens and extract context
- * 4. Download images and analyze screens with AI
+ * 1. Fetch epic and extract Figma links
+ * 2. Setup Figma screens and extract context
+ * 3. Download images and analyze screens with AI
  */
 
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import type { ToolDependencies } from '../types.js';
-import { getTempDir } from '../writing-shell-stories/temp-directory-manager.js';
+import { getDebugDir } from '../writing-shell-stories/temp-directory-manager.js';
 import { setupFigmaScreens } from '../writing-shell-stories/figma-screen-setup.js';
-import { regenerateScreenAnalyses } from '../writing-shell-stories/screen-analysis-regenerator.js';
+import { regenerateScreenAnalyses } from './screen-analysis-regenerator.js';
 import type { ADFNode } from '../../../atlassian/markdown-converter.js';
 
 /**
@@ -26,7 +25,6 @@ export interface ScreenAnalysisPipelineParams {
   epicKey: string;
   cloudId?: string;
   siteName?: string;
-  sessionId?: string;
   sectionName?: string; // e.g., "Shell Stories" or "Scope Analysis" - section to exclude from epic context
 }
 
@@ -38,8 +36,8 @@ export interface ScreenAnalysisResult {
   allFrames: any[];
   allNotes: any[];
   figmaFileKey: string;
-  tempDirPath: string;
-  yamlPath: string;
+  debugDir: string | null;
+  yamlContent: string;
   epicContext: string;
   contentWithoutSection: ADFNode[]; // Epic description ADF without specified section
   figmaUrls: string[];
@@ -66,18 +64,18 @@ export async function executeScreenAnalysisPipeline(
   params: ScreenAnalysisPipelineParams,
   deps: ToolDependencies
 ): Promise<ScreenAnalysisResult> {
-  const { epicKey, cloudId, siteName, sessionId = 'default', sectionName = 'Shell Stories' } = params;
+  const { epicKey, cloudId, siteName, sectionName = 'Shell Stories' } = params;
   const { atlassianClient, figmaClient, generateText, notify } = deps;
 
   // ==========================================
-  // PHASE 1.5: Create temp directory for data
+  // PHASE 1: Get debug directory (DEV mode only)
   // ==========================================
   
-  // Get or create temp directory (with lookup and 24hr cleanup)
-  const { path: tempDirPath } = await getTempDir(sessionId, epicKey);
+  // Get debug directory for artifacts (only in DEV mode)
+  const debugDir = await getDebugDir(epicKey);
 
   // ==========================================
-  // PHASE 1-3: Fetch epic, extract context, setup Figma screens
+  // PHASE 2-3: Fetch epic, extract context, setup Figma screens
   // ==========================================
   await notify('📝 Preparation: Fetching epic and Figma metadata...');
   
@@ -85,7 +83,7 @@ export async function executeScreenAnalysisPipeline(
     epicKey,
     atlassianClient,
     figmaClient,
-    tempDirPath,
+    debugDir,
     cloudId,
     siteName,
     notify: async (msg) => await notify(msg)
@@ -120,7 +118,6 @@ export async function executeScreenAnalysisPipeline(
     allFrames,
     allNotes,
     figmaFileKey,
-    tempDirPath,
     epicContext,
     notify: async (message: string) => {
       // Show progress for each screen (auto-increments)
@@ -136,8 +133,8 @@ export async function executeScreenAnalysisPipeline(
     allFrames,
     allNotes,
     figmaFileKey,
-    tempDirPath,
-    yamlPath,
+    debugDir,
+    yamlContent: setupResult.yamlContent,
     epicContext,
     contentWithoutSection: contentWithoutShellStories, // TODO: Rename in setupFigmaScreens to be more generic
     figmaUrls,

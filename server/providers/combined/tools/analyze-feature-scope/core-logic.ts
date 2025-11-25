@@ -9,6 +9,8 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import type { ToolDependencies } from '../types.js';
+import { getBaseCacheDir } from '../writing-shell-stories/temp-directory-manager.js';
+import { getFigmaFileCachePath } from '../../../figma/figma-cache.js';
 import { executeScreenAnalysisPipeline } from '../shared/screen-analysis-pipeline.js';
 import {
   generateFeatureIdentificationPrompt,
@@ -30,7 +32,6 @@ export interface ExecuteAnalyzeFeatureScopeParams {
   epicKey: string;
   cloudId?: string;
   siteName?: string;
-  sessionId?: string;
 }
 
 /**
@@ -42,7 +43,6 @@ export interface ExecuteAnalyzeFeatureScopeResult {
   featureAreasCount: number;
   questionsCount: number;
   screensAnalyzed: number;
-  tempDirPath: string;
 }
 
 /**
@@ -59,7 +59,7 @@ export async function executeAnalyzeFeatureScope(
   params: ExecuteAnalyzeFeatureScopeParams,
   deps: ToolDependencies
 ): Promise<ExecuteAnalyzeFeatureScopeResult> {
-  const { epicKey, cloudId, siteName, sessionId = 'default' } = params;
+  const { epicKey, cloudId, siteName } = params;
   const { atlassianClient, figmaClient, generateText, notify } = deps;
 
   // ==========================================
@@ -70,7 +70,6 @@ export async function executeAnalyzeFeatureScope(
       epicKey,
       cloudId,
       siteName,
-      sessionId,
       sectionName: 'Scope Analysis' // Exclude this section from epic context
     },
     deps
@@ -78,8 +77,9 @@ export async function executeAnalyzeFeatureScope(
   
   const {
     screens,
-    tempDirPath,
-    yamlPath,
+    debugDir,
+    figmaFileKey,
+    yamlContent,
     epicContext,
     contentWithoutSection,
     cloudId: resolvedCloudId,
@@ -93,8 +93,9 @@ export async function executeAnalyzeFeatureScope(
   const scopeAnalysisResult = await generateScopeAnalysis({
     generateText,
     screens,
-    tempDirPath,
-    yamlPath,
+    debugDir,
+    figmaFileKey,
+    yamlContent,
     notify,
     epicContext
   });
@@ -116,8 +117,7 @@ export async function executeAnalyzeFeatureScope(
     scopeAnalysisContent: scopeAnalysisResult.scopeAnalysisContent,
     featureAreasCount: scopeAnalysisResult.featureAreasCount,
     questionsCount: scopeAnalysisResult.questionsCount,
-    screensAnalyzed: analyzedScreens,
-    tempDirPath
+    screensAnalyzed: analyzedScreens
   };
 }
 
@@ -132,8 +132,9 @@ export async function executeAnalyzeFeatureScope(
 async function generateScopeAnalysis(params: {
   generateText: ToolDependencies['generateText'];
   screens: Array<{ name: string; url: string; notes: string[] }>;
-  tempDirPath: string;
-  yamlPath: string;
+  debugDir: string | null;
+  figmaFileKey: string;
+  yamlContent: string;
   notify: ToolDependencies['notify'];
   epicContext?: string;
 }): Promise<{
@@ -142,17 +143,20 @@ async function generateScopeAnalysis(params: {
   questionsCount: number;
   scopeAnalysisPath: string;
 }> {
-  const { generateText, screens, tempDirPath, yamlPath, notify, epicContext } = params;
+  const { generateText, screens, debugDir, figmaFileKey, yamlContent, notify, epicContext } = params;
   
   await notify('📝 Feature Identification: Analyzing features and scope...');
   
-  // Read screens.yaml for screen ordering
-  const screensYamlContent = await fs.readFile(yamlPath, 'utf-8');
+  // screens.yaml content is provided directly (always generated, optionally written to file)
+  const screensYamlContent = yamlContent;
   
-  // Read all analysis files with URLs
+  // Construct file cache path for analysis files (always available)
+  const fileCachePath = getFigmaFileCachePath(figmaFileKey);
+  
+  // Read all analysis files with URLs from file cache
   const analysisFiles: Array<{ screenName: string; content: string; url: string }> = [];
   for (const screen of screens) {
-    const analysisPath = path.join(tempDirPath, `${screen.name}.analysis.md`);
+    const analysisPath = path.join(fileCachePath, `${screen.name}.analysis.md`);
     try {
       const content = await fs.readFile(analysisPath, 'utf-8');
       analysisFiles.push({
@@ -177,9 +181,11 @@ async function generateScopeAnalysis(params: {
     epicContext
   );
   
-  // Save prompt to temp directory for debugging
-  const promptPath = path.join(tempDirPath, 'scope-analysis-prompt.md');
-  await fs.writeFile(promptPath, prompt, 'utf-8');
+  // Save prompt to debug directory for debugging (if enabled)
+  if (debugDir) {
+    const promptPath = path.join(debugDir, 'scope-analysis-prompt.md');
+    await fs.writeFile(promptPath, prompt, 'utf-8');
+  }
   
   console.log(`    🤖 Scope analysis (${prompt.length} chars / ${FEATURE_IDENTIFICATION_MAX_TOKENS} max tokens)`);
   
@@ -206,9 +212,12 @@ Technical details:
 - Analysis files loaded: ${analysisFiles.length}`);
   }
   
-  // Save scope analysis to file
-  const scopeAnalysisPath = path.join(tempDirPath, 'scope-analysis.md');
-  await fs.writeFile(scopeAnalysisPath, scopeAnalysisText, 'utf-8');
+  // Save scope analysis to debug directory (if enabled)
+  let scopeAnalysisPath = '';
+  if (debugDir) {
+    scopeAnalysisPath = path.join(debugDir, 'scope-analysis.md');
+    await fs.writeFile(scopeAnalysisPath, scopeAnalysisText, 'utf-8');
+  }
   
   // Count feature areas and questions
   const featureAreaMatches = scopeAnalysisText.match(/^### .+$/gm);

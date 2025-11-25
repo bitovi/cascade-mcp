@@ -59,7 +59,7 @@ export async function handleAnalyzeFeatureScope(req: Request, res: Response) {
   let progressManager: ProgressCommentManager | null = null;
   
   try {
-    const { siteName, cloudId, sessionId } = req.body;
+    const { siteName, cloudId } = req.body;
     const epicKey = validateEpicKey(req.body, res);
     if (!epicKey) return; // Response already sent
     
@@ -99,11 +99,10 @@ export async function handleAnalyzeFeatureScope(req: Request, res: Response) {
     
     // Call core logic with resolved cloudId
     const result = await executeAnalyzeFeatureScope(
-      {
-        epicKey,
+      { 
+        epicKey, 
         cloudId: resolvedCloudId,
-        siteName,
-        sessionId
+        siteName
       },
       toolDeps
     );

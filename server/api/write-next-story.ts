@@ -101,7 +101,7 @@ export async function handleWriteNextStory(req: Request, res: Response, deps: Wr
     const { atlassianToken, figmaToken, anthropicApiKey } = tokens;
     
     // Validate request body
-    const { siteName, cloudId, sessionId } = req.body;
+    const { siteName, cloudId } = req.body;
     const epicKey = validateEpicKey(req.body, res);
     if (!epicKey) return; // Response already sent
     
@@ -142,8 +142,7 @@ export async function handleWriteNextStory(req: Request, res: Response, deps: Wr
       { 
         epicKey, 
         cloudId: resolvedCloudId,
-        siteName, 
-        sessionId
+        siteName
       },
       toolDeps
     );

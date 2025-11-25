@@ -99,16 +99,12 @@ export function registerAnalyzeFeatureScopeTool(mcp: McpServer): void {
         const generateText = createMcpLLMClient(context);
         const notify = createProgressNotifier(context, 6); // 6 phases total
         
-        // Get sessionId from auth context (used for deterministic directory naming)
-        const sessionId = authInfo.sessionId || 'default';
-        
         // Execute core logic
         const result = await executeAnalyzeFeatureScope(
           {
             epicKey,
             cloudId,
-            siteName,
-            sessionId
+            siteName
           },
           {
             atlassianClient,
@@ -133,7 +129,7 @@ ${result.scopeAnalysisContent}
 
 ---
 
-**Debug Artifacts**: ${result.tempDirPath}
+**Debug Information**: Debug artifacts are saved to \`cache/${epicKey}/\` when DEV_CACHE_DIR is set
 - \`scope-analysis.md\` - Generated scope analysis
 - \`scope-analysis-prompt.md\` - Prompt sent to AI
 - \`screens.yaml\` - Screen ordering

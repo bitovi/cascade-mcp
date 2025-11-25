@@ -256,7 +256,7 @@ export interface FigmaScreenSetupParams {
   epicKey: string;               // Jira epic key
   atlassianClient: AtlassianClient;  // Atlassian API client with auth in closure
   figmaClient: FigmaClient;          // Figma API client with auth in closure
-  tempDirPath: string;           // Where to save notes files and YAML
+  debugDir: string | null;       // Debug directory for artifacts (null if not in DEV mode)
   cloudId?: string;              // Optional explicit cloud ID
   siteName?: string;             // Optional site name
   notify?: (message: string) => Promise<void>;  // Optional progress callback
@@ -270,8 +270,8 @@ export interface FigmaScreenSetupResult {
   allFrames: FigmaNodeMetadata[];
   allNotes: FigmaNodeMetadata[];
   figmaFileKey: string;          // File key for image downloads
-  downloadedNotes: number;       // Count of note files written
-  yamlPath: string;              // Path to screens.yaml
+  yamlContent: string;           // Generated screens.yaml content
+  yamlPath?: string;             // Path to screens.yaml (only in DEV mode)
   epicContext: string;           // Epic description content (excluding Shell Stories)
   epicMarkdown: string;          // Full epic description as markdown (including Shell Stories)
   contentWithoutShellStories: ADFNode[];  // ADF content for later updating
@@ -296,7 +296,7 @@ export interface FigmaScreenSetupResult {
 export async function setupFigmaScreens(
   params: FigmaScreenSetupParams
 ): Promise<FigmaScreenSetupResult> {
-  const { epicKey, atlassianClient, figmaClient, tempDirPath, cloudId, siteName, notify } = params;
+  const { epicKey, atlassianClient, figmaClient, debugDir, cloudId, siteName, notify } = params;
   
   // ==========================================
   // Step 1: Fetch epic and extract Figma URLs
@@ -408,26 +408,19 @@ export async function setupFigmaScreens(
   );
   
   // ==========================================
-  // Step 4: Generate screens.yaml
+  // Step 4: Generate screens.yaml content
   // ==========================================
-  if (notify) {
-    await notify('Saving preparation data...');
-  }
-  
   const yamlContent = generateScreensYaml(screens, unassociatedNotes);
-  const yamlPath = path.join(tempDirPath, 'screens.yaml');
-  await fs.writeFile(yamlPath, yamlContent, 'utf-8');
+  let yamlPath: string | undefined;
   
-  // ==========================================
-  // Step 5: Write notes files for each screen
-  // ==========================================
-  
-  let downloadedNotes = 0;
-  for (const screen of screens) {
-    const notesWritten = await writeNotesForScreen(screen, allNotes, tempDirPath);
-    if (notesWritten > 0) {
-      downloadedNotes++;
+  // Only write to file in DEV mode
+  if (debugDir) {
+    if (notify) {
+      await notify('Saving preparation data...');
     }
+    
+    yamlPath = path.join(debugDir, 'screens.yaml');
+    await fs.writeFile(yamlPath, yamlContent, 'utf-8');
   }
   
   // Construct epic URL
@@ -438,7 +431,7 @@ export async function setupFigmaScreens(
     allFrames,
     allNotes,
     figmaFileKey,
-    downloadedNotes,
+    yamlContent,
     yamlPath,
     epicContext,
     epicMarkdown,
