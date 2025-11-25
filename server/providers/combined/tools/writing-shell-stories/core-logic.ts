@@ -176,24 +176,18 @@ export async function executeWriteShellStories(
   await notify('📝 Jira Update: Updating Jira epic...');
   
   let shellStoriesContent = '';
-  if (shellStoriesResult.shellStoriesPath) {
-    try {
-      shellStoriesContent = await fs.readFile(shellStoriesResult.shellStoriesPath, 'utf-8');
-      
-      // Update the epic description with shell stories
-      await updateEpicWithShellStories({
-        epicKey,
-        cloudId: resolvedCloudId,
-        atlassianClient,
-        shellStoriesMarkdown: shellStoriesContent,
-        contentWithoutShellStories,
-        notify
-      });
-      
-    } catch (error: any) {
-      console.log(`    ⚠️ Could not read shell stories file: ${error.message}`);
-      shellStoriesContent = `Error: Could not read shell stories file: ${error.message}`;
-    }
+  if (shellStoriesResult.shellStoriesText) {
+    shellStoriesContent = shellStoriesResult.shellStoriesText;
+    
+    // Update the epic description with shell stories
+    await updateEpicWithShellStories({
+      epicKey,
+      cloudId: resolvedCloudId,
+      atlassianClient,
+      shellStoriesMarkdown: shellStoriesContent,
+      contentWithoutShellStories,
+      notify
+    });
   } else {
     shellStoriesContent = 'No shell stories were generated.';
   }
@@ -222,7 +216,7 @@ async function generateShellStoriesFromAnalyses(params: {
   yamlContent: string;
   notify: ToolDependencies['notify'];
   epicContext?: string;
-}): Promise<{ storyCount: number; analysisCount: number; shellStoriesPath: string | null }> {
+}): Promise<{ storyCount: number; analysisCount: number; shellStoriesPath: string | null; shellStoriesText: string | null }> {
   const { generateText, screens, debugDir, figmaFileKey, yamlContent, notify, epicContext } = params;
   
   console.log('  Phase 5: Generating shell stories from analyses...');
@@ -255,7 +249,7 @@ async function generateShellStoriesFromAnalyses(params: {
   
   if (analysisFiles.length === 0) {
     await notify('⚠️ No analysis files found - skipping shell story generation');
-    return { storyCount: 0, analysisCount: 0, shellStoriesPath: null };
+    return { storyCount: 0, analysisCount: 0, shellStoriesPath: null, shellStoriesText: null };
   }
   
   // Verify epic context exists (required for scope analysis)
@@ -348,7 +342,7 @@ No shell stories content received from AI
   
   await notify(`✅ Shell Story Generation Complete: Generated ${storyCount} shell stories`);
   
-  return { storyCount, analysisCount: analysisFiles.length, shellStoriesPath };
+  return { storyCount, analysisCount: analysisFiles.length, shellStoriesPath, shellStoriesText };
 }
 
 /**
