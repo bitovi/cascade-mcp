@@ -15,7 +15,7 @@ const https = require('https');
 // Load environment variables
 require('dotenv').config();
 
-const ATLASSIAN_PAT = process.env.JIRA_TEST_PAT?.replace(/^"|"$/g, ''); // Pre-encoded base64(email:token)
+const ATLASSIAN_PAT = process.env.ATLASSIAN_TEST_PAT?.replace(/^"|"$/g, ''); // Pre-encoded base64(email:token)
 const FIGMA_PAT = process.env.FIGMA_TEST_PAT?.replace(/^"|"$/g, '');
 const JIRA_CLOUD_ID = process.env.JIRA_TEST_CLOUD_ID;
 
@@ -47,7 +47,7 @@ async function validateAtlassianToken() {
   console.log('\n🔍 Validating Atlassian PAT Token...\n');
 
   if (!ATLASSIAN_PAT) {
-    console.error('❌ JIRA_TEST_PAT not found in environment variables');
+    console.error('❌ ATLASSIAN_TEST_PAT not found in environment variables');
     return false;
   }
   
@@ -56,7 +56,7 @@ async function validateAtlassianToken() {
     return false;
   }
 
-  console.log('✅ JIRA_TEST_PAT found (pre-encoded base64 credentials)');
+  console.log('✅ ATLASSIAN_TEST_PAT found (pre-encoded base64 credentials)');
   console.log('✅ JIRA_TEST_CLOUD_ID found:', JIRA_CLOUD_ID);
 
   try {

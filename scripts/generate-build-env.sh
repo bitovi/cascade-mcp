@@ -17,6 +17,12 @@ set -e
 : "${FIGMA_CLIENT_SECRET?Need to set FIGMA_CLIENT_SECRET}"
 : "${PORT?Need to set PORT}"
 
+# DEV_CACHE_DIR - Override cache directory location (development only)
+# - Relative paths resolved from project root: DEV_CACHE_DIR=./cache
+# - Absolute paths used as-is: DEV_CACHE_DIR=/tmp/my-cache
+# - When not set, uses OS temp directory
+# export DEV_CACHE_DIR=./cache
+
 cat <<EOF > .env
 AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
 AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
