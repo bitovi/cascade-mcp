@@ -31,6 +31,11 @@ export interface AtlassianClient {
    * @returns Base URL for Jira REST API
    */
   getJiraBaseUrl: (cloudId: string) => string;
+  
+  /**
+   * Authentication type used by this client
+   */
+  authType: 'oauth' | 'pat';
 }
 
 /**
@@ -52,6 +57,8 @@ export interface AtlassianClient {
  */
 export function createAtlassianClient(accessToken: string): AtlassianClient {
   return {
+    authType: 'oauth',
+    
     fetch: async (url: string, options: RequestInit = {}) => {
       // Token is captured in this closure!
       return fetch(url, {
@@ -102,6 +109,8 @@ export function createAtlassianClientWithPAT(base64Credentials: string): Atlassi
   });
   
   return {
+    authType: 'pat',
+    
     fetch: async (url: string, options: RequestInit = {}) => {
       // Credentials are captured in this closure!
       const headers = {

@@ -40,14 +40,14 @@ export const atlassianProvider: OAuthProvider = {
     });
 
     const clientId = process.env.VITE_JIRA_CLIENT_ID;
-    const baseUrl = process.env.VITE_AUTH_SERVER_URL || 'http://localhost:3000';
+    const baseUrl = process.env.VITE_AUTH_SERVER_URL!;
     const redirectUri = params.redirectUri || `${baseUrl}/auth/callback/atlassian`;
-    const scope = params.scope || process.env.VITE_JIRA_SCOPE || 'read:jira-work write:jira-work offline_access';
+    const scope = params.scope || process.env.VITE_JIRA_SCOPE!;
 
     console.log(`[ATLASSIAN] Using environment variables:`);
     console.log(`[ATLASSIAN]   - VITE_JIRA_CLIENT_ID: ${clientId?.substring(0, 10)}...`);
     console.log(`[ATLASSIAN]   - VITE_AUTH_SERVER_URL: ${baseUrl}`);
-    console.log(`[ATLASSIAN]   - VITE_JIRA_SCOPE: ${process.env.VITE_JIRA_SCOPE || 'not set, using default'}`);
+    console.log(`[ATLASSIAN]   - VITE_JIRA_SCOPE: ${process.env.VITE_JIRA_SCOPE}`);
     console.log(`[ATLASSIAN]   - Final redirect_uri: ${redirectUri}`);
     console.log(`[ATLASSIAN]   - Final scope: ${scope}`);
 
@@ -139,7 +139,7 @@ export const atlassianProvider: OAuthProvider = {
 
     const clientId = process.env.VITE_JIRA_CLIENT_ID;
     const clientSecret = process.env.JIRA_CLIENT_SECRET;
-    const baseUrl = process.env.VITE_AUTH_SERVER_URL || 'http://localhost:3000';
+    const baseUrl = process.env.VITE_AUTH_SERVER_URL!;
     const redirectUri = params.redirectUri || `${baseUrl}/auth/callback/atlassian`;
 
     console.log(`[ATLASSIAN] Environment variables:`);

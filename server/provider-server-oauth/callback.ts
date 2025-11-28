@@ -103,7 +103,7 @@ export function makeCallback(
 
       console.log(`[CALLBACK] Found code_verifier in session: ${codeVerifier.substring(0, 10)}... (length: ${codeVerifier.length})`);
 
-      const baseUrl = process.env.VITE_AUTH_SERVER_URL || 'http://localhost:3000';
+      const baseUrl = process.env.VITE_AUTH_SERVER_URL!;
       const redirectUri = `${baseUrl}/auth/callback/${provider.name}`;
 
       console.log(`[CALLBACK] Preparing token exchange:`);
