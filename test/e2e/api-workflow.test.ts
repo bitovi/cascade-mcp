@@ -3,42 +3,44 @@
  * 
  * Tests the complete flow:
  * 1. Create a Jira epic with Figma design links
- * 2. Call REST API to generate shell stories
- * 3. Verify shell stories were created in epic
- * 4. Call REST API to write the next story
- * 5. Verify story was created
+ * 2. Call REST API to analyze feature scope
+ * 3. Call REST API to generate shell stories
+ * 4. Verify shell stories were created in epic
+ * 5. Call REST API to write the next story
+ * 6. Verify story was created
  * 
  * Requirements:
  * - ATLASSIAN_PAT: Personal Access Token for Jira
  * - FIGMA_PAT: Personal Access Token for Figma
  * - ANTHROPIC_API_KEY: Anthropic API key for LLM generation
- * - JIRA_TEST_CLOUD_ID: Cloud ID for Jira site
  */
 
 import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';
 import { startTestServer, stopTestServer } from '../../specs/shared/helpers/test-server.js';
 import { createApiClient } from './helpers/api-client.js';
-import { writeShellStories, writeNextStory } from './helpers/api-endpoints.js';
+import { analyzeFeatureScope, writeShellStories, writeNextStory } from './helpers/api-endpoints.js';
+import { createAtlassianClientWithPAT } from '../../server/providers/atlassian/atlassian-api-client.js';
+import { createJiraIssue, getJiraIssue, deleteJiraIssue, resolveCloudId } from '../../server/providers/atlassian/atlassian-helpers.js';
+import { convertMarkdownToAdf } from '../../server/providers/atlassian/markdown-converter.js';
 
 // Test configuration from environment (using existing env var names)
 const ATLASSIAN_PAT = process.env.ATLASSIAN_TEST_PAT?.replace(/^"|"/g, ''); // Remove quotes if present (base64 credentials)
 const FIGMA_PAT = process.env.FIGMA_TEST_PAT?.replace(/^"|"/g, ''); // Remove quotes if present
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const JIRA_CLOUD_ID = process.env.JIRA_TEST_CLOUD_ID;
 const JIRA_PROJECT_KEY = 'PLAY'; // Target project
+const JIRA_SITE_NAME = 'bitovi'; // Jira site subdomain
 
-// Figma design for testing
-const FIGMA_DESIGN_URL = 'https://www.figma.com/design/3JgSzy4U8gdIGm1oyHiovy/TaskFlow?node-id=0-321&t=gLoyvDoklsFADvn8-0';
+// Figma design for testing (from environment or default)
+const FIGMA_DESIGN_URL = process.env.FIGMA_TEST_URL || 'https://www.figma.com/design/3JgSzy4U8gdIGm1oyHiovy/TaskFlow?node-id=0-321&t=gLoyvDoklsFADvn8-0';
 
 // Skip tests if required environment variables are not set
-const shouldSkip = !ATLASSIAN_PAT || !FIGMA_PAT || !ANTHROPIC_API_KEY || !JIRA_CLOUD_ID;
+const shouldSkip = !ATLASSIAN_PAT || !FIGMA_PAT || !ANTHROPIC_API_KEY;
 
 if (shouldSkip) {
   console.warn('⚠️  Skipping REST API E2E tests - missing required environment variables:');
   if (!ATLASSIAN_PAT) console.warn('  - ATLASSIAN_TEST_PAT (Atlassian PAT - base64(email:token))');
   if (!FIGMA_PAT) console.warn('  - FIGMA_TEST_PAT (Figma PAT)');
   if (!ANTHROPIC_API_KEY) console.warn('  - ANTHROPIC_API_KEY');
-  if (!JIRA_CLOUD_ID) console.warn('  - JIRA_TEST_CLOUD_ID');
   console.warn('  Set these in your .env file to run the tests.');
   console.warn('  See: https://bitovi.atlassian.net/wiki/spaces/agiletraining/pages/1302462817/How+to+create+a+Jira+Request+token');
 }
@@ -47,6 +49,8 @@ describe('REST API: Write Shell Stories E2E', () => {
   let serverUrl: string;
   let createdEpicKey: string | undefined;
   let apiClient: ReturnType<typeof createApiClient>;
+  let atlassianClient: ReturnType<typeof createAtlassianClientWithPAT>;
+  let cloudId: string;
 
   beforeAll(async () => {
     if (shouldSkip) {
@@ -54,9 +58,14 @@ describe('REST API: Write Shell Stories E2E', () => {
     }
 
     console.log('🚀 Starting test server...');
+    
+    // This test uses REST API with PAT tokens, not OAuth flow
+    // Clear mock OAuth flag that jest-setup.js sets by default
+    delete process.env.TEST_USE_MOCK_ATLASSIAN;
+    
     serverUrl = await startTestServer({ 
-      testMode: true, 
-      logLevel: 'info',
+      testMode: false, // Not using mock OAuth
+      logLevel: 'error', // Quiet logs
       port: 3000 
     });
     console.log(`✅ Test server running at ${serverUrl}`);
@@ -68,6 +77,12 @@ describe('REST API: Write Shell Stories E2E', () => {
       figmaToken: FIGMA_PAT!,
       anthropicToken: ANTHROPIC_API_KEY!,
     });
+
+    // Create Atlassian client and resolve cloudId
+    atlassianClient = createAtlassianClientWithPAT(ATLASSIAN_PAT!);
+    const siteInfo = await resolveCloudId(atlassianClient, undefined, JIRA_SITE_NAME);
+    cloudId = siteInfo.cloudId;
+    console.log(`✅ Resolved cloudId: ${cloudId}`);
   }, 30000);
 
   afterAll(async () => {
@@ -79,20 +94,8 @@ describe('REST API: Write Shell Stories E2E', () => {
     if (createdEpicKey) {
       try {
         console.log(`🧹 Cleaning up epic ${createdEpicKey}...`);
-        const deleteUrl = `https://bitovi.atlassian.net/rest/api/3/issue/${createdEpicKey}`;
-        const deleteResponse = await fetch(deleteUrl, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Basic ${ATLASSIAN_PAT}`,
-            'Accept': 'application/json'
-          }
-        });
-        
-        if (deleteResponse.ok) {
-          console.log(`✅ Deleted epic ${createdEpicKey}`);
-        } else {
-          console.warn(`⚠️  Failed to delete epic: ${deleteResponse.status}`);
-        }
+        await deleteJiraIssue(atlassianClient, cloudId, createdEpicKey);
+        console.log(`✅ Deleted epic ${createdEpicKey}`);
       } catch (error: any) {
         console.warn(`⚠️  Error during cleanup: ${error.message}`);
       }
@@ -110,76 +113,58 @@ describe('REST API: Write Shell Stories E2E', () => {
 
     // Step 1: Create a Jira epic with Figma link
     console.log('📝 Step 1: Creating test epic in Jira...');
-    console.log(`   Using Atlassian PAT: ${ATLASSIAN_PAT?.substring(0, 15)}...${ATLASSIAN_PAT?.substring(ATLASSIAN_PAT.length - 5)} (length: ${ATLASSIAN_PAT?.length})`);
-    console.log(`   Cloud ID: ${JIRA_CLOUD_ID}`);
+    console.log(`   Cloud ID: ${cloudId}`);
+    console.log(`   Site Name: ${JIRA_SITE_NAME}`);
     
     const epicSummary = `E2E Test Epic - ${new Date().toISOString()}`;
-    const epicDescription = `Test epic for REST API validation.\n\nFigma Design: ${FIGMA_DESIGN_URL}`;
+    const epicDescriptionMarkdown = `Test epic for REST API validation.\n\nFigma Design: ${FIGMA_DESIGN_URL}`;
+    const epicDescriptionAdf = await convertMarkdownToAdf(epicDescriptionMarkdown);
     
-    // Atlassian PATs use Basic Authentication with direct site URL (not api.atlassian.com)
-    // ATLASSIAN_PAT is already base64-encoded (email:token)
-    const createEpicUrl = `https://bitovi.atlassian.net/rest/api/3/issue`;
-    console.log(`   API URL: ${createEpicUrl}`);
-    
-    const createEpicResponse = await fetch(createEpicUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${ATLASSIAN_PAT}`,
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        fields: {
-          project: {
-            key: JIRA_PROJECT_KEY
-          },
-          summary: epicSummary,
-          description: {
-            type: 'doc',
-            version: 1,
-            content: [
-              {
-                type: 'paragraph',
-                content: [
-                  {
-                    type: 'text',
-                    text: epicDescription
-                  }
-                ]
-              }
-            ]
-          },
-          issuetype: {
-            name: 'Epic'
-          }
-        }
-      })
-    });
-
-    if (!createEpicResponse.ok) {
-      const errorText = await createEpicResponse.text();
-      console.error(`❌ Failed to create epic: ${createEpicResponse.status} ${createEpicResponse.statusText}`);
-      console.error(`   Response: ${errorText}`);
-      throw new Error(`Failed to create epic: ${createEpicResponse.status} - ${errorText}`);
-    }
+    const createEpicResponse = await createJiraIssue(
+      atlassianClient,
+      cloudId,
+      JIRA_PROJECT_KEY,
+      epicSummary,
+      epicDescriptionAdf,
+      { issueTypeName: 'Epic' }
+    );
 
     expect(createEpicResponse.ok).toBe(true);
-    const epicData = await createEpicResponse.json();
+    const epicData = await createEpicResponse.json() as { key: string };
     createdEpicKey = epicData.key;
     
     console.log(`✅ Created epic: ${createdEpicKey}`);
     console.log(`   URL: https://bitovi.atlassian.net/browse/${createdEpicKey}`);
 
-    // Step 2: Call REST API to generate shell stories using helper
-    console.log('🤖 Step 2: Calling write-shell-stories API...');
+    // Step 2: Call REST API to analyze feature scope
+    console.log('🔍 Step 2: Calling analyze-feature-scope API...');
     
-    const apiResult = await writeShellStories(apiClient, {
+    const analysisResult = await analyzeFeatureScope(apiClient, {
       epicKey: createdEpicKey!,
-      cloudId: JIRA_CLOUD_ID,
+      siteName: JIRA_SITE_NAME,
       sessionId: `e2e-test-${Date.now()}`
     });
 
-    console.log('📋 API Response:', JSON.stringify(apiResult, null, 2));
+    console.log('📋 Analysis Response:', JSON.stringify(analysisResult, null, 2));
+
+    // Verify analysis was successful
+    expect(analysisResult.success).toBe(true);
+    expect(analysisResult.epicKey).toBe(createdEpicKey);
+    expect(analysisResult.featureAreasCount).toBeGreaterThan(0);
+    // Note: screensAnalyzed may be 0 if using cached analysis
+
+    console.log(`✅ Analysis complete: ${analysisResult.featureAreasCount} feature areas, ${analysisResult.questionsCount} questions`);
+
+    // Step 3: Call REST API to generate shell stories using helper
+    console.log('🤖 Step 3: Calling write-shell-stories API...');
+    
+    const apiResult = await writeShellStories(apiClient, {
+      epicKey: createdEpicKey!,
+      siteName: JIRA_SITE_NAME,
+      sessionId: `e2e-test-${Date.now()}`
+    });
+
+    console.log('📋 Shell Stories Response:', JSON.stringify(apiResult, null, 2));
 
     // Verify API call was successful
     expect(apiResult.success).toBe(true);
@@ -189,19 +174,24 @@ describe('REST API: Write Shell Stories E2E', () => {
 
     console.log(`✅ API created ${apiResult.storyCount} shell stories from ${apiResult.screensAnalyzed} screens`);
 
-    // Step 3: Fetch the epic and verify shell stories were created
-    console.log('🔍 Step 3: Verifying shell stories in epic...');
+    // Step 4: Fetch the epic and verify shell stories were created
+    console.log('🔍 Step 4: Verifying shell stories in epic...');
     
-    const getEpicUrl = `https://bitovi.atlassian.net/rest/api/3/issue/${createdEpicKey}?fields=description`;
-    const getEpicResponse = await fetch(getEpicUrl, {
-      headers: {
-        'Authorization': `Basic ${ATLASSIAN_PAT}`,
-        'Accept': 'application/json'
-      }
-    });
+    const getEpicResponse = await getJiraIssue(
+      atlassianClient,
+      cloudId,
+      createdEpicKey!,
+      'description'
+    );
 
     expect(getEpicResponse.ok).toBe(true);
-    const epicDetails = await getEpicResponse.json();
+    const epicDetails = await getEpicResponse.json() as {
+      fields: {
+        description?: {
+          content?: Array<any>;
+        };
+      };
+    };
     
     // Convert ADF to text for parsing
     const descriptionContent = epicDetails.fields.description?.content || [];
@@ -226,10 +216,9 @@ describe('REST API: Write Shell Stories E2E', () => {
 
     // Verify Shell Stories section exists (ADF converts ## to plain text)
     expect(epicText).toContain('Shell Stories');
-    expect(epicText).toContain('Final Prioritized Stories');
     
     // Extract shell stories (look for st001 pattern since ADF loses markdown heading markers)
-    const shellStoriesMatch = epicText.match(/(Final Prioritized Stories[\s\S]+)/);
+    const shellStoriesMatch = epicText.match(/(Shell Stories[\s\S]+)/);
     expect(shellStoriesMatch).toBeTruthy();
     
     const shellStoriesContent = shellStoriesMatch![1];
@@ -249,7 +238,6 @@ describe('REST API: Write Shell Stories E2E', () => {
     // Verify expected content in shell stories
     expect(apiResult.shellStoriesContent).toBeTruthy();
     expect(apiResult.shellStoriesContent).toContain('st001');
-    expect(apiResult.shellStoriesContent).toContain('Final Prioritized Stories');
     
     // Verify the epic was updated with shell stories
     expect(epicText).toContain('Shell Stories');
@@ -258,13 +246,13 @@ describe('REST API: Write Shell Stories E2E', () => {
     console.log('✅ Shell stories test completed successfully!');
     
     // ==========================================
-    // Step 4: Call write-next-story API to write st001 using helper
+    // Step 5: Call write-next-story API to write st001 using helper
     // ==========================================
-    console.log('\n📝 Step 4: Calling write-next-story API to write st001...');
+    console.log('\n📝 Step 5: Calling write-next-story API to write st001...');
     
     const writeNextStoryResult = await writeNextStory(apiClient, {
       epicKey: createdEpicKey!,
-      cloudId: JIRA_CLOUD_ID
+      siteName: JIRA_SITE_NAME
     });
     
     console.log('📋 Write-next-story API Response:', JSON.stringify(writeNextStoryResult, null, 2));

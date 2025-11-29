@@ -16,7 +16,7 @@ export class ApiClient {
 
   constructor(config: ApiClientConfig) {
     this.config = {
-      timeout: 120000, // 2 minutes default
+      timeout: 300000, // 5 minutes for AI processing
       ...config,
     };
   }

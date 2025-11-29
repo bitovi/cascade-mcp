@@ -29,16 +29,9 @@ FIGMA_TEST_PAT="figd_..."
 # Anthropic API Key
 ANTHROPIC_API_KEY="sk-..."
 
-# Jira Cloud ID (required for PAT authentication)
-# Get your cloud ID from: https://admin.atlassian.com/ → Organizations → [Your Org] → Settings
-JIRA_TEST_CLOUD_ID="<uuid>"
-
 # Optional: API Base URL (defaults to http://localhost:3000)
 API_BASE_URL="http://localhost:3000"
 ```
-
-**Important Note for PAT Authentication:**
-When using PAT tokens (Personal Access Tokens), you **must** provide the `JIRA_TEST_CLOUD_ID` because PATs cannot access the `accessible-resources` OAuth endpoint. The cloud ID is used to construct direct API URLs to your Jira instance.
 
 ## Running E2E Tests
 

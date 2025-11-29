@@ -19,8 +19,8 @@ if (!process.env.TEST_USE_MOCK_ATLASSIAN && !process.env.TEST_USE_PAT_BYPASS) {
 }
 
 // Fallback to PAT bypass if no PAT token available and mock not explicitly enabled
-if (process.env.TEST_USE_MOCK_ATLASSIAN === 'true' && !process.env.JIRA_TEST_PAT) {
-  console.warn('⚠️  Mock Atlassian mode enabled but JIRA_TEST_PAT not set');
+if (process.env.TEST_USE_MOCK_ATLASSIAN === 'true' && !process.env.ATLASSIAN_TEST_PAT) {
+  console.warn('⚠️  Mock Atlassian mode enabled but ATLASSIAN_TEST_PAT not set');
   console.warn('   Mock OAuth endpoints will use PAT token internally');
 }
 
@@ -49,8 +49,8 @@ beforeAll(() => {
     console.log('   Test mode: Manual OAuth (requires browser interaction)');
   }
   
-  if (process.env.TEST_USE_MOCK_ATLASSIAN === 'true' && !process.env.JIRA_TEST_PAT) {
-    console.warn('⚠️  WARNING: Mock OAuth mode enabled but JIRA_TEST_PAT not set');
+  if (process.env.TEST_USE_MOCK_ATLASSIAN === 'true' && !process.env.ATLASSIAN_TEST_PAT) {
+    console.warn('⚠️  WARNING: Mock OAuth mode enabled but ATLASSIAN_TEST_PAT not set');
     console.warn('   Mock endpoints need PAT token for internal Jira API calls');
   }
 });

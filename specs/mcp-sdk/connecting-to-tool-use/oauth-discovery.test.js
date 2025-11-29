@@ -49,20 +49,17 @@ describe('MCP SDK: OAuth Flow to Token', () => {
     xtest('[not working due to incorrect server response] MCP SDK discovers OAuth endpoints and initiates authentication flow', async () => {
       // Check for required test environment variables upfront
       const issueKey = process.env.JIRA_TEST_ISSUE_KEY;
-      const cloudId = process.env.JIRA_TEST_CLOUD_ID;
+      const siteName = 'bitovi'; // Jira site subdomain
       
       if (!issueKey) {
         throw new Error('JIRA_TEST_ISSUE_KEY environment variable is required for this test');
-      }
-      if (!cloudId) {
-        throw new Error('JIRA_TEST_CLOUD_ID environment variable is required for this test');
       }
       
       console.log('🥚 Creating MCP SDK client with OAuth provider...');
       console.log('🔍 Debug environment variables:');
       console.log('  VITE_JIRA_CALLBACK_URL:', process.env.VITE_JIRA_CALLBACK_URL);
       console.log('  JIRA_TEST_ISSUE_KEY:', process.env.JIRA_TEST_ISSUE_KEY);
-      console.log('  JIRA_TEST_CLOUD_ID:', process.env.JIRA_TEST_CLOUD_ID);
+      console.log('  Site Name:', siteName);
       
       // Create a minimal OAuth provider - MCP SDK will handle the heavy lifting
       let storedCodeVerifier = null;
@@ -306,13 +303,13 @@ describe('MCP SDK: OAuth Flow to Token', () => {
         console.log('✅ MCP SDK OAuth flow completed successfully');
         
         // Test that we can actually call a tool after OAuth
-        console.log(`🚀 Testing get-jira-issue tool call with issue: ${issueKey}, cloudId: ${cloudId}...`);
+        console.log(`🚀 Testing get-jira-issue tool call with issue: ${issueKey}, siteName: ${siteName}...`);
         
         const issueResult = await activeClient.callTool({ 
           name: 'get-jira-issue',
           arguments: {
             issueKey: issueKey, 
-            cloudId: cloudId 
+            siteName: siteName 
           }
         });
         

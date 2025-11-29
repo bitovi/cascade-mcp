@@ -10,7 +10,6 @@
  * - ATLASSIAN_PAT: Personal Access Token for Jira
  * - FIGMA_PAT: Personal Access Token for Figma
  * - ANTHROPIC_API_KEY: Anthropic API key for LLM generation
- * - JIRA_TEST_CLOUD_ID: Cloud ID for Jira site
  */
 
 import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';
@@ -18,24 +17,23 @@ import { startTestServer, stopTestServer } from './shared/helpers/test-server.js
 import { parseShellStories } from '../server/providers/combined/tools/write-next-story/shell-story-parser.js';
 
 // Test configuration from environment (using existing env var names)
-const ATLASSIAN_PAT = process.env.JIRA_TEST_PAT?.replace(/^"|"$/g, ''); // Remove quotes if present (base64 credentials)
-const FIGMA_PAT = process.env.FIGMA_TEST_PAT?.replace(/^"|"$/g, ''); // Remove quotes if present
+const ATLASSIAN_PAT = process.env.ATLASSIAN_TEST_PAT?.replace(/^"|"/g, ''); // Remove quotes if present (base64 credentials)
+const FIGMA_PAT = process.env.FIGMA_TEST_PAT?.replace(/^"|"/g, ''); // Remove quotes if present
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const JIRA_CLOUD_ID = process.env.JIRA_TEST_CLOUD_ID;
 const JIRA_PROJECT_KEY = 'PLAY'; // Target project
+const JIRA_SITE_NAME = 'bitovi'; // Jira site subdomain
 
 // Figma design for testing
 const FIGMA_DESIGN_URL = 'https://www.figma.com/design/3JgSzy4U8gdIGm1oyHiovy/TaskFlow?node-id=0-321&t=gLoyvDoklsFADvn8-0';
 
 // Skip tests if required environment variables are not set
-const shouldSkip = !ATLASSIAN_PAT || !FIGMA_PAT || !ANTHROPIC_API_KEY || !JIRA_CLOUD_ID;
+const shouldSkip = !ATLASSIAN_PAT || !FIGMA_PAT || !ANTHROPIC_API_KEY;
 
 if (shouldSkip) {
   console.warn('⚠️  Skipping REST API E2E tests - missing required environment variables:');
-  if (!ATLASSIAN_PAT) console.warn('  - JIRA_TEST_PAT (Atlassian PAT - base64(email:token))');
+  if (!ATLASSIAN_PAT) console.warn('  - ATLASSIAN_TEST_PAT (Atlassian PAT - base64(email:token))');
   if (!FIGMA_PAT) console.warn('  - FIGMA_TEST_PAT (Figma PAT)');
   if (!ANTHROPIC_API_KEY) console.warn('  - ANTHROPIC_API_KEY');
-  if (!JIRA_CLOUD_ID) console.warn('  - JIRA_TEST_CLOUD_ID');
   console.warn('  Set these in your .env file to run the tests.');
   console.warn('  See: https://bitovi.atlassian.net/wiki/spaces/agiletraining/pages/1302462817/How+to+create+a+Jira+Request+token');
 }
@@ -103,7 +101,7 @@ describe('REST API: Write Shell Stories E2E', () => {
     // Step 1: Create a Jira epic with Figma link
     console.log('📝 Step 1: Creating test epic in Jira...');
     console.log(`   Using Atlassian PAT: ${ATLASSIAN_PAT?.substring(0, 15)}...${ATLASSIAN_PAT?.substring(ATLASSIAN_PAT.length - 5)} (length: ${ATLASSIAN_PAT?.length})`);
-    console.log(`   Cloud ID: ${JIRA_CLOUD_ID}`);
+    console.log(`   Site Name: ${JIRA_SITE_NAME}`);
     
     const epicSummary = `E2E Test Epic - ${new Date().toISOString()}`;
     const epicDescription = `Test epic for REST API validation.\n\nFigma Design: ${FIGMA_DESIGN_URL}`;
@@ -176,7 +174,7 @@ describe('REST API: Write Shell Stories E2E', () => {
       },
       body: JSON.stringify({
         epicKey: createdEpicKey,
-        cloudId: JIRA_CLOUD_ID,
+        siteName: JIRA_SITE_NAME,
         sessionId: `e2e-test-${Date.now()}`
       })
     });
@@ -285,7 +283,7 @@ describe('REST API: Write Shell Stories E2E', () => {
       },
       body: JSON.stringify({
         epicKey: createdEpicKey,
-        cloudId: JIRA_CLOUD_ID
+        siteName: JIRA_SITE_NAME
       })
     });
     

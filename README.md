@@ -8,6 +8,7 @@ Cascading MCP Tools provides a collection of MCP (Model Context Protocol) capabi
 Supported tools at the `https://cascade.bitovi.com/mcp` endpoint:
 
 **Combined Tools** (Multi-provider workflows):
+- **[`analyze-feature-scope`](./server/providers/combined/tools/analyze-feature-scope/README.md)** - Generate scope analysis from Figma designs linked in a Jira epic (identifies features, establishes scope boundaries, surfaces questions before implementation)
 - **[`write-shell-stories`](./server/providers/combined/tools/writing-shell-stories/README.md)** - Generate shell stories from Figma designs linked in a Jira epic (analyzes screens, downloads assets, creates prioritized user stories using AI)
 - **[`write-epics-next-story`](./server/providers/combined/tools/write-next-story/README.md)** - Write the next Jira story from shell stories in an epic (validates dependencies, generates full story content, creates Jira issue with acceptance criteria)
 
