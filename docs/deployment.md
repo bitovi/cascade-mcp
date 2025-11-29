@@ -138,8 +138,20 @@ TBD:
 
 ## Verify the deployment
 
-The following are incremental verification steps you can use to make sure the app is working.
+The following are incremental verification steps you can use to ensure the app is functioning properly.
 
 ### Visit the homepage
 
-The homepage should show 
+The homepage should load properly.  You should see the right url for the MCP service:
+
+> <img width="568" height="424" alt="image" src="https://github.com/user-attachments/assets/39034d87-a872-4da3-9003-30a3200d8967" />
+
+### Check the Metadata Endpoints
+
+The homepage has links to the metadata endpoints. Check that these also have the right urls.
+
+> <img width="638" height="157" alt="image" src="https://github.com/user-attachments/assets/d476c047-95d5-4ee6-a5d8-f00fcc9b67ed" />
+
+### Connect with an MCP client
+
+The final step is to connect with an MCP client. The homepage has instructions on how to do this. 
