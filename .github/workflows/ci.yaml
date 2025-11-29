@@ -66,7 +66,7 @@ jobs:
           echo "JIRA_CLIENT_SECRET=${{ secrets.JIRA_CLIENT_SECRET }}" >> .env
           echo "FIGMA_CLIENT_SECRET=${{ secrets.FIGMA_CLIENT_SECRET }}" >> .env
           echo "JIRA_TOTP_SECRET=${{ secrets.JIRA_TOTP_SECRET }}" >> .env
-          echo "JIRA_TEST_PAT=CI Test PAT" >> .env
+          echo "ATLASSIAN_TEST_PAT=CI Test PAT" >> .env
           echo ".env file updated"
 
       - name: Install Dependencies

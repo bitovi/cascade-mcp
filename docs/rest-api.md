@@ -73,8 +73,7 @@ Generates prioritized shell stories from Figma designs linked in a Jira epic.
 {
   "epicKey": "PROJ-123",
   "siteName": "my-jira-site",
-  "cloudId": "uuid",
-  "sessionId": "unique-id"
+  "cloudId": "uuid"
 }
 ```
 
@@ -82,7 +81,6 @@ Generates prioritized shell stories from Figma designs linked in a Jira epic.
 - `epicKey` (required) - The Jira epic key (e.g., "PROJ-123")
 - `siteName` (optional) - Name of the Jira site to use
 - `cloudId` (optional) - Atlassian cloud ID (alternative to siteName)
-- `sessionId` (optional) - Unique session ID for temp directory naming
 
 **Success Response (200 OK):**
 ```json
@@ -91,7 +89,6 @@ Generates prioritized shell stories from Figma designs linked in a Jira epic.
   "shellStoriesContent": "## Shell Stories\n\n- `st001` **User Login** ...",
   "storyCount": 12,
   "screensAnalyzed": 8,
-  "tempDirPath": "/tmp/shell-stories-...",
   "epicKey": "PROJ-123"
 }
 ```
@@ -164,8 +161,7 @@ Writes the next Jira story from shell stories in an epic. Validates dependencies
 {
   "epicKey": "PROJ-123",
   "siteName": "my-jira-site",
-  "cloudId": "uuid",
-  "sessionId": "unique-id"
+  "cloudId": "uuid"
 }
 ```
 
@@ -173,7 +169,6 @@ Writes the next Jira story from shell stories in an epic. Validates dependencies
 - `epicKey` (required) - The Jira epic key (e.g., "PROJ-123")
 - `siteName` (optional) - Name of the Jira site to use
 - `cloudId` (optional) - Atlassian cloud ID (alternative to siteName)
-- `sessionId` (optional) - Unique session ID for temp directory naming
 
 **Success Response (200 OK):**
 ```json
@@ -227,7 +222,7 @@ const atlassianToken = Buffer.from(
   `${process.env.ATLASSIAN_EMAIL}:${process.env.ATLASSIAN_PAT}`
 ).toString('base64');
 
-// Prepare headers for both API calls
+// Prepare headers for all API calls
 const headers = {
   'Content-Type': 'application/json',
   'X-Atlassian-Token': atlassianToken,
@@ -235,7 +230,20 @@ const headers = {
   'X-Anthropic-Token': process.env.ANTHROPIC_API_KEY,
 };
 
-// 1. Generate shell stories first
+// 1. Analyze feature scope first
+const scopeResult = await fetch('http://localhost:3000/api/analyze-feature-scope', {
+  method: 'POST',
+  headers,
+  body: JSON.stringify({
+    epicKey: 'PROJ-123',
+    siteName: 'my-jira-site',
+  }),
+});
+
+const scopeAnalysis = await scopeResult.json();
+console.log(`Generated scope analysis with ${scopeAnalysis.featureAreaCount} feature areas`);
+
+// 2. Review and refine scope in Jira, then generate shell stories
 const shellStoriesResult = await fetch('http://localhost:3000/api/write-shell-stories', {
   method: 'POST',
   headers,
@@ -248,7 +256,7 @@ const shellStoriesResult = await fetch('http://localhost:3000/api/write-shell-st
 const shellStories = await shellStoriesResult.json();
 console.log(`Generated ${shellStories.storyCount} shell stories`);
 
-// 2. Write stories one by one until all complete
+// 3. Write stories one by one until all complete
 let storiesWritten = 0;
 while (true) {
   const nextStoryResult = await fetch('http://localhost:3000/api/write-next-story', {
@@ -315,8 +323,6 @@ The REST API endpoints use the same backend services as the MCP tools:
 
 For high-volume usage, consider:
 - Implementing request queuing/throttling in your client
-- Caching analysis files between runs (stored in temp directories)
-- Using the `sessionId` parameter consistently to reuse cached data
 
 ## Security Notes
 

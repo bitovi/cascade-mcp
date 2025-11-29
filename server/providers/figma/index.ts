@@ -31,9 +31,9 @@ export const figmaProvider: OAuthProvider = {
    */
   createAuthUrl(params: AuthUrlParams): string {
     const clientId = process.env.FIGMA_CLIENT_ID;
-    const baseUrl = process.env.VITE_AUTH_SERVER_URL || 'http://localhost:3000';
+    const baseUrl = process.env.VITE_AUTH_SERVER_URL!;
     const redirectUri = params.redirectUri || `${baseUrl}/auth/callback/figma`;
-    const scope = params.scope || process.env.FIGMA_OAUTH_SCOPES || 'file_content:read,file_comments:read';
+    const scope = params.scope || process.env.FIGMA_OAUTH_SCOPES!;
     
     // Figma uses traditional OAuth 2.0 - DO NOT include PKCE parameters
     const urlParams: Record<string, string> = {
@@ -74,7 +74,7 @@ export const figmaProvider: OAuthProvider = {
   async exchangeCodeForTokens(params: TokenExchangeParams): Promise<StandardTokenResponse> {
     const clientId = process.env.FIGMA_CLIENT_ID;
     const clientSecret = process.env.FIGMA_CLIENT_SECRET;
-    const baseUrl = process.env.VITE_AUTH_SERVER_URL || 'http://localhost:3000';
+    const baseUrl = process.env.VITE_AUTH_SERVER_URL!;
     const redirectUri = params.redirectUri || `${baseUrl}/auth/callback/figma`;
     
     // Figma uses traditional OAuth 2.0 - DO NOT include code_verifier

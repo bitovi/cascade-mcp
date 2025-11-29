@@ -72,6 +72,21 @@ export function createFigmaClient(accessToken: string): FigmaClient {
         console.log('🔐 FULL FIGMA TOKEN (DEBUG MODE):', accessToken);
       }
       
+      // Debug: Log request details for 403 troubleshooting
+      const authHeaderValue = isOAuthToken 
+        ? `Bearer ${accessToken.substring(0, 20)}...`
+        : accessToken.substring(0, 20) + '...';
+      
+      console.log('🌐 Figma API Request:', {
+        url: url.substring(0, 100) + (url.length > 100 ? '...' : ''),
+        tokenType: isOAuthToken ? 'OAuth (figu_)' : 'PAT (figd_)',
+        tokenPrefix: accessToken.substring(0, 10),
+        tokenLength: accessToken.length,
+        headers: Object.keys(headers),
+        authHeader: isOAuthToken ? 'Authorization: Bearer' : 'X-Figma-Token',
+        authHeaderPreview: authHeaderValue
+      });
+      
       return fetch(url, {
         ...options,
         headers,

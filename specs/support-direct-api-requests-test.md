@@ -19,7 +19,7 @@ You need to set up the following environment variables in your `.env` file:
 Create one at: https://id.atlassian.com/manage-profile/security/api-tokens
 
 ```bash
-JIRA_TEST_PAT="ATATT3xFf..."
+ATLASSIAN_TEST_PAT="ATATT3xFf..."
 ```
 
 **Note:** 
@@ -51,14 +51,6 @@ Get one at: https://console.anthropic.com/settings/keys
 
 ```bash
 ANTHROPIC_API_KEY=sk-ant-api03-...
-```
-
-#### 4. Jira Cloud ID
-
-Your Jira site's cloud ID (usually already in your `.env`):
-
-```bash
-JIRA_TEST_CLOUD_ID=2a2bce9e-5780-4e10-a848-ee82abca0056
 ```
 
 ### Validating Your Tokens
@@ -150,11 +142,10 @@ The test validates:
 
 **Test skips with warning about missing environment variables:**
 - Check that all required environment variables are set in your `.env` file:
-  - `JIRA_TEST_PAT` - Atlassian Personal Access Token
+  - `ATLASSIAN_TEST_PAT` - Atlassian Personal Access Token
   - `FIGMA_TEST_PAT` - Figma Personal Access Token  
   - `ANTHROPIC_API_KEY` - Anthropic API key
-  - `JIRA_TEST_CLOUD_ID` - Jira Cloud ID
-- Run `cat .env | grep -E "(JIRA_TEST_PAT|FIGMA_TEST_PAT|ANTHROPIC_API_KEY|JIRA_TEST_CLOUD_ID)"` to verify
+- Run `cat .env | grep -E "(ATLASSIAN_TEST_PAT|FIGMA_TEST_PAT|ANTHROPIC_API_KEY)"` to verify
 - Note: PAT tokens can be quoted in `.env` - the test strips quotes automatically
 
 **API returns 401 Unauthorized:**
@@ -173,7 +164,7 @@ The test validates:
 
 **Epic not cleaned up:**
 - If the test fails before cleanup, manually delete: `https://bitovi.atlassian.net/browse/PLAY-XXX`
-- Or use: `curl -X DELETE "https://api.atlassian.com/ex/jira/{cloudId}/rest/api/3/issue/{epicKey}" -H "Authorization: Bearer ${JIRA_TEST_PAT}"`
+- Or use: `curl -X DELETE "https://api.atlassian.com/ex/jira/{cloudId}/rest/api/3/issue/{epicKey}" -H "Authorization: Bearer ${ATLASSIAN_TEST_PAT}"`
 
 ### Related Files
 

@@ -171,38 +171,6 @@ Jira Cloud has a **43,838 character limit** for description fields (applies to t
 
 This ensures both sections are preserved while keeping the description within Jira's limits.
 
-## Environment Variables
-
-### Required
-- `SESSION_SECRET` - Express session encryption key
-- `JIRA_CLIENT_ID` - Atlassian OAuth client ID
-- `JIRA_CLIENT_SECRET` - Atlassian OAuth client secret
-- `VITE_AUTH_SERVER_URL` - OAuth server base URL
-- `VITE_JIRA_SCOPE` - Jira permissions scope
-
-### Optional - Caching and Debug Output
-- **`DEV_CACHE_DIR`** - Custom cache directory location (default: `./cache`)
-  - Controls where Figma files and analysis artifacts are stored
-  - Always enabled - caching happens regardless of this setting
-  - Example: `DEV_CACHE_DIR=/var/cache/cascade-mcp`
-  
-- **`DEV_SAVE_DEBUG_OUTPUT`** - Enable debug artifacts (default: disabled)
-  - When set (any truthy value), saves intermediate outputs to `cache/{epicKey}/`:
-    - `prompt-*.md` - LLM prompts for each generation step
-    - `screens.yaml` - Extracted screen information
-    - `shell-stories.md` - Generated shell stories before Jira update
-  - Example: `DEV_SAVE_DEBUG_OUTPUT=true`
-
-**Cache Behavior:**
-- File-based caching: `cache/figma-files/{fileKey}/` stores:
-  - `.png` images (Figma screen exports)
-  - `.analysis.md` files (AI-generated screen analyses)
-  - `.notes.md` files (extracted Figma design notes)
-  - `.figma-metadata.json` (timestamp for cache validation)
-- Cache validation: Uses Figma's `/meta` endpoint (Tier 3) to check `lastTouchedAt` timestamp
-- Cache cleanup: Automatic cleanup of files older than 7 days (hourly check)
-- Debug directories: Created under `cache/{epicKey}/` only when `DEV_SAVE_DEBUG_OUTPUT` is set
-
 ## Integration Points
 
 ### External APIs

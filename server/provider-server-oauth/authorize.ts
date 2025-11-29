@@ -69,7 +69,7 @@ export function makeAuthorize(provider: OAuthProvider) {
     console.log(`[AUTHORIZE]   - codeVerifier: ${req.session.codeVerifier?.substring(0, 10)}...`);
     console.log(`[AUTHORIZE]   - state: ${req.session.state?.substring(0, 10)}...`);
 
-    const baseUrl = process.env.VITE_AUTH_SERVER_URL || 'http://localhost:3000';
+    const baseUrl = process.env.VITE_AUTH_SERVER_URL!;
     console.log(`[AUTHORIZE] Base URL from env: ${baseUrl}`);
 
     const redirectUri = `${baseUrl}/auth/callback/${provider.name}`;

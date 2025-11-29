@@ -276,9 +276,9 @@ export function createMockAtlassianServer(port = 3001) {
  */
 function generateMockAtlassianToken(type) {
   // Use real test token if available
-  if (type === 'access' && process.env.JIRA_TEST_PAT) {
-    console.log('  Using JIRA_TEST_PAT for mock response');
-    return process.env.JIRA_TEST_PAT;
+  if (type === 'access' && process.env.ATLASSIAN_TEST_PAT) {
+    console.log('  Using ATLASSIAN_TEST_PAT for mock response');
+    return process.env.ATLASSIAN_TEST_PAT;
   }
   
   // Generate mock token format for testing
