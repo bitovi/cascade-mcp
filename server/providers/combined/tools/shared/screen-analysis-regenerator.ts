@@ -233,15 +233,17 @@ export async function regenerateScreenAnalyses(
 
       // Generate analysis using injected LLM client (with image)
       const analysisResponse = await generateText({
-        prompt: analysisPrompt,
-        image: {
-          type: 'image',
-          data: imageResult.base64Data,
-          mimeType: 'image/png'
-        },
-        systemPrompt: SCREEN_ANALYSIS_SYSTEM_PROMPT,
-        maxTokens: SCREEN_ANALYSIS_MAX_TOKENS,
-        speedPriority: 0.5
+        messages: [
+          { role: 'system', content: SCREEN_ANALYSIS_SYSTEM_PROMPT },
+          { 
+            role: 'user', 
+            content: [
+              { type: 'text', text: analysisPrompt },
+              { type: 'image', data: imageResult.base64Data, mimeType: 'image/png' }
+            ]
+          }
+        ],
+        maxTokens: SCREEN_ANALYSIS_MAX_TOKENS
       });
       
       const analysisText = analysisResponse.text;

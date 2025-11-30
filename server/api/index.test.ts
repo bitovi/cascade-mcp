@@ -43,7 +43,7 @@ describe('REST API Handler - Token Isolation', () => {
       executeWriteNextStory: mockExecute,
       createAtlassianClient: jest.fn().mockReturnValue({ fetch: jest.fn() }),
       createFigmaClient: jest.fn().mockReturnValue({ fetch: jest.fn() }),
-      createAnthropicLLMClient: jest.fn().mockReturnValue(jest.fn())
+      // createLLMClient is now imported directly from llm-client
     });
 
     // Verify response was sent

@@ -29,10 +29,11 @@ export interface McpToolContext {
  *   const generateText = createMcpLLMClient(extra);
  *   
  *   const response = await generateText({
- *     prompt: 'Analyze this design...',
- *     systemPrompt: 'You are a helpful assistant.',
- *     maxTokens: 8000,
- *     speedPriority: 0.5
+ *     messages: [
+ *       { role: 'system', content: 'You are a helpful assistant.' },
+ *       { role: 'user', content: 'Analyze this design...' }
+ *     ],
+ *     maxTokens: 8000
  *   });
  *   
  *   console.log(response.text);
@@ -43,37 +44,46 @@ export function createMcpLLMClient(context: McpToolContext): GenerateTextFn {
   return async (request: LLMRequest): Promise<LLMResponse> => {
     // Tool context is captured in this closure!
     
-    // Build messages array
-    const messages: Array<{ role: string; content: any }> = [
-      {
-        role: "user",
-        content: {
-          type: "text",
-          text: request.prompt
+    // Build messages array for MCP sampling format
+    const mcpMessages: Array<{ role: string; content: any }> = [];
+    
+    // Extract system prompt if present
+    let systemPrompt: string | undefined;
+    
+    for (const message of request.messages) {
+      if (message.role === 'system') {
+        // MCP sampling uses separate systemPrompt parameter
+        systemPrompt = typeof message.content === 'string' ? message.content : message.content[0]?.text;
+      } else {
+        // Handle text and multimodal content
+        if (typeof message.content === 'string') {
+          mcpMessages.push({
+            role: message.role,
+            content: {
+              type: "text",
+              text: message.content
+            }
+          });
+        } else {
+          // Handle array of content (text and images)
+          for (const item of message.content) {
+            mcpMessages.push({
+              role: message.role,
+              content: item
+            });
+          }
         }
       }
-    ];
-    
-    // Add image if provided
-    if (request.image) {
-      messages.push({
-        role: "user",
-        content: {
-          type: "image",
-          data: request.image.data,
-          mimeType: request.image.mimeType
-        }
-      });
     }
     
     const samplingResponse = await context.sendRequest({
       method: "sampling/createMessage",
       params: {
-        messages,
+        messages: mcpMessages,
         modelPreferences: {
-          speedPriority: request.speedPriority ?? 0.5
+          speedPriority: 0.5 // Default speed priority
         },
-        systemPrompt: request.systemPrompt,
+        systemPrompt,
         maxTokens: request.maxTokens ?? 8000
       }
     }, CreateMessageResultSchema);
@@ -84,12 +94,30 @@ export function createMcpLLMClient(context: McpToolContext): GenerateTextFn {
       throw new Error('No text content received from MCP sampling');
     }
     
+    // Map MCP response to standard LLMResponse format
     return {
       text,
       metadata: {
         model: samplingResponse.model,
-        stopReason: samplingResponse.stopReason,
+        finishReason: mapStopReason(samplingResponse.stopReason),
+        usage: {
+          promptTokens: 0, // MCP doesn't provide this
+          completionTokens: 0, // MCP doesn't provide this
+          totalTokens: 0 // MCP doesn't provide this
+        }
       }
     };
   };
+}
+
+/**
+ * Map MCP stop reason to standard finish reason
+ */
+function mapStopReason(stopReason?: string): 'stop' | 'length' | 'tool-calls' | 'error' | 'other' {
+  switch (stopReason) {
+    case 'end_turn': return 'stop';
+    case 'max_tokens': return 'length';
+    case 'stop_sequence': return 'stop';
+    default: return 'other';
+  }
 }

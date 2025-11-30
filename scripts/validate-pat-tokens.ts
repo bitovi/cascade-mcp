@@ -15,7 +15,7 @@
  */
 
 import https from 'https';
-import { createAnthropicLLMClient } from '../server/llm-client/anthropic-client.js';
+import { createLLMClient } from '../server/llm-client/index.js';
 
 // Load environment variables
 import dotenv from 'dotenv';
@@ -298,15 +298,15 @@ async function validateAnthropicKey(): Promise<boolean> {
     console.log('\n📋 Test: Checking Anthropic API authentication...');
     
     // Use the helper to make a minimal API call
-    const generateText = createAnthropicLLMClient(ANTHROPIC_API_KEY);
+    const generateText = createLLMClient({ apiKey: ANTHROPIC_API_KEY });
     const response = await generateText({
-      prompt: 'Hi',
+      messages: [{ role: 'user', content: 'Hi' }],
       maxTokens: 10
     });
     
     console.log('✅ Anthropic API key is valid');
     console.log(`   Model: ${response.metadata?.model || 'unknown'}`);
-    console.log(`   Tokens used: ${response.metadata?.tokensUsed || 'unknown'}`);
+    console.log(`   Tokens used: ${response.metadata?.usage?.totalTokens || 'unknown'}`);
     console.log('\n✅ Anthropic validation passed!\n');
     return true;
 

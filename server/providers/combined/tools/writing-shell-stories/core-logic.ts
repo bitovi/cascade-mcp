@@ -290,8 +290,10 @@ async function generateShellStoriesFromAnalyses(params: {
   // Request shell story generation via injected LLM client
   console.log('    ⏳ Waiting for Anthropic API response...');
   const response = await generateText({
-    systemPrompt: SHELL_STORY_SYSTEM_PROMPT,
-    prompt: shellStoryPrompt,
+    messages: [
+      { role: 'system', content: SHELL_STORY_SYSTEM_PROMPT },
+      { role: 'user', content: shellStoryPrompt }
+    ],
     maxTokens: SHELL_STORY_MAX_TOKENS
   });
   
@@ -325,7 +327,7 @@ No shell stories content received from AI
   
   console.log(`    ✅ Shell stories generated (${shellStoriesText.length} characters)`);
   if (response.metadata) {
-    console.log(`       Tokens used: ${response.metadata.tokensUsed}, Stop reason: ${response.metadata.stopReason}`);
+    console.log(`       Tokens used: ${response.metadata.usage?.totalTokens}, Finish reason: ${response.metadata.finishReason}`);
   }
   
   // Save shell stories to file (if debug directory enabled)

@@ -191,8 +191,10 @@ async function generateScopeAnalysis(params: {
   
   // Request scope analysis generation via injected LLM client
   const response = await generateText({
-    systemPrompt: FEATURE_IDENTIFICATION_SYSTEM_PROMPT,
-    prompt,
+    messages: [
+      { role: 'system', content: FEATURE_IDENTIFICATION_SYSTEM_PROMPT },
+      { role: 'user', content: prompt }
+    ],
     maxTokens: FEATURE_IDENTIFICATION_MAX_TOKENS
   });
   

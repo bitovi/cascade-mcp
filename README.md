@@ -31,8 +31,9 @@ Supported tools at the `https://cascade.bitovi.com/mcp` endpoint:
 
 Read the [documentation](./docs/rest-api.md) on accessing the following REST apis:
 
+- `POST /api/analyze-feature-scope`
 - `POST /api/write-shell-stories`
-- `POST /api/write-epics-next-story`
+- `POST /api/write-next-story`
 
 
 ## Use

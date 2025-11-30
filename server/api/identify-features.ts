@@ -8,7 +8,7 @@
 import type { Request, Response } from 'express';
 import { createAtlassianClientWithPAT } from '../providers/atlassian/atlassian-api-client.js';
 import { createFigmaClient } from '../providers/figma/figma-api-client.js';
-import { createAnthropicLLMClient } from '../llm-client/anthropic-client.js';
+import { createLLMClient } from '../llm-client/index.js';
 import { executeAnalyzeFeatureScope, type ExecuteAnalyzeFeatureScopeParams } from '../providers/combined/tools/analyze-feature-scope/core-logic.js';
 import type { ToolDependencies } from '../providers/combined/tools/types.js';
 import { resolveCloudId } from '../providers/atlassian/atlassian-helpers.js';
@@ -74,7 +74,7 @@ export async function handleIdentifyFeatures(req: Request, res: Response) {
     // Create pre-configured API clients with tokens
     const atlassianClient = createAtlassianClientWithPAT(atlassianToken);
     const figmaClient = createFigmaClient(figmaToken);
-    const generateText = createAnthropicLLMClient(anthropicApiKey);
+    const generateText = createLLMClient({ apiKey: anthropicApiKey });
     
     // Resolve cloudId BEFORE calling execute (needed for commenting)
     const { cloudId: resolvedCloudId } = await resolveCloudId(atlassianClient, cloudId, siteName);

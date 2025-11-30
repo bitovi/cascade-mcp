@@ -7,50 +7,55 @@
  */
 
 /**
- * Image content for multimodal requests
+ * Message content - either text or multimodal (text + images)
  */
-export interface LLMImageContent {
-  type: 'image';
-  data: string;       // Base64-encoded image data
-  mimeType: string;   // e.g., 'image/png', 'image/jpeg'
+export type MessageContent = string | Array<{
+  type: 'text' | 'image';
+  text?: string;           // For text content
+  data?: string;           // Base64-encoded image data
+  mimeType?: string;       // e.g., 'image/png', 'image/jpeg'
+}>;
+
+/**
+ * A single message in the conversation
+ */
+export interface Message {
+  role: 'user' | 'assistant' | 'system';
+  content: MessageContent;
 }
 
 /**
  * LLM Request configuration
  * 
- * Represents a request to generate text from an LLM.
+ * Represents a request to generate text from an LLM using messages format.
  * Maps to both MCP sampling/createMessage and Anthropic messages.create formats.
  */
 export interface LLMRequest {
   /**
-   * The user's prompt/message
+   * Array of messages in the conversation.
+   * For simple text generation, typically: [{ role: 'user', content: 'Your prompt' }]
+   * With system prompt: [{ role: 'system', content: 'Instructions' }, { role: 'user', content: 'Your prompt' }]
    */
-  prompt: string;
+  messages: Message[];
   
   /**
-   * Optional image to include in the request (for vision models)
-   */
-  image?: LLMImageContent;
-  
-  /**
-   * System prompt to guide the model's behavior
-   */
-  systemPrompt?: string;
-  
-  /**
-   * Maximum tokens to generate in the response
+   * Maximum tokens to generate in the response (default: 8000)
    */
   maxTokens?: number;
   
   /**
-   * Speed priority (0.0 = max quality, 1.0 = max speed)
-   * Only used by MCP sampling, ignored for direct API calls
+   * Temperature for sampling (0-1, default: varies by model)
    */
-  speedPriority?: number;
+  temperature?: number;
   
   /**
-   * Model to use (e.g., 'claude-3-5-sonnet-20241022')
-   * Only used for direct API calls, ignored for MCP sampling
+   * Top-p for nucleus sampling (0-1)
+   */
+  topP?: number;
+  
+  /**
+   * Model to use (e.g., 'claude-sonnet-4-5-20250929')
+   * If not provided, uses LLM_MODEL env var or provider default
    */
   model?: string;
 }
@@ -71,8 +76,13 @@ export interface LLMResponse {
    */
   metadata?: {
     model?: string;
-    stopReason?: string;
-    tokensUsed?: number;
+    finishReason?: 'stop' | 'length' | 'tool-calls' | 'error' | 'other';
+    usage?: {
+      promptTokens: number;
+      completionTokens: number;
+      totalTokens: number;
+    };
+    warnings?: string[];
   };
 }
 

@@ -17,7 +17,7 @@
 import type { Request, Response } from 'express';
 import { createAtlassianClientWithPAT, type AtlassianClient } from '../providers/atlassian/atlassian-api-client.js';
 import { createFigmaClient } from '../providers/figma/figma-api-client.js';
-import { createAnthropicLLMClient } from '../llm-client/anthropic-client.js';
+import { createLLMClient } from '../llm-client/index.js';
 import { executeWriteNextStory as defaultExecuteWriteNextStory, type ExecuteWriteNextStoryParams } from '../providers/combined/tools/write-next-story/core-logic.js';
 import type { ToolDependencies } from '../providers/combined/tools/types.js';
 import { resolveCloudId } from '../providers/atlassian/atlassian-helpers.js';
@@ -40,7 +40,6 @@ export interface WriteNextStoryHandlerDeps {
   executeWriteNextStory?: (params: ExecuteWriteNextStoryParams, deps: ToolDependencies) => Promise<any>;
   createAtlassianClient?: typeof createAtlassianClientWithPAT;
   createFigmaClient?: typeof createFigmaClient;
-  createAnthropicLLMClient?: typeof createAnthropicLLMClient;
 }
 
 /**
@@ -85,7 +84,6 @@ export async function handleWriteNextStory(req: Request, res: Response, deps: Wr
   const executeWriteNextStoryFn = deps.executeWriteNextStory || defaultExecuteWriteNextStory;
   const createAtlassianClientFn = deps.createAtlassianClient || createAtlassianClientWithPAT;
   const createFigmaClientFn = deps.createFigmaClient || createFigmaClient;
-  const createAnthropicLLMClientFn = deps.createAnthropicLLMClient || createAnthropicLLMClient;
   
   // Track context for error commenting (set after clients created)
   let commentContext: ErrorCommentContext | null = null;
@@ -103,7 +101,7 @@ export async function handleWriteNextStory(req: Request, res: Response, deps: Wr
     // Validate request body
     const { siteName, cloudId } = req.body;
     const epicKey = validateEpicKey(req.body, res);
-    if (!epicKey) return; // Response already sent
+    if (!epicKey) return;
     
     console.log(`  Processing epic: ${epicKey}`);
     console.log(`  Site name: ${siteName || 'auto-detect'}`);
@@ -112,7 +110,7 @@ export async function handleWriteNextStory(req: Request, res: Response, deps: Wr
     // Create pre-configured API clients with tokens
     const atlassianClient = createAtlassianClientFn(atlassianToken);
     const figmaClient = createFigmaClientFn(figmaToken);
-    const generateText = createAnthropicLLMClientFn(anthropicApiKey);
+    const generateText = createLLMClient({ apiKey: anthropicApiKey });
     
     // Resolve cloudId BEFORE calling execute (needed for commenting)
     console.log('  Resolving cloud ID...');
