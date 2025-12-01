@@ -1,5 +1,18 @@
 ## Environment Variables
 
+### LLM Clients
+
+The API supports multiple LLM providers for AI-powered operations. Users can choose their provider and supply credentials via request headers.
+
+**Supported Providers**: Anthropic (Claude), OpenAI (GPT), Google (Gemini), AWS Bedrock, Mistral, DeepSeek, Groq, xAI (Grok)
+
+**📖 See [LLM Provider Guide](./llm-client/providers/README.md)** for complete documentation including:
+- All supported providers with authentication details
+- Header and environment variable naming conventions (e.g., `X-OpenAI-Api-Key`, `OPENAI_API_KEY`)
+- Usage examples for multi-tenant and single-tenant deployments
+- AWS Bedrock multi-credential configuration
+- Model IDs for each provider
+
 ### Optional Configuration
 
 **`ANTHROPIC_API_KEY`** (Optional for REST API)
@@ -10,8 +23,9 @@
 - **Note**: REST API routes prefer `X-Anthropic-Key` header (multi-tenant). This env var is used only when header is not provided.
 
 **`LLM_MODEL`** (Optional)
-- Override the default Anthropic model ID
+- Override the default model ID
 - Default: `claude-sonnet-4-5-20250929`
+- Works with any provider (specify provider-specific model IDs)
 - Example: `export LLM_MODEL=claude-sonnet-4-5-20250929`
 
 **`DEV_CACHE_DIR`** (Optional - Development Only)

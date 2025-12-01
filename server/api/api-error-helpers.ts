@@ -100,15 +100,15 @@ async function tryPostErrorComment(
  * @param res - Express response object
  * @returns Object with extracted tokens, or null if validation failed (response already sent)
  * 
- * Note: X-Anthropic-Key is optional - will use ANTHROPIC_API_KEY env var if not provided
+ * Note: LLM provider credentials are validated by createProviderFromHeaders() which supports
+ * multiple providers via X-LLM-Provider header and falls back to environment variables
  */
 export function validateApiHeaders(
   headers: Record<string, string | string[] | undefined>,
   res: Response
-): { atlassianToken: string; figmaToken: string; anthropicApiKey?: string } | null {
+): { atlassianToken: string; figmaToken: string } | null {
   const atlassianToken = headers['x-atlassian-token'] as string;
   const figmaToken = headers['x-figma-token'] as string;
-  const anthropicApiKey = headers['x-anthropic-key'] as string;
   
   if (!atlassianToken) {
     res.status(401).json({ success: false, error: 'Missing required header: X-Atlassian-Token' });
@@ -119,7 +119,7 @@ export function validateApiHeaders(
     return null;
   }
   
-  return { atlassianToken, figmaToken, anthropicApiKey };
+  return { atlassianToken, figmaToken };
 }
 
 /**

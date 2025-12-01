@@ -75,7 +75,7 @@ describe('REST API: Write Shell Stories E2E', () => {
       baseUrl: serverUrl,
       atlassianToken: ATLASSIAN_PAT!,
       figmaToken: FIGMA_PAT!,
-      anthropicToken: ANTHROPIC_API_KEY!,
+      headers: ANTHROPIC_API_KEY ? { 'X-LLMClient-Anthropic-Api-Key': ANTHROPIC_API_KEY } : undefined,
     });
 
     // Create Atlassian client and resolve cloudId

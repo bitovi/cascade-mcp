@@ -29,11 +29,17 @@ Supported tools at the `https://cascade.bitovi.com/mcp` endpoint:
 **Utility Tools**:
 - **[`utility-test-sampling`](./server/providers/utility/tools/utility-test-sampling.md)** - Test sampling functionality by sending prompts to the agent and logging the interaction (enables testing of agent capabilities and inter-MCP tool communication)
 
-Read the [documentation](./docs/rest-api.md) on accessing the following REST apis:
+Read the [REST API documentation](./docs/rest-api.md) for accessing these endpoints:
 
 - `POST /api/analyze-feature-scope`
 - `POST /api/write-shell-stories`
 - `POST /api/write-next-story`
+
+### LLM Client Support
+
+The API supports 8 major LLM clients (Anthropic, OpenAI, Google, AWS Bedrock, Mistral, DeepSeek, Groq, xAI). Users choose their LLM client and supply credentials via request headers.
+
+See the **[LLM Provider Guide](./server/llm-client/README.md)** for complete documentation.
 
 
 ## Use

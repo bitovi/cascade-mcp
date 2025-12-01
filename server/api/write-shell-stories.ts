@@ -8,7 +8,7 @@
 import type { Request, Response } from 'express';
 import { createAtlassianClientWithPAT, type AtlassianClient } from '../providers/atlassian/atlassian-api-client.js';
 import { createFigmaClient } from '../providers/figma/figma-api-client.js';
-import { createLLMClient } from '../llm-client/index.js';
+import { createProviderFromHeaders } from '../llm-client/index.js';
 import { executeWriteShellStories as defaultExecuteWriteShellStories, type ExecuteWriteShellStoriesParams } from '../providers/combined/tools/writing-shell-stories/core-logic.js';
 import type { ToolDependencies } from '../providers/combined/tools/types.js';
 import { resolveCloudId } from '../providers/atlassian/atlassian-helpers.js';
@@ -81,7 +81,7 @@ export async function handleWriteShellStories(req: Request, res: Response, deps:
     const tokens = validateApiHeaders(req.headers, res);
     if (!tokens) return; // Response already sent
     
-    const { atlassianToken, figmaToken, anthropicApiKey } = tokens;
+    const { atlassianToken, figmaToken } = tokens;
     
     // Validate request body
     const { siteName, cloudId } = req.body;
@@ -96,7 +96,7 @@ export async function handleWriteShellStories(req: Request, res: Response, deps:
     // Note: atlassianToken should be base64(email:api_token) for Basic Auth
     const atlassianClient = createAtlassianClientFn(atlassianToken);
     const figmaClient = createFigmaClientFn(figmaToken);
-    const generateText = createLLMClient({ apiKey: anthropicApiKey });
+    const generateText = createProviderFromHeaders(req.headers as Record<string, string>);
     
     // Resolve cloudId BEFORE calling execute (needed for commenting)
     console.log('  Resolving cloud ID...');
