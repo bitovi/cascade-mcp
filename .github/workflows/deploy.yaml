@@ -42,6 +42,9 @@ jobs:
           echo "FIGMA_OAUTH_SCOPES=${{ vars.FIGMA_OAUTH_SCOPES }}" >> repo_env
           echo "FIGMA_CLIENT_SECRET=${{ secrets.FIGMA_CLIENT_SECRET }}" >> repo_env
           ####
+          echo "SESSION_SECRET=${{ secrets.SESSION_SECRET }}" >> repo_env
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> repo_env
+          ####
           echo "PORT=${{ env.PORT }}" >> repo_env
 
       - id: deploy
