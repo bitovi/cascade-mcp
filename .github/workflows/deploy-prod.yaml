@@ -8,12 +8,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
-env:
-  PORT: 3000
-
 jobs:
   deploy-mcp:
-    name: Deploy API to Development
+    name: Deploy MCP Production
     uses: ./.github/workflows/deploy.yaml
     secrets: inherit
     with:
