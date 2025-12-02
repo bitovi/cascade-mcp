@@ -34,7 +34,7 @@ import {
   type ADFNode,
   type ADFDocument
 } from '../../../atlassian/markdown-converter.js';
-import { extractAdfSection } from '../../../atlassian/adf-operations.js';
+import { extractADFSection } from '../../../atlassian/markdown-converter.js';
 import { associateNotesWithFrames } from './screen-analyzer.js';
 import { generateScreensYaml } from './yaml-generator.js';
 import { writeNotesForScreen } from './note-text-extractor.js';
@@ -348,8 +348,8 @@ export async function setupFigmaScreens(
   }
   
   // Extract Shell Stories section using ADF operations
-  const { section: shellStoriesAdf, remaining: epicContextAdf } = 
-    extractAdfSection(description.content || [], 'Shell Stories');
+  const { section: shellStoriesAdf, remainingContent: epicContextAdf } = 
+    extractADFSection(description.content || [], 'Shell Stories');
   
   console.log(`    Epic context: ${epicContextAdf.length} ADF nodes`);
   console.log(`    Shell stories: ${shellStoriesAdf.length} ADF nodes`);

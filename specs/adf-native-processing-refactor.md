@@ -86,50 +86,26 @@ This plan refactors the codebase to work directly with ADF format, eliminating l
 4. **Simplicity**: Easier to debug and iterate on prompts
 
 **Implementation**:
-- `convertAdfToMarkdown_AIPromptOnly()` used only in `prepareAIPromptContext()` for prompt generation
+- `convertAdfToMarkdown()` used only in `prepareAIPromptContext()` for prompt generation
 - All Jira data manipulation uses ADF operations (no round-trips)
 - AI-generated Markdown → convert once to ADF → push to Jira
 - `_AIPromptOnly` suffix on function names and field names to prevent misuse
 
 ## Implementation Steps
 
-### Step 1: Rename Conversion Functions and Create ADF Utilities
+### Step 1: Rename Conversion Functions (optional, later)
 
 **Part A: Rename Conversion Functions**
 
 **File**: `server/providers/atlassian/markdown-converter.ts`
 
-**Rename 1: `convertMarkdownToAdf()` → `convertMarkdownToAdf_NewContentOnly()`**
+<!-- **Rename 1: `convertMarkdownToAdf()` → `convertMarkdownToAdf()`**
+ -->
 
-**Changes**:
-- Rename function from `convertMarkdownToAdf()` to `convertMarkdownToAdf_NewContentOnly()`
-- Update JSDoc comment:
-  ```typescript
-  /**
-   * Converts new Markdown content to ADF (AI output, error messages, user-written strings).
-   * 
-   * ⚠️ NEVER use for round-trip conversions of existing Jira content.
-   * For manipulating existing Jira ADF, use ADF operations directly.
-   * 
-   * @param markdown - Markdown string to convert
-   * @returns ADF document structure
-   * 
-   * @example
-   * // ✅ CORRECT: Converting new AI-generated content
-   * const adf = await convertMarkdownToAdf_NewContentOnly(aiOutput);
-   * 
-   * // ✅ CORRECT: Converting error messages
-   * const adf = await convertMarkdownToAdf_NewContentOnly(errorMessage);
-   * 
-   * // ❌ WRONG: Converting existing Jira content (use ADF operations instead)
-   * const adf = await convertMarkdownToAdf_NewContentOnly(existingJiraDescription);
-   */
-  export async function convertMarkdownToAdf_NewContentOnly(markdown: string): Promise<ADFDocument>
-  ```
 
-**Rename 2: `convertAdfToMarkdown()` → `convertAdfToMarkdown_AIPromptOnly()`**
+**Rename: `convertAdfToMarkdown()` → `convertAdfToMarkdownForAIPrompt()`**
 
-- Rename function from `convertAdfToMarkdown()` to `convertAdfToMarkdown_AIPromptOnly()`
+- Rename function from `convertAdfToMarkdown()` to `convertAdfToMarkdownForAIPrompt()`
 - Update JSDoc comment:
   ```typescript
   /**
@@ -143,133 +119,23 @@ This plan refactors the codebase to work directly with ADF format, eliminating l
    * 
    * @example
    * // ✅ CORRECT: Converting for AI prompt context
-   * const markdown = convertAdfToMarkdown_AIPromptOnly(epicDescription);
+   * const markdown = convertAdfToMarkdown(epicDescription);
    * const prompt = `Context: ${markdown}\n\nGenerate...`;
    * 
    *
    * // ❌ WRONG: Never convert back to ADF for Jira updates
-   * // const markdown = convertAdfToMarkdown_AIPromptOnly(description);
+   * // const markdown = convertAdfToMarkdown(description);
    * // const modified = markdown.replace(...);
-   * // const adf = await convertMarkdownToAdf_NewContentOnly(modified); // This loses data like hardBreak nodes from the original ADF
+   * // const adf = await convertMarkdownToAdf(modified); // This loses data like hardBreak nodes from the original ADF
    */
-  export function convertAdfToMarkdown_AIPromptOnly(adf: ADFDocument): string
+  export function convertAdfToMarkdown(adf: ADFDocument): string
   ```
 
-**Verification for Both Renamings**:
+**Verification for Renamings**:
 - Run TypeScript compiler to find all references
 - Update all imports and usages
 - Update all existing documentation to use new names
 - Run existing tests to ensure no breakage
-
-**Part B: Create ADF Manipulation Utilities**
-
-**File**: `server/providers/atlassian/adf-operations.ts`
-
-Create a new module with pure ADF manipulation functions:
-
-```typescript
-/**
- * Extract a section from ADF content between two headings
- * @param content - Array of ADF nodes
- * @param headingText - Heading text to match (case-insensitive)
- * @returns { section: nodes in section, remaining: all other nodes }
- */
-export function extractAdfSection(
-  content: ADFNode[],
-  headingText: string
-): { section: ADFNode[], remaining: ADFNode[] }
-
-/**
- * Remove a section from ADF content
- * @param content - Array of ADF nodes
- * @param headingText - Heading to remove
- * @returns New content array without the section
- */
-export function removeAdfSection(
-  content: ADFNode[],
-  headingText: string
-): ADFNode[]
-
-/**
- * Append nodes to end of a specific section
- * @param content - Array of ADF nodes
- * @param headingText - Section heading to append to
- * @param newNodes - Nodes to append
- * @returns New content with nodes appended
- */
-export function appendToAdfSection(
-  content: ADFNode[],
-  headingText: string,
-  newNodes: ADFNode[]
-): ADFNode[]
-
-/**
- * Replace entire section content
- * @param content - Array of ADF nodes
- * @param headingText - Section heading to replace
- * @param newSectionNodes - New section content (including heading)
- * @returns New content with section replaced
- */
-export function replaceAdfSection(
-  content: ADFNode[],
-  headingText: string,
-  newSectionNodes: ADFNode[]
-): ADFNode[]
-
-/**
- * Find index of heading in ADF content
- * @returns Index of heading node, or -1 if not found
- */
-export function findAdfHeading(
-  content: ADFNode[],
-  headingText: string
-): number
-
-/**
- * Traverse ADF tree depth-first with visitor pattern
- * @param nodes - Root nodes to traverse
- * @param visitor - Callback for each node (receives node and path)
- */
-export function traverseAdfNodes(
-  nodes: ADFNode[],
-  visitor: (node: ADFNode, path: string[]) => void
-): void
-
-/**
- * Create ADF heading node
- */
-export function createAdfHeading(level: number, text: string): ADFNode
-
-/**
- * Create ADF paragraph node with text
- */
-export function createAdfParagraph(text: string, marks?: any[]): ADFNode
-
-/**
- * Create ADF bullet list from items
- * @param items - Array of content arrays (each item's nodes)
- */
-export function createAdfBulletList(items: ADFNode[][]): ADFNode
-
-/**
- * Create ADF hard break node (for Shift+Enter)
- */
-export function createAdfHardBreak(): ADFNode
-
-/**
- * Extract text content from ADF nodes (for display/debugging)
- * @param nodes - ADF nodes to extract text from
- * @returns Plain text string
- */
-export function extractTextFromAdf(nodes: ADFNode[]): string
-```
-
-**Validation**:
-- All functions should be pure (no side effects)
-- Return new arrays/objects (immutable operations)
-- Handle edge cases: empty sections, missing headings, malformed ADF
-- **Preserve unknown node types**: When traversing/manipulating ADF, copy unknown node types unchanged
-- Include JSDoc comments with examples
 
 ### Step 2: Create ADF-Based Shell Story Parser
 
@@ -360,7 +226,7 @@ export function addCompletionMarkerToStory(
 **File**: `server/providers/combined/tools/writing-shell-stories/figma-screen-setup.ts`
 
 **Changes**:
-1. Remove `convertAdfToMarkdown_AIPromptOnly()` calls from data manipulation (move to `prepareAIPromptContext()` only)
+1. Remove `convertAdfToMarkdown()` calls from data manipulation (move to `prepareAIPromptContext()` only)
 2. Keep ADF section extraction using ADF operations
 3. Update `FigmaScreenSetupResult` interface inline (ADF only, no Markdown)
 4. Create new file `server/providers/combined/tools/shared/ai-prompt-context.ts` for:
@@ -425,13 +291,13 @@ export function prepareAIPromptContext(
   setupResult: FigmaScreenSetupResult
 ): AIPromptContext {
   return {
-    epicMarkdown_AIPromptOnly: convertAdfToMarkdown_AIPromptOnly({
+    epicMarkdown_AIPromptOnly: convertAdfToMarkdown({
       version: 1,
       type: 'doc',
       content: setupResult.epicContextAdf
     }),
     shellStoriesMarkdown_AIPromptOnly: setupResult.shellStoriesAdf.length > 0
-      ? convertAdfToMarkdown_AIPromptOnly({
+      ? convertAdfToMarkdown({
           version: 1,
           type: 'doc',
           content: setupResult.shellStoriesAdf
@@ -547,7 +413,7 @@ async function updateEpicWithCompletion(
 ```typescript
 // Generate Markdown for AI, convert once to ADF
 const storyMarkdown = await generateStoryContent(...);
-const storyAdf = await convertMarkdownToAdf_NewContentOnly(storyMarkdown);
+const storyAdf = await convertMarkdownToAdf(storyMarkdown);
 ```
 
 ### Step 5: Refactor `writing-shell-stories/core-logic.ts`
@@ -575,7 +441,7 @@ async function updateEpicWithShellStories({
   const cleanedMarkdown = prepareShellStoriesSection(shellStoriesMarkdown);
   
   // Convert shell stories to ADF (one-way, from AI output)
-  const shellStoriesAdf = await convertMarkdownToAdf_NewContentOnly(cleanedMarkdown);
+  const shellStoriesAdf = await convertMarkdownToAdf(cleanedMarkdown);
   
   if (!validateAdf(shellStoriesAdf)) {
     throw new Error('Invalid ADF generated from shell stories');
@@ -638,8 +504,8 @@ async function updateEpicWithShellStories({
 - [ ] **Naming convention enforcement**:
   - Run: `grep -r "_AIPromptOnly" server/providers/combined/tools/` - should find all Markdown fields and conversion functions
   - Run: `grep -r "AIPromptContext" server/providers/combined/tools/` - should find interface usage
-  - Run: `grep -r "convertAdfToMarkdown_AIPromptOnly" server/providers/combined/tools/` - should only appear in `prepareAIPromptContext()`
-  - Run: `grep -r "convertMarkdownToAdf_NewContentOnly" server/providers/combined/tools/` - should only be on new AI-generated content
+  - Run: `grep -r "convertAdfToMarkdown" server/providers/combined/tools/` - should only appear in `prepareAIPromptContext()`
+  - Run: `grep -r "convertMarkdownToAdf" server/providers/combined/tools/` - should only be on new AI-generated content
   - Run: `grep -r "\bconvertAdfToMarkdown\b" server/providers/combined/tools/` - should return NO matches (old name removed)
   - Run: `grep -r "\bconvertMarkdownToAdf\b" server/providers/combined/tools/` - should return NO matches (old name removed)
 
@@ -694,7 +560,7 @@ Create fixture files with sample ADF structures:
 ### Step 8: Final Validation and Documentation
 
 **Phase 1** (Validation):
-- Verify no `convertMarkdownToAdf_NewContentOnly()` calls on existing Jira content (only new content)
+- Verify no `convertMarkdownToAdf()` calls on existing Jira content (only new content)
 - Verify all ADF operations are using the new utilities from `adf-operations.ts`
 - Run full test suite including integration tests
 - Verify hard breaks (Shift+Enter) are preserved in real Jira testing
@@ -714,10 +580,10 @@ Create fixture files with sample ADF structures:
 ## Success Criteria
 
 ### Must Have
-- [x] `convertMarkdownToAdf()` renamed to `convertMarkdownToAdf_NewContentOnly()` (Step 1)
-- [x] `convertAdfToMarkdown()` renamed to `convertAdfToMarkdown_AIPromptOnly()` (Step 1)
-- [x] No `convertMarkdownToAdf_NewContentOnly()` calls on existing Jira content (only new content: AI output, error messages, etc.)
-- [x] No `convertAdfToMarkdown_AIPromptOnly()` calls except in `prepareAIPromptContext()` for AI prompt generation
+- [x] `convertMarkdownToAdf()` renamed to `convertMarkdownToAdf()` (Step 1)
+- [x] `convertAdfToMarkdown()` renamed to `convertAdfToMarkdown()` (Step 1)
+- [x] No `convertMarkdownToAdf()` calls on existing Jira content (only new content: AI output, error messages, etc.)
+- [x] No `convertAdfToMarkdown()` calls except in `prepareAIPromptContext()` for AI prompt generation
 - [x] Shell story parsing works with ADF nodes (Step 2)
 - [x] Hard breaks (Shift+Enter) preserved through entire workflow
 - [x] All existing tests pass

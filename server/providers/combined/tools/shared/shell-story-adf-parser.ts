@@ -6,7 +6,7 @@
  */
 
 import type { ADFNode, ADFDocument } from '../../../atlassian/markdown-converter.js';
-import { extractAdfSection } from '../../../atlassian/adf-operations.js';
+import { extractADFSection } from '../../../atlassian/markdown-converter.js';
 
 /**
  * Parsed shell story structure
@@ -382,7 +382,7 @@ export function parseShellStoriesFromAdf(
 export function extractAndParseShellStories(
   epicDescription: ADFDocument
 ): ParsedShellStory[] {
-  const { section } = extractAdfSection(epicDescription.content, 'Shell Stories');
+  const { section } = extractADFSection(epicDescription.content, 'Shell Stories');
   
   if (section.length === 0) {
     return []; // No Shell Stories section
