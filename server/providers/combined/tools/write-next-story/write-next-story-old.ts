@@ -33,9 +33,9 @@ import {
 } from '../writing-shell-stories/screen-analysis-regenerator.js';
 import type { FigmaScreenSetupResult } from '../writing-shell-stories/figma-screen-setup.js';
 import { 
-  convertMarkdownToAdf, 
+  convertMarkdownToAdf_NewContentOnly, 
   validateAdf, 
-  convertAdfToMarkdown,
+  convertAdfToMarkdown_AIPromptOnly,
   type ADFDocument,
   type ADFNode
 } from '../../../atlassian/markdown-converter.js';
@@ -446,7 +446,7 @@ export async function createJiraIssue(
   console.log(`  Converting story to ADF...`);
   
   // Convert markdown to ADF
-  const adfDocument = await convertMarkdownToAdf(storyContent);
+  const adfDocument = await convertMarkdownToAdf_NewContentOnly(storyContent);
   console.log(`  ✅ Converted to ADF (${JSON.stringify(adfDocument).length} characters)`);
   
   // Validate ADF
@@ -630,7 +630,7 @@ export async function updateEpicWithCompletion(
   console.log(`  Rebuilt full epic markdown`);
   
   // Convert the entire updated markdown back to ADF
-  const updatedAdf = await convertMarkdownToAdf(updatedEpicMarkdown);
+  const updatedAdf = await convertMarkdownToAdf_NewContentOnly(updatedEpicMarkdown);
   
   if (!validateAdf(updatedAdf)) {
     throw new Error('Invalid ADF generated from updated epic markdown');
