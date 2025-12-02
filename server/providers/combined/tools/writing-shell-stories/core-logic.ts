@@ -20,6 +20,7 @@ import { getDebugDir, getBaseCacheDir } from './temp-directory-manager.js';
 import { getFigmaFileCachePath } from '../../../figma/figma-cache.js';
 import { setupFigmaScreens } from './figma-screen-setup.js';
 import { regenerateScreenAnalyses } from '../shared/screen-analysis-regenerator.js';
+import { prepareAIPromptContext } from '../shared/ai-prompt-context.js';
 import {
   generateShellStoryPrompt,
   SHELL_STORY_SYSTEM_PROMPT,
@@ -121,8 +122,7 @@ export async function executeWriteShellStories(
     allFrames,
     allNotes,
     figmaFileKey,
-    epicContext,
-    contentWithoutShellStories,
+    epicContextAdf,
     figmaUrls,
     cloudId: resolvedCloudId,
     siteName: resolvedSiteName,
@@ -140,6 +140,9 @@ export async function executeWriteShellStories(
   // Add steps for all screens to be analyzed
   await notify(`📝 AI Screen Analysis: Starting analysis of ${screens.length} screens...`, screens.length);
   
+  // Prepare AI prompt context (convert ADF to Markdown for AI)
+  const aiContext = prepareAIPromptContext(setupResult);
+  
   const { analyzedScreens } = await regenerateScreenAnalyses({
     generateText,
     figmaClient,
@@ -147,7 +150,7 @@ export async function executeWriteShellStories(
     allFrames,
     allNotes,
     figmaFileKey,
-    epicContext,
+    epicContext: aiContext.epicMarkdown_AIPromptOnly,
     notify: async (message: string) => {
       // Show progress for each screen (auto-increments)
       await notify(message);
@@ -167,7 +170,7 @@ export async function executeWriteShellStories(
     figmaFileKey,
     yamlContent,
     notify,
-    epicContext
+    epicContext: aiContext.epicMarkdown_AIPromptOnly
   });
 
   // ==========================================
@@ -185,7 +188,7 @@ export async function executeWriteShellStories(
       cloudId: resolvedCloudId,
       atlassianClient,
       shellStoriesMarkdown: shellStoriesContent,
-      contentWithoutShellStories,
+      epicContextAdf,
       notify
     });
   } else {
@@ -347,12 +350,16 @@ No shell stories content received from AI
 
 /**
  * Helper function for Phase 6: Update epic with shell stories
+ * 
+ * Updates the epic description by combining epic context (without Shell Stories section)
+ * with the new AI-generated shell stories. Uses ADF operations (no Markdown round-trips).
+ * 
  * @param params - Parameters for updating the epic
  * @param params.epicKey - The Jira epic key
  * @param params.cloudId - The Atlassian cloud ID
- * @param params.token - The Atlassian access token
- * @param params.shellStoriesMarkdown - The shell stories markdown content
- * @param params.contentWithoutShellStories - The epic description ADF content without Shell Stories section (from Phase 1.6)
+ * @param params.atlassianClient - Atlassian API client with auth
+ * @param params.shellStoriesMarkdown - The AI-generated shell stories markdown content
+ * @param params.epicContextAdf - The epic description ADF content without Shell Stories section (from setupResult)
  * @param params.notify - Progress notification function
  */
 async function updateEpicWithShellStories({
@@ -360,14 +367,14 @@ async function updateEpicWithShellStories({
   cloudId,
   atlassianClient,
   shellStoriesMarkdown,
-  contentWithoutShellStories,
+  epicContextAdf,
   notify
 }: {
   epicKey: string;
   cloudId: string;
   atlassianClient: ToolDependencies['atlassianClient'];
   shellStoriesMarkdown: string;
-  contentWithoutShellStories: ADFNode[];
+  epicContextAdf: ADFNode[];
   notify: ToolDependencies['notify'];
 }): Promise<void> {
   console.log('  Phase 6: Updating epic with shell stories...');
@@ -376,7 +383,7 @@ async function updateEpicWithShellStories({
     // Clean up AI-generated content and prepare section
     const shellStoriesSection = prepareShellStoriesSection(shellStoriesMarkdown);
     
-    // Convert the new section to ADF
+    // Convert the new section to ADF (one-way, from AI output)
     console.log('    Converting shell stories section to ADF...');
     const shellStoriesAdf = await convertMarkdownToAdf_NewContentOnly(shellStoriesSection);
     
@@ -389,14 +396,14 @@ async function updateEpicWithShellStories({
     console.log('    ✅ Shell stories converted to ADF');
     
     // Check if combined size would exceed Jira's limit
-    const wouldExceed = wouldExceedLimit(contentWithoutShellStories, shellStoriesAdf);
+    const wouldExceed = wouldExceedLimit(epicContextAdf, shellStoriesAdf);
 
-    let finalContent = contentWithoutShellStories;
+    let finalContent = epicContextAdf;
 
     if (wouldExceed) {
       // Extract Scope Analysis section from content
       const { section: scopeAnalysisSection, remainingContent } = extractADFSection(
-        contentWithoutShellStories,
+        epicContextAdf,
         'Scope Analysis'
       );
       
