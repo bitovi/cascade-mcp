@@ -7,7 +7,7 @@ import { z } from 'zod';
 import type { McpServer } from '../../../../mcp-core/mcp-types.js';
 import { getAuthInfoSafe } from '../../../../mcp-core/auth-helpers.js';
 import { resolveCloudId, getJiraIssue, handleJiraAuthError } from '../../../atlassian/atlassian-helpers.js';
-import { convertMarkdownToAdf_NewContentOnly, validateAdf } from '../../../atlassian/markdown-converter.js';
+import { convertMarkdownToAdf, validateAdf } from '../../../atlassian/markdown-converter.js';
 import { createAtlassianClient } from '../../../atlassian/atlassian-api-client.js';
 
 /**
@@ -126,7 +126,7 @@ export function registerTestJiraUpdateTool(mcp: McpServer): void {
         console.log('  Converting shell stories to ADF...');
         console.log('  Markdown length:', shellStoriesSection.length);
         
-        const shellStoriesAdf = await convertMarkdownToAdf_NewContentOnly(shellStoriesSection);
+        const shellStoriesAdf = await convertMarkdownToAdf(shellStoriesSection);
         
         if (!validateAdf(shellStoriesAdf)) {
           return {

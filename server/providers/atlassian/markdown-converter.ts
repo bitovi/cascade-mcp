@@ -49,15 +49,15 @@ export interface ADFDocument {
  * 
  * @example
  * // ✅ CORRECT: Converting new AI-generated content
- * const adf = await convertMarkdownToAdf_NewContentOnly(aiOutput);
+ * const adf = await convertMarkdownToAdf(aiOutput);
  * 
  * // ✅ CORRECT: Converting error messages
- * const adf = await convertMarkdownToAdf_NewContentOnly(errorMessage);
+ * const adf = await convertMarkdownToAdf(errorMessage);
  * 
  * // ❌ WRONG: Converting existing Jira content (use ADF operations instead)
- * const adf = await convertMarkdownToAdf_NewContentOnly(existingJiraDescription);
+ * const adf = await convertMarkdownToAdf(existingJiraDescription);
  */
-export async function convertMarkdownToAdf_NewContentOnly(markdown: string): Promise<ADFDocument> {
+export async function convertMarkdownToAdf(markdown: string): Promise<ADFDocument> {
   if (!markdown || typeof markdown !== 'string') {
     logger.warn('Invalid markdown input provided', { markdown });
     return createFallbackAdf(markdown || '');
@@ -361,18 +361,18 @@ export function extractADFSection(
  * 
  * @example
  * // ✅ CORRECT: Converting for AI prompt context
- * const markdown = convertAdfToMarkdown_AIPromptOnly(epicDescription);
+ * const markdown = convertAdfToMarkdown(epicDescription);
  * const prompt = `Context: ${markdown}\n\nGenerate...`;
  * 
  * // ❌ WRONG: Never convert back to ADF for Jira updates
- * const markdown = convertAdfToMarkdown_AIPromptOnly(description);
+ * const markdown = convertAdfToMarkdown(description);
  * const modified = markdown.replace(...);
- * const adf = await convertMarkdownToAdf_NewContentOnly(modified); // WRONG! This approach loses Jira formatting and may corrupt data.
+ * const adf = await convertMarkdownToAdf(modified); // WRONG! This approach loses Jira formatting and may corrupt data.
  * // Instead, use ADF operations directly to manipulate content for Jira updates:
  * // ✅ CORRECT: Use ADF manipulation functions for updates
  * const updatedAdf = updateAdfContent(description, ...); // Use ADF-aware helpers
  */
-export function convertAdfToMarkdown_AIPromptOnly(adf: ADFDocument): string {
+export function convertAdfToMarkdown(adf: ADFDocument): string {
   logger.info('Converting ADF to markdown', {
     contentBlocks: adf.content?.length || 0
   });

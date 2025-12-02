@@ -21,7 +21,7 @@ import { createApiClient } from './helpers/api-client.js';
 import { analyzeFeatureScope, writeShellStories, writeNextStory } from './helpers/api-endpoints.js';
 import { createAtlassianClientWithPAT } from '../../server/providers/atlassian/atlassian-api-client.js';
 import { createJiraIssue, getJiraIssue, deleteJiraIssue, resolveCloudId } from '../../server/providers/atlassian/atlassian-helpers.js';
-import { convertMarkdownToAdf_NewContentOnly } from '../../server/providers/atlassian/markdown-converter.js';
+import { convertMarkdownToAdf } from '../../server/providers/atlassian/markdown-converter.js';
 
 // Test configuration from environment (using existing env var names)
 const ATLASSIAN_PAT = process.env.ATLASSIAN_TEST_PAT?.replace(/^"|"/g, ''); // Remove quotes if present (base64 credentials)
@@ -118,7 +118,7 @@ describe('REST API: Write Shell Stories E2E', () => {
     
     const epicSummary = `E2E Test Epic - ${new Date().toISOString()}`;
     const epicDescriptionMarkdown = `Test epic for REST API validation.\n\nFigma Design: ${FIGMA_DESIGN_URL}`;
-    const epicDescriptionAdf = await convertMarkdownToAdf_NewContentOnly(epicDescriptionMarkdown);
+    const epicDescriptionAdf = await convertMarkdownToAdf(epicDescriptionMarkdown);
     
     const createEpicResponse = await createJiraIssue(
       atlassianClient,

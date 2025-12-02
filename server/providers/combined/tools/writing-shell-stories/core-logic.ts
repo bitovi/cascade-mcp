@@ -27,10 +27,10 @@ import {
   SHELL_STORY_MAX_TOKENS
 } from './prompt-shell-stories.js';
 import { 
-  convertMarkdownToAdf_NewContentOnly, 
+  convertMarkdownToAdf, 
   validateAdf,
   extractADFSection,
-  convertAdfToMarkdown_AIPromptOnly,
+  convertAdfToMarkdown,
   type ADFNode,
   type ADFDocument
 } from '../../../atlassian/markdown-converter.js';
@@ -385,7 +385,7 @@ async function updateEpicWithShellStories({
     
     // Convert the new section to ADF (one-way, from AI output)
     console.log('    Converting shell stories section to ADF...');
-    const shellStoriesAdf = await convertMarkdownToAdf_NewContentOnly(shellStoriesSection);
+    const shellStoriesAdf = await convertMarkdownToAdf(shellStoriesSection);
     
     if (!validateAdf(shellStoriesAdf)) {
       console.log('    ⚠️ Failed to convert shell stories to valid ADF');
@@ -419,7 +419,7 @@ async function updateEpicWithShellStories({
         };
         
         // Convert to markdown
-        const scopeAnalysisMarkdown = convertAdfToMarkdown_AIPromptOnly(scopeAnalysisDoc);
+        const scopeAnalysisMarkdown = convertAdfToMarkdown(scopeAnalysisDoc);
         
         // Post as comment
         try {

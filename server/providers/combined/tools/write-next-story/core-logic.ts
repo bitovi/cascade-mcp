@@ -32,7 +32,7 @@ import {
   STORY_GENERATION_MAX_TOKENS 
 } from './prompt-story-generation.js';
 import { 
-  convertMarkdownToAdf_NewContentOnly, 
+  convertMarkdownToAdf, 
   validateAdf,
   type ADFDocument,
   type ADFNode
@@ -553,7 +553,7 @@ export async function createJiraIssue(
   console.log(`  Converting story to ADF...`);
   
   // Convert markdown to ADF
-  const adfDocument = await convertMarkdownToAdf_NewContentOnly(storyContent);
+  const adfDocument = await convertMarkdownToAdf(storyContent);
   console.log(`  ✅ Converted to ADF (${JSON.stringify(adfDocument).length} characters)`);
   
   // Validate ADF

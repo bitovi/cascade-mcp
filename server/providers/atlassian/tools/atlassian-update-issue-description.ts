@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { logger } from '../../../observability/logger.ts';
 import { getAuthInfoSafe, handleJiraAuthError } from '../../../mcp-core/auth-helpers.ts';
 import { resolveCloudId } from '../atlassian-helpers.ts';
-import { convertMarkdownToAdf_NewContentOnly, validateAdf, type ADFDocument } from '../markdown-converter.ts';
+import { convertMarkdownToAdf, validateAdf, type ADFDocument } from '../markdown-converter.ts';
 import type { McpServer } from '../../../mcp-core/mcp-types.ts';
 import { createAtlassianClient } from '../atlassian-api-client.ts';
 
@@ -118,7 +118,7 @@ export function registerAtlassianUpdateIssueDescriptionTool(mcp: McpServer): voi
           descriptionLength: description.length 
         });
 
-        const adfDescription = await convertMarkdownToAdf_NewContentOnly(description);
+        const adfDescription = await convertMarkdownToAdf(description);
 
         // Validate ADF structure
         if (!validateAdf(adfDescription)) {

@@ -12,7 +12,7 @@
  */
 
 import type { FigmaScreenSetupResult } from '../writing-shell-stories/figma-screen-setup.js';
-import { convertAdfToMarkdown_AIPromptOnly } from '../../../atlassian/markdown-converter.js';
+import { convertAdfToMarkdown } from '../../../atlassian/markdown-converter.js';
 
 /**
  * AI prompt context with Markdown conversion
@@ -52,19 +52,19 @@ export interface AIPromptContext {
  * @example
  * // ❌ WRONG: Never convert Markdown back to ADF for Jira updates
  * const modified = aiContext.epicMarkdown_AIPromptOnly.replace(...);
- * const adf = await convertMarkdownToAdf_NewContentOnly(modified); // This loses data!
+ * const adf = await convertMarkdownToAdf(modified); // This loses data!
  */
 export function prepareAIPromptContext(
   setupResult: FigmaScreenSetupResult
 ): AIPromptContext {
   return {
-    epicMarkdown_AIPromptOnly: convertAdfToMarkdown_AIPromptOnly({
+    epicMarkdown_AIPromptOnly: convertAdfToMarkdown({
       version: 1,
       type: 'doc',
       content: setupResult.epicContextAdf
     }),
     shellStoriesMarkdown_AIPromptOnly: setupResult.shellStoriesAdf.length > 0
-      ? convertAdfToMarkdown_AIPromptOnly({
+      ? convertAdfToMarkdown({
           version: 1,
           type: 'doc',
           content: setupResult.shellStoriesAdf

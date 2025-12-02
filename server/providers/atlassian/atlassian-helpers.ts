@@ -4,9 +4,9 @@
  */
 
 import { logger } from '../../observability/logger.ts';
-import { sanitizeObjectWithJWTs } from '../../tokens.ts';
+// import { sanitizeObjectWithJWTs } from '../../tokens.ts';
 import type { ADFDocument } from './markdown-converter.ts';
-import { convertMarkdownToAdf_NewContentOnly } from './markdown-converter.ts';
+import { convertMarkdownToAdf } from './markdown-converter.ts';
 import type { AtlassianClient } from './atlassian-api-client.js';
 
 // Atlassian site information structure
@@ -311,7 +311,7 @@ export async function addIssueComment(
   });
 
   // Convert markdown to ADF
-  const adfBody = await convertMarkdownToAdf_NewContentOnly(markdownText);
+  const adfBody = await convertMarkdownToAdf(markdownText);
 
   // Construct comment URL
   const commentUrl = `${client.getJiraBaseUrl(cloudId)}/issue/${issueKey}/comment`;
@@ -372,7 +372,7 @@ export async function updateIssueComment(
   markdownText: string
 ): Promise<Response> {
   // Convert markdown to ADF
-  const adfBody = await convertMarkdownToAdf_NewContentOnly(markdownText);
+  const adfBody = await convertMarkdownToAdf(markdownText);
 
   // Construct comment update URL
   const commentUrl = `${client.getJiraBaseUrl(cloudId)}/issue/${issueKey}/comment/${commentId}`;
