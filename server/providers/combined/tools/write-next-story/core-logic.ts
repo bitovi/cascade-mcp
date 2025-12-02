@@ -230,25 +230,15 @@ export async function extractShellStoriesFromSetup(
   await notify('Extracting shell stories...');
   console.log('Extracting shell stories from epic description...');
 
-  // Validate that shellStoriesAdf is present and appears valid
-  if (!setupResult.shellStoriesAdf || typeof setupResult.shellStoriesAdf !== 'object') {
-    throw new Error(`
-📝 **Shell Stories ADF Data Missing or Invalid**
-
-**What happened:**
-Epic ${setupResult.epicKey} is missing the shellStoriesAdf field, or it is not a valid ADF document.
-
-**Possible causes:**
-- The epic description could not be retrieved or parsed
-- The ADF data was not provided by the upstream workflow
-- There is a bug in the setup or extraction logic
-
-Please ensure the epic description is accessible and contains valid ADF data.
-    `.trim());
+  // Validate shellStoriesAdf data structure
+  if (!Array.isArray(setupResult.shellStoriesAdf)) {
+    throw new Error(`Epic ${setupResult.epicKey} has invalid shellStoriesAdf data (expected array, got ${typeof setupResult.shellStoriesAdf})`);
   }
 
-  // Use ADF parser instead of Markdown parser
+  // Parse shell stories from ADF
   const shellStories = parseShellStoriesFromAdf(setupResult.shellStoriesAdf);
+  
+  // Validate business logic: at least one story must exist
   if (shellStories.length === 0) {
     throw new Error(`
 📝 **Shell Stories Section Missing or Empty**
