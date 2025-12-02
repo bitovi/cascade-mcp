@@ -334,57 +334,20 @@ export function extractTextFromAdf(nodes: ADFNode[]): string {
 }
 
 /**
- * Recursively deep clones an object or array.
- * Handles primitives, arrays, and plain objects.
- */
-function deepClone<T>(obj: T): T {
-  if (obj === null || typeof obj !== 'object') {
-    return obj;
-  }
-  if (Array.isArray(obj)) {
-    return obj.map(item => deepClone(item)) as unknown as T;
-  }
-  const clonedObj: any = {};
-  for (const key in obj) {
-    if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      clonedObj[key] = deepClone((obj as any)[key]);
-    }
-  }
-  return clonedObj;
-}
-
-/**
  * Deep clone an ADF node (preserving unknown properties)
+ * 
+ * Uses native structuredClone() which is safe for ADF nodes since they are
+ * plain data objects (JSON-serializable: strings, numbers, objects, arrays).
+ * ADF nodes do not contain functions, class instances, or other non-cloneable types.
+ * 
  * @param node - ADF node to clone
  * @returns Cloned node
  * 
  * @example
  * const copy = cloneAdfNode(original);
  */
-
 export function cloneAdfNode(node: ADFNode): ADFNode {
-  const cloned: ADFNode = {
-    ...node  // Preserve all properties including unknown ones
-  };
-
-  // Deep clone content array if present
-  if (node.content && Array.isArray(node.content)) {
-    cloned.content = node.content.map(child => cloneAdfNode(child));
-  }
-
-  // Deep clone attrs if present
-  if (node.attrs) {
-    cloned.attrs = deepClone(node.attrs);
-  }
-
-  // Deep clone marks if present
-  if (node.marks && Array.isArray(node.marks)) {
-    cloned.marks = node.marks.map(mark => ({
-      ...mark,
-      attrs: mark.attrs ? deepClone(mark.attrs) : undefined
-    }));
-  }
-  return cloned;
+  return structuredClone(node);
 }
 
 /**

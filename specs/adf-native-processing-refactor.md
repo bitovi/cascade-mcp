@@ -743,7 +743,7 @@ Create fixture files with sample ADF structures:
 | Breaking existing workflows | High - API changes | Maintain backward compatibility during transition |
 | Missing edge cases | Medium - parsing failures | Comprehensive test fixtures, real-world testing |
 
-## Implementation Strategy
+<!-- ## Implementation Strategy
 
 **Approach**: Vertical Slice (Feature-by-Feature) - Fast feedback, early validation
 
@@ -761,10 +761,11 @@ Create fixture files with sample ADF structures:
 4. **Manual test**: Verify completion markers + hard breaks in Jira
 
 ### Phase 3: Final (~1-2 sessions)
+1. **Cleanup**: evaluate if there are unused functions in markdown-converter.ts, or if there are functions that should be moved into adr-operations.ts.
 1. **Step 8**: Full validation, ESLint rules, documentation
 2. **Manual test**: End-to-end workflow verification
 
-**Start Prompt**: `Implement Phase 1, Session 1: Step 1 (rename functions + create adf-operations.ts)`
+**Start Prompt**: `Implement Phase 1, Session 1: Step 1 (rename functions + create adf-operations.ts)` -->
 
 ## Design Decisions & Resolved Questions
 
