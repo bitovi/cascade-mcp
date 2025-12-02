@@ -164,7 +164,7 @@ describe('REST API: Write Shell Stories E2E', () => {
     }
 
     expect(createEpicResponse.ok).toBe(true);
-    const epicData = await createEpicResponse.json();
+    const epicData = await createEpicResponse.json() as { key: string };
     createdEpicKey = epicData.key;
     
     console.log(`✅ Created epic: ${createdEpicKey}`);
@@ -201,7 +201,7 @@ describe('REST API: Write Shell Stories E2E', () => {
     });
 
     expect(getEpicResponse.ok).toBe(true);
-    const epicDetails = await getEpicResponse.json();
+    const epicDetails = await getEpicResponse.json() as { fields: { description?: { content?: any[] } } };
     
     // Convert ADF to text for parsing
     const descriptionContent = epicDetails.fields.description?.content || [];
