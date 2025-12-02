@@ -46,12 +46,13 @@ export interface AIPromptContext {
  * @example
  * // ✅ CORRECT: Get setup result with ADF, then convert for AI prompts
  * const setupResult = await setupFigmaScreens(...);
- * // const adf = await convertMarkdownToAdf_NewContentOnly(modified); // This loses data!
+ * const aiContext = prepareAIPromptContext(setupResult);
  * const prompt = `Context: ${aiContext.epicMarkdown_AIPromptOnly}\n\nGenerate...`;
  * 
+ * @example
  * // ❌ WRONG: Never convert Markdown back to ADF for Jira updates
- * // const modified = aiContext.epicMarkdown_AIPromptOnly.replace(...);
- * // const adf = await convertMarkdownToAdf_NewContentOnly(modified); // This loses data!
+ * const modified = aiContext.epicMarkdown_AIPromptOnly.replace(...);
+ * const adf = await convertMarkdownToAdf_NewContentOnly(modified); // This loses data!
  */
 export function prepareAIPromptContext(
   setupResult: FigmaScreenSetupResult
