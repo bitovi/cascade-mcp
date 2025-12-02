@@ -3,12 +3,12 @@
  */
 
 import { 
-  convertMarkdownToAdf, 
+  convertMarkdownToAdf_NewContentOnly, 
   validateAdf, 
   removeADFSectionByHeading, 
   countADFSectionsByHeading,
   extractADFSection,
-  convertAdfToMarkdown,
+  convertAdfToMarkdown_AIPromptOnly,
   type ADFDocument 
 } from './markdown-converter.js';
 
@@ -32,10 +32,10 @@ function getMaxListDepth(content: any[], currentDepth: number = 0): number {
 }
 
 describe('Markdown to ADF Converter', () => {
-  describe('convertMarkdownToAdf', () => {
+  describe('convertMarkdownToAdf_NewContentOnly', () => {
     test('should convert simple markdown to valid ADF', async () => {
       const markdown = '# Hello World\n\nThis is a test.';
-      const adf = await convertMarkdownToAdf(markdown);
+      const adf = await convertMarkdownToAdf_NewContentOnly(markdown);
       
       expect(validateAdf(adf)).toBe(true);
       expect(adf.version).toBe(1);
@@ -44,7 +44,7 @@ describe('Markdown to ADF Converter', () => {
     });
 
     test('should handle empty input gracefully', async () => {
-      const adf = await convertMarkdownToAdf('');
+      const adf = await convertMarkdownToAdf_NewContentOnly('');
       
       expect(validateAdf(adf)).toBe(true);
       expect(adf.content).toHaveLength(1);
@@ -52,8 +52,8 @@ describe('Markdown to ADF Converter', () => {
     });
 
     test('should handle null/undefined input', async () => {
-      const adf1 = await convertMarkdownToAdf(null as any);
-      const adf2 = await convertMarkdownToAdf(undefined as any);
+      const adf1 = await convertMarkdownToAdf_NewContentOnly(null as any);
+      const adf2 = await convertMarkdownToAdf_NewContentOnly(undefined as any);
       
       expect(validateAdf(adf1)).toBe(true);
       expect(validateAdf(adf2)).toBe(true);
@@ -67,7 +67,7 @@ describe('Markdown to ADF Converter', () => {
   * DEPENDENCIES: none
   * Display header/navigation bar`;
 
-      const adf = await convertMarkdownToAdf(markdown);
+      const adf = await convertMarkdownToAdf_NewContentOnly(markdown);
       
       expect(validateAdf(adf)).toBe(true);
       expect(getMaxListDepth(adf.content)).toBeLessThanOrEqual(2);
@@ -77,7 +77,7 @@ describe('Markdown to ADF Converter', () => {
       const markdown = `- **Important** item
 - Regular item`;
 
-      const adf = await convertMarkdownToAdf(markdown);
+      const adf = await convertMarkdownToAdf_NewContentOnly(markdown);
       
       expect(validateAdf(adf)).toBe(true);
       expect(JSON.stringify(adf)).toContain('"type":"strong"');
@@ -86,7 +86,7 @@ describe('Markdown to ADF Converter', () => {
     test('should handle inline code formatting', async () => {
       const markdown = '- `code` item\n- regular item';
 
-      const adf = await convertMarkdownToAdf(markdown);
+      const adf = await convertMarkdownToAdf_NewContentOnly(markdown);
       
       expect(validateAdf(adf)).toBe(true);
       expect(JSON.stringify(adf)).toContain('"type":"code"');
@@ -96,7 +96,7 @@ describe('Markdown to ADF Converter', () => {
       const markdown = `- \\+ escaped plus
 - \\- escaped minus`;
 
-      const adf = await convertMarkdownToAdf(markdown);
+      const adf = await convertMarkdownToAdf_NewContentOnly(markdown);
       
       expect(validateAdf(adf)).toBe(true);
       expect(getMaxListDepth(adf.content)).toBeLessThanOrEqual(2);
@@ -324,7 +324,7 @@ describe('Markdown to ADF Converter', () => {
         ]
       };
 
-      const markdown = convertAdfToMarkdown(adf);
+      const markdown = convertAdfToMarkdown_AIPromptOnly(adf);
       
       expect(markdown).toContain('# Title');
       expect(markdown).toContain('Hello world');
@@ -361,7 +361,7 @@ describe('Markdown to ADF Converter', () => {
         ]
       };
 
-      const markdown = convertAdfToMarkdown(adf);
+      const markdown = convertAdfToMarkdown_AIPromptOnly(adf);
       
       expect(markdown).toContain('- First item');
       expect(markdown).toContain('- Second item');
@@ -391,7 +391,7 @@ describe('Markdown to ADF Converter', () => {
         ]
       };
 
-      const markdown = convertAdfToMarkdown(adf);
+      const markdown = convertAdfToMarkdown_AIPromptOnly(adf);
       
       expect(markdown).toContain('**Bold text**');
       expect(markdown).toContain('`code`');
@@ -404,7 +404,7 @@ describe('Markdown to ADF Converter', () => {
         content: []
       };
 
-      const markdown = convertAdfToMarkdown(adf);
+      const markdown = convertAdfToMarkdown_AIPromptOnly(adf);
       
       expect(typeof markdown).toBe('string');
       expect(markdown.length).toBeGreaterThanOrEqual(0);
@@ -420,8 +420,8 @@ describe('Markdown to ADF Converter', () => {
   * Level 2
     + Level 3`;
 
-      const shallowAdf = await convertMarkdownToAdf(shallowMarkdown);
-      const deepAdf = await convertMarkdownToAdf(deepMarkdown);
+      const shallowAdf = await convertMarkdownToAdf_NewContentOnly(shallowMarkdown);
+      const deepAdf = await convertMarkdownToAdf_NewContentOnly(deepMarkdown);
 
       expect(getMaxListDepth(shallowAdf.content)).toBeLessThanOrEqual(2);
       

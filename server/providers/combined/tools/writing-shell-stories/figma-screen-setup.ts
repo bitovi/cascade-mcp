@@ -31,7 +31,7 @@ import {
 import { resolveCloudId, getJiraIssue, handleJiraAuthError } from '../../../atlassian/atlassian-helpers.js';
 import { 
   removeADFSectionByHeading,
-  convertAdfToMarkdown,
+  convertAdfToMarkdown_AIPromptOnly,
   countADFSectionsByHeading,
   type ADFNode,
   type ADFDocument
@@ -335,7 +335,7 @@ export async function setupFigmaScreens(
   }
   
   // Convert full description to markdown (including Shell Stories)
-  const epicMarkdown = convertAdfToMarkdown(description);
+  const epicMarkdown = convertAdfToMarkdown_AIPromptOnly(description);
   
   const figmaUrls = extractFigmaUrlsFromADF(description);
   console.log(`  Found ${figmaUrls.length} Figma URLs`);
@@ -363,7 +363,7 @@ export async function setupFigmaScreens(
     );
     
     // Convert remaining ADF to markdown
-    epicContext = convertAdfToMarkdown({
+    epicContext = convertAdfToMarkdown_AIPromptOnly({
       version: 1,
       type: 'doc',
       content: contentWithoutShellStories

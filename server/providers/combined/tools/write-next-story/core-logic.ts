@@ -31,7 +31,7 @@ import {
   STORY_GENERATION_MAX_TOKENS 
 } from './prompt-story-generation.js';
 import { 
-  convertMarkdownToAdf, 
+  convertMarkdownToAdf_NewContentOnly, 
   validateAdf,
   type ADFDocument
 } from '../../../atlassian/markdown-converter.js';
@@ -551,7 +551,7 @@ export async function createJiraIssue(
   console.log(`  Converting story to ADF...`);
   
   // Convert markdown to ADF
-  const adfDocument = await convertMarkdownToAdf(storyContent);
+  const adfDocument = await convertMarkdownToAdf_NewContentOnly(storyContent);
   console.log(`  ✅ Converted to ADF (${JSON.stringify(adfDocument).length} characters)`);
   
   // Validate ADF
@@ -832,7 +832,7 @@ Could not find "## Shell Stories" section in epic ${epicKey} when trying to mark
   console.log(`  Rebuilt full epic markdown`);
   
   // Convert the entire updated markdown back to ADF
-  const updatedAdf = await convertMarkdownToAdf(updatedEpicMarkdown);
+  const updatedAdf = await convertMarkdownToAdf_NewContentOnly(updatedEpicMarkdown);
   
   if (!validateAdf(updatedAdf)) {
     throw new Error(`

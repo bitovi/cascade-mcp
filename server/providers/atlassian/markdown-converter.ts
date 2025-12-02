@@ -39,11 +39,25 @@ export interface ADFDocument {
 }
 
 /**
- * Convert markdown text to ADF format
- * @param markdown - Markdown text to convert
- * @returns ADF document object
+ * Converts new Markdown content to ADF (AI output, error messages, user-written strings).
+ * 
+ * ⚠️ NEVER use for round-trip conversions of existing Jira content.
+ * For manipulating existing Jira ADF, use ADF operations directly.
+ * 
+ * @param markdown - Markdown string to convert
+ * @returns ADF document structure
+ * 
+ * @example
+ * // ✅ CORRECT: Converting new AI-generated content
+ * const adf = await convertMarkdownToAdf_NewContentOnly(aiOutput);
+ * 
+ * // ✅ CORRECT: Converting error messages
+ * const adf = await convertMarkdownToAdf_NewContentOnly(errorMessage);
+ * 
+ * // ❌ WRONG: Converting existing Jira content (use ADF operations instead)
+ * const adf = await convertMarkdownToAdf_NewContentOnly(existingJiraDescription);
  */
-export async function convertMarkdownToAdf(markdown: string): Promise<ADFDocument> {
+export async function convertMarkdownToAdf_NewContentOnly(markdown: string): Promise<ADFDocument> {
   if (!markdown || typeof markdown !== 'string') {
     logger.warn('Invalid markdown input provided', { markdown });
     return createFallbackAdf(markdown || '');
@@ -337,15 +351,28 @@ export function extractADFSection(
 
 
 /**
- * Convert ADF (Atlassian Document Format) to Markdown
+ * Converts ADF (Atlassian Document Format) to Markdown for AI prompt generation ONLY.
  * 
- * Converts ADF nodes to markdown text while preserving formatting,
- * structure, and links. Used to extract epic context for AI prompts.
+ * ⚠️ NEVER use for data manipulation or Jira updates.
+ * This is a one-way conversion for AI reading only.
  * 
  * @param adf - ADF document to convert
- * @returns Markdown string
+ * @returns Markdown string for AI prompts only
+ * 
+ * @example
+ * // ✅ CORRECT: Converting for AI prompt context
+ * const markdown = convertAdfToMarkdown_AIPromptOnly(epicDescription);
+ * const prompt = `Context: ${markdown}\n\nGenerate...`;
+ * 
+ * // ❌ WRONG: Never convert back to ADF for Jira updates
+ * const markdown = convertAdfToMarkdown_AIPromptOnly(description);
+ * const modified = markdown.replace(...);
+ * const adf = await convertMarkdownToAdf_NewContentOnly(modified); // WRONG! This approach loses Jira formatting and may corrupt data.
+ * // Instead, use ADF operations directly to manipulate content for Jira updates:
+ * // ✅ CORRECT: Use ADF manipulation functions for updates
+ * const updatedAdf = updateAdfContent(description, ...); // Use ADF-aware helpers
  */
-export function convertAdfToMarkdown(adf: ADFDocument): string {
+export function convertAdfToMarkdown_AIPromptOnly(adf: ADFDocument): string {
   logger.info('Converting ADF to markdown', {
     contentBlocks: adf.content?.length || 0
   });

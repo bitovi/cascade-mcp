@@ -18,7 +18,7 @@ import {
   FEATURE_IDENTIFICATION_MAX_TOKENS
 } from './strategies/prompt-scope-analysis-2.js';
 import {
-  convertMarkdownToAdf,
+  convertMarkdownToAdf_NewContentOnly,
   validateAdf,
   type ADFNode,
   type ADFDocument
@@ -266,7 +266,7 @@ async function updateEpicWithScopeAnalysis({
     // so we don't need to add it again
     
     // Convert the scope analysis to ADF
-    const scopeAnalysisAdf = await convertMarkdownToAdf(scopeAnalysisMarkdown);
+    const scopeAnalysisAdf = await convertMarkdownToAdf_NewContentOnly(scopeAnalysisMarkdown);
     
     if (!validateAdf(scopeAnalysisAdf)) {
       console.log('    ⚠️ Failed to convert scope analysis to valid ADF');
