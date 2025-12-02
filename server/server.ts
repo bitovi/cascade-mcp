@@ -80,7 +80,7 @@ if (process.env.DEV_CACHE_DIR) {
 }
 
 const sessionMiddleware = session({
-  secret: process.env.SESSION_SECRET || 'changeme',
+  secret: process.env.SESSION_SECRET!,
   resave: false,
   saveUninitialized: true,
   cookie: {
@@ -145,13 +145,13 @@ app.get('/health', (req, res) => {
 app.get('/debug/config', (req, res) => {
   res.json({
     environment: process.env.NODE_ENV || 'development',
-    baseUrl: process.env.VITE_AUTH_SERVER_URL || 'not set',
+    baseUrl: process.env.VITE_AUTH_SERVER_URL!,
     jira: {
       clientId: process.env.VITE_JIRA_CLIENT_ID ? process.env.VITE_JIRA_CLIENT_ID.substring(0, 10) + '...' : 'not set',
       clientSecretPresent: !!process.env.JIRA_CLIENT_SECRET,
       clientSecretLength: process.env.JIRA_CLIENT_SECRET?.length || 0,
-      scope: process.env.VITE_JIRA_SCOPE || 'default',
-      redirectUri: `${process.env.VITE_AUTH_SERVER_URL || 'http://localhost:3000'}/auth/callback/atlassian`,
+      scope: process.env.VITE_JIRA_SCOPE!,
+      redirectUri: `${process.env.VITE_AUTH_SERVER_URL!}/auth/callback/atlassian`,
     },
     session: {
       secretPresent: !!process.env.SESSION_SECRET,
@@ -171,10 +171,10 @@ app.get('/favicon.ico', (req, res) => {
 
 // Root endpoint for service discovery
 app.get('/', (req, res) => {
-  const baseUrl = process.env.VITE_AUTH_SERVER_URL || `http://localhost:${process.env.PORT || 3000}`;
+  const baseUrl = process.env.VITE_AUTH_SERVER_URL!;
 
   res.send(`
-    <h1>Cascade MCP service</h1>
+    <h1>Cascade MCP Service</h1>
     <p>MCP tools that help software teams. Integrates Jira and Figma. See <a href="https://github.com/bitovi/cascade-mcp">Cascade MCP on GitHub</a> for guides and documentation.</p>
     <p>Note: some tools require <a href="https://modelcontextprotocol.io/specification/2025-06-18/client/sampling">sampling</a>. Make sure your agent supports sampling.</p>
     <h2>Available Endpoints</h2>

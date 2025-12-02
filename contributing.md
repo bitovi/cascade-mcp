@@ -1,65 +1,128 @@
-# Contributing to Jira MCP Auth Bridge
+# Contributing to Cascade MCP Tools
 
-Thank you for your interest in contributing! This guide will help you set up the project locally and configure it to work with your own Atlassian app credentials.
+Thank you for your interest in contributing! To contribute to this project, you'll need to complete both setup paths:
+
+1. **[API Client Setup](#setup-for-api-clients)** - Start here - PAT token-based setup (easier to verify)
+2. **[MCP Client Setup](#setup-for-mcp-clients)** - Then complete OAuth setup for full functionality
+
+**Both Atlassian (Jira) and Figma are required** for the application to function.
+
+## Table of Contents
+- [Prerequisites](#prerequisites)
+- [Setup Overview](#setup-overview)
+- [Setup for API Clients](#setup-for-api-clients) - Step 1: PAT-based setup
+- [Setup for MCP Clients](#setup-for-mcp-clients) - Step 2: OAuth setup
+- [Optional Configuration](#optional-configuration)
+- [Contributing Code](#contributing-code)
 
 ## Prerequisites
 - Node.js (v18 or higher recommended)
 - npm (v9 or higher recommended)
-- An Atlassian developer account ([developer.atlassian.com](https://developer.atlassian.com/))
+- An Atlassian account with access to Jira ([atlassian.com](https://www.atlassian.com/))
+- A Figma account ([figma.com](https://www.figma.com/))
+- An Anthropic API account ([console.anthropic.com](https://console.anthropic.com/))
 
-## 1. Fork and Clone the Repository
+## Setup Overview
+
+For contributing to this project, you need to complete **both** setup sections:
+
+1. **[API Client Setup](#setup-for-api-clients)** - Start here. Uses PAT tokens which are easier to generate and verify.
+2. **[MCP Client Setup](#setup-for-mcp-clients)** - Complete after API setup. Adds OAuth configuration for MCP protocol integration.
+
+This two-step approach lets you verify your environment is working correctly with the API scripts before adding the more complex OAuth configuration.
+
+---
+
+## Setup for API Clients
+
+**Complete this section first.** This setup uses Personal Access Tokens (PATs) for authentication, which are simpler to generate and verify than OAuth credentials.
+
+### 1. Fork and Clone the Repository
 
 ```bash
 git clone https://github.com/bitovi/cascade-mcp.git
 cd cascade-mcp
 ```
 
-## 2. Install Dependencies
+### 2. Install Dependencies
 
 ```bash
 npm install
 ```
 
-## 3. Create an Atlassian OAuth App
+### 3. Generate Personal Access Tokens
 
-You must register a new OAuth 2.0 (3LO) app in the Atlassian Developer Console to obtain credentials for local development.
+#### Atlassian PAT
 
-### Steps:
-1. Go to the [Atlassian Developer Console](https://developer.atlassian.com/console/myapps/).
-2. Click **Create app** > **OAuth 2.0 integration**.
-3. Enter an app name (e.g., `Jira MCP Auth Bridge Local`).
-4. Set the **Redirect URL** to:
-   - `http://localhost:3000/callback`
-5. Add the following **OAuth scopes**:
-   - `read:jira-work`
-   - `write:jira-work`
-   - `offline_access`
-6. Save the app and copy the **Client ID** and **Client Secret**.
+1. Follow the instructions at: [How to create a Jira Request token](https://bitovi.atlassian.net/wiki/spaces/agiletraining/pages/1302462817/How+to+create+a+Jira+Request+token)
+2. Your token will look like: `ATATT3xFfGF0...` (starts with `ATATT`)
+3. Encode your credentials as base64:
+   ```bash
+   echo -n "your.email@example.com:ATATT3xFfGF0..." | base64
+   ```
+4. Save the base64-encoded output for your `.env` file
 
-## 4. Configure Environment Variables
+**Important:** Keep your token secure and never commit it to version control.
 
-1. Copy `.env.example` to `.env`:
+#### Figma PAT
+
+1. Go to [Figma Settings > Personal access tokens](https://www.figma.com/settings)
+2. Click **Generate new token**
+3. Give it a descriptive name (e.g., `Cascade MCP Local Dev`)
+4. Copy the token (starts with `figd_`)
+5. Save it for your `.env` file
+
+**Note:** Figma PATs have full access to your account - no additional scope configuration needed.
+
+#### Figma Test File
+
+The E2E tests and PAT validation script require access to a specific Figma file. By default, the project uses the "TaskFlow" design file:
+- **File URL:** `https://www.figma.com/design/3JgSzy4U8gdIGm1oyHiovy/TaskFlow?node-id=0-321`
+
+To use a different test file:
+1. Open your Figma file in the browser
+2. Select a specific node/frame to use for testing (optional)
+3. Copy the full URL from the browser address bar (including `node-id` parameter if you selected a node)
+4. Add `FIGMA_TEST_URL` to your `.env` file with the complete URL
+
+### 4. Configure Environment Variables
+
+1. Copy the example environment file:
    ```bash
    cp .env.example .env
    ```
-2. Fill in the following variables in your `.env` file using the values from your Atlassian app:
-   - `VITE_JIRA_CLIENT_ID` (from Atlassian Developer Console)
-   - `JIRA_CLIENT_SECRET` (from Atlassian Developer Console)
-   - `VITE_JIRA_CALLBACK_URL` (should be `http://localhost:3000/callback`)
-   - `VITE_JIRA_SCOPE` (should be `read:jira-work write:jira-work offline_access`)
-   - `SESSION_SECRET` and `JWT_SECRET` (set to random secure strings for local dev)
 
-Example:
-```env
-VITE_JIRA_CLIENT_ID=your-client-id-here
-JIRA_CLIENT_SECRET=your-client-secret-here
-VITE_JIRA_CALLBACK_URL=http://localhost:3000/callback
-VITE_JIRA_SCOPE="read:jira-work write:jira-work offline_access"
-SESSION_SECRET=changeme_in_dev
-JWT_SECRET=changeme_in_dev
-```
+2. Add these **required** variables to your `.env` file:
 
-## 5. Run the App Locally
+   ```bash
+   # Atlassian PAT (base64-encoded email:token)
+   ATLASSIAN_TEST_PAT="<your-base64-encoded-credentials>"
+   
+   # Figma PAT
+   FIGMA_TEST_PAT="figd_..."
+   
+   # Figma test file URL (full URL with node-id for E2E tests)
+   # Copy the full URL from your Figma file, including the node-id parameter
+   FIGMA_TEST_URL="https://www.figma.com/design/3JgSzy4U8gdIGm1oyHiovy/TaskFlow?node-id=0-321"
+   
+   # Anthropic API Key (for AI-powered API endpoints)
+   ANTHROPIC_API_KEY="sk-ant-..."
+   
+   # Security secrets (use random strings for local development)
+   SESSION_SECRET="changeme_in_production"
+   JWT_SECRET="devsecret_change_in_production"
+   ```
+
+3. **Optional** variables:
+   ```bash
+   # Override API base URL (defaults to http://localhost:3000)
+   API_BASE_URL=http://localhost:3000
+   
+   # Cache location (defaults to /tmp, use ./cache to keep in project)
+   DEV_CACHE_DIR=./cache
+   ```
+
+### 5. Run the Server
 
 ```bash
 npm run start-local
@@ -67,43 +130,135 @@ npm run start-local
 
 The server will start on `http://localhost:3000`.
 
-## 6. Development Cache Directory (Optional)
+### 6. Validate Your Setup
 
-For easier debugging, you can override the default temporary directory location:
+Run the token validation script to ensure your PATs are configured correctly:
 
 ```bash
-# Use a local cache directory
-export DEV_CACHE_DIR=./cache
+npm run validate-pat-tokens
+```
+
+**What it checks:**
+- **Atlassian:** Authentication, project access (PLAY), issue creation permissions
+- **Figma:** Basic authentication, optional E2E test file access
+
+### 7. Try the API Scripts
+
+The API scripts provide a quick way to test your setup and use the main features:
+
+```bash
+# 1. Analyze feature scope from Figma designs
+node --import ./loader.mjs scripts/api/analyze-feature-scope.ts https://bitovi.atlassian.net/browse/PLAY-123
+
+# 2. Generate shell stories from scope analysis
+node --import ./loader.mjs scripts/api/write-shell-stories.ts https://bitovi.atlassian.net/browse/PLAY-123
+
+# 3. Write the next story (run iteratively to create all stories)
+node --import ./loader.mjs scripts/api/write-next-story.ts https://bitovi.atlassian.net/browse/PLAY-123
+```
+
+**Typical workflow:** Run the commands in order, using a real Jira epic URL from your workspace.
+
+For detailed options and examples, see: [`scripts/api/readme.md`](scripts/api/readme.md)
+
+---
+
+## Setup for MCP Clients
+
+**Complete this section after [API Client Setup](#setup-for-api-clients)** to add full MCP protocol integration.
+
+This setup configures OAuth 2.0 authentication for MCP (Model Context Protocol) integration, enabling use with MCP clients like VS Code Copilot, Claude Desktop, and other MCP-compatible tools.
+
+### 1. Create an Atlassian OAuth App
+
+You must register a new OAuth 2.0 (3LO) app in the Atlassian Developer Console to obtain credentials for MCP integration.
+
+**Steps:**
+1. Go to the [Atlassian Developer Console](https://developer.atlassian.com/console/myapps/).
+2. Click **Create app** > **OAuth 2.0 integration**.
+3. Enter an app name (e.g., `Cascade MCP - Atlassian Local`).
+4. Set the **Redirect URL** to:
+   - `http://localhost:3000/auth/callback/atlassian`
+5. Add the following **OAuth scopes**:
+   - `read:jira-work`
+   - `write:jira-work`
+   - `offline_access`
+6. Save the app and copy the **Client ID** and **Client Secret**.
+
+### 2. Create a Figma OAuth App
+
+You must register a new OAuth app in Figma to obtain credentials for MCP integration.
+
+**Steps:**
+1. Go to [Figma Developer Settings](https://www.figma.com/developers/apps).
+2. Click **Create new app**.
+3. Enter an app name (e.g., `Cascade MCP - Figma Local`).
+4. Set the **Callback URL** to:
+   - `http://localhost:3000/auth/callback/figma`
+5. Configure the following OAuth scopes:
+   - `file_content:read`
+   - `file_metadata:read`
+   - `file_comments:read`
+   - `current_user:read`
+6. Save the app and copy the **Client ID** and **Client Secret**.
+
+### 3. Configure Environment Variables
+
+1. Copy the example environment file:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Fill in the following **required** variables in your `.env` file:
+
+   **Atlassian/Jira OAuth** (from Step 1):
+   - `VITE_JIRA_CLIENT_ID` - Your Atlassian OAuth Client ID
+   - `JIRA_CLIENT_SECRET` - Your Atlassian OAuth Client Secret
+   - `VITE_JIRA_CALLBACK_URL` - Must be `http://localhost:3000/auth/callback/atlassian`
+   - `VITE_JIRA_SCOPE` - Should be `"read:jira-work write:jira-work offline_access"`
+
+   **Figma OAuth** (from Step 2):
+   - `FIGMA_CLIENT_ID` - Your Figma OAuth Client ID
+   - `FIGMA_CLIENT_SECRET` - Your Figma OAuth Client Secret
+   - `FIGMA_OAUTH_SCOPES` - Should be `"file_content:read file_metadata:read file_comments:read current_user:read"`
+
+   **Note:** The `ANTHROPIC_API_KEY`, `SESSION_SECRET`, and `JWT_SECRET` variables were already set during API setup.
+
+3. **Understanding Callback URLs**: The application uses provider-specific callback URLs following the pattern:
+   ```
+   {BASE_URL}/auth/callback/{provider}
+   ```
+   - Atlassian: `http://localhost:3000/auth/callback/atlassian`
+   - Figma: `http://localhost:3000/auth/callback/figma`
+   
+   These URLs **must match exactly** in your OAuth app configurations.
+
+### 4. Restart the Server
+
+If the server is still running from the API setup, restart it to pick up the new OAuth environment variables:
+
+```bash
 npm run start-local
 ```
 
-This will:
-- Store all cache artifacts in `<project-root>/cache/` instead of `/tmp`
-- Preserve artifacts across server restarts for inspection
-- Use consistent paths: `./cache/{sessionId}/{epicKey}/`
-- Skip automatic cleanup (directories persist until manually deleted)
+### 5. Connect Your MCP Client
 
-To inspect artifacts while debugging:
-```bash
-ls -la ./cache/default/PROJ-123/
-# Shows: screens.yaml, *.analysis.md, *.png, etc.
-```
+Follow the MCP client-specific instructions for connecting to `http://localhost:3000/mcp`. The OAuth flow will guide you through authentication with Atlassian and Figma.
 
-To clean up manually:
-```bash
-rm -rf ./cache
-```
+---
 
-## 7. Testing Token Expiration (Optional)
-To test token refresh flows, you can force short-lived tokens:
-```bash
-TEST_SHORT_AUTH_TOKEN_EXP=60 npm run start-local
-```
+## Optional Configuration
 
-## 8. Running Integration Tests (Optional)
-See the `README.md` and `specs/` directory for integration test instructions.
+You can configure optional environment variables in your `.env` file to help with development and debugging:
 
-## 9. Contributing Code
+- `DEV_CACHE_DIR=./cache` - Sets the cache location to within the project instead of `/tmp`, making it easier to inspect cached files and preserving them across restarts
+- `TEST_SHORT_AUTH_TOKEN_EXP=60` - Forces JWT tokens to expire after 60 seconds to test token refresh flows (MCP clients only)
+- `DEBUG_FIGMA_TOKEN=true` - Enables detailed logging of Figma token operations
+- `CHECK_JWT_EXPIRATION=false` - Disables JWT expiration checking during development (useful for debugging MCP OAuth flows)
+
+---
+
+## Contributing Code
 - Please follow the code style and documentation patterns in the repo.
 - Update `server/readme.md` with any API or file changes.
 - Open a pull request with a clear description of your changes.

@@ -15,7 +15,7 @@ export interface JWTPayload {
 }
 
 // Create a secret key for JWT signing
-const key = createSecretKey(Buffer.from(process.env.JWT_SECRET || 'devsecret'));
+const key = createSecretKey(Buffer.from(process.env.JWT_SECRET!));
 
 /**
  * Sign a JWT token with the provided payload

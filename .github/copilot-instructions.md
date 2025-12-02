@@ -171,7 +171,8 @@ try {
 
 ### Atlassian APIs
 - **Token Exchange**: `https://auth.atlassian.com/oauth/token` for access/refresh token operations
-- **Sites API**: `https://api.atlassian.com/oauth/token/accessible-resources` for cloud ID resolution
+- **Sites API (OAuth only)**: `https://api.atlassian.com/oauth/token/accessible-resources` for cloud ID resolution with OAuth tokens
+- **Cloud ID Resolution (OAuth + PAT)**: `https://{siteName}.atlassian.net/_edge/tenant_info` - Works with both OAuth Bearer tokens and PAT Basic Auth to retrieve cloudId
 - **Jira REST API**: `https://api.atlassian.com/ex/jira/{cloudId}/rest/api/3/` for issue operations
 - **Official Atlassian MCP Service**: `https://mcp.atlassian.com/v1/sse` - Used for integration testing and validation
 

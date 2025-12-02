@@ -41,12 +41,12 @@ export async function createPATBypassToken(patToken) {
  */
 export async function completePkceFlow(metadata = null) {
   // Check if PAT bypass mode is enabled for automated testing
-  if (process.env.TEST_USE_PAT_BYPASS === 'true' && process.env.JIRA_TEST_PAT) {
+  if (process.env.TEST_USE_PAT_BYPASS === 'true' && process.env.ATLASSIAN_TEST_PAT) {
     console.log('🔧 Using PAT bypass mode for automated testing');
     
     // Create a JWT token that contains the PAT as the Atlassian access token
     // This bypasses the OAuth flow but allows testing real Jira API calls
-    const patToken = await createPATBypassToken(process.env.JIRA_TEST_PAT);
+    const patToken = await createPATBypassToken(process.env.ATLASSIAN_TEST_PAT);
     
     return {
       access_token: patToken,
