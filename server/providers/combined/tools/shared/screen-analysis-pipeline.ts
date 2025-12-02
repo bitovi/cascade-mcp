@@ -97,7 +97,6 @@ export async function executeScreenAnalysisPipeline(
     figmaFileKey,
     yamlPath,
     epicContextAdf,
-    epicDescriptionAdf,
     figmaUrls,
     cloudId: resolvedCloudId,
     siteName: resolvedSiteName
