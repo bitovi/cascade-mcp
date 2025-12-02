@@ -24,7 +24,8 @@ import { getDebugDir, getBaseCacheDir } from '../writing-shell-stories/temp-dire
 import { getFigmaFileCachePath } from '../../../figma/figma-cache.js';
 import { setupFigmaScreens, type FigmaScreenSetupResult } from '../writing-shell-stories/figma-screen-setup.js';
 import { regenerateScreenAnalyses } from '../shared/screen-analysis-regenerator.js';
-import { parseShellStories, type ParsedShellStory } from './shell-story-parser.js';
+import { parseShellStoriesFromAdf, addCompletionMarkerToStory, type ParsedShellStory } from '../shared/shell-story-adf-parser.js';
+import { prepareAIPromptContext } from '../shared/ai-prompt-context.js';
 import { 
   generateStoryPrompt, 
   STORY_GENERATION_SYSTEM_PROMPT, 
@@ -33,7 +34,8 @@ import {
 import { 
   convertMarkdownToAdf_NewContentOnly, 
   validateAdf,
-  type ADFDocument
+  type ADFDocument,
+  type ADFNode
 } from '../../../atlassian/markdown-converter.js';
 
 /**
@@ -197,7 +199,7 @@ Each story must follow this format:
     atlassianClient,
     setupResult.cloudId,
     setupResult.epicKey,
-    setupResult.epicMarkdown,
+    setupResult,
     nextStory,
     createdIssue,
     notify
@@ -219,51 +221,55 @@ Each story must follow this format:
 
 /**
  * Step 2-3: Extract shell stories from epic description
- * Uses the epic markdown already fetched by setupFigmaScreens
+ * Uses ADF parser to preserve all formatting including hardBreak nodes
  */
 export async function extractShellStoriesFromSetup(
   setupResult: FigmaScreenSetupResult,
   notify: ToolDependencies['notify']
 ): Promise<ParsedShellStory[]> {
   await notify('Extracting shell stories...');
-  
-  // Extract Shell Stories section from the full epic markdown
-  const shellStoriesMatch = setupResult.epicMarkdown.match(/## Shell Stories\n([\s\S]*?)(?=\n## |$)/);
-  
-  if (!shellStoriesMatch) {
+  console.log('Extracting shell stories from epic description...');
+
+  // Validate that shellStoriesAdf is present and appears valid
+  if (!setupResult.shellStoriesAdf || typeof setupResult.shellStoriesAdf !== 'object') {
     throw new Error(`
-📝 **Shell Stories Section Missing**
+📝 **Shell Stories ADF Data Missing or Invalid**
 
 **What happened:**
-Epic ${setupResult.epicKey} does not contain a "## Shell Stories" section
+Epic ${setupResult.epicKey} is missing the shellStoriesAdf field, or it is not a valid ADF document.
+
+**Possible causes:**
+- The epic description could not be retrieved or parsed
+- The ADF data was not provided by the upstream workflow
+- There is a bug in the setup or extraction logic
+
+Please ensure the epic description is accessible and contains valid ADF data.
+    `.trim());
+  }
+
+  // Use ADF parser instead of Markdown parser
+  const shellStories = parseShellStoriesFromAdf(setupResult.shellStoriesAdf);
+  if (shellStories.length === 0) {
+    throw new Error(`
+📝 **Shell Stories Section Missing or Empty**
+
+**What happened:**
+Epic ${setupResult.epicKey} does not contain any shell stories
 
 **Possible causes:**
 - Shell stories have not been generated yet
-- The section header was renamed or deleted
+- The Shell Stories section is empty
 - Epic description was modified incorrectly
 
 **How to fix:**
 1. Run the \`write-shell-stories\` tool to generate shell stories
-2. Verify the epic description contains "## Shell Stories" as a markdown heading
-3. Check that the section wasn't accidentally deleted or renamed
+2. Verify the epic description contains "## Shell Stories" section with story content
+3. Check that the section wasn't accidentally deleted or modified
 
 **Technical details:**
 - Epic: ${setupResult.epicKey}
 - Required section: "## Shell Stories"
 `.trim());
-  }
-
-  const shellStoriesContent = shellStoriesMatch[1].trim();
-  console.log('  Shell Stories section extracted');
-  
-  // Parse shell stories
-  await notify('Parsing shell stories...');
-  const shellStories = parseShellStories(shellStoriesContent);
-  
-  // Log parsing details for debugging
-  if (shellStories.length === 0) {
-    console.warn('  ⚠️ Parsing returned 0 stories. First 200 chars of content:');
-    console.warn(`     "${shellStoriesContent.substring(0, 200)}..."`);
   }
   
   return shellStories;
@@ -422,6 +428,9 @@ export async function generateStoryContent(
       missingScreens.some(missing => screen.name === missing.name)
     );
     
+    // Prepare AI prompt context (convert ADF to Markdown for AI)
+    const aiContext = prepareAIPromptContext(setupResult);
+    
     await regenerateScreenAnalyses({
       generateText,
       figmaClient,
@@ -429,7 +438,7 @@ export async function generateStoryContent(
       allFrames: setupResult.allFrames,
       allNotes: setupResult.allNotes,
       figmaFileKey: setupResult.figmaFileKey,
-      epicContext: setupResult.epicContext,
+      epicContext: aiContext.epicMarkdown_AIPromptOnly,
       notify: async (msg) => await notify(msg)
     });
     
@@ -488,8 +497,11 @@ No screen analysis files are available for story ${story.id}
   
   console.log(`  Using ${dependencyStories.length} dependency stories for context`);
   
+  // Prepare AI prompt context (convert ADF to Markdown for AI)
+  const aiContext = prepareAIPromptContext(setupResult);
+  
   // Generate prompt
-  const storyPrompt = await generateStoryPrompt(story, dependencyStories, analysisFiles, setupResult.epicContext);
+  const storyPrompt = await generateStoryPrompt(story, dependencyStories, analysisFiles, aiContext.epicMarkdown_AIPromptOnly);
   console.log(`  Generated prompt (${storyPrompt.length} characters)`);
   
   // Request story generation via LLM
@@ -770,80 +782,64 @@ Could not create Jira story for "${story.title}"
 
 /**
  * Step 8: Update epic with completion marker
- * Updates the shell story in the epic description to add Jira link and timestamp
+ * Updates the shell story in the epic description using ADF operations (no Markdown conversion)
  */
 export async function updateEpicWithCompletion(
   atlassianClient: ToolDependencies['atlassianClient'],
   cloudId: string,
   epicKey: string,
-  epicMarkdown: string,
+  setupResult: FigmaScreenSetupResult,
   story: ParsedShellStory,
   createdIssue: { key: string; self: string },
   notify: ToolDependencies['notify']
 ): Promise<void> {
   await notify('Updating epic with completion marker...');
+  console.log('Adding completion marker to shell story...');
   
-  console.log(`  Extracting Shell Stories section from epic...`);
+  // Construct Jira URL
+  const jiraUrl = `https://bitovi.atlassian.net/browse/${createdIssue.key}`;
   
-  // Extract Shell Stories section
-  const shellStoriesMatch = epicMarkdown.match(/## Shell Stories\n([\s\S]*?)(?=\n## |$)/);
-  
-  if (!shellStoriesMatch) {
-    throw new Error(`
-📝 **Shell Stories Section Missing**
-
-**What happened:**
-Could not find "## Shell Stories" section in epic ${epicKey} when trying to mark story as complete
-
-**Possible causes:**
-- Epic description was modified manually
-- Shell Stories section was deleted
-- Section header was renamed
-
-**How to fix:**
-1. Check if epic ${epicKey} still has a "## Shell Stories" section
-2. If missing, restore it or re-run \`write-shell-stories\`
-3. Avoid manually editing the Shell Stories section
-
-**Technical details:**
-- Epic: ${epicKey}
-- Created story: ${createdIssue.key}
-- Story was created successfully but epic couldn't be updated
-- Required section: "## Shell Stories"
-`.trim());
+  // Add completion marker to shell stories ADF
+  let updatedShellStories;
+  try {
+    updatedShellStories = addCompletionMarkerToStory(
+      setupResult.shellStoriesAdf,
+      story.id,
+      createdIssue.key,
+      jiraUrl
+    );
+  } catch (err: any) {
+    throw new Error(
+      `✅ Story ${createdIssue.key} was created, but failed to update the epic with a completion marker for shell story ID "${story.id}".\n` +
+      `Reason: ${err && err.message ? err.message : err}`
+    );
   }
   
-  const shellStoriesMarkdown = shellStoriesMatch[0];
-  console.log(`  Shell Stories section extracted (${shellStoriesMarkdown.length} characters)`);
+  console.log(`  Updated story ${story.id} in ADF`);
   
-  // Update the specific story in markdown
-  const jiraUrl = `https://bitovi.atlassian.net/browse/${createdIssue.key}`;
-  const timestamp = new Date().toISOString();
-  const updatedShellStoriesMarkdown = updateShellStoryInMarkdown(shellStoriesMarkdown, story.id, jiraUrl, timestamp);
+  // Rebuild epic description: epic context + updated shell stories
+  const updatedDescription: ADFDocument = {
+    version: 1,
+    type: 'doc',
+    content: [
+      ...setupResult.epicContextAdf,
+      ...updatedShellStories
+    ]
+  };
   
-  console.log(`  Updated story ${story.id} in markdown`);
+  console.log(`  Rebuilt full epic description in ADF`);
   
-  // Replace the Shell Stories section in the full epic markdown
-  const updatedEpicMarkdown = epicMarkdown.replace(
-    /## Shell Stories\n[\s\S]*?(?=\n## |$)/,
-    updatedShellStoriesMarkdown
-  );
-  
-  console.log(`  Rebuilt full epic markdown`);
-  
-  // Convert the entire updated markdown back to ADF
-  const updatedAdf = await convertMarkdownToAdf_NewContentOnly(updatedEpicMarkdown);
-  
-  if (!validateAdf(updatedAdf)) {
+  // Validate ADF structure
+  if (!validateAdf(updatedDescription)) {
     throw new Error(`
 📄 **Invalid Epic Format Generated**
 
 **What happened:**
-Updated epic description could not be converted to valid Jira format (ADF)
+Updated epic description has invalid ADF structure
 
 **Possible causes:**
-- Markdown conversion error when updating epic
-- Epic description contains unsupported formatting
+- ADF manipulation error when updating epic
+- Epic description contains malformed ADF nodes
 - Shell Stories section has invalid structure
 
 **How to fix:**
@@ -856,11 +852,10 @@ Updated epic description could not be converted to valid Jira format (ADF)
 - Epic: ${epicKey}
 - Created story: ${createdIssue.key}
 - Story ID: ${story.id}
-- ADF validation failed after updating epic markdown
+- ADF validation failed
 `.trim());
   }
   
-  console.log(`  Converted updated epic to ADF`);
   console.log(`  Updating epic ${epicKey} via Jira API...`);
   
   // Update epic via Jira API
@@ -873,7 +868,7 @@ Updated epic description could not be converted to valid Jira format (ADF)
     },
     body: JSON.stringify({
       fields: {
-        description: updatedAdf
+        description: updatedDescription
       }
     })
   });

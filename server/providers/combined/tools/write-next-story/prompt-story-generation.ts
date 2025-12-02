@@ -7,7 +7,7 @@
 
 import { readFile } from 'fs/promises';
 import { resolveServerPath } from '../../../../utils/file-paths.js';
-import type { ParsedShellStory } from './shell-story-parser.js';
+import type { ParsedShellStory } from '../shared/shell-story-adf-parser.js';
 
 /**
  * System prompt for story generation
@@ -81,10 +81,21 @@ ${epicContext}
 
 The following dependency stories have already been implemented. Use them for context about prerequisite functionality:
 
-${dependencyStories.map(dep => `### ${dep.id}: ${dep.title}
+${dependencyStories.map(dep => {
+  const parts = [];
+  if (dep.screens.length > 0) parts.push(`* SCREENS: ${dep.screens.join(', ')}`);
+  if (dep.dependencies.length > 0) parts.push(`* DEPENDENCIES: ${dep.dependencies.join(', ')}`);
+  if (dep.included.length > 0) dep.included.forEach(item => parts.push(`  * ☐ ${item}`));
+  if (dep.lowPriority.length > 0) dep.lowPriority.forEach(item => parts.push(`  * ⏬ ${item}`));
+  if (dep.excluded.length > 0) dep.excluded.forEach(item => parts.push(`  * ❌ ${item}`));
+  if (dep.questions.length > 0) dep.questions.forEach(item => parts.push(`  * ❓ ${item}`));
+  
+  return `### ${dep.id}: ${dep.title}
 
-${dep.rawContent}
-`).join('\n---\n\n')}
+${dep.description}
+
+${parts.join('\n')}`;
+}).join('\n---\n\n')}
 `
     : '';
   
@@ -99,6 +110,27 @@ ${content}
 `).join('\n---\n\n')}
 `
     : '';
+  
+  // Build shell story details from parsed fields
+  const shellStoryParts = [];
+  if (shellStory.screens.length > 0) {
+    shellStoryParts.push(`* SCREENS: ${shellStory.screens.join(', ')}`);
+  }
+  if (shellStory.dependencies.length > 0) {
+    shellStoryParts.push(`* DEPENDENCIES: ${shellStory.dependencies.join(', ')}`);
+  }
+  if (shellStory.included.length > 0) {
+    shellStory.included.forEach(item => shellStoryParts.push(`  * ☐ ${item}`));
+  }
+  if (shellStory.lowPriority.length > 0) {
+    shellStory.lowPriority.forEach(item => shellStoryParts.push(`  * ⏬ ${item}`));
+  }
+  if (shellStory.excluded.length > 0) {
+    shellStory.excluded.forEach(item => shellStoryParts.push(`  * ❌ ${item}`));
+  }
+  if (shellStory.questions.length > 0) {
+    shellStory.questions.forEach(item => shellStoryParts.push(`  * ❓ ${item}`));
+  }
   
   // Build the complete prompt
   return `# Story Writing Guidelines
@@ -116,7 +148,7 @@ ${epicSection}${dependencySection}${analysisSection}
 
 ### Shell Story Details
 
-${shellStory.rawContent}
+${shellStoryParts.join('\n')}
 
 ---
 
