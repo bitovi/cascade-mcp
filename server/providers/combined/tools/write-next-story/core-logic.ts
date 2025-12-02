@@ -812,7 +812,7 @@ export async function updateEpicWithCompletion(
     version: 1,
     type: 'doc',
     content: [
-      ...setupResult.epicContextAdf,
+      ...setupResult.epicSansShellStoriesAdf,
       ...updatedShellStories
     ]
   };

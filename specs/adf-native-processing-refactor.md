@@ -247,7 +247,7 @@ export interface FigmaScreenSetupResult {
   yamlPath?: string;
   
   // CHANGED: Return ADF only (no Markdown)
-  epicContextAdf: ADFNode[];           // Epic content excluding Shell Stories
+  epicSansShellStoriesAdf: ADFNode[];           // Epic content excluding Shell Stories
   epicDescriptionAdf: ADFDocument;     // Full epic description (ADF)
   shellStoriesAdf: ADFNode[];          // Shell Stories section (if exists)
   
@@ -294,7 +294,7 @@ export function prepareAIPromptContext(
     epicMarkdown_AIPromptOnly: convertAdfToMarkdown({
       version: 1,
       type: 'doc',
-      content: setupResult.epicContextAdf
+      content: setupResult.epicSansShellStoriesAdf
     }),
     shellStoriesMarkdown_AIPromptOnly: setupResult.shellStoriesAdf.length > 0
       ? convertAdfToMarkdown({
@@ -316,13 +316,13 @@ if (!description) {
 }
 
 // Extract Shell Stories section using ADF operations
-const { section: shellStoriesAdf, remaining: epicContextAdf } = 
+const { section: shellStoriesAdf, remaining: epicSansShellStoriesAdf } = 
   extractAdfSection(description.content, "Shell Stories");
 
 // Return ADF structures only (no Markdown conversion here)
 return {
   // ... other fields
-  epicContextAdf,
+  epicSansShellStoriesAdf,
   epicDescriptionAdf: description,
   shellStoriesAdf
 };
@@ -392,7 +392,7 @@ async function updateEpicWithCompletion(
     version: 1,
     type: 'doc',
     content: [
-      ...setupResult.epicContextAdf,
+      ...setupResult.epicSansShellStoriesAdf,
       ...updatedShellStories
     ]
   };
@@ -427,14 +427,14 @@ async function updateEpicWithShellStories({
   cloudId,
   atlassianClient,
   shellStoriesMarkdown, // AI-generated content
-  epicContextAdf,       // From setupResult
+  epicSansShellStoriesAdf,       // From setupResult
   notify
 }: {
   epicKey: string;
   cloudId: string;
   atlassianClient: AtlassianClient;
   shellStoriesMarkdown: string;
-  epicContextAdf: ADFNode[];
+  epicSansShellStoriesAdf: ADFNode[];
   notify: (msg: string) => Promise<void>;
 }): Promise<void> {
   // Clean up AI-generated Markdown
@@ -452,7 +452,7 @@ async function updateEpicWithShellStories({
     version: 1,
     type: 'doc',
     content: [
-      ...epicContextAdf,
+      ...epicSansShellStoriesAdf,
       ...shellStoriesAdf.content
     ]
   };
@@ -471,7 +471,7 @@ async function updateEpicWithShellStories({
 **Validation Checklist**:
 
 - [ ] **`FigmaScreenSetupResult` interface verification**:
-  - Contains only ADF fields (`epicContextAdf`, `epicDescriptionAdf`, `shellStoriesAdf`)
+  - Contains only ADF fields (`epicSansShellStoriesAdf`, `epicDescriptionAdf`, `shellStoriesAdf`)
   - No Markdown fields present
   - All ADF fields properly typed with `ADFNode[]` or `ADFDocument`
   - JSDoc comments clearly state "ADF only"
@@ -492,7 +492,7 @@ async function updateEpicWithShellStories({
 - [ ] **Function signature consistency**:
   - `extractShellStoriesFromSetup()` accepts `FigmaScreenSetupResult`
   - `updateEpicWithCompletion()` uses ADF operations
-  - `updateEpicWithShellStories()` accepts `epicContextAdf: ADFNode[]`
+  - `updateEpicWithShellStories()` accepts `epicSansShellStoriesAdf: ADFNode[]`
   - No function signatures accept Markdown for Jira data manipulation
 
 - [ ] **Type safety enforcement**:

@@ -122,7 +122,7 @@ export async function executeWriteShellStories(
     allFrames,
     allNotes,
     figmaFileKey,
-    epicContextAdf,
+    epicSansShellStoriesAdf: epicSansShellStoriesAdf,
     figmaUrls,
     cloudId: resolvedCloudId,
     siteName: resolvedSiteName,
@@ -188,7 +188,7 @@ export async function executeWriteShellStories(
       cloudId: resolvedCloudId,
       atlassianClient,
       shellStoriesMarkdown: shellStoriesContent,
-      epicContextAdf,
+      epicSansShellStoriesAdf,
       notify
     });
   } else {
@@ -359,7 +359,7 @@ No shell stories content received from AI
  * @param params.cloudId - The Atlassian cloud ID
  * @param params.atlassianClient - Atlassian API client with auth
  * @param params.shellStoriesMarkdown - The AI-generated shell stories markdown content
- * @param params.epicContextAdf - The epic description ADF content without Shell Stories section (from setupResult)
+ * @param params.epicSansShellStoriesAdf - The epic description ADF content without Shell Stories section (from setupResult)
  * @param params.notify - Progress notification function
  */
 async function updateEpicWithShellStories({
@@ -367,14 +367,14 @@ async function updateEpicWithShellStories({
   cloudId,
   atlassianClient,
   shellStoriesMarkdown,
-  epicContextAdf,
+  epicSansShellStoriesAdf,
   notify
 }: {
   epicKey: string;
   cloudId: string;
   atlassianClient: ToolDependencies['atlassianClient'];
   shellStoriesMarkdown: string;
-  epicContextAdf: ADFNode[];
+  epicSansShellStoriesAdf: ADFNode[];
   notify: ToolDependencies['notify'];
 }): Promise<void> {
   console.log('  Phase 6: Updating epic with shell stories...');
@@ -396,14 +396,14 @@ async function updateEpicWithShellStories({
     console.log('    ✅ Shell stories converted to ADF');
     
     // Check if combined size would exceed Jira's limit
-    const wouldExceed = wouldExceedLimit(epicContextAdf, shellStoriesAdf);
+    const wouldExceed = wouldExceedLimit(epicSansShellStoriesAdf, shellStoriesAdf);
 
-    let finalContent = epicContextAdf;
+    let finalContent = epicSansShellStoriesAdf;
 
     if (wouldExceed) {
       // Extract Scope Analysis section from content
       const { section: scopeAnalysisSection, remainingContent } = extractADFSection(
-        epicContextAdf,
+        epicSansShellStoriesAdf,
         'Scope Analysis'
       );
       
