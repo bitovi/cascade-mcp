@@ -30,12 +30,11 @@ import {
 } from '../../../figma/figma-helpers.js';
 import { resolveCloudId, getJiraIssue, handleJiraAuthError } from '../../../atlassian/atlassian-helpers.js';
 import { 
-  removeADFSectionByHeading,
-  convertAdfToMarkdown_AIPromptOnly,
   countADFSectionsByHeading,
   type ADFNode,
   type ADFDocument
 } from '../../../atlassian/markdown-converter.js';
+import { extractAdfSection } from '../../../atlassian/adf-operations.js';
 import { associateNotesWithFrames } from './screen-analyzer.js';
 import { generateScreensYaml } from './yaml-generator.js';
 import { writeNotesForScreen } from './note-text-extractor.js';
@@ -272,9 +271,10 @@ export interface FigmaScreenSetupResult {
   figmaFileKey: string;          // File key for image downloads
   yamlContent: string;           // Generated screens.yaml content
   yamlPath?: string;             // Path to screens.yaml (only in DEV mode)
-  epicContext: string;           // Epic description content (excluding Shell Stories)
-  epicMarkdown: string;          // Full epic description as markdown (including Shell Stories)
-  contentWithoutShellStories: ADFNode[];  // ADF content for later updating
+  epicContextAdf: ADFNode[];           // Epic content excluding Shell Stories
+  epicDescriptionAdf: ADFDocument;     // Full epic description (ADF)
+  shellStoriesAdf: ADFNode[];          // Shell Stories section (if exists)
+  
   figmaUrls: string[];           // Extracted Figma URLs
   cloudId: string;               // Resolved cloud ID
   siteName: string;              // Resolved site name
@@ -334,9 +334,6 @@ export async function setupFigmaScreens(
     throw new Error(`Epic ${epicKey} has no description. Please add Figma design URLs to the epic description.`);
   }
   
-  // Convert full description to markdown (including Shell Stories)
-  const epicMarkdown = convertAdfToMarkdown_AIPromptOnly(description);
-  
   const figmaUrls = extractFigmaUrlsFromADF(description);
   console.log(`  Found ${figmaUrls.length} Figma URLs`);
   
@@ -344,39 +341,18 @@ export async function setupFigmaScreens(
     throw new Error(`No Figma URLs found in epic ${epicKey}. Please add Figma design links to the epic description.`);
   }
   
-
-  
-  let epicContext = '';
-  let contentWithoutShellStories: ADFNode[] = [];
-  
-  try {
-    // Check for multiple Shell Stories sections
-    const shellStoriesCount = countADFSectionsByHeading(description.content || [], 'shell stories');
-    if (shellStoriesCount > 1) {
-      throw new Error(`Epic ${epicKey} contains ${shellStoriesCount} "## Shell Stories" sections. Please consolidate into one section.`);
-    }
-    
-    // Remove Shell Stories section
-    contentWithoutShellStories = removeADFSectionByHeading(
-      description.content || [],
-      'shell stories'
-    );
-    
-    // Convert remaining ADF to markdown
-    epicContext = convertAdfToMarkdown_AIPromptOnly({
-      version: 1,
-      type: 'doc',
-      content: contentWithoutShellStories
-    });
-    epicContext = epicContext.trim();
-    
-    console.log(`    Epic context: ${epicContext.length} chars`);
-  } catch (error: any) {
-    console.log(`  ⚠️  Failed to extract epic context: ${error.message}`);
-    console.log('  Continuing without epic context...');
-    epicContext = '';
-    contentWithoutShellStories = [];
+  // Check for multiple Shell Stories sections
+  const shellStoriesCount = countADFSectionsByHeading(description.content || [], 'shell stories');
+  if (shellStoriesCount > 1) {
+    throw new Error(`Epic ${epicKey} contains ${shellStoriesCount} "## Shell Stories" sections. Please consolidate into one section.`);
   }
+  
+  // Extract Shell Stories section using ADF operations
+  const { section: shellStoriesAdf, remaining: epicContextAdf } = 
+    extractAdfSection(description.content || [], 'Shell Stories');
+  
+  console.log(`    Epic context: ${epicContextAdf.length} ADF nodes`);
+  console.log(`    Shell stories: ${shellStoriesAdf.length} ADF nodes`);
   
   // ==========================================
   // Step 3: Fetch Figma metadata for all URLs
@@ -433,9 +409,9 @@ export async function setupFigmaScreens(
     figmaFileKey,
     yamlContent,
     yamlPath,
-    epicContext,
-    epicMarkdown,
-    contentWithoutShellStories,
+    epicContextAdf,
+    epicDescriptionAdf: description,
+    shellStoriesAdf,
     figmaUrls,
     cloudId: siteInfo.cloudId,
     siteName: siteInfo.siteName,
