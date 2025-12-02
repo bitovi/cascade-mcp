@@ -6,7 +6,7 @@
  */
 
 import type { ADFNode, ADFDocument } from '../../../atlassian/markdown-converter.js';
-import { extractAdfSection, findAdfHeading, traverseAdfNodes } from '../../../atlassian/adf-operations.js';
+import { extractAdfSection } from '../../../atlassian/adf-operations.js';
 
 /**
  * Parsed shell story structure
