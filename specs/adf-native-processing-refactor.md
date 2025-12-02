@@ -714,17 +714,17 @@ Create fixture files with sample ADF structures:
 ## Success Criteria
 
 ### Must Have
-- [ ] `convertMarkdownToAdf()` renamed to `convertMarkdownToAdf_NewContentOnly()` (Step 1)
-- [ ] `convertAdfToMarkdown()` renamed to `convertAdfToMarkdown_AIPromptOnly()` (Step 1)
-- [ ] No `convertMarkdownToAdf_NewContentOnly()` calls on existing Jira content (only new content: AI output, error messages, etc.)
-- [ ] No `convertAdfToMarkdown_AIPromptOnly()` calls except in `prepareAIPromptContext()` for AI prompt generation
-- [ ] Shell story parsing works with ADF nodes (Step 2)
-- [ ] Hard breaks (Shift+Enter) preserved through entire workflow
-- [ ] All existing tests pass
-- [ ] New unit tests for ADF operations (>80% coverage)
+- [x] `convertMarkdownToAdf()` renamed to `convertMarkdownToAdf_NewContentOnly()` (Step 1)
+- [x] `convertAdfToMarkdown()` renamed to `convertAdfToMarkdown_AIPromptOnly()` (Step 1)
+- [x] No `convertMarkdownToAdf_NewContentOnly()` calls on existing Jira content (only new content: AI output, error messages, etc.)
+- [x] No `convertAdfToMarkdown_AIPromptOnly()` calls except in `prepareAIPromptContext()` for AI prompt generation
+- [x] Shell story parsing works with ADF nodes (Step 2)
+- [x] Hard breaks (Shift+Enter) preserved through entire workflow
+- [x] All existing tests pass
+- [x] New unit tests for ADF operations (>80% coverage)
 
 ### Should Have  
-- [ ] Integration tests with real Jira sandbox
+- [x] Integration tests with real Jira sandbox
 - [ ] Documentation updated in `server/readme.md`
 - [ ] TypeScript strict mode compliance
 - [ ] ESLint rules to prevent future misuse of conversion functions

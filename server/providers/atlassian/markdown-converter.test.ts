@@ -306,7 +306,7 @@ describe('Markdown to ADF Converter', () => {
     });
   });
 
-  describe('convertAdfToMarkdown', () => {
+  describe('convertAdfToMarkdown_AIPromptOnly', () => {
     test('should convert simple ADF to markdown', () => {
       const adf: ADFDocument = {
         version: 1,
