@@ -8,11 +8,11 @@
 import { describe, it, expect } from '@jest/globals';
 import {
   parseShellStoriesFromAdf,
-  extractAndParseShellStories,
   addCompletionMarkerToStory,
   type ParsedShellStory
 } from './shell-story-adf-parser.js';
 import type { ADFNode, ADFDocument } from '../../../atlassian/markdown-converter.js';
+import { extractADFSection } from '../../../atlassian/markdown-converter.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -436,9 +436,10 @@ describe('parseShellStoriesFromAdf', () => {
   });
 });
 
-describe('extractAndParseShellStories', () => {
-  it('should extract and parse shell stories from epic content', () => {
-    const stories = extractAndParseShellStories(epicWithShellStories);
+describe('extractADFSection and parseShellStoriesFromAdf (two-step pattern)', () => {
+  it('should extract section and parse shell stories from epic content', () => {
+    const { section } = extractADFSection(epicWithShellStories.content, 'Shell Stories');
+    const stories = parseShellStoriesFromAdf(section);
 
     // Should find stories
     expect(stories.length).toBeGreaterThan(0);
@@ -461,7 +462,8 @@ describe('extractAndParseShellStories', () => {
       ]
     };
 
-    const stories = extractAndParseShellStories(emptyDoc);
+    const { section } = extractADFSection(emptyDoc.content, 'Shell Stories');
+    const stories = parseShellStoriesFromAdf(section);
 
     // Should return empty stories
     expect(stories).toEqual([]);

@@ -372,26 +372,6 @@ export function parseShellStoriesFromAdf(
 }
 
 /**
- * Extract Shell Stories section and parse it
- * @param epicDescription - Full epic description ADF
- * @returns Parsed shell stories
- * 
- * @example
- * const stories = extractAndParseShellStories(epicDescription);
- */
-export function extractAndParseShellStories(
-  epicDescription: ADFDocument
-): ParsedShellStory[] {
-  const { section } = extractADFSection(epicDescription.content, 'Shell Stories');
-  
-  if (section.length === 0) {
-    return []; // No Shell Stories section
-  }
-  
-  return parseShellStoriesFromAdf(section);
-}
-
-/**
  * Add completion marker to shell story in ADF
  * 
  * Adds a link mark to the title text node and appends a timestamp.
