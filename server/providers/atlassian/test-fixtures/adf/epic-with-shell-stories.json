@@ -1,0 +1,142 @@
+{
+  "version": 1,
+  "type": "doc",
+  "content": [
+    {
+      "type": "heading",
+      "attrs": { "level": 2 },
+      "content": [
+        { "type": "text", "text": "Context" }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "content": [
+        { "type": "text", "text": "This is some epic context that describes the overall feature." }
+      ]
+    },
+    {
+      "type": "heading",
+      "attrs": { "level": 2 },
+      "content": [
+        { "type": "text", "text": "Shell Stories" }
+      ]
+    },
+    {
+      "type": "bulletList",
+      "content": [
+        {
+          "type": "listItem",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "st001",
+                  "marks": [{ "type": "code" }]
+                },
+                { "type": "text", "text": " " },
+                {
+                  "type": "text",
+                  "text": "User Login Story",
+                  "marks": [{ "type": "strong" }]
+                },
+                { "type": "text", "text": " ⟩ Allow users to log in" }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        { "type": "text", "text": "Screens: Login Form (Fig-001)" }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        { "type": "text", "text": "Dependencies: None" }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "listItem",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "st002",
+                  "marks": [{ "type": "code" }]
+                },
+                { "type": "text", "text": " " },
+                {
+                  "type": "text",
+                  "text": "Dashboard View",
+                  "marks": [{ "type": "strong" }]
+                },
+                { "type": "text", "text": " ⟩ Display user dashboard" }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        { "type": "text", "text": "Screens: Dashboard (Fig-002)" }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        { "type": "text", "text": "Dependencies: User Login Story" }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "attrs": { "level": 2 },
+      "content": [
+        { "type": "text", "text": "Other Section" }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "content": [
+        { "type": "text", "text": "Additional content here." }
+      ]
+    }
+  ]
+}

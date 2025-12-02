@@ -1,0 +1,71 @@
+{
+  "type": "listItem",
+  "content": [
+    {
+      "type": "paragraph",
+      "content": [
+        {
+          "type": "text",
+          "text": "st001",
+          "marks": [{ "type": "code" }]
+        },
+        { "type": "text", "text": " " },
+        {
+          "type": "text",
+          "text": "Completed Story ✓",
+          "marks": [
+            { "type": "strong" },
+            {
+              "type": "link",
+              "attrs": { "href": "https://jira.com/PROJ-123" }
+            }
+          ]
+        },
+        { "type": "text", "text": " ⟩ This story is already done " },
+        {
+          "type": "text",
+          "text": "(2025-01-15T10:30:00Z)",
+          "marks": [{ "type": "em" }]
+        }
+      ]
+    },
+    {
+      "type": "bulletList",
+      "content": [
+        {
+          "type": "listItem",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                { "type": "text", "text": "Screens: Login Page (Fig-001)" }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "listItem",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                { "type": "text", "text": "Dependencies: None" }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "listItem",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                { "type": "text", "text": "Included: Yes" }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

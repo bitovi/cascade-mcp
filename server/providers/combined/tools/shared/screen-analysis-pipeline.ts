@@ -17,6 +17,7 @@ import { getDebugDir } from '../writing-shell-stories/temp-directory-manager.js'
 import { setupFigmaScreens } from '../writing-shell-stories/figma-screen-setup.js';
 import { regenerateScreenAnalyses } from './screen-analysis-regenerator.js';
 import type { ADFNode } from '../../../atlassian/markdown-converter.js';
+import { prepareAIPromptContext } from './ai-prompt-context.js';
 
 /**
  * Parameters for screen analysis pipeline
@@ -95,8 +96,8 @@ export async function executeScreenAnalysisPipeline(
     allNotes,
     figmaFileKey,
     yamlPath,
-    epicContext,
-    contentWithoutShellStories, // Note: This is actually "contentWithout{sectionName}" but field name not changed yet
+    epicContextAdf,
+    epicDescriptionAdf,
     figmaUrls,
     cloudId: resolvedCloudId,
     siteName: resolvedSiteName
@@ -108,6 +109,9 @@ export async function executeScreenAnalysisPipeline(
   // PHASE 4: Download images and analyze screens
   // ==========================================
   
+  // Convert ADF to Markdown for AI prompts
+  const aiPromptContext = prepareAIPromptContext(setupResult);
+  
   // Add steps for all screens to be analyzed
   await notify(`📝 AI Screen Analysis: Starting analysis of ${screens.length} screens...`, screens.length);
   
@@ -118,7 +122,7 @@ export async function executeScreenAnalysisPipeline(
     allFrames,
     allNotes,
     figmaFileKey,
-    epicContext,
+    epicContext: aiPromptContext.epicMarkdown_AIPromptOnly,
     notify: async (message: string) => {
       // Show progress for each screen (auto-increments)
       await notify(message);
@@ -135,8 +139,8 @@ export async function executeScreenAnalysisPipeline(
     figmaFileKey,
     debugDir,
     yamlContent: setupResult.yamlContent,
-    epicContext,
-    contentWithoutSection: contentWithoutShellStories, // TODO: Rename in setupFigmaScreens to be more generic
+    epicContext: aiPromptContext.epicMarkdown_AIPromptOnly,
+    contentWithoutSection: epicContextAdf,
     figmaUrls,
     cloudId: resolvedCloudId,
     siteName: resolvedSiteName,
