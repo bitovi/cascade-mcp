@@ -394,10 +394,14 @@ export function convertAdfToMarkdown(adf: ADFDocument): string {
 
 /**
  * Convert array of ADF nodes to markdown
+ * 
+ * Use this when you already have ADFNode[] (e.g., from extractADFSection).
+ * Avoids wrapping nodes in a document structure unnecessarily.
+ * 
  * @param nodes - Array of ADF nodes
  * @returns Markdown string
  */
-function convertAdfNodesToMarkdown(nodes: ADFNode[]): string {
+export function convertAdfNodesToMarkdown(nodes: ADFNode[]): string {
   return nodes.map(node => convertAdfNodeToMarkdown(node)).join('');
 }
 

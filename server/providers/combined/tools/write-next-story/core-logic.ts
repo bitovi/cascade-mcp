@@ -18,27 +18,25 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import type { ToolDependencies } from '../types.js';
-import type { AtlassianClient } from '../../../atlassian/atlassian-api-client.js';
+// import type { AtlassianClient } from '../../../atlassian/atlassian-api-client.js';
 import type { FigmaClient } from '../../../figma/figma-api-client.js';
 import { getDebugDir, getBaseCacheDir } from '../writing-shell-stories/temp-directory-manager.js';
 import { getFigmaFileCachePath } from '../../../figma/figma-cache.js';
 import { setupFigmaScreens, type FigmaScreenSetupResult } from '../writing-shell-stories/figma-screen-setup.js';
 import { regenerateScreenAnalyses } from '../shared/screen-analysis-regenerator.js';
 import { parseShellStoriesFromAdf, addCompletionMarkerToStory, type ParsedShellStory } from '../shared/shell-story-adf-parser.js';
-import { prepareAIPromptContext } from '../shared/ai-prompt-context.js';
 import { 
   generateStoryPrompt, 
   STORY_GENERATION_SYSTEM_PROMPT, 
   STORY_GENERATION_MAX_TOKENS 
 } from './prompt-story-generation.js';
 import { 
-  convertMarkdownToAdf, 
+  convertMarkdownToAdf,
+  convertAdfNodesToMarkdown,
   validateAdf,
   type ADFDocument,
   type ADFNode
-} from '../../../atlassian/markdown-converter.js';
-
-/**
+} from '../../../atlassian/markdown-converter.js';/**
  * Parameters for executing the write-next-story workflow
  */
 export interface ExecuteWriteNextStoryParams {
@@ -418,8 +416,8 @@ export async function generateStoryContent(
       missingScreens.some(missing => screen.name === missing.name)
     );
     
-    // Prepare AI prompt context (convert ADF to Markdown for AI)
-    const aiContext = prepareAIPromptContext(setupResult);
+    // Convert epic context to Markdown for AI prompts
+    const epicMarkdown = convertAdfNodesToMarkdown(setupResult.epicSansShellStoriesAdf);
     
     await regenerateScreenAnalyses({
       generateText,
@@ -428,7 +426,7 @@ export async function generateStoryContent(
       allFrames: setupResult.allFrames,
       allNotes: setupResult.allNotes,
       figmaFileKey: setupResult.figmaFileKey,
-      epicContext: aiContext.epicMarkdown_AIPromptOnly,
+      epicContext: epicMarkdown,
       notify: async (msg) => await notify(msg)
     });
     
@@ -487,11 +485,11 @@ No screen analysis files are available for story ${story.id}
   
   console.log(`  Using ${dependencyStories.length} dependency stories for context`);
   
-  // Prepare AI prompt context (convert ADF to Markdown for AI)
-  const aiContext = prepareAIPromptContext(setupResult);
+  // Convert epic context to Markdown for AI prompts
+  const epicMarkdown = convertAdfNodesToMarkdown(setupResult.epicSansShellStoriesAdf);
   
   // Generate prompt
-  const storyPrompt = await generateStoryPrompt(story, dependencyStories, analysisFiles, aiContext.epicMarkdown_AIPromptOnly);
+  const storyPrompt = await generateStoryPrompt(story, dependencyStories, analysisFiles, epicMarkdown);
   console.log(`  Generated prompt (${storyPrompt.length} characters)`);
   
   // Request story generation via LLM

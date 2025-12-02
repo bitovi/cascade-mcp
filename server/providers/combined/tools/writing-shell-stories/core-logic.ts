@@ -20,17 +20,16 @@ import { getDebugDir, getBaseCacheDir } from './temp-directory-manager.js';
 import { getFigmaFileCachePath } from '../../../figma/figma-cache.js';
 import { setupFigmaScreens } from './figma-screen-setup.js';
 import { regenerateScreenAnalyses } from '../shared/screen-analysis-regenerator.js';
-import { prepareAIPromptContext } from '../shared/ai-prompt-context.js';
 import {
   generateShellStoryPrompt,
   SHELL_STORY_SYSTEM_PROMPT,
   SHELL_STORY_MAX_TOKENS
 } from './prompt-shell-stories.js';
 import { 
-  convertMarkdownToAdf, 
+  convertMarkdownToAdf,
+  convertAdfNodesToMarkdown,
   validateAdf,
   extractADFSection,
-  convertAdfToMarkdown,
   type ADFNode,
   type ADFDocument
 } from '../../../atlassian/markdown-converter.js';
@@ -140,8 +139,8 @@ export async function executeWriteShellStories(
   // Add steps for all screens to be analyzed
   await notify(`📝 AI Screen Analysis: Starting analysis of ${screens.length} screens...`, screens.length);
   
-  // Prepare AI prompt context (convert ADF to Markdown for AI)
-  const aiContext = prepareAIPromptContext(setupResult);
+  // Convert epic context to Markdown for AI prompts
+  const epicMarkdown = convertAdfNodesToMarkdown(setupResult.epicSansShellStoriesAdf);
   
   const { analyzedScreens } = await regenerateScreenAnalyses({
     generateText,
@@ -150,7 +149,7 @@ export async function executeWriteShellStories(
     allFrames,
     allNotes,
     figmaFileKey,
-    epicContext: aiContext.epicMarkdown_AIPromptOnly,
+    epicContext: epicMarkdown,
     notify: async (message: string) => {
       // Show progress for each screen (auto-increments)
       await notify(message);
@@ -170,7 +169,7 @@ export async function executeWriteShellStories(
     figmaFileKey,
     yamlContent,
     notify,
-    epicContext: aiContext.epicMarkdown_AIPromptOnly
+    epicContext: epicMarkdown
   });
 
   // ==========================================
@@ -411,15 +410,8 @@ async function updateEpicWithShellStories({
         console.log('  ⚠️ Moving Scope Analysis to comment (content would exceed 43KB limit)');
         await notify('⚠️ Moving Scope Analysis to comment to stay within 43KB limit...');
         
-        // Wrap in document structure for conversion
-        const scopeAnalysisDoc: ADFDocument = {
-          version: 1,
-          type: 'doc',
-          content: scopeAnalysisSection
-        };
-        
         // Convert to markdown
-        const scopeAnalysisMarkdown = convertAdfToMarkdown(scopeAnalysisDoc);
+        const scopeAnalysisMarkdown = convertAdfNodesToMarkdown(scopeAnalysisSection);
         
         // Post as comment
         try {

@@ -17,7 +17,7 @@ import { getDebugDir } from '../writing-shell-stories/temp-directory-manager.js'
 import { setupFigmaScreens } from '../writing-shell-stories/figma-screen-setup.js';
 import { regenerateScreenAnalyses } from './screen-analysis-regenerator.js';
 import type { ADFNode } from '../../../atlassian/markdown-converter.js';
-import { prepareAIPromptContext } from './ai-prompt-context.js';
+import { convertAdfNodesToMarkdown } from '../../../atlassian/markdown-converter.js';
 
 /**
  * Parameters for screen analysis pipeline
@@ -109,7 +109,7 @@ export async function executeScreenAnalysisPipeline(
   // ==========================================
   
   // Convert ADF to Markdown for AI prompts
-  const aiPromptContext = prepareAIPromptContext(setupResult);
+  const epicMarkdown = convertAdfNodesToMarkdown(setupResult.epicSansShellStoriesAdf);
   
   // Add steps for all screens to be analyzed
   await notify(`📝 AI Screen Analysis: Starting analysis of ${screens.length} screens...`, screens.length);
@@ -121,7 +121,7 @@ export async function executeScreenAnalysisPipeline(
     allFrames,
     allNotes,
     figmaFileKey,
-    epicContext: aiPromptContext.epicMarkdown_AIPromptOnly,
+    epicContext: epicMarkdown,
     notify: async (message: string) => {
       // Show progress for each screen (auto-increments)
       await notify(message);
@@ -138,7 +138,7 @@ export async function executeScreenAnalysisPipeline(
     figmaFileKey,
     debugDir,
     yamlContent: setupResult.yamlContent,
-    epicContext: aiPromptContext.epicMarkdown_AIPromptOnly,
+    epicContext: epicMarkdown,
     contentWithoutSection: epicSansShellStoriesAdf,
     figmaUrls,
     cloudId: resolvedCloudId,
