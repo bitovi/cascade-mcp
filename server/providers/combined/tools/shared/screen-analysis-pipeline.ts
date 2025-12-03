@@ -39,8 +39,8 @@ export interface ScreenAnalysisResult {
   figmaFileKey: string;
   debugDir: string | null;
   yamlContent: string;
-  epicContext: string;
-  contentWithoutSection: ADFNode[]; // Epic description ADF without specified section
+  epicSansShellStoriesMarkdown: string;
+  epicSansShellStoriesAdf: ADFNode[];
   figmaUrls: string[];
   cloudId: string;
   siteName: string;
@@ -136,8 +136,8 @@ export async function executeScreenAnalysisPipeline(
     figmaFileKey,
     debugDir,
     yamlContent,
-    epicContext: epicSansShellStoriesMarkdown,
-    contentWithoutSection: epicSansShellStoriesAdf,
+    epicSansShellStoriesMarkdown,
+    epicSansShellStoriesAdf,
     figmaUrls,
     cloudId: resolvedCloudId,
     siteName: resolvedSiteName,

@@ -32,10 +32,8 @@ import {
 } from './prompt-story-generation.js';
 import { 
   convertMarkdownToAdf,
-  convertAdfNodesToMarkdown,
   validateAdf,
   type ADFDocument,
-  type ADFNode
 } from '../../../atlassian/markdown-converter.js';/**
  * Parameters for executing the write-next-story workflow
  */
@@ -415,10 +413,7 @@ export async function generateStoryContent(
     const screensToAnalyze = setupResult.screens.filter(screen =>
       missingScreens.some(missing => screen.name === missing.name)
     );
-    
-    // Convert epic context to Markdown for AI prompts
-    const epicMarkdown = convertAdfNodesToMarkdown(setupResult.epicSansShellStoriesAdf);
-    
+
     await regenerateScreenAnalyses({
       generateText,
       figmaClient,
@@ -426,7 +421,7 @@ export async function generateStoryContent(
       allFrames: setupResult.allFrames,
       allNotes: setupResult.allNotes,
       figmaFileKey: setupResult.figmaFileKey,
-      epicContext: epicMarkdown,
+      epicContext: setupResult.epicSansShellStoriesMarkdown,
       notify: async (msg) => await notify(msg)
     });
     
@@ -485,11 +480,8 @@ No screen analysis files are available for story ${story.id}
   
   console.log(`  Using ${dependencyStories.length} dependency stories for context`);
   
-  // Convert epic context to Markdown for AI prompts
-  const epicMarkdown = convertAdfNodesToMarkdown(setupResult.epicSansShellStoriesAdf);
-  
   // Generate prompt
-  const storyPrompt = await generateStoryPrompt(story, dependencyStories, analysisFiles, epicMarkdown);
+  const storyPrompt = await generateStoryPrompt(story, dependencyStories, analysisFiles, setupResult.epicSansShellStoriesMarkdown);
   console.log(`  Generated prompt (${storyPrompt.length} characters)`);
   
   // Request story generation via LLM
