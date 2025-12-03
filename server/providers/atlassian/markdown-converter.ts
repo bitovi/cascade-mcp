@@ -46,16 +46,6 @@ export interface ADFDocument {
  * 
  * @param markdown - Markdown string to convert
  * @returns ADF document structure
- * 
- * @example
- * // ✅ CORRECT: Converting new AI-generated content
- * const adf = await convertMarkdownToAdf(aiOutput);
- * 
- * // ✅ CORRECT: Converting error messages
- * const adf = await convertMarkdownToAdf(errorMessage);
- * 
- * // ❌ WRONG: Converting existing Jira content (use ADF operations instead)
- * const adf = await convertMarkdownToAdf(existingJiraDescription);
  */
 export async function convertMarkdownToAdf(markdown: string): Promise<ADFDocument> {
   if (!markdown || typeof markdown !== 'string') {
@@ -351,26 +341,12 @@ export function extractADFSection(
 
 
 /**
- * Converts ADF (Atlassian Document Format) to Markdown for AI prompt generation ONLY.
+ * Converts ADF (Atlassian Document Format) to Markdown for AI prompt consumption only.
  * 
- * ⚠️ NEVER use for data manipulation or Jira updates.
- * This is a one-way conversion for AI reading only.
+ * ⚠️ NEVER use for data manipulation, as this is a lossy conversion.
  * 
  * @param adf - ADF document to convert
  * @returns Markdown string for AI prompts only
- * 
- * @example
- * // ✅ CORRECT: Converting for AI prompt context
- * const markdown = convertAdfToMarkdown(epicDescription);
- * const prompt = `Context: ${markdown}\n\nGenerate...`;
- * 
- * // ❌ WRONG: Never convert back to ADF for Jira updates
- * const markdown = convertAdfToMarkdown(description);
- * const modified = markdown.replace(...);
- * const adf = await convertMarkdownToAdf(modified); // WRONG! This approach loses Jira formatting and may corrupt data.
- * // Instead, use ADF operations directly to manipulate content for Jira updates:
- * // ✅ CORRECT: Use ADF manipulation functions for updates
- * const updatedAdf = updateAdfContent(description, ...); // Use ADF-aware helpers
  */
 export function convertAdfToMarkdown(adf: ADFDocument): string {
   logger.info('Converting ADF to markdown', {
@@ -396,7 +372,6 @@ export function convertAdfToMarkdown(adf: ADFDocument): string {
  * Convert array of ADF nodes to markdown
  * 
  * Use this when you already have ADFNode[] (e.g., from extractADFSection).
- * Avoids wrapping nodes in a document structure unnecessarily.
  * 
  * @param nodes - Array of ADF nodes
  * @returns Markdown string

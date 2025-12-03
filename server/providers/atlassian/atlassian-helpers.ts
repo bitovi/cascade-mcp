@@ -4,7 +4,7 @@
  */
 
 import { logger } from '../../observability/logger.ts';
-// import { sanitizeObjectWithJWTs } from '../../tokens.ts';
+import { sanitizeObjectWithJWTs } from '../../tokens.ts';
 import type { ADFDocument } from './markdown-converter.ts';
 import { convertMarkdownToAdf } from './markdown-converter.ts';
 import type { AtlassianClient } from './atlassian-api-client.js';
