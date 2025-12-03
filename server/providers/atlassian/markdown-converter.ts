@@ -370,9 +370,6 @@ export function convertAdfToMarkdown(adf: ADFDocument): string {
 
 /**
  * Convert array of ADF nodes to markdown
- * 
- * Use this when you already have ADFNode[] (e.g., from extractADFSection).
- * 
  * @param nodes - Array of ADF nodes
  * @returns Markdown string
  */

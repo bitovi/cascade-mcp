@@ -764,7 +764,7 @@ Could not create Jira story for "${story.title}"
 
 /**
  * Step 8: Update epic with completion marker
- * Updates the shell story in the epic description using ADF operations (no Markdown conversion)
+ * Updates the shell story in the epic description: adds Jira link and timestamp using ADF operations
  */
 export async function updateEpicWithCompletion(
   atlassianClient: ToolDependencies['atlassianClient'],
@@ -800,7 +800,7 @@ export async function updateEpicWithCompletion(
   console.log(`  Updated story ${story.id} in ADF`);
   
   // Rebuild epic description: epic context + updated shell stories
-  const updatedDescription: ADFDocument = {
+  const updatedAdfDoc: ADFDocument = {
     version: 1,
     type: 'doc',
     content: [
@@ -812,7 +812,7 @@ export async function updateEpicWithCompletion(
   console.log(`  Rebuilt full epic description in ADF`);
   
   // Validate ADF structure
-  if (!validateAdf(updatedDescription)) {
+  if (!validateAdf(updatedAdfDoc)) {
     throw new Error(`
 📄 **Invalid Epic Format Generated**
 
@@ -850,7 +850,7 @@ Updated epic description has invalid ADF structure
     },
     body: JSON.stringify({
       fields: {
-        description: updatedDescription
+        description: updatedAdfDoc
       }
     })
   });
