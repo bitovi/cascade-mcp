@@ -17,7 +17,7 @@ import { getDebugDir } from '../writing-shell-stories/temp-directory-manager.js'
 import { setupFigmaScreens } from '../writing-shell-stories/figma-screen-setup.js';
 import { regenerateScreenAnalyses } from './screen-analysis-regenerator.js';
 import type { ADFNode } from '../../../atlassian/markdown-converter.js';
-import { convertAdfNodesToMarkdown } from '../../../atlassian/markdown-converter.js';
+
 
 /**
  * Parameters for screen analysis pipeline
@@ -95,7 +95,8 @@ export async function executeScreenAnalysisPipeline(
     allFrames,
     allNotes,
     figmaFileKey,
-    // yamlPath,
+    yamlContent,
+    epicSansShellStoriesMarkdown,
     epicSansShellStoriesAdf,
     figmaUrls,
     cloudId: resolvedCloudId,
@@ -108,9 +109,6 @@ export async function executeScreenAnalysisPipeline(
   // PHASE 4: Download images and analyze screens
   // ==========================================
   
-  // Convert ADF to Markdown for AI prompts
-  const epicMarkdown = convertAdfNodesToMarkdown(setupResult.epicSansShellStoriesAdf);
-  
   // Add steps for all screens to be analyzed
   await notify(`📝 AI Screen Analysis: Starting analysis of ${screens.length} screens...`, screens.length);
   
@@ -121,7 +119,7 @@ export async function executeScreenAnalysisPipeline(
     allFrames,
     allNotes,
     figmaFileKey,
-    epicContext: epicMarkdown,
+    epicContext: epicSansShellStoriesMarkdown,
     notify: async (message: string) => {
       // Show progress for each screen (auto-increments)
       await notify(message);
@@ -137,8 +135,8 @@ export async function executeScreenAnalysisPipeline(
     allNotes,
     figmaFileKey,
     debugDir,
-    yamlContent: setupResult.yamlContent,
-    epicContext: epicMarkdown,
+    yamlContent,
+    epicContext: epicSansShellStoriesMarkdown,
     contentWithoutSection: epicSansShellStoriesAdf,
     figmaUrls,
     cloudId: resolvedCloudId,

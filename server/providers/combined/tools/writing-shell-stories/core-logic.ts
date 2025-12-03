@@ -121,7 +121,8 @@ export async function executeWriteShellStories(
     allFrames,
     allNotes,
     figmaFileKey,
-    epicSansShellStoriesAdf: epicSansShellStoriesAdf,
+    epicSansShellStoriesMarkdown,
+    epicSansShellStoriesAdf,
     figmaUrls,
     cloudId: resolvedCloudId,
     siteName: resolvedSiteName,
@@ -139,9 +140,6 @@ export async function executeWriteShellStories(
   // Add steps for all screens to be analyzed
   await notify(`📝 AI Screen Analysis: Starting analysis of ${screens.length} screens...`, screens.length);
   
-  // Convert epic context to Markdown for AI prompts
-  const epicMarkdown = convertAdfNodesToMarkdown(setupResult.epicSansShellStoriesAdf);
-  
   const { analyzedScreens } = await regenerateScreenAnalyses({
     generateText,
     figmaClient,
@@ -149,7 +147,7 @@ export async function executeWriteShellStories(
     allFrames,
     allNotes,
     figmaFileKey,
-    epicContext: epicMarkdown,
+    epicContext: epicSansShellStoriesMarkdown,
     notify: async (message: string) => {
       // Show progress for each screen (auto-increments)
       await notify(message);
@@ -169,7 +167,7 @@ export async function executeWriteShellStories(
     figmaFileKey,
     yamlContent,
     notify,
-    epicContext: epicMarkdown
+    epicContext: epicSansShellStoriesMarkdown
   });
 
   // ==========================================
@@ -382,7 +380,7 @@ async function updateEpicWithShellStories({
     // Clean up AI-generated content and prepare section
     const shellStoriesSection = prepareShellStoriesSection(shellStoriesMarkdown);
     
-    // Convert the new section to ADF (one-way, from AI output)
+    // Convert the new section to ADF
     console.log('    Converting shell stories section to ADF...');
     const shellStoriesAdf = await convertMarkdownToAdf(shellStoriesSection);
     
