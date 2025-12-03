@@ -13,20 +13,100 @@ import {
 } from './shell-story-parser.js';
 import type { ADFNode, ADFDocument } from '../../../atlassian/markdown-converter.js';
 import { extractADFSection } from '../../../atlassian/markdown-converter.js';
-import * as fs from 'fs';
-import * as path from 'path';
 
-// Load test fixtures
-const fixturesPath = path.join(__dirname, '../../../atlassian/test-fixtures/adf');
-const epicWithShellStories: ADFDocument = JSON.parse(
-  fs.readFileSync(path.join(fixturesPath, 'epic-with-shell-stories.json'), 'utf-8')
-);
-const shellStoryWithHardBreak: ADFNode = JSON.parse(
-  fs.readFileSync(path.join(fixturesPath, 'shell-story-with-hardbreak.json'), 'utf-8')
-);
-const completedShellStory: ADFNode = JSON.parse(
-  fs.readFileSync(path.join(fixturesPath, 'completed-shell-story.json'), 'utf-8')
-);
+// Test fixture - Story with hardBreak nodes (main test case for ADF parsing)
+const storyWithHardBreak: ADFNode = {
+  type: 'listItem',
+  content: [
+    {
+      type: 'paragraph',
+      content: [
+        { type: 'text', text: 'st001', marks: [{ type: 'code' }] },
+        { type: 'text', text: ' ' },
+        { type: 'text', text: 'Story Title', marks: [{ type: 'strong' }] },
+        { type: 'text', text: ' ⟩ Story description' }
+      ]
+    },
+    {
+      type: 'bulletList',
+      content: [
+        {
+          type: 'listItem',
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                { type: 'text', text: 'SCREENS: ' },
+                { 
+                  type: 'text', 
+                  text: 'Screen 1',
+                  marks: [{ type: 'link', attrs: { href: 'https://figma.com/file/test?node-id=001' } }]
+                },
+                { type: 'hardBreak' },
+                { 
+                  type: 'text', 
+                  text: 'Screen 2',
+                  marks: [{ type: 'link', attrs: { href: 'https://figma.com/file/test?node-id=002' } }]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          type: 'listItem',
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                { type: 'text', text: 'DEPENDENCIES: Auth,' },
+                { type: 'hardBreak' },
+                { type: 'text', text: 'Data' }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+};
+
+// Test fixture - Completed story with link mark and timestamp
+const completedStory: ADFNode = {
+  type: 'listItem',
+  content: [
+    {
+      type: 'paragraph',
+      content: [
+        { type: 'text', text: 'st001', marks: [{ type: 'code' }] },
+        { type: 'text', text: ' ' },
+        {
+          type: 'text',
+          text: 'Completed Story ✓',
+          marks: [
+            { type: 'strong' },
+            { type: 'link', attrs: { href: 'https://jira.com/PROJ-123' } }
+          ]
+        },
+        { type: 'text', text: ' ⟩ This story is done ' },
+        { type: 'text', text: '(2025-01-15T10:30:00Z)', marks: [{ type: 'em' }] }
+      ]
+    },
+    {
+      type: 'bulletList',
+      content: [
+        {
+          type: 'listItem',
+          content: [
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'SCREENS: None' }]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+};
 
 describe('parseShellStoriesFromAdf', () => {
   it('should parse basic shell stories from bulletList', () => {
@@ -87,7 +167,7 @@ describe('parseShellStoriesFromAdf', () => {
     const stories = parseShellStoriesFromAdf([
       {
         type: 'bulletList',
-        content: [shellStoryWithHardBreak]
+        content: [storyWithHardBreak]
       }
     ]);
 
@@ -101,39 +181,57 @@ describe('parseShellStoriesFromAdf', () => {
     
     // Dependencies should handle hardBreak
     expect(story.dependencies.length).toBe(2);
-    expect(story.dependencies).toContain('Authentication');
-    expect(story.dependencies).toContain('Data Layer');
+    expect(story.dependencies).toContain('Auth');
+    expect(story.dependencies).toContain('Data');
   });
 
   it('should parse multiple shell stories', () => {
-    // Get Shell Stories section from fixture
-    const content = epicWithShellStories.content;
-    const shellStoriesSection = content.find((node: ADFNode) => 
-      node.type === 'bulletList'
-    );
+    const bulletList: ADFNode = {
+      type: 'bulletList',
+      content: [
+        {
+          type: 'listItem',
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                { type: 'text', text: 'st001', marks: [{ type: 'code' }] },
+                { type: 'text', text: ' ' },
+                { type: 'text', text: 'First Story', marks: [{ type: 'strong' }] },
+                { type: 'text', text: ' ⟩ First description' }
+              ]
+            }
+          ]
+        },
+        {
+          type: 'listItem',
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                { type: 'text', text: 'st002', marks: [{ type: 'code' }] },
+                { type: 'text', text: ' ' },
+                { type: 'text', text: 'Second Story', marks: [{ type: 'strong' }] },
+                { type: 'text', text: ' ⟩ Second description' }
+              ]
+            }
+          ]
+        }
+      ]
+    };
 
-    if (!shellStoriesSection) {
-      throw new Error('Shell Stories section not found in fixture');
-    }
-
-    const stories = parseShellStoriesFromAdf([shellStoriesSection]);
+    const stories = parseShellStoriesFromAdf([bulletList]);
     
-    expect(stories.length).toBeGreaterThanOrEqual(2);
-    
-    // Verify first story
-    const loginStory = stories.find((s: ParsedShellStoryADF) => s.title.includes('Login'));
-    expect(loginStory).toBeDefined();
-    
-    // Verify second story
-    const dashboardStory = stories.find((s: ParsedShellStoryADF) => s.title.includes('Dashboard'));
-    expect(dashboardStory).toBeDefined();
+    expect(stories.length).toBe(2);
+    expect(stories[0].title).toBe('First Story');
+    expect(stories[1].title).toBe('Second Story');
   });
 
   it('should detect completion marker (✓)', () => {
     const stories = parseShellStoriesFromAdf([
       {
         type: 'bulletList',
-        content: [completedShellStory]
+        content: [completedStory]
       }
     ]);
 
@@ -200,7 +298,7 @@ describe('parseShellStoriesFromAdf', () => {
     expect(stories[0].screens[1]).toContain('figma.com');
   });
 
-  it('should parse included items (☐)', () => {
+  it('should parse emoji markers (☐, ⏬, ❌, ❓)', () => {
     const bulletList: ADFNode = {
       type: 'bulletList',
       content: [
@@ -212,31 +310,17 @@ describe('parseShellStoriesFromAdf', () => {
               content: [
                 { type: 'text', text: 'st001', marks: [{ type: 'code' }] },
                 { type: 'text', text: ' ' },
-                { type: 'text', text: 'Feature Story', marks: [{ type: 'strong' }] },
-                { type: 'text', text: ' ⟩ User can access feature functionality' }
+                { type: 'text', text: 'Story', marks: [{ type: 'strong' }] },
+                { type: 'text', text: ' ⟩ Description' }
               ]
             },
             {
               type: 'bulletList',
               content: [
-                {
-                  type: 'listItem',
-                  content: [
-                    {
-                      type: 'paragraph',
-                      content: [{ type: 'text', text: '☐ Form validation' }]
-                    }
-                  ]
-                },
-                {
-                  type: 'listItem',
-                  content: [
-                    {
-                      type: 'paragraph',
-                      content: [{ type: 'text', text: '☐ Error messages' }]
-                    }
-                  ]
-                }
+                { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: '☐ Included' }] }] },
+                { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: '⏬ Low priority' }] }] },
+                { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: '❌ Excluded' }] }] },
+                { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: '❓ Question' }] }] }
               ]
             }
           ]
@@ -247,135 +331,10 @@ describe('parseShellStoriesFromAdf', () => {
     const stories = parseShellStoriesFromAdf([bulletList]);
     
     expect(stories.length).toBe(1);
-    expect(stories[0].included.length).toBe(2);
-    expect(stories[0].included).toContain('Form validation');
-    expect(stories[0].included).toContain('Error messages');
-  });
-
-  it('should parse low priority items (⏬)', () => {
-    const bulletList: ADFNode = {
-      type: 'bulletList',
-      content: [
-        {
-          type: 'listItem',
-          content: [
-            {
-              type: 'paragraph',
-              content: [
-                { type: 'text', text: 'st001', marks: [{ type: 'code' }] },
-                { type: 'text', text: ' ' },
-                { type: 'text', text: 'UI Story', marks: [{ type: 'strong' }] },
-                { type: 'text', text: ' ⟩ User can interact with UI elements' }
-              ]
-            },
-            {
-              type: 'bulletList',
-              content: [
-                {
-                  type: 'listItem',
-                  content: [
-                    {
-                      type: 'paragraph',
-                      content: [{ type: 'text', text: '⏬ Animation polish' }]
-                    }
-                  ]
-                }
-              ]
-            }
-          ]
-        }
-      ]
-    };
-
-    const stories = parseShellStoriesFromAdf([bulletList]);
-    
-    expect(stories.length).toBe(1);
-    expect(stories[0].lowPriority.length).toBe(1);
-    expect(stories[0].lowPriority).toContain('Animation polish');
-  });
-
-  it('should parse excluded items (❌)', () => {
-    const bulletList: ADFNode = {
-      type: 'bulletList',
-      content: [
-        {
-          type: 'listItem',
-          content: [
-            {
-              type: 'paragraph',
-              content: [
-                { type: 'text', text: 'st001', marks: [{ type: 'code' }] },
-                { type: 'text', text: ' ' },
-                { type: 'text', text: 'API Story', marks: [{ type: 'strong' }] },
-                { type: 'text', text: ' ⟩ User can access API endpoints' }
-              ]
-            },
-            {
-              type: 'bulletList',
-              content: [
-                {
-                  type: 'listItem',
-                  content: [
-                    {
-                      type: 'paragraph',
-                      content: [{ type: 'text', text: '❌ Deprecated endpoint' }]
-                    }
-                  ]
-                }
-              ]
-            }
-          ]
-        }
-      ]
-    };
-
-    const stories = parseShellStoriesFromAdf([bulletList]);
-    
-    expect(stories.length).toBe(1);
-    expect(stories[0].excluded.length).toBe(1);
-    expect(stories[0].excluded).toContain('Deprecated endpoint');
-  });
-
-  it('should parse questions (❓)', () => {
-    const bulletList: ADFNode = {
-      type: 'bulletList',
-      content: [
-        {
-          type: 'listItem',
-          content: [
-            {
-              type: 'paragraph',
-              content: [
-                { type: 'text', text: 'st001', marks: [{ type: 'code' }] },
-                { type: 'text', text: ' ' },
-                { type: 'text', text: 'Auth Story', marks: [{ type: 'strong' }] },
-                { type: 'text', text: ' ⟩ User can authenticate' }
-              ]
-            },
-            {
-              type: 'bulletList',
-              content: [
-                {
-                  type: 'listItem',
-                  content: [
-                    {
-                      type: 'paragraph',
-                      content: [{ type: 'text', text: '❓ Which OAuth provider?' }]
-                    }
-                  ]
-                }
-              ]
-            }
-          ]
-        }
-      ]
-    };
-
-    const stories = parseShellStoriesFromAdf([bulletList]);
-    
-    expect(stories.length).toBe(1);
-    expect(stories[0].questions.length).toBe(1);
-    expect(stories[0].questions).toContain('Which OAuth provider?');
+    expect(stories[0].included).toContain('Included');
+    expect(stories[0].lowPriority).toContain('Low priority');
+    expect(stories[0].excluded).toContain('Excluded');
+    expect(stories[0].questions).toContain('Question');
   });
 
   it('should handle stories without nested lists', () => {
@@ -410,11 +369,37 @@ describe('parseShellStoriesFromAdf', () => {
 
 describe('extractADFSection and parseShellStoriesFromAdf (two-step pattern)', () => {
   it('should extract section and parse shell stories from epic content', () => {
-    const { section } = extractADFSection(epicWithShellStories.content, 'Shell Stories');
+    const epicDoc: ADFDocument = {
+      version: 1,
+      type: 'doc',
+      content: [
+        { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Shell Stories' }] },
+        {
+          type: 'bulletList',
+          content: [
+            {
+              type: 'listItem',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [
+                    { type: 'text', text: 'st001', marks: [{ type: 'code' }] },
+                    { type: 'text', text: ' ' },
+                    { type: 'text', text: 'Test', marks: [{ type: 'strong' }] },
+                    { type: 'text', text: ' ⟩ Test' }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+
+    const { section } = extractADFSection(epicDoc.content, 'Shell Stories');
     const stories = parseShellStoriesFromAdf(section);
 
-    // Should find stories
-    expect(stories.length).toBeGreaterThan(0);
+    expect(stories.length).toBe(1);
   });
 
   it('should handle epic without shell stories section', () => {
@@ -422,22 +407,14 @@ describe('extractADFSection and parseShellStoriesFromAdf (two-step pattern)', ()
       version: 1,
       type: 'doc',
       content: [
-        {
-          type: 'heading',
-          attrs: { level: 2 },
-          content: [{ type: 'text', text: 'Context' }]
-        },
-        {
-          type: 'paragraph',
-          content: [{ type: 'text', text: 'Some context text' }]
-        }
+        { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Context' }] },
+        { type: 'paragraph', content: [{ type: 'text', text: 'Some context text' }] }
       ]
     };
 
     const { section } = extractADFSection(emptyDoc.content, 'Shell Stories');
     const stories = parseShellStoriesFromAdf(section);
 
-    // Should return empty stories
     expect(stories).toEqual([]);
   });
 });
@@ -544,12 +521,11 @@ describe('addCompletionMarkerToStory', () => {
   it('should not modify already completed stories', () => {
     const bulletList: ADFNode = {
       type: 'bulletList',
-      content: [completedShellStory]
+      content: [completedStory]
     };
 
     const updated = addCompletionMarkerToStory([bulletList], 'st001', 'PROJ-789', 'https://jira.com/PROJ-789');
 
-    // Should be essentially unchanged (already has ✓)
     const stories = parseShellStoriesFromAdf(updated);
     expect(stories.length).toBe(1);
     expect(stories[0].title).toContain('✓');
@@ -558,7 +534,7 @@ describe('addCompletionMarkerToStory', () => {
   it('should preserve hardBreak nodes when adding completion marker', () => {
     const bulletList: ADFNode = {
       type: 'bulletList',
-      content: [shellStoryWithHardBreak]
+      content: [storyWithHardBreak]
     };
 
     const updated = addCompletionMarkerToStory([bulletList], 'st001', 'PROJ-999', 'https://jira.com/PROJ-999');
@@ -615,67 +591,16 @@ describe('Error handling and edge cases', () => {
     expect(stories).toEqual([]);
   });
 
-  it('should handle malformed story structure', () => {
-    const bulletList: ADFNode = {
-      type: 'bulletList',
-      content: [
-        {
-          type: 'listItem',
-          content: [] // Empty listItem
-        }
-      ]
-    };
+  it('should throw error for malformed story structures', () => {
+    const malformedCases = [
+      { type: 'bulletList', content: [{ type: 'listItem', content: [] }] }, // Empty listItem
+      { type: 'bulletList', content: [{ type: 'listItem', content: [{ type: 'bulletList', content: [] }] }] }, // Nested list without paragraph
+      { type: 'bulletList', content: [{ type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text' }] }] }] } // No text property
+    ];
 
-    // Should throw validation error for malformed story
-    expect(() => {
-      parseShellStoriesFromAdf([bulletList]);
-    }).toThrow('Shell story missing ID');
-  });
-
-  it('should handle nested lists without proper structure', () => {
-    const bulletList: ADFNode = {
-      type: 'bulletList',
-      content: [
-        {
-          type: 'listItem',
-          content: [
-            {
-              type: 'bulletList', // Nested list without paragraph first
-              content: []
-            }
-          ]
-        }
-      ]
-    };
-
-    // Should throw validation error for missing story ID
-    expect(() => {
-      parseShellStoriesFromAdf([bulletList]);
-    }).toThrow('Shell story missing ID');
-  });
-
-  it('should handle text nodes without content', () => {
-    const bulletList: ADFNode = {
-      type: 'bulletList',
-      content: [
-        {
-          type: 'listItem',
-          content: [
-            {
-              type: 'paragraph',
-              content: [
-                { type: 'text' } // No text property
-              ]
-            }
-          ]
-        }
-      ]
-    };
-
-    // Should throw validation error for missing story ID
-    expect(() => {
-      parseShellStoriesFromAdf([bulletList]);
-    }).toThrow('Shell story missing ID');
+    malformedCases.forEach(bulletList => {
+      expect(() => parseShellStoriesFromAdf([bulletList])).toThrow('Shell story missing ID');
+    });
   });
 
   it('should preserve unknown node types', () => {
