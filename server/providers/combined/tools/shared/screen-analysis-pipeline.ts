@@ -18,7 +18,6 @@ import { setupFigmaScreens } from '../writing-shell-stories/figma-screen-setup.j
 import { regenerateScreenAnalyses } from './screen-analysis-regenerator.js';
 import type { ADFNode } from '../../../atlassian/markdown-converter.js';
 
-
 /**
  * Parameters for screen analysis pipeline
  */

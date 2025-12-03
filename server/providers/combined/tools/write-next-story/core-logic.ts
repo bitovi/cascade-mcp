@@ -34,7 +34,9 @@ import {
   convertMarkdownToAdf,
   validateAdf,
   type ADFDocument,
-} from '../../../atlassian/markdown-converter.js';/**
+} from '../../../atlassian/markdown-converter.js';
+
+/**
  * Parameters for executing the write-next-story workflow
  */
 export interface ExecuteWriteNextStoryParams {

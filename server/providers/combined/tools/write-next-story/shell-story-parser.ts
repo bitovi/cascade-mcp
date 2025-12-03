@@ -6,6 +6,7 @@
  */
 
 import type { ADFNode } from '../../../atlassian/markdown-converter.js';
+import { convertAdfNodesToMarkdown } from '../../../atlassian/markdown-converter.js';
 
 /**
  * Parsed shell story structure
@@ -22,6 +23,7 @@ export interface ParsedShellStory {
   lowPriority: string[];   // ⏬ bullets
   excluded: string[];      // ❌ bullets
   questions: string[];     // ❓ bullets
+  rawContent: string;     // Original markdown for AI prompts
 }
 
 // ============================================================================
@@ -430,6 +432,9 @@ function parseShellStoryFromListItem(listItem: ADFNode): ParsedShellStory | null
     throw new Error(`Shell story ${storyId} missing description after separator (⟩)`);
   }
   
+  // Convert entire listItem to markdown for AI prompts (preserves original formatting)
+  const rawContent = convertAdfNodesToMarkdown([listItem]);
+  
   return {
     id: storyId,
     title: titleInfo.title,
@@ -442,6 +447,7 @@ function parseShellStoryFromListItem(listItem: ADFNode): ParsedShellStory | null
     lowPriority: extractEmojiItems(listItem.content, '⏬'),
     excluded: extractEmojiItems(listItem.content, '❌'),
     questions: extractEmojiItems(listItem.content, '❓'),
+    rawContent,
   };
 }
 
