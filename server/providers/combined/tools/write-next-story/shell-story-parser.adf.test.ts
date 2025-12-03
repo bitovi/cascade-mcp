@@ -10,7 +10,7 @@ import {
   parseShellStoriesFromAdf,
   addCompletionMarkerToStory,
   type ParsedShellStory
-} from './shell-story-adf-parser.js';
+} from './shell-story-parser.js';
 import type { ADFNode, ADFDocument } from '../../../atlassian/markdown-converter.js';
 import { extractADFSection } from '../../../atlassian/markdown-converter.js';
 import * as fs from 'fs';
@@ -406,34 +406,6 @@ describe('parseShellStoriesFromAdf', () => {
     expect(stories[0].screens).toEqual([]);
     expect(stories[0].dependencies).toEqual([]);
   });
-
-  it('should preserve rawAdf field', () => {
-    const bulletList: ADFNode = {
-      type: 'bulletList',
-      content: [
-        {
-          type: 'listItem',
-          content: [
-            {
-              type: 'paragraph',
-              content: [
-                { type: 'text', text: 'st001', marks: [{ type: 'code' }] },
-                { type: 'text', text: ' ' },
-                { type: 'text', text: 'Story with ADF', marks: [{ type: 'strong' }] },
-                { type: 'text', text: ' ⟩ This story preserves ADF' }
-              ]
-            }
-          ]
-        }
-      ]
-    };
-
-    const stories = parseShellStoriesFromAdf([bulletList]);
-    
-    expect(stories.length).toBe(1);
-    expect(stories[0].rawAdf).toBeDefined();
-    expect(stories[0].rawAdf?.length).toBeGreaterThan(0);
-  });
 });
 
 describe('extractADFSection and parseShellStoriesFromAdf (two-step pattern)', () => {
@@ -730,6 +702,5 @@ describe('Error handling and edge cases', () => {
 
     const stories = parseShellStoriesFromAdf([bulletList]);
     expect(stories.length).toBe(1);
-    expect(stories[0].rawAdf).toBeDefined();
   });
 });

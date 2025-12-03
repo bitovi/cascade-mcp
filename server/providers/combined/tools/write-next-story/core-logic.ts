@@ -24,7 +24,7 @@ import { getDebugDir, getBaseCacheDir } from '../writing-shell-stories/temp-dire
 import { getFigmaFileCachePath } from '../../../figma/figma-cache.js';
 import { setupFigmaScreens, type FigmaScreenSetupResult } from '../writing-shell-stories/figma-screen-setup.js';
 import { regenerateScreenAnalyses } from '../shared/screen-analysis-regenerator.js';
-import { parseShellStoriesFromAdf, addCompletionMarkerToStory, type ParsedShellStory } from '../shared/shell-story-adf-parser.js';
+import { parseShellStoriesFromAdf, addCompletionMarkerToStory, type ParsedShellStory } from './shell-story-parser.js';
 import { 
   generateStoryPrompt, 
   STORY_GENERATION_SYSTEM_PROMPT, 

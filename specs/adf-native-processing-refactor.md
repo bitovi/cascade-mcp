@@ -139,7 +139,7 @@ This plan refactors the codebase to work directly with ADF format, eliminating l
 
 ### Step 2: Create ADF-Based Shell Story Parser
 
-**File**: `server/providers/combined/tools/shared/shell-story-adf-parser.ts`
+**File**: `server/providers/combined/tools/write-next-story/shell-story-parser.ts`
 
 Refactor shell story parsing to work with ADF nodes instead of Markdown:
 
@@ -526,7 +526,7 @@ async function updateEpicWithShellStories({
    - Replace section
    - Handle malformed ADF gracefully
 
-2. **Shell Story Parser** (`shell-story-adf-parser.test.ts`):
+2. **Shell Story Parser** (`shell-story-parser.adf.test.ts`):
    - Parse basic story with ID, title, description
    - Parse story with hard breaks in description
    - Parse nested bullet lists (SCREENS, DEPENDENCIES)
@@ -621,7 +621,7 @@ Create fixture files with sample ADF structures:
 5. **Manual test**: Verify hard breaks preserved in Jira
 
 ### Phase 2: Next Story (~2-3 sessions)
-1. **Step 2**: Create `shell-story-adf-parser.ts`
+1. **Step 2**: Create `shell-story-parser.ts` with ADF parsing functions
 2. **Step 4**: Refactor `write-next-story/core-logic.ts`
 3. **Step 6 + 7**: Validate + test next story workflow
 4. **Manual test**: Verify completion markers + hard breaks in Jira

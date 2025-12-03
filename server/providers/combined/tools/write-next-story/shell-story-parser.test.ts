@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from '@jest/globals';
-import { parseShellStories, type ParsedShellStory } from './shell-story-parser.js';
+import { parseShellStories } from './shell-story-parser.js';
 
 describe('parseShellStories', () => {
   describe('basic shell story parsing', () => {

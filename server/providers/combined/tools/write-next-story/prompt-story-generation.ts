@@ -7,7 +7,7 @@
 
 import { readFile } from 'fs/promises';
 import { resolveServerPath } from '../../../../utils/file-paths.js';
-import type { ParsedShellStory } from '../shared/shell-story-adf-parser.js';
+import type { ParsedShellStory } from './shell-story-parser.js';
 
 /**
  * System prompt for story generation
