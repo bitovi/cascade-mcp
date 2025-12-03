@@ -24,7 +24,7 @@ import { getDebugDir, getBaseCacheDir } from '../writing-shell-stories/temp-dire
 import { getFigmaFileCachePath } from '../../../figma/figma-cache.js';
 import { setupFigmaScreens, type FigmaScreenSetupResult } from '../writing-shell-stories/figma-screen-setup.js';
 import { regenerateScreenAnalyses } from '../shared/screen-analysis-regenerator.js';
-import { parseShellStoriesFromAdf, addCompletionMarkerToStory, type ParsedShellStory } from './shell-story-parser.js';
+import { parseShellStoriesFromAdf, addCompletionMarkerToStory, type ParsedShellStoryADF } from './shell-story-parser.js';
 import { 
   generateStoryPrompt, 
   STORY_GENERATION_SYSTEM_PROMPT, 
@@ -224,7 +224,7 @@ Each story must follow this format:
 export async function extractShellStoriesFromSetup(
   setupResult: FigmaScreenSetupResult,
   notify: ToolDependencies['notify']
-): Promise<ParsedShellStory[]> {
+): Promise<ParsedShellStoryADF[]> {
   await notify('Extracting shell stories...');
   console.log('Extracting shell stories from epic description...');
 
@@ -267,9 +267,9 @@ Epic ${setupResult.epicKey} does not contain any shell stories
  * Step 4: Find next unwritten story
  */
 export async function findNextUnwrittenStory(
-  shellStories: ParsedShellStory[],
+  shellStories: ParsedShellStoryADF[],
   notify: ToolDependencies['notify']
-): Promise<ParsedShellStory | undefined> {
+): Promise<ParsedShellStoryADF | undefined> {
   await notify('Finding next unwritten story...');
   return shellStories.find(story => !story.jiraUrl);
 }
@@ -279,8 +279,8 @@ export async function findNextUnwrittenStory(
  * Recursively checks all dependencies and their dependencies
  */
 export async function validateDependencies(
-  story: ParsedShellStory,
-  allStories: ParsedShellStory[],
+  story: ParsedShellStoryADF,
+  allStories: ParsedShellStoryADF[],
   notify: ToolDependencies['notify']
 ): Promise<void> {
   await notify('Validating dependencies...');
@@ -362,8 +362,8 @@ export async function generateStoryContent(
   figmaClient: FigmaClient,
   setupResult: FigmaScreenSetupResult,
   debugDir: string | null,
-  story: ParsedShellStory,
-  allStories: ParsedShellStory[],
+  story: ParsedShellStoryADF,
+  allStories: ParsedShellStoryADF[],
   notify: ToolDependencies['notify']
 ): Promise<string> {
   await notify('Generating story content...');
@@ -478,7 +478,7 @@ No screen analysis files are available for story ${story.id}
   // Get dependency stories for context
   const dependencyStories = story.dependencies
     .map(depId => allStories.find(s => s.id === depId))
-    .filter((s): s is ParsedShellStory => s !== undefined);
+    .filter((s): s is ParsedShellStoryADF => s !== undefined);
   
   console.log(`  Using ${dependencyStories.length} dependency stories for context`);
   
@@ -535,8 +535,8 @@ export async function createJiraIssue(
   cloudId: string,
   epicKey: string,
   projectKey: string,
-  story: ParsedShellStory,
-  allStories: ParsedShellStory[],
+  story: ParsedShellStoryADF,
+  allStories: ParsedShellStoryADF[],
   storyContent: string,
   notify: ToolDependencies['notify']
 ): Promise<{ key: string; self: string }> {
@@ -771,7 +771,7 @@ export async function updateEpicWithCompletion(
   cloudId: string,
   epicKey: string,
   setupResult: FigmaScreenSetupResult,
-  story: ParsedShellStory,
+  story: ParsedShellStoryADF,
   createdIssue: { key: string; self: string },
   notify: ToolDependencies['notify']
 ): Promise<void> {

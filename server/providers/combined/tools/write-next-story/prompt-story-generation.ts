@@ -7,7 +7,7 @@
 
 import { readFile } from 'fs/promises';
 import { resolveServerPath } from '../../../../utils/file-paths.js';
-import type { ParsedShellStory } from './shell-story-parser.js';
+import type { ParsedShellStoryADF } from './shell-story-parser.js';
 
 /**
  * System prompt for story generation
@@ -54,8 +54,8 @@ async function loadStoryWritingGuidelines(): Promise<string> {
  * @returns Complete prompt for story generation
  */
 export async function generateStoryPrompt(
-  shellStory: ParsedShellStory,
-  dependencyStories: ParsedShellStory[],
+  shellStory: ParsedShellStoryADF,
+  dependencyStories: ParsedShellStoryADF[],
   analysisFiles: Array<{ screenName: string; content: string }>,
   epicContext?: string
 ): Promise<string> {
@@ -143,7 +143,7 @@ Generate a complete Jira story following the Story Writing Guidelines and Comple
  * Format dependency stories for inclusion in prompt
  * Extracts just the essential context without full details
  */
-export function formatDependencySummaries(dependencies: ParsedShellStory[]): string {
+export function formatDependencySummaries(dependencies: ParsedShellStoryADF[]): string {
   if (dependencies.length === 0) {
     return 'No dependencies for this story.';
   }

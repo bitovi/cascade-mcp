@@ -145,7 +145,7 @@ Refactor shell story parsing to work with ADF nodes instead of Markdown:
 
 **Interface** (if not already defined elsewhere):
 ```typescript
-export interface ParsedShellStory {
+export interface ParsedShellStoryADF {
   id: string;                    // e.g., "st001"
   title: string;                 // Story title
   description: string;           // Story description
@@ -167,7 +167,7 @@ export interface ParsedShellStory {
  */
 export function parseShellStoriesFromAdf(
   adfContent: ADFNode[]
-): ParsedShellStory[]
+): ParsedShellStoryADF[]
 
 /**
  * Extract Shell Stories section and parse it
@@ -176,7 +176,7 @@ export function parseShellStoriesFromAdf(
  */
 export function extractAndParseShellStories(
   epicDescription: ADFDocument
-): ParsedShellStory[]
+): ParsedShellStoryADF[]
 
 /**
  * Add completion marker to shell story in ADF
@@ -201,7 +201,7 @@ export function addCompletionMarkerToStory(
    - Extract description (text after ⟩ separator)
    - Check for completion marker (✅ + issueKey or URL)
    - Parse nested bullet lists for SCREENS, DEPENDENCIES, etc.
-4. Return `ParsedShellStory[]` matching existing interface
+4. Return `ParsedShellStoryADF[]` matching existing interface
 
 **Edge Cases to Handle**:
 - Missing story ID - **throw descriptive error**
@@ -353,7 +353,7 @@ Generate shell stories...
 async function extractShellStoriesFromSetup(
   setupResult: FigmaScreenSetupResult,
   notify: (msg: string) => Promise<void>
-): Promise<ParsedShellStory[]> {
+): Promise<ParsedShellStoryADF[]> {
   console.log('  Extracting shell stories from epic description...');
   
   // Use ADF parser instead of Markdown parser
@@ -374,7 +374,7 @@ async function updateEpicWithCompletion(
   cloudId: string,
   epicKey: string,
   setupResult: FigmaScreenSetupResult,
-  nextStory: ParsedShellStory,
+  nextStory: ParsedShellStoryADF,
   createdIssueKey: string,
   notify: (msg: string) => Promise<void>
 ): Promise<void> {

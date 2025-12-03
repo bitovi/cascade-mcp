@@ -9,7 +9,7 @@ import { describe, it, expect } from '@jest/globals';
 import {
   parseShellStoriesFromAdf,
   addCompletionMarkerToStory,
-  type ParsedShellStory
+  type ParsedShellStoryADF
 } from './shell-story-parser.js';
 import type { ADFNode, ADFDocument } from '../../../atlassian/markdown-converter.js';
 import { extractADFSection } from '../../../atlassian/markdown-converter.js';
@@ -121,11 +121,11 @@ describe('parseShellStoriesFromAdf', () => {
     expect(stories.length).toBeGreaterThanOrEqual(2);
     
     // Verify first story
-    const loginStory = stories.find((s: ParsedShellStory) => s.title.includes('Login'));
+    const loginStory = stories.find((s: ParsedShellStoryADF) => s.title.includes('Login'));
     expect(loginStory).toBeDefined();
     
     // Verify second story
-    const dashboardStory = stories.find((s: ParsedShellStory) => s.title.includes('Dashboard'));
+    const dashboardStory = stories.find((s: ParsedShellStoryADF) => s.title.includes('Dashboard'));
     expect(dashboardStory).toBeDefined();
   });
 

@@ -11,7 +11,7 @@ import { convertAdfNodesToMarkdown } from '../../../atlassian/markdown-converter
 /**
  * Parsed shell story structure
  */
-export interface ParsedShellStory {
+export interface ParsedShellStoryADF {
   id: string;              // "st001"
   title: string;           // Story title
   description: string;     // One-sentence description
@@ -41,8 +41,8 @@ export interface ParsedShellStory {
  */
 export function parseShellStoriesFromAdf(
   shellStoriesSection: ADFNode[]
-): ParsedShellStory[] {
-  const stories: ParsedShellStory[] = [];
+): ParsedShellStoryADF[] {
+  const stories: ParsedShellStoryADF[] = [];
   
   // Find bulletList nodes in section
   for (const node of shellStoriesSection) {
@@ -414,7 +414,7 @@ function extractEmojiItems(itemContent: ADFNode[], emoji: string): string[] {
  * @param listItem - ADF listItem node containing shell story
  * @returns Parsed shell story or null if invalid
  */
-function parseShellStoryFromListItem(listItem: ADFNode): ParsedShellStory | null {
+function parseShellStoryFromListItem(listItem: ADFNode): ParsedShellStoryADF | null {
   if (listItem.type !== 'listItem' || !listItem.content) return null;
   
   const storyId = extractStoryId(listItem.content);
