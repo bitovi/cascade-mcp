@@ -30,15 +30,15 @@ import {
 } from '../../../figma/figma-helpers.js';
 import { resolveCloudId, getJiraIssue, handleJiraAuthError } from '../../../atlassian/atlassian-helpers.js';
 import { 
+  convertAdfNodesToMarkdown,
   countADFSectionsByHeading,
+  extractADFSection,
   type ADFNode,
   type ADFDocument,
-  convertAdfNodesToMarkdown
 } from '../../../atlassian/markdown-converter.js';
-import { extractADFSection } from '../../../atlassian/markdown-converter.js';
 import { associateNotesWithFrames } from './screen-analyzer.js';
 import { generateScreensYaml } from './yaml-generator.js';
-import { writeNotesForScreen } from './note-text-extractor.js';
+// import { writeNotesForScreen } from './note-text-extractor.js';
 
 /**
  * Fetches Figma metadata (frames and notes) from multiple Figma URLs using batched requests.

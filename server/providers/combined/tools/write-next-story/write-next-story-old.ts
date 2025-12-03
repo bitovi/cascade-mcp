@@ -22,7 +22,7 @@ import { createProgressNotifier } from '../writing-shell-stories/progress-notifi
 import { getTempDir } from '../writing-shell-stories/temp-directory-manager.js';
 import { setupFigmaScreens } from '../writing-shell-stories/figma-screen-setup.js';
 import { CreateMessageResultSchema } from "@modelcontextprotocol/sdk/types.js";
-import { parseShellStories, type ParsedShellStoryDeprecated } from './shell-story-parser.js';
+import { parseShellStories, type ParsedShellStoryMarkdown } from './shell-story-parser.js';
 import { 
   generateStoryPrompt, 
   STORY_GENERATION_SYSTEM_PROMPT, 
@@ -221,7 +221,7 @@ export function registerWriteNextStoryTool(mcp: McpServer): void {
 export async function extractShellStoriesFromSetup(
   setupResult: FigmaScreenSetupResult,
   notify: (message: string, step: number) => Promise<void>
-): Promise<ParsedShellStoryDeprecated[]> {
+): Promise<ParsedShellStoryMarkdown[]> {
   await notify('Extracting shell stories...', 2);
   
   // Extract Shell Stories section from the full epic markdown
@@ -245,9 +245,9 @@ export async function extractShellStoriesFromSetup(
  * Step 4: Find next unwritten story
  */
 export function findNextUnwrittenStory(
-  shellStories: ParsedShellStoryDeprecated[],
+  shellStories: ParsedShellStoryMarkdown[],
   notify: (message: string, step: number) => Promise<void>
-): ParsedShellStoryDeprecated | undefined {
+): ParsedShellStoryMarkdown | undefined {
   notify('Finding next unwritten story...', 4);
   return shellStories.find(story => !story.jiraUrl);
 }
@@ -257,8 +257,8 @@ export function findNextUnwrittenStory(
  * Recursively checks all dependencies and their dependencies
  */
 export function validateDependencies(
-  story: ParsedShellStoryDeprecated,
-  allStories: ParsedShellStoryDeprecated[],
+  story: ParsedShellStoryMarkdown,
+  allStories: ParsedShellStoryMarkdown[],
   notify: (message: string, step: number) => Promise<void>
 ): void {
   notify('Validating dependencies...', 5);
@@ -300,8 +300,8 @@ export async function generateStoryContent(
   figmaClient: ReturnType<typeof createFigmaClient>,
   setupResult: FigmaScreenSetupResult,
   tempDirPath: string,
-  story: ParsedShellStoryDeprecated,
-  allStories: ParsedShellStoryDeprecated[],
+  story: ParsedShellStoryMarkdown,
+  allStories: ParsedShellStoryMarkdown[],
   notify: (message: string, progress: number, level?: 'info' | 'debug' | 'warning' | 'error', addSteps?: number) => Promise<void>
 ): Promise<string> {
   await notify('Generating story content...', 6);
@@ -402,7 +402,7 @@ export async function generateStoryContent(
   // Get dependency stories for context
   const dependencyStories = story.dependencies
     .map(depId => allStories.find(s => s.id === depId))
-    .filter((s): s is ParsedShellStoryDeprecated => s !== undefined);
+    .filter((s): s is ParsedShellStoryMarkdown => s !== undefined);
   
   console.log(`  Using ${dependencyStories.length} dependency stories for context`);
   
@@ -436,8 +436,8 @@ export async function createJiraIssue(
   cloudId: string,
   epicKey: string,
   projectKey: string,
-  story: ParsedShellStoryDeprecated,
-  allStories: ParsedShellStoryDeprecated[],
+  story: ParsedShellStoryMarkdown,
+  allStories: ParsedShellStoryMarkdown[],
   storyContent: string,
   notify: (message: string, progress: number, level?: 'info' | 'debug' | 'warning' | 'error', addSteps?: number) => Promise<void>
 ): Promise<{ key: string; self: string }> {
@@ -596,7 +596,7 @@ export async function updateEpicWithCompletion(
   cloudId: string,
   epicKey: string,
   epicMarkdown: string,
-  story: ParsedShellStoryDeprecated,
+  story: ParsedShellStoryMarkdown,
   createdIssue: { key: string; self: string },
   notify: (message: string, progress: number, level?: 'info' | 'debug' | 'warning' | 'error', addSteps?: number) => Promise<void>
 ): Promise<void> {

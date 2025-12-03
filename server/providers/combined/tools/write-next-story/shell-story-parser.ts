@@ -457,7 +457,7 @@ function parseShellStoryFromListItem(listItem: ADFNode): ParsedShellStory | null
 /**
  * Parsed shell story structure
  */
-export interface ParsedShellStoryDeprecated {
+export interface ParsedShellStoryMarkdown {
   id: string;              // "st001"
   title: string;           // Story title
   description: string;     // One-sentence description
@@ -491,8 +491,8 @@ export interface ParsedShellStoryDeprecated {
  * @param shellStoriesContent - Markdown content of Shell Stories section
  * @returns Array of parsed shell stories
  */
-export function parseShellStories(shellStoriesContent: string): ParsedShellStoryDeprecated[] {
-  const stories: ParsedShellStoryDeprecated[] = [];
+export function parseShellStories(shellStoriesContent: string): ParsedShellStoryMarkdown[] {
+  const stories: ParsedShellStoryMarkdown[] = [];
   
   // Split by top-level bullets (stories start with -)
   const storyBlocks = shellStoriesContent.split(/\n- /);

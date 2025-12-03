@@ -347,10 +347,6 @@ No shell stories content received from AI
 
 /**
  * Helper function for Phase 6: Update epic with shell stories
- * 
- * Updates the epic description by combining epic context (without Shell Stories section)
- * with the new AI-generated shell stories. Uses ADF operations (no Markdown round-trips).
- * 
  * @param params - Parameters for updating the epic
  * @param params.epicKey - The Jira epic key
  * @param params.cloudId - The Atlassian cloud ID

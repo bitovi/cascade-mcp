@@ -83,7 +83,7 @@ The following dependency stories have already been implemented. Use them for con
 
 ${dependencyStories.map(dep => `### ${dep.id}: ${dep.title}
 
-  ${dep.rawContent}
+${dep.rawContent}
 `).join('\n---\n\n')}
 `
     : '';
