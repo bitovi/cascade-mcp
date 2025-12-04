@@ -206,21 +206,12 @@ function getMarkAttribute(node: ADFNode, markType: string, attrName: string): st
 }
 
 /**
- * Find first paragraph in list item content
- * @param itemContent - List item content nodes
- * @returns First paragraph node or null
- */
-function findFirstParagraph(itemContent: ADFNode[]): ADFNode | null {
-  return itemContent.find(node => node.type === 'paragraph') ?? null;
-}
-
-/**
  * Extract story ID (e.g., "st001") from list item content
  * @param itemContent - List item content nodes
  * @returns Story ID or null if not found
  */
 function extractStoryId(itemContent: ADFNode[]): string | null {
-  const para = findFirstParagraph(itemContent);
+  const para = itemContent.find(node => node.type === 'paragraph') ?? null;
   if (!para?.content) return null;
   
   for (const textNode of para.content) {
@@ -235,17 +226,16 @@ function extractStoryId(itemContent: ADFNode[]): string | null {
 /**
  * Extract title and check for completion marker
  * @param itemContent - List item content nodes
- * @returns Object with title, optional jiraUrl and timestamp, or null if not found
+ * @returns Object with title and optional jiraUrl, or null if not found
  */
-function extractTitleInfo(itemContent: ADFNode[]): { title: string, jiraUrl?: string, timestamp?: string } | null {
-  const para = findFirstParagraph(itemContent);
+function extractTitleInfo(itemContent: ADFNode[]): { title: string, jiraUrl?: string } | null {
+  const para = itemContent.find(node => node.type === 'paragraph') ?? null;
   if (!para?.content) return null;
   
   let foundId = false;
   let foundSeparator = false;
   let title = '';
   let jiraUrl: string | undefined;
-  let timestamp: string | undefined;
   
   for (const textNode of para.content) {
     // Skip story ID (code mark)
@@ -271,15 +261,7 @@ function extractTitleInfo(itemContent: ADFNode[]): { title: string, jiraUrl?: st
     }
   }
   
-  // Extract timestamp (em mark after separator)
-  for (const textNode of para.content) {
-    if (textNode.type === 'text' && hasMarkType(textNode, 'em')) {
-      const match = textNode.text?.match(/\(([^)]+)\)/);
-      if (match) timestamp = match[1];
-    }
-  }
-  
-  return foundId && foundSeparator && title ? { title: title.trim(), jiraUrl, timestamp } : null;
+  return foundId && foundSeparator && title ? { title: title.trim(), jiraUrl } : null;
 }
 
 /**
@@ -288,7 +270,7 @@ function extractTitleInfo(itemContent: ADFNode[]): { title: string, jiraUrl?: st
  * @returns Description text (text after ⟩ separator)
  */
 function extractDescription(itemContent: ADFNode[]): string {
-  const para = findFirstParagraph(itemContent);
+  const para = itemContent.find(node => node.type === 'paragraph') ?? null;
   if (!para?.content) return '';
   
   let foundSeparator = false;
@@ -343,21 +325,6 @@ function extractFromNestedList<T>(
 }
 
 /**
- * Extract items from nested list by keyword prefix
- * @param itemContent - List item content nodes
- * @param keyword - Keyword to search for in paragraph text
- * @param parser - Function to parse text content into array of items
- * @returns Array of parsed items
- */
-function extractByKeyword(itemContent: ADFNode[], keyword: string, parser: (text: string) => string[]): string[] {
-  return extractFromNestedList(
-    itemContent,
-    (content) => !!(content[0]?.type === 'text' && content[0].text?.includes(keyword)),
-    (content) => parser(extractTextFromAdfNodes(content))
-  );
-}
-
-/**
  * Extract screens from nested SCREENS list
  * @returns Array of Figma URLs
  */
@@ -384,10 +351,15 @@ function extractScreens(itemContent: ADFNode[]): string[] {
  * @returns Array of dependency story IDs
  */
 function extractDependencies(itemContent: ADFNode[]): string[] {
-  return extractByKeyword(itemContent, 'DEPENDENCIES:', (text) => {
-    const depsText = text.replace(/^DEPENDENCIES:\s*/, '').trim();
-    return depsText.toLowerCase() === 'none' ? [] : depsText.split(',').map(d => d.trim()).filter(d => d);
-  });
+  return extractFromNestedList(
+    itemContent,
+    (content) => !!(content[0]?.type === 'text' && content[0].text?.includes('DEPENDENCIES:')),
+    (content) => {
+      const text = extractTextFromAdfNodes(content);
+      const depsText = text.replace(/^DEPENDENCIES:\s*/, '').trim();
+      return depsText.toLowerCase() === 'none' ? [] : depsText.split(',').map(d => d.trim()).filter(d => d);
+    }
+  );
 }
 
 /**
