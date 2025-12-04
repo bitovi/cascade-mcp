@@ -38,8 +38,8 @@ export interface ScreenAnalysisResult {
   figmaFileKey: string;
   debugDir: string | null;
   yamlContent: string;
-  epicSansShellStoriesMarkdown: string;
-  epicSansShellStoriesAdf: ADFNode[];
+  epicWithoutShellStoriesMarkdown: string;
+  epicWithoutShellStoriesAdf: ADFNode[];
   figmaUrls: string[];
   cloudId: string;
   siteName: string;
@@ -95,8 +95,8 @@ export async function executeScreenAnalysisPipeline(
     allNotes,
     figmaFileKey,
     yamlContent,
-    epicSansShellStoriesMarkdown,
-    epicSansShellStoriesAdf,
+    epicWithoutShellStoriesMarkdown,
+    epicWithoutShellStoriesAdf,
     figmaUrls,
     cloudId: resolvedCloudId,
     siteName: resolvedSiteName
@@ -118,7 +118,7 @@ export async function executeScreenAnalysisPipeline(
     allFrames,
     allNotes,
     figmaFileKey,
-    epicContext: epicSansShellStoriesMarkdown,
+    epicContext: epicWithoutShellStoriesMarkdown,
     notify: async (message: string) => {
       // Show progress for each screen (auto-increments)
       await notify(message);
@@ -135,8 +135,8 @@ export async function executeScreenAnalysisPipeline(
     figmaFileKey,
     debugDir,
     yamlContent,
-    epicSansShellStoriesMarkdown,
-    epicSansShellStoriesAdf,
+    epicWithoutShellStoriesMarkdown,
+    epicWithoutShellStoriesAdf,
     figmaUrls,
     cloudId: resolvedCloudId,
     siteName: resolvedSiteName,

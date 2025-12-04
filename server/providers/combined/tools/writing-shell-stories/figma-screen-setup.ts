@@ -272,8 +272,8 @@ export interface FigmaScreenSetupResult {
   figmaFileKey: string;          // File key for image downloads
   yamlContent: string;           // Generated screens.yaml content
   yamlPath?: string;             // Path to screens.yaml (only in DEV mode)
-  epicSansShellStoriesMarkdown: string;   // Epic content excluding Shell Stories
-  epicSansShellStoriesAdf: ADFNode[];           // Epic content excluding Shell Stories
+  epicWithoutShellStoriesMarkdown: string;   // Epic content excluding Shell Stories
+  epicWithoutShellStoriesAdf: ADFNode[];           // Epic content excluding Shell Stories
   epicDescriptionAdf: ADFDocument;     // Full epic description (ADF)
   shellStoriesAdf: ADFNode[];          // Shell Stories section (if exists)
   
@@ -350,12 +350,12 @@ export async function setupFigmaScreens(
   }
   
   // Extract Shell Stories section using ADF operations
-  const { section: shellStoriesAdf, remainingContent: epicSansShellStoriesAdf } = 
+  const { section: shellStoriesAdf, remainingContent: epicWithoutShellStoriesAdf } = 
     extractADFSection(description.content || [], 'Shell Stories');
 
-  const epicSansShellStoriesMarkdown = convertAdfNodesToMarkdown(epicSansShellStoriesAdf);
+  const epicWithoutShellStoriesMarkdown = convertAdfNodesToMarkdown(epicWithoutShellStoriesAdf);
   
-  console.log(`    Epic context: ${epicSansShellStoriesAdf.length} ADF nodes`);
+  console.log(`    Epic context: ${epicWithoutShellStoriesAdf.length} ADF nodes`);
   console.log(`    Shell stories: ${shellStoriesAdf.length} ADF nodes`);
   
   // ==========================================
@@ -413,8 +413,8 @@ export async function setupFigmaScreens(
     figmaFileKey,
     yamlContent,
     yamlPath,
-    epicSansShellStoriesMarkdown,
-    epicSansShellStoriesAdf,
+    epicWithoutShellStoriesMarkdown,
+    epicWithoutShellStoriesAdf,
     epicDescriptionAdf: description,
     shellStoriesAdf,
     figmaUrls,

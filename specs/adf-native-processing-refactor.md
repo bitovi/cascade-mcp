@@ -185,7 +185,7 @@ export function extractAndParseShellStories(
  * @param issueKey - Jira issue key (e.g., "PROJ-123")
  * @returns New section with marker added
  */
-export function addCompletionMarkerToStory(
+export function addCompletionMarkerToShellStory(
   shellStoriesSection: ADFNode[],
   storyId: string,
   issueKey: string
@@ -247,7 +247,7 @@ export interface FigmaScreenSetupResult {
   yamlPath?: string;
   
   // CHANGED: Return ADF only (no Markdown)
-  epicSansShellStoriesAdf: ADFNode[];           // Epic content excluding Shell Stories
+  epicWithoutShellStoriesAdf: ADFNode[];           // Epic content excluding Shell Stories
   epicDescriptionAdf: ADFDocument;     // Full epic description (ADF)
   shellStoriesAdf: ADFNode[];          // Shell Stories section (if exists)
   
@@ -294,7 +294,7 @@ export function prepareAIPromptContext(
     epicMarkdown_AIPromptOnly: convertAdfToMarkdown({
       version: 1,
       type: 'doc',
-      content: setupResult.epicSansShellStoriesAdf
+      content: setupResult.epicWithoutShellStoriesAdf
     }),
     shellStoriesMarkdown_AIPromptOnly: setupResult.shellStoriesAdf.length > 0
       ? convertAdfToMarkdown({
@@ -316,13 +316,13 @@ if (!description) {
 }
 
 // Extract Shell Stories section using ADF operations
-const { section: shellStoriesAdf, remaining: epicSansShellStoriesAdf } = 
+const { section: shellStoriesAdf, remaining: epicWithoutShellStoriesAdf } = 
   extractAdfSection(description.content, "Shell Stories");
 
 // Return ADF structures only (no Markdown conversion here)
 return {
   // ... other fields
-  epicSansShellStoriesAdf,
+  epicWithoutShellStoriesAdf,
   epicDescriptionAdf: description,
   shellStoriesAdf
 };
@@ -381,7 +381,7 @@ async function updateEpicWithCompletion(
   console.log('  Adding completion marker to shell story...');
   
   // Add completion marker to shell stories ADF
-  const updatedShellStories = addCompletionMarkerToStory(
+  const updatedShellStories = addCompletionMarkerToShellStory(
     setupResult.shellStoriesAdf,
     nextStory.id,
     createdIssueKey
@@ -392,7 +392,7 @@ async function updateEpicWithCompletion(
     version: 1,
     type: 'doc',
     content: [
-      ...setupResult.epicSansShellStoriesAdf,
+      ...setupResult.epicWithoutShellStoriesAdf,
       ...updatedShellStories
     ]
   };
@@ -427,14 +427,14 @@ async function updateEpicWithShellStories({
   cloudId,
   atlassianClient,
   shellStoriesMarkdown, // AI-generated content
-  epicSansShellStoriesAdf,       // From setupResult
+  epicWithoutShellStoriesAdf,       // From setupResult
   notify
 }: {
   epicKey: string;
   cloudId: string;
   atlassianClient: AtlassianClient;
   shellStoriesMarkdown: string;
-  epicSansShellStoriesAdf: ADFNode[];
+  epicWithoutShellStoriesAdf: ADFNode[];
   notify: (msg: string) => Promise<void>;
 }): Promise<void> {
   // Clean up AI-generated Markdown
@@ -452,7 +452,7 @@ async function updateEpicWithShellStories({
     version: 1,
     type: 'doc',
     content: [
-      ...epicSansShellStoriesAdf,
+      ...epicWithoutShellStoriesAdf,
       ...shellStoriesAdf.content
     ]
   };
@@ -471,7 +471,7 @@ async function updateEpicWithShellStories({
 **Validation Checklist**:
 
 - [ ] **`FigmaScreenSetupResult` interface verification**:
-  - Contains only ADF fields (`epicSansShellStoriesAdf`, `epicDescriptionAdf`, `shellStoriesAdf`)
+  - Contains only ADF fields (`epicWithoutShellStoriesAdf`, `epicDescriptionAdf`, `shellStoriesAdf`)
   - No Markdown fields present
   - All ADF fields properly typed with `ADFNode[]` or `ADFDocument`
   - JSDoc comments clearly state "ADF only"
@@ -492,7 +492,7 @@ async function updateEpicWithShellStories({
 - [ ] **Function signature consistency**:
   - `extractShellStoriesFromSetup()` accepts `FigmaScreenSetupResult`
   - `updateEpicWithCompletion()` uses ADF operations
-  - `updateEpicWithShellStories()` accepts `epicSansShellStoriesAdf: ADFNode[]`
+  - `updateEpicWithShellStories()` accepts `epicWithoutShellStoriesAdf: ADFNode[]`
   - No function signatures accept Markdown for Jira data manipulation
 
 - [ ] **Type safety enforcement**:
@@ -661,7 +661,7 @@ Create fixture files with sample ADF structures:
    - **A: Option A** - Keep current approach (text node with `link` mark + timestamp)
    - **Implementation**: Pure ADF manipulation (no Markdown round-trip)
    - **How it works**:
-     - `addCompletionMarkerToStory()`: Find title text node, add `link` mark to marks array, append timestamp text node with `em` mark
+     - `addCompletionMarkerToShellStory()`: Find title text node, add `link` mark to marks array, append timestamp text node with `em` mark
      - `parseShellStoriesFromAdf()`: Check if title text node has `link` mark to detect completion
    - **Rationale**: Simpler, already working, no user-facing changes, fully ADF-native
 

@@ -24,7 +24,7 @@ import { getDebugDir, getBaseCacheDir } from '../writing-shell-stories/temp-dire
 import { getFigmaFileCachePath } from '../../../figma/figma-cache.js';
 import { setupFigmaScreens, type FigmaScreenSetupResult } from '../writing-shell-stories/figma-screen-setup.js';
 import { regenerateScreenAnalyses } from '../shared/screen-analysis-regenerator.js';
-import { parseShellStoriesFromAdf, addCompletionMarkerToStory, type ParsedShellStoryADF } from './shell-story-parser.js';
+import { parseShellStoriesFromAdf, addCompletionMarkerToShellStory, type ParsedShellStoryADF } from './shell-story-parser.js';
 import { 
   generateStoryPrompt, 
   STORY_GENERATION_SYSTEM_PROMPT, 
@@ -423,7 +423,7 @@ export async function generateStoryContent(
       allFrames: setupResult.allFrames,
       allNotes: setupResult.allNotes,
       figmaFileKey: setupResult.figmaFileKey,
-      epicContext: setupResult.epicSansShellStoriesMarkdown,
+      epicContext: setupResult.epicWithoutShellStoriesMarkdown,
       notify: async (msg) => await notify(msg)
     });
     
@@ -483,7 +483,7 @@ No screen analysis files are available for story ${story.id}
   console.log(`  Using ${dependencyStories.length} dependency stories for context`);
   
   // Generate prompt
-  const storyPrompt = await generateStoryPrompt(story, dependencyStories, analysisFiles, setupResult.epicSansShellStoriesMarkdown);
+  const storyPrompt = await generateStoryPrompt(story, dependencyStories, analysisFiles, setupResult.epicWithoutShellStoriesMarkdown);
   console.log(`  Generated prompt (${storyPrompt.length} characters)`);
   
   // Request story generation via LLM
@@ -784,7 +784,7 @@ export async function updateEpicWithCompletion(
   // Add completion marker to shell stories ADF
   let updatedShellStories;
   try {
-    updatedShellStories = addCompletionMarkerToStory(
+    updatedShellStories = addCompletionMarkerToShellStory(
       setupResult.shellStoriesAdf,
       story.id,
       createdIssue.key,
@@ -804,7 +804,7 @@ export async function updateEpicWithCompletion(
     version: 1,
     type: 'doc',
     content: [
-      ...setupResult.epicSansShellStoriesAdf,
+      ...setupResult.epicWithoutShellStoriesAdf,
       ...updatedShellStories
     ]
   };

@@ -121,8 +121,8 @@ export async function executeWriteShellStories(
     allFrames,
     allNotes,
     figmaFileKey,
-    epicSansShellStoriesMarkdown,
-    epicSansShellStoriesAdf,
+    epicWithoutShellStoriesMarkdown,
+    epicWithoutShellStoriesAdf,
     figmaUrls,
     cloudId: resolvedCloudId,
     siteName: resolvedSiteName,
@@ -147,7 +147,7 @@ export async function executeWriteShellStories(
     allFrames,
     allNotes,
     figmaFileKey,
-    epicContext: epicSansShellStoriesMarkdown,
+    epicContext: epicWithoutShellStoriesMarkdown,
     notify: async (message: string) => {
       // Show progress for each screen (auto-increments)
       await notify(message);
@@ -167,7 +167,7 @@ export async function executeWriteShellStories(
     figmaFileKey,
     yamlContent,
     notify,
-    epicContext: epicSansShellStoriesMarkdown
+    epicContext: epicWithoutShellStoriesMarkdown
   });
 
   // ==========================================
@@ -185,7 +185,7 @@ export async function executeWriteShellStories(
       cloudId: resolvedCloudId,
       atlassianClient,
       shellStoriesMarkdown: shellStoriesContent,
-      epicSansShellStoriesAdf,
+      epicWithoutShellStoriesAdf,
       notify
     });
   } else {
@@ -352,7 +352,7 @@ No shell stories content received from AI
  * @param params.cloudId - The Atlassian cloud ID
  * @param params.atlassianClient - Atlassian API client with auth
  * @param params.shellStoriesMarkdown - The AI-generated shell stories markdown content
- * @param params.epicSansShellStoriesAdf - The epic description ADF content without Shell Stories section (from setupResult)
+ * @param params.epicWithoutShellStoriesAdf - The epic description ADF content without Shell Stories section (from setupResult)
  * @param params.notify - Progress notification function
  */
 async function updateEpicWithShellStories({
@@ -360,14 +360,14 @@ async function updateEpicWithShellStories({
   cloudId,
   atlassianClient,
   shellStoriesMarkdown,
-  epicSansShellStoriesAdf,
+  epicWithoutShellStoriesAdf,
   notify
 }: {
   epicKey: string;
   cloudId: string;
   atlassianClient: ToolDependencies['atlassianClient'];
   shellStoriesMarkdown: string;
-  epicSansShellStoriesAdf: ADFNode[];
+  epicWithoutShellStoriesAdf: ADFNode[];
   notify: ToolDependencies['notify'];
 }): Promise<void> {
   console.log('  Phase 6: Updating epic with shell stories...');
@@ -389,14 +389,14 @@ async function updateEpicWithShellStories({
     console.log('    ✅ Shell stories converted to ADF');
     
     // Check if combined size would exceed Jira's limit
-    const wouldExceed = wouldExceedLimit(epicSansShellStoriesAdf, shellStoriesAdf);
+    const wouldExceed = wouldExceedLimit(epicWithoutShellStoriesAdf, shellStoriesAdf);
 
-    let finalContent = epicSansShellStoriesAdf;
+    let finalContent = epicWithoutShellStoriesAdf;
 
     if (wouldExceed) {
       // Extract Scope Analysis section from content
       const { section: scopeAnalysisSection, remainingContent } = extractADFSection(
-        epicSansShellStoriesAdf,
+        epicWithoutShellStoriesAdf,
         'Scope Analysis'
       );
       
