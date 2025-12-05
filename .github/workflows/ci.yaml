@@ -37,47 +37,19 @@ jobs:
         with:
           node-version: 22
 
-      - name: Generate .env and repo_env
+      - name: Generate .env file
         run: |
-          chmod +x scripts/generate-build-env.sh
-          ./scripts/generate-build-env.sh
-        env:
-          VITE_COMMIT_SHA: ${{ github.sha }}
-          VITE_AUTH_SERVER_URL: ${{ vars.VITE_AUTH_SERVER_URL }}
-          VITE_JIRA_CLIENT_ID: ${{ vars.VITE_JIRA_CLIENT_ID }}
-          JIRA_CLIENT_SECRET: ${{ secrets.JIRA_CLIENT_SECRET }}
-          VITE_FIGMA_CLIENT_ID: ${{ vars.VITE_FIGMA_CLIENT_ID }}
-          FIGMA_CLIENT_SECRET: ${{ secrets.FIGMA_CLIENT_SECRET }}
-          VITE_JIRA_SCOPE: ${{ vars.VITE_JIRA_SCOPE }}
-          VITE_JIRA_CALLBACK_URL: ${{ vars.VITE_JIRA_CALLBACK_URL }}
-          VITE_JIRA_API_URL: ${{ vars.VITE_JIRA_API_URL }}
-          BACKEND_SENTRY_DSN: ''
-          VITE_FRONTEND_SENTRY_DSN: ''
-          VITE_STATUS_REPORTS_ENV: ''
-          AWS_SECRET_ACCESS_KEY: ''
-          AWS_ACCESS_KEY_ID: ''
-          FIGMA_CLIENT_ID: ${{ vars.FIGMA_CLIENT_ID }}
-          FIGMA_OAUTH_SCOPES: ${{ vars.FIGMA_OAUTH_SCOPES }}
-          PORT: ${{ env.PORT }}
-      - name: Add Test User .env
-        run: |
-          echo "JIRA_TEST_USERNAME=${{ vars.JIRA_TEST_USERNAME }}" >> .env
-          echo "JIRA_TEST_PASSWORD=${{ secrets.JIRA_TEST_PASSWORD }}" >> .env
-          echo "JIRA_CLIENT_SECRET=${{ secrets.JIRA_CLIENT_SECRET }}" >> .env
-          echo "FIGMA_CLIENT_SECRET=${{ secrets.FIGMA_CLIENT_SECRET }}" >> .env
-          echo "JIRA_TOTP_SECRET=${{ secrets.JIRA_TOTP_SECRET }}" >> .env
-          echo "ATLASSIAN_TEST_PAT=CI Test PAT" >> .env
-          echo ".env file updated"
+          echo "PORT=${{ env.PORT }}" > .env
+          echo "ATLASSIAN_TEST_PAT=${{ secrets.ATLASSIAN_TEST_PAT }}" >> .env
+          echo "FIGMA_TEST_PAT=${{ secrets.FIGMA_TEST_PAT }}" >> .env
+          echo "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}" >> .env
+          echo ".env file created"
 
       - name: Install Dependencies
-        run: |
-          npm ci
-          npx playwright install
-          sudo npx playwright install-deps
-        # npm run build # no build script at this time
+        run: npm ci
 
       - name: Run E2E Tests
-        run: npm run test:e2e:mcp-sdk:mock
+        run: npm run test:e2e:rest-api
       - name: Save Artifacts
         if: always()
         uses: actions/upload-artifact@v4
