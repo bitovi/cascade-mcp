@@ -8,6 +8,7 @@
  * 
  * Example:
  *   node --import ./loader.mjs scripts/api/analyze-feature-scope.ts https://bitovi.atlassian.net/browse/PLAY-123
+ *   node --import ./loader.mjs scripts/api/analyze-feature-scope.ts https://bitovi.atlassian.net/browse/TF-10 --provider bedrock --model us.anthropic.claude-sonnet-4-5-20250929-v1:0
  * 
  * Environment Variables Required:
  *   ATLASSIAN_TEST_PAT - Atlassian Personal Access Token

@@ -25,5 +25,6 @@ export const createProviderFromHeaders = createSimpleProvider({
   createFn: createAmazonBedrock,
   providerName: 'AWS Bedrock',
   providerKey: 'bedrock',
-  keys: ['region', 'accessKeyId', 'secretAccessKey', 'sessionToken'],
+  keys: ['accessKeyId', 'secretAccessKey'],
+  optionalKeys: ['region', 'sessionToken'],
 });

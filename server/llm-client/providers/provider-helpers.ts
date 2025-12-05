@@ -21,8 +21,11 @@ export interface SimpleProviderConfig<T> {
   /** Provider identifier for header/env naming (lowercase, no spaces) */
   providerKey: string;
   
-  /** Parameter keys that match the AI SDK's createFn parameter names */
+  /** Required parameter keys that match the AI SDK's createFn parameter names */
   keys: (keyof T)[];
+  
+  /** Optional parameter keys (will be included if present, but won't throw if missing) */
+  optionalKeys?: (keyof T)[];
 }
 
 /**
@@ -81,6 +84,7 @@ export function createSimpleProvider<T extends Record<string, any>>(
     const providerConfig = {} as T;
     const missingKeys: string[] = [];
     
+    // Process required keys
     for (const key of config.keys) {
       const keyStr = String(key);
       
@@ -95,6 +99,24 @@ export function createSimpleProvider<T extends Record<string, any>>(
         missingKeys.push(`${headerKey} header or ${envKey} env var`);
       } else {
         (providerConfig as any)[key] = value;
+      }
+    }
+    
+    // Process optional keys
+    if (config.optionalKeys) {
+      for (const key of config.optionalKeys) {
+        const keyStr = String(key);
+        
+        // Generate provider-specific header and env var names with llmclient prefix
+        const headerKey = `x-llmclient-${config.providerKey}-${camelToKebab(keyStr)}`;
+        const envKey = `LLMCLIENT_${config.providerKey.toUpperCase()}_${camelToSnake(keyStr)}`;
+        
+        // Check standard names (but don't require them)
+        const value = headers[headerKey] || process.env[envKey];
+        
+        if (value) {
+          (providerConfig as any)[key] = value;
+        }
       }
     }
     
