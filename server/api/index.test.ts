@@ -22,7 +22,8 @@ describe('REST API Handler - Token Isolation', () => {
     const mockReq = {
       headers: {
         'x-atlassian-token': 'atlassian-token',
-        'x-figma-token': 'figma-token'
+        'x-figma-token': 'figma-token',
+        'x-anthropic-key': 'test-anthropic-key-for-unit-test'
       },
       body: {
         epicKey: 'PROJ-456',
