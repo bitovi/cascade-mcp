@@ -40,17 +40,12 @@ export function parseShellStoriesFromAdf(
   const stories: ParsedShellStoryADF[] = [];
   
   // Find bulletList nodes in section
-  for (const node of shellStoriesSection) {
-    if (node.type === 'bulletList' && node.content) {
-      // Each listItem is a shell story
-      for (const listItem of node.content) {
-        const story = parseShellStoryFromListItem(listItem);
-        if (story) {
-          stories.push(story);
-        }
-      }
-    }
-  }
+  forEachWithContent(shellStoriesSection, { type: 'bulletList' }, (bulletList) => {
+    forEachWithContent(bulletList.content!, { type: 'listItem' }, (listItem) => {
+      const story = parseShellStoryFromListItem(listItem);
+      if (story) stories.push(story);
+    });
+  });
   
   return stories;
 }
@@ -84,82 +79,74 @@ export function addCompletionMarkerToShellStory(
   // Deep clone to avoid mutations
   const newSection = structuredClone(shellStoriesSection);
   
-  // Find the story's listItem
-  for (const node of newSection) {
-    if (node.type === 'bulletList' && node.content) {
-      for (const listItem of node.content) {
-        if (listItem.type === 'listItem' && listItem.content) {
-          const id = extractStoryId(listItem.content);
-          if (id === storyId) {
-            // Find paragraph with title
-            for (const para of listItem.content) {
-              if (para.type === 'paragraph' && para.content) {
-                let foundId = false;
-                let foundSeparator = false;
-                
-                for (let i = 0; i < para.content.length; i++) {
-                  const textNode = para.content[i];
-                  
-                  // Skip story ID
-                  if (textNode.type === 'text' && hasMarkType(textNode, 'code')) {
-                    foundId = true;
-                    continue;
-                  }
-                  
-                  // Add link mark to title text nodes (between ID and separator)
-                  if (foundId && !foundSeparator && textNode.type === 'text') {
-                    // Add link mark to existing marks
-                    if (!textNode.marks) {
-                      textNode.marks = [];
-                    }
-                    
-                    // Check if already has link mark
-                    const hasLink = textNode.marks.some(m => m.type === 'link');
-                    if (!hasLink) {
-                      textNode.marks.push({
-                        type: 'link',
-                        attrs: { href: issueUrl }
-                      });
-                    }
-                  }
-                  
-                  // Mark separator found
-                  if (textNode.type === 'text' && textNode.text?.includes('⟩')) {
-                    foundSeparator = true;
-                  }
-                  
-                  // Add timestamp after description (before any existing em mark)
-                  if (foundSeparator && i === para.content.length - 1) {
-                    // Check if timestamp already exists
-                    const hasTimestamp = para.content.some(n => 
-                      n.type === 'text' && hasMarkType(n, 'em')
-                    );
-                    
-                    if (!hasTimestamp) {
-                      // Add space + timestamp
-                      para.content.push({
-                        type: 'text',
-                        text: ' '
-                      });
-                      para.content.push({
-                        type: 'text',
-                        text: `(${new Date().toISOString()})`,
-                        marks: [{ type: 'em' }]
-                      });
-                    }
-                  }
-                }
-              }
-            }
-            
-            return newSection;
-          }
-        }
-      }
-    }
+  let storyFound = false;
+  forEachWithContent(newSection, { type: 'bulletList' }, (bulletList) => {
+    forEachWithContent(bulletList.content!, { type: 'listItem' }, (listItem) => {
+      const id = extractStoryId(listItem.content!);
+      if (id !== storyId) return;
+      storyFound = true;
+      forEachWithContent(listItem.content!, { type: 'paragraph' }, (paragraph) => {
+        if (!paragraph.content) return;
+        const parts = findTitleParts(paragraph.content);
+        for (const node of parts.titleNodes) addLinkToNode(node, issueUrl);
+        appendOrUpdateTimestamp(paragraph.content);
+      });
+    });
+  });
+  if (!storyFound) {
+    throw new Error(`Story ${storyId} not found in Shell Stories section`);
   }
-  
-  throw new Error(`Story ${storyId} not found in Shell Stories section`);
+  return newSection;
+}
+
+// Generic helper: iterate nodes with matching type that have content
+function forEachWithContent(source: ADFNode[] | ADFNode, match: { type: string }, callback: (node: ADFNode) => void): void {
+  const nodes = Array.isArray(source) ? source : [source];
+  for (const node of nodes) {
+    if (node.type === match.type && node.content) callback(node);
+  }
+}
+
+// Find title parts from a paragraph content: title nodes between ID and separator
+function findTitleParts(content: ADFNode[]): { titleNodes: ADFNode[] } {
+  const titleNodes: ADFNode[] = [];
+  let passedId = false;
+  let seenSeparator = false;
+  for (const node of content) {
+    if (node.type === 'text' && hasMarkType(node, 'code')) {
+      passedId = true;
+      continue;
+    }
+    if (node.type === 'text' && node.text?.includes('⟩')) {
+      seenSeparator = true;
+      break;
+    }
+    if (passedId && !seenSeparator && node.type === 'text') titleNodes.push(node);
+  }
+  return { titleNodes };
+}
+
+// Add link mark to a text node
+function addLinkToNode(textNode: ADFNode, url: string): void {
+  if (textNode.type !== 'text') return;
+  if (!textNode.marks) textNode.marks = [];
+  const hasLink = textNode.marks.some(m => m.type === 'link');
+  if (!hasLink) textNode.marks.push({ type: 'link', attrs: { href: url } });
+}
+
+// Appends or updates timestamp at end of ADFNode
+function appendOrUpdateTimestamp(content: ADFNode[]): void {
+  const now = new Date().toISOString();
+  const existingIdx = content.findIndex(n => n.type === 'text' && hasMarkType(n, 'em'));
+  if (existingIdx >= 0) {
+    const node = content[existingIdx];
+    if (node.type === 'text') {
+      node.text = `(${now})`;
+    }
+    return;
+  }
+  content.push({ type: 'text', text: ' ' });
+  content.push({ type: 'text', text: `(${now})`, marks: [{ type: 'em' }] });
 }
 
 /**
@@ -229,15 +216,15 @@ function extractStoryId(itemContent: ADFNode[]): string | null {
  * @returns Object with title and optional jiraUrl, or null if not found
  */
 function extractTitleInfo(itemContent: ADFNode[]): { title: string, jiraUrl?: string } | null {
-  const para = itemContent.find(node => node.type === 'paragraph') ?? null;
-  if (!para?.content) return null;
+  const paragraph = itemContent.find(node => node.type === 'paragraph') ?? null;
+  if (!paragraph?.content) return null;
   
   let foundId = false;
   let foundSeparator = false;
   let title = '';
   let jiraUrl: string | undefined;
   
-  for (const textNode of para.content) {
+  for (const textNode of paragraph.content) {
     // Skip story ID (code mark)
     if (textNode.type === 'text' && hasMarkType(textNode, 'code')) {
       foundId = true;
@@ -270,13 +257,13 @@ function extractTitleInfo(itemContent: ADFNode[]): { title: string, jiraUrl?: st
  * @returns Description text (text after ⟩ separator)
  */
 function extractDescription(itemContent: ADFNode[]): string {
-  const para = itemContent.find(node => node.type === 'paragraph') ?? null;
-  if (!para?.content) return '';
+  const paragraph = itemContent.find(node => node.type === 'paragraph') ?? null;
+  if (!paragraph?.content) return '';
   
   let foundSeparator = false;
   let description = '';
   
-  for (const textNode of para.content) {
+  for (const textNode of paragraph.content) {
     if (textNode.type === 'text') {
       if (textNode.text?.includes('⟩')) {
         foundSeparator = true;
@@ -294,55 +281,28 @@ function extractDescription(itemContent: ADFNode[]): string {
 }
 
 /**
- * Extract items from nested bullet list matching a predicate
- * @param itemContent - List item content nodes
- * @param predicate - Function to test if paragraph content matches criteria
- * @param extractor - Function to extract items from matching paragraph content
- * @returns Array of extracted items
- */
-function extractFromNestedList<T>(
-  itemContent: ADFNode[],
-  predicate: (paraContent: ADFNode[]) => boolean,
-  extractor: (paraContent: ADFNode[]) => T[]
-): T[] {
-  const items: T[] = [];
-  
-  for (const node of itemContent) {
-    if (node.type === 'bulletList' && node.content) {
-      for (const listItem of node.content) {
-        if (listItem.type === 'listItem' && listItem.content) {
-          for (const para of listItem.content) {
-            if (para.type === 'paragraph' && para.content && predicate(para.content)) {
-              items.push(...extractor(para.content));
-            }
-          }
-        }
-      }
-    }
-  }
-  
-  return items;
-}
-
-/**
  * Extract screens from nested SCREENS list
  * @returns Array of Figma URLs
  */
 function extractScreens(itemContent: ADFNode[]): string[] {
-  return extractFromNestedList(
-    itemContent,
-    (content) => !!(content[0]?.type === 'text' && content[0].text?.includes('SCREENS:')),
-    (content) => {
-      const urls: string[] = [];
-      for (const node of content) {
-        if (node.type === 'text' && hasMarkType(node, 'link')) {
-          const url = getMarkAttribute(node, 'link', 'href');
-          if (url) urls.push(url);
+  const urls: string[] = [];
+  forEachWithContent(itemContent, { type: 'bulletList' }, (bulletList) => {
+    forEachWithContent(bulletList.content!, { type: 'listItem' }, (listItem) => {
+      forEachWithContent(listItem.content!, { type: 'paragraph' }, (paragraph) => {
+        const content = paragraph.content ?? [];
+        const first = content[0];
+        const isScreens = first?.type === 'text' && !!first.text && first.text.includes('SCREENS:');
+        if (!isScreens) return;
+        for (const node of content) {
+          if (node.type === 'text' && hasMarkType(node, 'link')) {
+            const url = getMarkAttribute(node, 'link', 'href');
+            if (url) urls.push(url);
+          }
         }
-      }
-      return urls;
-    }
-  );
+      });
+    });
+  });
+  return urls;
 }
 
 /**
@@ -351,15 +311,27 @@ function extractScreens(itemContent: ADFNode[]): string[] {
  * @returns Array of dependency story IDs
  */
 function extractDependencies(itemContent: ADFNode[]): string[] {
-  return extractFromNestedList(
-    itemContent,
-    (content) => !!(content[0]?.type === 'text' && content[0].text?.includes('DEPENDENCIES:')),
-    (content) => {
-      const text = extractTextFromAdfNodes(content);
-      const depsText = text.replace(/^DEPENDENCIES:\s*/, '').trim();
-      return depsText.toLowerCase() === 'none' ? [] : depsText.split(',').map(d => d.trim()).filter(d => d);
-    }
-  );
+  const dependencyIds: string[] = [];
+  forEachWithContent(itemContent, { type: 'bulletList' }, (bulletList) => {
+    forEachWithContent(bulletList.content!, { type: 'listItem' }, (listItem) => {
+      forEachWithContent(listItem.content!, { type: 'paragraph' }, (paragraph) => {
+        const content = paragraph.content ?? [];
+        const firstNode = content[0];
+
+        const isDependenciesLine = firstNode?.type === 'text' && !!firstNode.text && firstNode.text.includes('DEPENDENCIES:');
+        if (!isDependenciesLine) return;
+        
+        const paragraphText = extractTextFromAdfNodes(content);
+        const depsText = paragraphText.replace(/^DEPENDENCIES:\s*/, '').trim();
+        if (depsText.toLowerCase() === 'none') return;
+        for (const dep of depsText.split(',')) {
+          const value = dep.trim();
+          if (value) dependencyIds.push(value);
+        }
+      });
+    });
+  });
+  return dependencyIds;
 }
 
 /**
