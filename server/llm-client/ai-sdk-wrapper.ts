@@ -42,10 +42,35 @@ export function wrapLanguageModel(model: LanguageModel): GenerateTextFn {
     });
 
     // Convert our Message format to AI SDK format
-    const messages = conversationMessages.map((msg: Message) => ({
-      role: msg.role,
-      content: msg.content
-    }));
+    // Handle both string content and multimodal content (text + images)
+    const messages = conversationMessages.map((msg: Message) => {
+      // If content is a string, use it directly
+      if (typeof msg.content === 'string') {
+        return {
+          role: msg.role,
+          content: msg.content
+        };
+      }
+      
+      // If content is an array (multimodal), convert to AI SDK format
+      return {
+        role: msg.role,
+        content: msg.content.map((part: any) => {
+          if (part.type === 'text') {
+            return { type: 'text', text: part.text };
+          }
+          if (part.type === 'image') {
+            // AI SDK expects base64 data with proper format
+            return { 
+              type: 'image',
+              image: part.data, // base64 string
+              mimeType: part.mimeType
+            };
+          }
+          return part;
+        })
+      };
+    });
 
     // Call AI SDK's generateText()
     try {
