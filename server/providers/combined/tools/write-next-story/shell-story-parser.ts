@@ -8,6 +8,9 @@
 import type { ADFNode } from '../../../atlassian/markdown-converter.js';
 import { convertAdfNodesToMarkdown } from '../../../atlassian/markdown-converter.js';
 
+/** ADFNode that is guaranteed to have a content property */
+type ADFNodeWithContent = ADFNode & { content: ADFNode[] };
+
 /**
  * Parsed shell story structure
  */
@@ -41,7 +44,7 @@ export function parseShellStoriesFromAdf(
   
   // Find bulletList nodes in section
   forEachWithContent(shellStoriesSection, { type: 'bulletList' }, (bulletList) => {
-    forEachWithContent(bulletList.content!, { type: 'listItem' }, (listItem) => {
+    forEachWithContent(bulletList.content, { type: 'listItem' }, (listItem) => {
       const story = parseShellStoryFromListItem(listItem);
       if (story) stories.push(story);
     });
@@ -81,12 +84,11 @@ export function addCompletionMarkerToShellStory(
   
   let storyFound = false;
   forEachWithContent(newSection, { type: 'bulletList' }, (bulletList) => {
-    forEachWithContent(bulletList.content!, { type: 'listItem' }, (listItem) => {
-      const id = extractStoryId(listItem.content!);
+    forEachWithContent(bulletList.content, { type: 'listItem' }, (listItem) => {
+      const id = extractStoryId(listItem.content);
       if (id !== storyId) return;
       storyFound = true;
-      forEachWithContent(listItem.content!, { type: 'paragraph' }, (paragraph) => {
-        if (!paragraph.content) return;
+      forEachWithContent(listItem.content, { type: 'paragraph' }, (paragraph) => {
         const parts = findTitleParts(paragraph.content);
         for (const node of parts.titleNodes) addLinkToNode(node, issueUrl);
         appendOrUpdateTimestamp(paragraph.content);
@@ -99,11 +101,16 @@ export function addCompletionMarkerToShellStory(
   return newSection;
 }
 
+// Type predicate: checks if a node has content property
+function isNodeWithContent(node: ADFNode): node is ADFNodeWithContent {
+  return !!node.content;
+}
+
 // Generic helper: iterate nodes with matching type that have content
-function forEachWithContent(source: ADFNode[] | ADFNode, match: { type: string }, callback: (node: ADFNode) => void): void {
+function forEachWithContent(source: ADFNode[] | ADFNode, match: { type: string }, callback: (node: ADFNodeWithContent) => void): void {
   const nodes = Array.isArray(source) ? source : [source];
   for (const node of nodes) {
-    if (node.type === match.type && node.content) callback(node);
+    if (node.type === match.type && isNodeWithContent(node)) callback(node);
   }
 }
 
@@ -287,8 +294,8 @@ function extractDescription(itemContent: ADFNode[]): string {
 function extractScreens(itemContent: ADFNode[]): string[] {
   const urls: string[] = [];
   forEachWithContent(itemContent, { type: 'bulletList' }, (bulletList) => {
-    forEachWithContent(bulletList.content!, { type: 'listItem' }, (listItem) => {
-      forEachWithContent(listItem.content!, { type: 'paragraph' }, (paragraph) => {
+    forEachWithContent(bulletList.content, { type: 'listItem' }, (listItem) => {
+      forEachWithContent(listItem.content, { type: 'paragraph' }, (paragraph) => {
         const content = paragraph.content ?? [];
         const first = content[0];
         const isScreens = first?.type === 'text' && !!first.text && first.text.includes('SCREENS:');
@@ -313,14 +320,14 @@ function extractScreens(itemContent: ADFNode[]): string[] {
 function extractDependencies(itemContent: ADFNode[]): string[] {
   const dependencyIds: string[] = [];
   forEachWithContent(itemContent, { type: 'bulletList' }, (bulletList) => {
-    forEachWithContent(bulletList.content!, { type: 'listItem' }, (listItem) => {
-      forEachWithContent(listItem.content!, { type: 'paragraph' }, (paragraph) => {
+    forEachWithContent(bulletList.content, { type: 'listItem' }, (listItem) => {
+      forEachWithContent(listItem.content, { type: 'paragraph' }, (paragraph) => {
         const content = paragraph.content ?? [];
         const firstNode = content[0];
 
         const isDependenciesLine = firstNode?.type === 'text' && !!firstNode.text && firstNode.text.includes('DEPENDENCIES:');
         if (!isDependenciesLine) return;
-        
+
         const paragraphText = extractTextFromAdfNodes(content);
         const depsText = paragraphText.replace(/^DEPENDENCIES:\s*/, '').trim();
         if (depsText.toLowerCase() === 'none') return;
