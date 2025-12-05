@@ -87,6 +87,9 @@ export async function executeAnalyzeFeatureScope(
     analyzedScreens
   } = analysisResult;
 
+  console.log(`🔍 analyze-feature-scope: Received ${screens.length} screens from pipeline`);
+  console.log(`   Analyzed screens count: ${analyzedScreens}`);
+
   // ==========================================
   // PHASE 5: Generate scope analysis
   // ==========================================
