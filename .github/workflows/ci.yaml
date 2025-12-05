@@ -40,6 +40,7 @@ jobs:
       - name: Generate .env file
         run: |
           echo "PORT=${{ env.PORT }}" > .env
+          echo "JWT_SECRET=test-jwt-secret-for-ci-only" >> .env
           echo "ATLASSIAN_TEST_PAT=${{ secrets.ATLASSIAN_TEST_PAT }}" >> .env
           echo "FIGMA_TEST_PAT=${{ secrets.FIGMA_TEST_PAT }}" >> .env
           echo "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}" >> .env
