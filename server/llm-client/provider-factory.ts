@@ -6,8 +6,7 @@
  */
 
 import { createAnthropic } from '@ai-sdk/anthropic';
-import { validateAnthropicConfig, getAnthropicModel } from './anthropic-config.js';
-import { wrapAnthropicModel } from './anthropic-wrapper.js';
+import { wrapLanguageModel } from './ai-sdk-wrapper.js';
 import { UnsupportedProviderError } from './provider-errors.js';
 import type { GenerateTextFn } from './types.js';
 import type { LanguageModel } from 'ai';
@@ -119,7 +118,7 @@ export function createProviderFromHeaders(headers: Record<string, string>): Gene
   const model: LanguageModel = provider(modelId);
   
   // Wrap and return (using Anthropic wrapper for now - works for all AI SDK providers)
-  return wrapAnthropicModel(model);
+  return wrapLanguageModel(model);
 }
 
 /**
@@ -179,8 +178,8 @@ export function createLLMClient(
     );
   }
 
-  // Get model to use
-  const modelId = model || getAnthropicModel();
+  // Get model to use (LLM_MODEL env var or default)
+  const modelId = model || process.env.LLM_MODEL || 'claude-sonnet-4-5-20250929';
 
   // Create Anthropic provider with API key
   const anthropicProvider = createAnthropic({
@@ -191,5 +190,5 @@ export function createLLMClient(
   const anthropicModel = anthropicProvider(modelId);
 
   // Wrap and return
-  return wrapAnthropicModel(anthropicModel);
+  return wrapLanguageModel(anthropicModel);
 }

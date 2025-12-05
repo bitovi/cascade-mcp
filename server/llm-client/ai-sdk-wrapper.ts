@@ -1,48 +1,57 @@
 /**
- * Anthropic Wrapper
+ * AI SDK Wrapper
  * 
- * Wraps Anthropic's LanguageModel to implement our GenerateTextFn interface.
+ * Wraps AI SDK's LanguageModel to implement our GenerateTextFn interface.
  * Converts between LLMRequest (messages format) and AI SDK's generateText() API.
+ * Works with any AI SDK provider (Anthropic, OpenAI, Google, etc.).
  */
 
 import { generateText, type LanguageModel } from 'ai';
 import type { GenerateTextFn, LLMRequest, LLMResponse, Message } from './types.js';
 
 /**
- * Wrap an Anthropic model to implement GenerateTextFn interface
+ * Wrap an AI SDK language model to implement GenerateTextFn interface
  * 
- * @param model - The Anthropic LanguageModel from @ai-sdk/anthropic
+ * @param model - Any AI SDK LanguageModel (from @ai-sdk/anthropic, @ai-sdk/openai, etc.)
  * @returns GenerateTextFn that uses the wrapped model
  * 
  * @example
  * ```typescript
  * import { anthropic } from '@ai-sdk/anthropic';
  * const model = anthropic('claude-sonnet-4-5-20250929');
- * const generateText = wrapAnthropicModel(model);
+ * const generateText = wrapLanguageModel(model);
  * const response = await generateText({ messages: [...] });
  * ```
  */
-export function wrapAnthropicModel(model: LanguageModel): GenerateTextFn {
+export function wrapLanguageModel(model: LanguageModel): GenerateTextFn {
   return async (request: LLMRequest): Promise<LLMResponse> => {
     // Validate messages array
     if (!request.messages || request.messages.length === 0) {
       throw new Error('LLMRequest must include at least one message');
     }
 
-    // Convert our Message format - AI SDK accepts messages as-is if they match the interface
-    const messages = request.messages.map((msg: Message) => {
-      // Simple conversion: if content is string, keep as-is; if array, need to convert
-      if (typeof msg.content === 'string') {
-        return msg as any;
+    // Separate system message from user/assistant messages
+    // AI SDK expects system as a separate parameter, not in messages array
+    let systemPrompt: string | undefined;
+    const conversationMessages = request.messages.filter((msg: Message) => {
+      if (msg.role === 'system') {
+        systemPrompt = typeof msg.content === 'string' ? msg.content : msg.content.map(c => c.type === 'text' ? c.text : '').join('');
+        return false;
       }
-      // For image content, keep the array format
-      return msg as any;
+      return true;
     });
+
+    // Convert our Message format to AI SDK format
+    const messages = conversationMessages.map((msg: Message) => ({
+      role: msg.role,
+      content: msg.content
+    }));
 
     // Call AI SDK's generateText()
     try {
       const result = await generateText({
         model,
+        system: systemPrompt,
         messages,
         maxTokens: request.maxTokens || 8000,
         ...(request.temperature !== undefined && { temperature: request.temperature }),
