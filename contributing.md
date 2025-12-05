@@ -105,8 +105,10 @@ To use a different test file:
    # Copy the full URL from your Figma file, including the node-id parameter
    FIGMA_TEST_URL="https://www.figma.com/design/3JgSzy4U8gdIGm1oyHiovy/TaskFlow?node-id=0-321"
    
-   # Anthropic API Key (for AI-powered API endpoints)
+   # LLM Client API Key (for AI-powered API endpoints)
+   # Default client: Anthropic - see server/llm-client/README.md for all LLM clients
    ANTHROPIC_API_KEY="sk-ant-..."
+   # Or use the standard naming: PROVIDER_API_KEY="sk-ant-..."
    
    # Security secrets (use random strings for local development)
    SESSION_SECRET="changeme_in_production"
@@ -248,6 +250,16 @@ Follow the MCP client-specific instructions for connecting to `http://localhost:
 ---
 
 ## Optional Configuration
+
+### LLM Clients
+
+The default LLM client is Anthropic (Claude), but you can use any of the 8 supported LLM clients. See the **[LLM Provider Guide](./server/llm-client/README.md)** for complete documentation on:
+- Supported LLM clients (Anthropic, OpenAI, Google, AWS Bedrock, Mistral, DeepSeek, Groq, xAI)
+- Authentication methods and credential formats
+- Header and environment variable naming conventions
+- Multi-tenant vs single-tenant usage patterns
+
+### Development Options
 
 You can configure optional environment variables in your `.env` file to help with development and debugging:
 

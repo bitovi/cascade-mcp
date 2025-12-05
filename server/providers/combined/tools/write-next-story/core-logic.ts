@@ -495,8 +495,10 @@ No screen analysis files are available for story ${story.id}
   // Request story generation via LLM
   console.log('  🤖 Requesting story generation from AI...');
   const response = await generateText({
-    prompt: storyPrompt,
-    systemPrompt: STORY_GENERATION_SYSTEM_PROMPT,
+    messages: [
+      { role: 'system', content: STORY_GENERATION_SYSTEM_PROMPT },
+      { role: 'user', content: storyPrompt }
+    ],
     maxTokens: STORY_GENERATION_MAX_TOKENS
   });
   

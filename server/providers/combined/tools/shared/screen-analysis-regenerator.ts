@@ -79,6 +79,12 @@ export async function regenerateScreenAnalyses(
   // Use file-based cache path for Figma artifacts (always enabled)
   const fileCachePath = getFigmaFileCachePath(figmaFileKey);
   
+  console.log(`  🔍 regenerateScreenAnalyses called with ${screens.length} screens`);
+  if (screens.length > 0) {
+    console.log(`     Screen names: ${screens.map(s => s.name).join(', ')}`);
+  }
+  console.log(`     Cache path: ${fileCachePath}`);
+  
   // Step 1: Validate cache if it exists (using Tier 3 /meta endpoint)
   await ensureValidCacheForFigmaFile(figmaClient, figmaFileKey);
   
@@ -91,9 +97,11 @@ export async function regenerateScreenAnalyses(
     try {
       await fs.access(analysisPath);
       // File exists - skip this screen
+      console.log(`     ✓ Cache hit: ${screen.name}`);
       cachedScreens.push(screen.name);
     } catch {
       // File doesn't exist - need to analyze
+      console.log(`     ✗ Cache miss: ${screen.name}`);
       screensToAnalyze.push(screen);
     }
   }
@@ -104,7 +112,9 @@ export async function regenerateScreenAnalyses(
   }
   
   // If all screens are cached, return early
+  console.log(`  📊 Analysis needed: ${screensToAnalyze.length} screens, Cached: ${cachedScreens.length} screens`);
   if (screensToAnalyze.length === 0) {
+    console.log(`  ♻️  All screens cached - returning early`);
     return { downloadedImages: 0, analyzedScreens: 0, downloadedNotes: 0, usedCache: true };
   }
   
@@ -233,15 +243,17 @@ export async function regenerateScreenAnalyses(
 
       // Generate analysis using injected LLM client (with image)
       const analysisResponse = await generateText({
-        prompt: analysisPrompt,
-        image: {
-          type: 'image',
-          data: imageResult.base64Data,
-          mimeType: 'image/png'
-        },
-        systemPrompt: SCREEN_ANALYSIS_SYSTEM_PROMPT,
-        maxTokens: SCREEN_ANALYSIS_MAX_TOKENS,
-        speedPriority: 0.5
+        messages: [
+          { role: 'system', content: SCREEN_ANALYSIS_SYSTEM_PROMPT },
+          { 
+            role: 'user', 
+            content: [
+              { type: 'text', text: analysisPrompt },
+              { type: 'image', data: imageResult.base64Data, mimeType: 'image/png' }
+            ]
+          }
+        ],
+        maxTokens: SCREEN_ANALYSIS_MAX_TOKENS
       });
       
       const analysisText = analysisResponse.text;

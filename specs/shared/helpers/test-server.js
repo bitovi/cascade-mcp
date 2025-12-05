@@ -106,7 +106,9 @@ export async function startTestServer(options = {}) {
   });
 
   // Wait for server to be ready
+  console.log(`⏳ Waiting for server health check at ${serverUrl}/health...`);
   let retries = 30;
+  let lastError = null;
   while (retries > 0) {
     try {
       const response = await fetch(`${serverUrl}/health`);
@@ -114,7 +116,11 @@ export async function startTestServer(options = {}) {
         console.log(`✅ Test server ready at ${serverUrl}`);
         return serverUrl;
       }
+      lastError = `Health check failed with status: ${response.status}`;
+      console.log(`   Retry ${31 - retries}/30: ${lastError}`);
     } catch (error) {
+      lastError = error.message;
+      console.log(`   Retry ${31 - retries}/30: ${lastError}`);
       // Server not ready yet
     }
     
@@ -122,7 +128,7 @@ export async function startTestServer(options = {}) {
     retries--;
   }
 
-  throw new Error('Test server failed to start within 30 seconds');
+  throw new Error(`Test server failed to start within 30 seconds. Last error: ${lastError}`);
 }
 
 /**

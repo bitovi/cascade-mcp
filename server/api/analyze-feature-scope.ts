@@ -8,7 +8,7 @@
 import type { Request, Response } from 'express';
 import { createAtlassianClientWithPAT } from '../providers/atlassian/atlassian-api-client.js';
 import { createFigmaClient } from '../providers/figma/figma-api-client.js';
-import { createAnthropicLLMClient } from '../llm-client/anthropic-client.js';
+import { createProviderFromHeaders } from '../llm-client/index.js';
 import { executeAnalyzeFeatureScope, type ExecuteAnalyzeFeatureScopeParams } from '../providers/combined/tools/analyze-feature-scope/core-logic.js';
 import type { ToolDependencies } from '../providers/combined/tools/types.js';
 import { resolveCloudId } from '../providers/atlassian/atlassian-helpers.js';
@@ -29,10 +29,15 @@ import {
  * 
  * Analyze Figma screens to generate comprehensive scope analysis with in-scope and out-of-scope features
  * 
- * Headers:
+ * Required Headers:
  *   X-Atlassian-Token: <base64(email:token)>  (Atlassian PAT)
- *   X-Figma-Token: figd_...      (Figma PAT)
- *   X-Anthropic-Token: sk-...    (Anthropic API key)
+ *   X-Figma-Token: figd_...                    (Figma PAT)
+ * 
+ * Optional LLM Provider Headers (falls back to env vars):
+ *   X-LLM-Provider: anthropic|openai|google|bedrock|mistral|deepseek|groq|xai
+ *   X-LLM-Model: model-id
+ *   X-LLMClient-{Provider}-Api-Key: key  (e.g., X-LLMClient-OpenAI-Api-Key)
+ *   See server/llm-client/providers/README.md for details
  * 
  * Request body:
  * {
@@ -69,12 +74,12 @@ export async function handleAnalyzeFeatureScope(req: Request, res: Response) {
     const tokens = validateApiHeaders(req.headers, res);
     if (!tokens) return; // Response already sent
     
-    const { atlassianToken, figmaToken, anthropicApiKey } = tokens;
+    const { atlassianToken, figmaToken } = tokens;
     
     // Create pre-configured API clients with tokens
     const atlassianClient = createAtlassianClientWithPAT(atlassianToken);
     const figmaClient = createFigmaClient(figmaToken);
-    const generateText = createAnthropicLLMClient(anthropicApiKey);
+    const generateText = createProviderFromHeaders(req.headers as Record<string, string>);
     
     // Resolve cloudId BEFORE calling execute (needed for commenting)
     const { cloudId: resolvedCloudId } = await resolveCloudId(atlassianClient, cloudId, siteName);

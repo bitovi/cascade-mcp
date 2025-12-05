@@ -87,6 +87,9 @@ export async function executeAnalyzeFeatureScope(
     analyzedScreens
   } = analysisResult;
 
+  console.log(`🔍 analyze-feature-scope: Received ${screens.length} screens from pipeline`);
+  console.log(`   Analyzed screens count: ${analyzedScreens}`);
+
   // ==========================================
   // PHASE 5: Generate scope analysis
   // ==========================================
@@ -191,8 +194,10 @@ async function generateScopeAnalysis(params: {
   
   // Request scope analysis generation via injected LLM client
   const response = await generateText({
-    systemPrompt: FEATURE_IDENTIFICATION_SYSTEM_PROMPT,
-    prompt,
+    messages: [
+      { role: 'system', content: FEATURE_IDENTIFICATION_SYSTEM_PROMPT },
+      { role: 'user', content: prompt }
+    ],
     maxTokens: FEATURE_IDENTIFICATION_MAX_TOKENS
   });
   

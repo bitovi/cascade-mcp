@@ -1,3 +1,82 @@
+## Environment Variables
+
+### LLM Clients
+
+The API supports multiple LLM providers for AI-powered operations. Users can choose their provider and supply credentials via request headers.
+
+**Supported Providers**: Anthropic (Claude), OpenAI (GPT), Google (Gemini), AWS Bedrock, Mistral, DeepSeek, Groq, xAI (Grok)
+
+**📖 See [LLM Provider Guide](./llm-client/providers/README.md)** for complete documentation including:
+- All supported providers with authentication details
+- Header and environment variable naming conventions (e.g., `X-OpenAI-Api-Key`, `OPENAI_API_KEY`)
+- Usage examples for multi-tenant and single-tenant deployments
+- AWS Bedrock multi-credential configuration
+- Model IDs for each provider
+
+### Optional Configuration
+
+**`ANTHROPIC_API_KEY`** (Optional for REST API)
+- Anthropic API key fallback for LLM completions
+- Get your key from: https://console.anthropic.com/account/keys
+- Format: `sk-ant-...` (typically 120+ characters)
+- Example: `export ANTHROPIC_API_KEY=sk-ant-XXXXXXXXXXXX...`
+- **Note**: REST API routes prefer `X-Anthropic-Key` header (multi-tenant). This env var is used only when header is not provided.
+
+**`LLM_MODEL`** (Optional)
+- Override the default model ID
+- Default: `claude-sonnet-4-5-20250929`
+- Works with any provider (specify provider-specific model IDs)
+- Example: `export LLM_MODEL=claude-sonnet-4-5-20250929`
+
+**`DEV_CACHE_DIR`** (Optional - Development Only)
+- Override the default OS temp directory for cache files
+- Relative paths: Resolved from project root (e.g., `./cache`)
+- Absolute paths: Used as-is (e.g., `/tmp/dev-cache`)
+- Default: OS temp directory when not set
+- Example: `export DEV_CACHE_DIR=./cache`
+
+### Quick Start
+
+#### REST API Usage (Multi-tenant)
+
+```bash
+# Set required environment variables
+export VITE_AUTH_SERVER_URL=http://localhost:3000
+
+# Run the development server
+npm run start-local
+
+# Call API with per-request headers
+curl -X POST http://localhost:3000/api/write-shell-stories \
+  -H "Content-Type: application/json" \
+  -H "X-Atlassian-Token: base64(email:token)" \
+  -H "X-Figma-Token: figd_..." \
+  -H "X-Anthropic-Key: sk-ant-..." \
+  -d '{"epicKey": "PROJ-123"}'
+```
+
+#### Local Development (Single-tenant)
+
+```bash
+# Set API key as environment variable (fallback)
+export ANTHROPIC_API_KEY=sk-ant-...
+export VITE_AUTH_SERVER_URL=http://localhost:3000
+
+# Run the development server
+npm run start-local
+
+# Call API without X-Anthropic-Key header (uses env var)
+curl -X POST http://localhost:3000/api/write-shell-stories \
+  -H "Content-Type: application/json" \
+  -H "X-Atlassian-Token: base64(email:token)" \
+  -H "X-Figma-Token: figd_..." \
+  -d '{"epicKey": "PROJ-123"}'
+```
+
+### MCP Tools Note
+
+MCP tool connections do NOT use Anthropic API - they use MCP sampling/createMessage endpoint for LLM completions via the connected MCP client.
+
 ## Module Responsibilities
 
 - **server.ts** - Application Bootstrap  
@@ -42,8 +121,22 @@
   - **api/write-shell-stories.ts** - Generate shell stories from Figma designs in a Jira epic
   - **api/write-next-story.ts** - Write the next Jira story from shell stories
   - **api/analyze-feature-scope.ts** - Analyze feature scope from Figma designs (generates scope analysis)
+  - **api/identify-features.ts** - Identify in-scope and out-of-scope features from Figma
   - **api/progress-comment-manager.ts** - Progress tracking via Jira comments
   - **api/api-error-helpers.ts** - Shared error handling and validation
+
+- **llm-client/** - LLM Client Integration (Vercel AI SDK)  
+  Abstracts LLM access for API routes (Anthropic via AI SDK). MCP tools use MCP sampling separately.
+  - **llm-client/types.ts** - Core types: `LLMRequest` (messages array), `LLMResponse`, `GenerateTextFn`
+  - **llm-client/provider-factory.ts** - `createLLMClient({ apiKey? })` - Creates Anthropic client (API key from header or env)
+  - **llm-client/anthropic-wrapper.ts** - Wraps AI SDK's `generateText()` to match `GenerateTextFn` interface
+  - **llm-client/anthropic-config.ts** - Configuration and validation for Anthropic provider
+  - **llm-client/mcp-sampling-client.ts** - `createMcpLLMClient()` - For MCP tools only (uses sampling)
+  - **llm-client/anthropic-config.ts** - Anthropic configuration and validation
+  - **llm-client/anthropic-wrapper.ts** - Wraps AI SDK's `generateText()` to implement `GenerateTextFn`
+  - **llm-client/migration-helpers.ts** - Helpers for converting old format to messages: `createUserMessage()`, `createSystemMessage()`, `convertPromptToMessages()`
+  - **llm-client/mcp-sampling-client.ts** - UNCHANGED: MCP tools still use this for MCP sampling
+  - *Example*: `const generateText = createLLMClient(); await generateText({ messages: [...] })`
 
 - **api/progress-comment-manager.ts** - Progress Comment Management  
   Manages creating and updating progress comments on Jira issues during long-running operations.
