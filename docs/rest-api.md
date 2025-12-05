@@ -56,95 +56,7 @@ X-Anthropic-Token: sk-ant-api03-...
 
 ## Endpoints
 
-### 1. Analyze Feature Scope
-
-Generates a scope analysis document from Figma designs linked in a Jira epic. Use this endpoint **before** generating shell stories to establish clear scope boundaries and surface questions.
-
-**Endpoint:** `POST /api/analyze-feature-scope`
-
-**Headers:**
-- `Content-Type: application/json`
-- `X-Atlassian-Token` (required) - Base64-encoded `email:token` for Basic Auth
-- `X-Figma-Token` (required) - Figma Personal Access Token (starts with `figd_...`)
-- `X-Anthropic-Token` (required) - Anthropic API key (starts with `sk-ant-...`)
-
-**Request Body:**
-```json
-{
-  "epicKey": "PROJ-123",
-  "siteName": "my-jira-site",
-  "cloudId": "uuid"
-}
-```
-
-**Parameters:**
-- `epicKey` (required) - The Jira epic key (e.g., "PROJ-123")
-- `siteName` (optional) - Name of the Jira site to use
-- `cloudId` (optional) - Atlassian cloud ID (alternative to siteName)
-
-**Success Response (200 OK):**
-```json
-{
-  "success": true,
-  "scopeAnalysisContent": "## Scope Analysis\n\n### Feature Area 1\n\n- ☐ In-scope feature...",
-  "featureAreaCount": 5,
-  "screensAnalyzed": 8,
-  "epicKey": "PROJ-123"
-}
-```
-
-**Error Response (400/500):**
-```json
-{
-  "success": false,
-  "error": "Missing required field: epicKey"
-}
-```
-
-**Example using curl:**
-```bash
-# First, create the base64-encoded token for Atlassian:
-# echo -n "your-email@example.com:ATATT3xFfGF0..." | base64
-
-curl -X POST http://localhost:3000/api/analyze-feature-scope \
-  -H "Content-Type: application/json" \
-  -H "X-Atlassian-Token: <base64(email:token)>" \
-  -H "X-Figma-Token: figd_5L7d0..." \
-  -H "X-Anthropic-Token: sk-ant-api03-..." \
-  -d '{
-    "epicKey": "PROJ-123",
-    "siteName": "my-jira-site"
-  }'
-```
-
-**Example using Node.js:**
-```javascript
-// Create base64-encoded Atlassian token
-const atlassianToken = Buffer.from(
-  `${process.env.ATLASSIAN_EMAIL}:${process.env.ATLASSIAN_PAT}`
-).toString('base64');
-
-const response = await fetch('http://localhost:3000/api/analyze-feature-scope', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'X-Atlassian-Token': atlassianToken,
-    'X-Figma-Token': process.env.FIGMA_PAT,
-    'X-Anthropic-Token': process.env.ANTHROPIC_API_KEY,
-  },
-  body: JSON.stringify({
-    epicKey: 'PROJ-123',
-    siteName: 'my-jira-site',
-  }),
-});
-
-const result = await response.json();
-console.log(`Generated scope analysis with ${result.featureAreaCount} feature areas`);
-```
-
----
-
-### 2. Write Shell Stories
+### Write Shell Stories
 
 Generates prioritized shell stories from Figma designs linked in a Jira epic.
 
@@ -232,7 +144,7 @@ console.log(`Generated ${result.storyCount} shell stories`);
 
 ---
 
-### 3. Write Next Story
+### Write Next Story
 
 Writes the next Jira story from shell stories in an epic. Validates dependencies, generates full story content, creates Jira issue, and updates epic with completion marker.
 
@@ -421,50 +333,6 @@ For high-volume usage, consider:
 5. **Monitor token usage** - Watch for unexpected API calls
 6. **Validate tokens before deployment** - Run `npm run validate-pat-tokens` to verify permissions
 
-## Testing
-
-### Validate Your Tokens
-
-Before using the REST API, validate that your tokens have the correct permissions:
-
-```bash
-npm run validate-pat-tokens
-```
-
-This script will:
-- ✅ Verify both PAT tokens are valid and not expired
-- ✅ Check you have access to your Jira workspace
-- ✅ Confirm you have CREATE_ISSUES permission
-- ✅ Verify the Figma token can read file content
-- ✅ Display your user info and permissions
-
-**Required Environment Variables** (in `.env` file):
-```bash
-ATLASSIAN_TEST_PAT="base64-encoded-email:token"
-FIGMA_TEST_PAT="figd_..."
-ANTHROPIC_API_KEY="sk-ant-..."
-```
-
-### End-to-End Test
-
-Run the full E2E test to verify both endpoints work:
-
-```bash
-npm run test:e2e:rest-api
-```
-
-This test will:
-- ✅ Start the local server
-- ✅ Create a test epic in the PLAY project
-- ✅ Call `/api/analyze-feature-scope` to generate scope analysis
-- ✅ Verify scope analysis was generated
-- ✅ Call `/api/write-shell-stories` with the epic key
-- ✅ Verify shell stories were generated
-- ✅ Call `/api/write-next-story` to create the first story
-- ✅ Verify the story was created successfully
-- ✅ Leave the epic for manual exploration
-
-**Expected duration:** ~3-5 minutes (includes AI generation)
 
 ## Troubleshooting
 
