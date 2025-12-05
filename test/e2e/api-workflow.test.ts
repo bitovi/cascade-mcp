@@ -83,7 +83,7 @@ describe('REST API: Write Shell Stories E2E', () => {
     const siteInfo = await resolveCloudId(atlassianClient, undefined, JIRA_SITE_NAME);
     cloudId = siteInfo.cloudId;
     console.log(`✅ Resolved cloudId: ${cloudId}`);
-  }, 30000);
+  }, 60000); // 60 second timeout for server startup + cloud ID resolution
 
   afterAll(async () => {
     if (shouldSkip) {
