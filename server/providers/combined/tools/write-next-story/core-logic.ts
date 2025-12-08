@@ -226,12 +226,6 @@ export async function extractShellStoriesFromSetup(
   notify: ToolDependencies['notify']
 ): Promise<ParsedShellStoryADF[]> {
   await notify('Extracting shell stories...');
-  console.log('Extracting shell stories from epic description...');
-
-  // Validate shellStoriesAdf data structure
-  if (!Array.isArray(setupResult.shellStoriesAdf)) {
-    throw new Error(`Epic ${setupResult.epicKey} has invalid shellStoriesAdf data (expected array, got ${typeof setupResult.shellStoriesAdf})`);
-  }
 
   // Parse shell stories from ADF
   const shellStories = parseShellStoriesFromAdf(setupResult.shellStoriesAdf);

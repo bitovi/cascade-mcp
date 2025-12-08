@@ -274,6 +274,7 @@ function extractScreens(itemContent: ADFNode[]): string[] {
 
 /**
  * Extract dependencies from nested DEPENDENCIES list
+ * Handles hardBreak nodes correctly (unlike markdown conversion)
  * @param itemContent - List item content nodes
  * @returns Array of dependency story IDs
  */
@@ -288,12 +289,19 @@ function extractDependencies(itemContent: ADFNode[]): string[] {
         const isDependenciesLine = firstNode?.type === 'text' && !!firstNode.text && firstNode.text.includes('DEPENDENCIES:');
         if (!isDependenciesLine) return;
 
-        const paragraphText = convertAdfNodesToMarkdown(content);
-        const depsText = paragraphText.replace(/^DEPENDENCIES:\s*/, '').trim();
-        if (depsText.toLowerCase() === 'none') return;
-        for (const dep of depsText.split(',')) {
-          const value = dep.trim();
-          if (value) dependencyIds.push(value);
+        // Extract dependencies directly from nodes (preserves hardBreak semantics)
+        // Collect all text nodes, treating hardBreak as separator
+        for (const node of content) {
+          if (node.type === 'text') {
+            const text = (node.text || '').replace(/^DEPENDENCIES:\s*/, '').trim();
+            if (text && text.toLowerCase() !== 'none') {
+              // Split on comma and hardBreak (next node will be after hardBreak)
+              for (const dep of text.split(',')) {
+                const value = dep.trim();
+                if (value) dependencyIds.push(value);
+              }
+            }
+          }
         }
       });
     });
@@ -307,10 +315,14 @@ function extractDependencies(itemContent: ADFNode[]): string[] {
  * @returns Parsed shell story or null if invalid
  */
 function parseShellStoryFromListItem(listItem: ADFNode): ParsedShellStoryADF | null {
-  if (listItem.type !== 'listItem' || !listItem.content) return null;
+  if (listItem.type !== 'listItem' || !listItem.content) {
+    throw new Error('Shell story missing ID: Each story must start with a story ID like `st001`');
+  }
   
   const firstParagraph = listItem.content.find(node => node.type === 'paragraph');
-  if (!firstParagraph?.content) return null;
+  if (!firstParagraph?.content) {
+    throw new Error('Shell story missing ID: Each story must start with a story ID like `st001`');
+  }
   
   const {titleString, storyId, jiraUrl, descriptionString} = extractTitleParts(firstParagraph.content);
   if (!storyId) {
