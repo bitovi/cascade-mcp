@@ -1,146 +1,352 @@
 /**
  * Shell Story Parser
  * 
- * Parses shell stories from markdown format in epic descriptions
+ * Parses shell stories from ADF or Markdown format in epic descriptions.
+ * Prefer ADF parsing to preserve formatting (hardBreaks, etc.)
  */
+
+import type { ADFNode } from '../../../atlassian/markdown-converter.js';
+import { convertAdfNodesToMarkdown } from '../../../atlassian/markdown-converter.js';
+
+/** ADFNode that is guaranteed to have a content property */
+type ADFNodeWithContent = ADFNode & { content: ADFNode[] };
 
 /**
  * Parsed shell story structure
  */
-export interface ParsedShellStory {
+export interface ParsedShellStoryADF {
   id: string;              // "st001"
   title: string;           // Story title
   description: string;     // One-sentence description
   jiraUrl?: string;        // URL if already written
-  timestamp?: string;      // ISO 8601 timestamp if written
   screens: string[];       // Figma URLs
   dependencies: string[];  // Array of story IDs
-  included: string[];      // ☐ bullets
-  lowPriority: string[];   // ⏬ bullets
-  excluded: string[];      // ❌ bullets
-  questions: string[];     // ❓ bullets
-  rawContent: string;      // Full markdown for this story
+  rawShellStoryMarkdown: string;     // Original markdown for AI prompts
+}
+
+// ============================================================================
+// ADF-Based Parsing (Preferred - Preserves Formatting)
+// ============================================================================
+
+/**
+ * Parse shell stories from ADF bullet list structure
+ * @param shellStoriesSection - ADF nodes containing Shell Stories section (including heading)
+ * @returns Array of parsed shell stories
+ * 
+ * @example
+ * const { section } = extractAdfSection(epicDescription.content, "Shell Stories");
+ * const stories = parseShellStoriesFromAdf(section);
+ */
+export function parseShellStoriesFromAdf(
+  shellStoriesSection: ADFNode[]
+): ParsedShellStoryADF[] {
+  const stories: ParsedShellStoryADF[] = [];
+  
+  // Find bulletList nodes in section
+  forEachWithContent(shellStoriesSection, { type: 'bulletList' }, (bulletList) => {
+    forEachWithContent(bulletList.content, { type: 'listItem' }, (listItem) => {
+      const story = parseShellStoryFromListItem(listItem);
+      if (story) stories.push(story);
+    });
+  });
+  
+  return stories;
 }
 
 /**
- * Parse shell stories from markdown content
+ * Add completion marker to shell story in ADF
  * 
- * Expected format:
- * - `st001` **Title** ⟩ Description
- * - `st001` Title ⟩ Description (bold optional)
- * - `st001` **[Title](url)** ⟩ Description _(timestamp)_
- *   * SCREENS: [screen1](url1), [screen2](url2)
- *   * DEPENDENCIES: st002, st003
- *   * ☐ Included item
- *   * ⏬ Low priority item
- *   * ❌ Excluded item
- *   * ❓ Question
+ * Adds a link mark to the title text node and appends a timestamp.
+ * Format: `st001` **[Title](https://url)** ⟩ Description _(2025-01-15T10:30:00Z)_
  * 
- * @param shellStoriesContent - Markdown content of Shell Stories section
- * @returns Array of parsed shell stories
+ * @param shellStoriesSection - Shell Stories ADF nodes (including heading)
+ * @param storyId - Story ID to mark (e.g., "st001")
+ * @param issueKey - Jira issue key (e.g., "PROJ-123")
+ * @param issueUrl - Jira issue URL
+ * @returns New section with marker added
+ * 
+ * @example
+ * const updated = addCompletionMarkerToShellStory(
+ *   shellStoriesSection,
+ *   "st001",
+ *   "PROJ-123",
+ *   "https://bitovi.atlassian.net/browse/PROJ-123"
+ * );
  */
-export function parseShellStories(shellStoriesContent: string): ParsedShellStory[] {
-  const stories: ParsedShellStory[] = [];
+export function addCompletionMarkerToShellStory(
+  shellStoriesSection: ADFNode[],
+  storyId: string,
+  issueKey: string,
+  issueUrl: string
+): ADFNode[] {
+  // Deep clone to avoid mutations
+  const newSection = structuredClone(shellStoriesSection);
   
-  // Split by top-level bullets (stories start with -)
-  const storyBlocks = shellStoriesContent.split(/\n- /);
-  
-  for (const block of storyBlocks) {
-    if (!block.trim()) continue;
-    
-    const lines = block.split('\n');
-    const firstLine = lines[0];
-    
-    // Parse first line: `st001` **[Title](url)** ⟩ Description _(timestamp)_
-    // or: `st001` **Title** ⟩ Description
-    // or: `st001` Title ⟩ Description (bold is optional)
-    const storyIdMatch = firstLine.match(/`(st\d+)`/);
-    if (!storyIdMatch) continue;
-    
-    const storyId = storyIdMatch[1];
-    
-    // Extract title and description using ⟩ separator
-    // First, get everything after the story ID (after the closing backtick)
-    // Find the position of the closing backtick by getting the end of the match
-    const storyIdEndPos = storyIdMatch.index! + storyIdMatch[0].length;
-    const afterId = firstLine.substring(storyIdEndPos).trim();
-    
-    // Split by ⟩ separator
-    const separatorMatch = afterId.match(/^(.+?)\s*⟩\s*(.+)$/);
-    if (!separatorMatch) continue; // Skip if no separator found
-    
-    let titlePart = separatorMatch[1].trim();
-    const descriptionPart = separatorMatch[2].trim();
-    
-    // Extract title and optional Jira URL from title part
-    let title = '';
-    let jiraUrl: string | undefined;
-    
-    // Check for link format: **[Title](url)** or [Title](url)
-    const titleWithLinkMatch = titlePart.match(/\*\*\[([^\]]+)\]\(([^)]+)\)\*\*|\[([^\]]+)\]\(([^)]+)\)/);
-    if (titleWithLinkMatch) {
-      // Groups 1,2 for bold link, groups 3,4 for plain link
-      title = titleWithLinkMatch[1] || titleWithLinkMatch[3];
-      jiraUrl = titleWithLinkMatch[2] || titleWithLinkMatch[4];
-    } else {
-      // No link, just text - strip optional bold formatting
-      title = titlePart.replace(/^\*\*(.+)\*\*$/, '$1').trim();
+  let storyFound = false;
+  forEachWithContent(newSection, { type: 'bulletList' }, (bulletList) => {
+    forEachWithContent(bulletList.content, { type: 'listItem' }, (listItem) => {
+      const id = extractNestedStoryId(listItem.content);
+      if (id !== storyId) return;
+      storyFound = true;
+      forEachWithContent(listItem.content, { type: 'paragraph' }, (paragraph) => {
+        const { titleNode, timestamp } = extractTitleParts(paragraph.content);
+        if (!titleNode) throw new Error(`Title not found for story ${storyId}`);
+
+        addLinkToNode(titleNode, issueUrl);
+        if (timestamp) {
+          timestamp.text = `(${new Date().toISOString()})`;
+        } else  {
+          paragraph.content.push({ type: 'text', text: ' ' });
+          paragraph.content.push({ type: 'text', text: `(${new Date().toISOString()})`, marks: [{ type: 'em' }] });
+        }
+      });
+    });
+  });
+  if (!storyFound) {
+    throw new Error(`Story ${storyId} not found in Shell Stories section`);
+  }
+  return newSection;
+}
+
+// Type predicate: checks if a node has content property
+function isNodeWithContent(node: ADFNode): node is ADFNodeWithContent {
+  return !!node.content;
+}
+
+// Generic helper: iterate nodes with matching type that have content.
+// Accepts an optional `predicate` on the `match` object to further filter
+// matching nodes (for example: only paragraphs that contain a `text` node).
+function forEachWithContent(
+  source: ADFNode[] | ADFNode,
+  match: { type: string; predicate?: (node: ADFNodeWithContent) => boolean },
+  callback: (node: ADFNodeWithContent) => void
+): void {
+  const nodes = Array.isArray(source) ? source : [source];
+  for (const node of nodes) {
+    if (node.type === match.type && isNodeWithContent(node)) {
+      if (!match.predicate || match.predicate(node)) callback(node);
+    }
+  }
+}
+
+/**
+ * Extract all title parts from paragraph content: ID, title nodes, timestamp
+ * Also extracts title string and jiraUrl for convenience
+ * @param content - Paragraph content nodes
+ * @returns Object with nodes and extracted string values
+ */
+function extractTitleParts(content: ADFNode[]): {
+  titleNode?: ADFNode;
+  titleString: string;
+  storyId?: ADFNode;
+  descriptionString?: string;
+  timestamp?: ADFNode;
+  jiraUrl?: string;
+} {
+  let titleNode: ADFNode | undefined = undefined;
+  let storyId: ADFNode | undefined = undefined;
+  let timestamp: ADFNode | undefined = undefined;
+  let titleString = '';
+  let descriptionString = '';
+  let jiraUrl: string | undefined;
+
+  let afterId = false;
+  let afterSeparator = false;
+  for (const node of content) {
+    // Find story ID
+    if (node.type === 'text' && hasMarkType(node, 'code') && node.text?.match(/^st\d+$/)) {
+      storyId = node;
+      afterId = true;
+      continue; // Move to next node
     }
     
-    // Extract description and optional timestamp
-    // Description might end with _(timestamp)_
-    const timestampMatch = descriptionPart.match(/^(.+?)\s*_\(([^)]+)\)_\s*$/);
-    const description = timestampMatch ? timestampMatch[1].trim() : descriptionPart;
-    const timestamp = timestampMatch ? timestampMatch[2] : undefined;
+    // Find separator (marks end of title and start of description)
+    if (node.type === 'text' && node.text?.includes('⟩')) {
+      afterSeparator = true;
+    }
     
-    // Parse sub-bullets
-    const screens: string[] = [];
-    const dependencies: string[] = [];
-    const included: string[] = [];
-    const lowPriority: string[] = [];
-    const excluded: string[] = [];
-    const questions: string[] = [];
-    
-    for (let i = 1; i < lines.length; i++) {
-      const line = lines[i].trim();
-      
-      if (line.startsWith('* SCREENS:') || line.startsWith('- SCREENS:')) {
-        // Extract Figma URLs from markdown links
-        const urlMatches = line.matchAll(/\[([^\]]+)\]\(([^)]+)\)/g);
-        for (const match of urlMatches) {
-          screens.push(match[2]); // URL
+    // Collect title nodes (between ID and separator)
+    if (afterId && !afterSeparator && node.type === 'text' && !hasMarkType(node, 'em')) {
+      titleNode = node;
+      titleString = (node.text || '');
+      if (hasMarkType(node, 'link')) {
+        jiraUrl = getMarkAttribute(node, 'link', 'href');
+      }
+      continue; // to next node
+    }
+
+    // Collect description node (after separator & before timestamp)
+    if (afterSeparator && node.type === 'text' && !hasMarkType(node, 'em')) {
+      // remove separator from start of description
+      let descText = node.text || '';
+      if (descText.startsWith('⟩')) {
+        descText = descText.replace('⟩', '').trimStart();
+      }
+      descriptionString = descText;
+      continue; // to next node
+    }
+
+    // Find timestamp (can appear anywhere, but typically after separator)
+    if (node.type === 'text' && hasMarkType(node, 'em')) {
+      timestamp = node;
+    }
+  }
+  titleString = titleString.trim();
+  return { titleNode, storyId, timestamp, titleString, jiraUrl, descriptionString };
+}
+
+// Add link mark to a text node
+function addLinkToNode(textNode: ADFNode, url: string): void {
+  if (textNode.type !== 'text') return;
+  if (!textNode.marks) textNode.marks = [];
+  const hasLink = textNode.marks.some(m => m.type === 'link');
+  if (!hasLink) textNode.marks.push({ type: 'link', attrs: { href: url } });
+}
+
+/**
+ * Check if a text node has a specific mark type
+ * @param node - ADF text node
+ * @param markType - Mark type to check ('strong', 'code', 'link', 'em', etc.)
+ * @returns True if node has the mark
+ */
+function hasMarkType(node: ADFNode, markType: string): boolean {
+  return node.marks?.some(mark => mark.type === markType) ?? false;
+}
+
+/**
+ * Get mark attribute value
+ * @param node - ADF text node
+ * @param markType - Mark type to find
+ * @param attrName - Attribute name
+ * @returns Attribute value or undefined
+ */
+function getMarkAttribute(node: ADFNode, markType: string, attrName: string): string | undefined {
+  const mark = node.marks?.find(m => m.type === markType);
+  return mark?.attrs?.[attrName];
+}
+
+/**
+ * Extract story ID (e.g., "st001") from list item content
+ * @param itemContent - List item content nodes
+ * @returns Story ID or null if not found
+ */
+function extractNestedStoryId(itemContent: ADFNode[]): string | null {
+  let foundId: string | null = null;
+  forEachWithContent(itemContent, { type: 'paragraph' }, (paragraph) => {
+    if (foundId) return; // Already found, skip remaining paragraphs
+    for (const textNode of paragraph.content) {
+      if (textNode.type === 'text' && hasMarkType(textNode, 'code')) {
+        const match = textNode.text?.match(/^st\d+$/);
+        if (match) {
+          foundId = match[0];
+          return;
         }
-      } else if (line.startsWith('* DEPENDENCIES:') || line.startsWith('- DEPENDENCIES:')) {
-        const depsText = line.replace(/^[*-]\s*DEPENDENCIES:\s*/, '');
-        if (depsText.toLowerCase() !== 'none') {
-          dependencies.push(...depsText.split(',').map(d => d.trim()).filter(d => d));
-        }
-      } else if (line.startsWith('* ☐') || line.startsWith('- ☐')) {
-        included.push(line.replace(/^[*-]\s*☐\s*/, ''));
-      } else if (line.startsWith('* ⏬') || line.startsWith('- ⏬')) {
-        lowPriority.push(line.replace(/^[*-]\s*⏬\s*/, ''));
-      } else if (line.startsWith('* ❌') || line.startsWith('- ❌')) {
-        excluded.push(line.replace(/^[*-]\s*❌\s*/, ''));
-      } else if (line.startsWith('* ❓') || line.startsWith('- ❓')) {
-        questions.push(line.replace(/^[*-]\s*❓\s*/, ''));
       }
     }
-    
-    stories.push({
-      id: storyId,
-      title,
-      description,
-      jiraUrl,
-      timestamp,
-      screens,
-      dependencies,
-      included,
-      lowPriority,
-      excluded,
-      questions,
-      rawContent: block.trim(),
+  });
+  return foundId;
+}
+
+/**
+ * Extract screens from nested SCREENS list
+ * @returns Array of Figma URLs
+ */
+function extractScreens(itemContent: ADFNode[]): string[] {
+  const urls: string[] = [];
+  forEachWithContent(itemContent, { type: 'bulletList' }, (bulletList) => {
+    forEachWithContent(bulletList.content, { type: 'listItem' }, (listItem) => {
+      forEachWithContent(listItem.content, { type: 'paragraph' }, (paragraph) => {
+        const content = paragraph.content ?? [];
+        const first = content[0];
+        const isScreens = first?.type === 'text' && !!first.text && first.text.includes('SCREENS:');
+        if (!isScreens) return;
+        for (const node of content) {
+          if (node.type === 'text' && hasMarkType(node, 'link')) {
+            const url = getMarkAttribute(node, 'link', 'href');
+            if (url) urls.push(url);
+          }
+        }
+      });
     });
+  });
+  return urls;
+}
+
+/**
+ * Extract dependencies from nested DEPENDENCIES list
+ * Handles hardBreak nodes correctly (unlike markdown conversion)
+ * @param itemContent - List item content nodes
+ * @returns Array of dependency story IDs
+ */
+function extractDependencies(itemContent: ADFNode[]): string[] {
+  const dependencyIds: string[] = [];
+  forEachWithContent(itemContent, { type: 'bulletList' }, (bulletList) => {
+    forEachWithContent(bulletList.content, { type: 'listItem' }, (listItem) => {
+      forEachWithContent(listItem.content, { type: 'paragraph' }, (paragraph) => {
+        const content = paragraph.content ?? [];
+        const firstNode = content[0];
+
+        const isDependenciesLine = firstNode?.type === 'text' && !!firstNode.text && firstNode.text.includes('DEPENDENCIES:');
+        if (!isDependenciesLine) return;
+
+        // Extract dependencies directly from nodes (preserves hardBreak semantics)
+        // Collect all text nodes, treating hardBreak as separator
+        for (const node of content) {
+          if (node.type === 'text') {
+            const text = (node.text || '').replace(/^DEPENDENCIES:\s*/, '').trim();
+            if (text && text.toLowerCase() !== 'none') {
+              // Split on comma and hardBreak (next node will be after hardBreak)
+              for (const dep of text.split(',')) {
+                const value = dep.trim();
+                if (value) dependencyIds.push(value);
+              }
+            }
+          }
+        }
+      });
+    });
+  });
+  return dependencyIds;
+}
+
+/**
+ * Parse a single shell story from listItem ADF node
+ * @param listItem - ADF listItem node containing shell story
+ * @returns Parsed shell story or null if invalid
+ */
+function parseShellStoryFromListItem(listItem: ADFNode): ParsedShellStoryADF | null {
+  if (listItem.type !== 'listItem' || !listItem.content) {
+    throw new Error('Shell story missing ID: Each story must start with a story ID like `st001`');
   }
   
-  return stories;
+  const firstParagraph = listItem.content.find(node => node.type === 'paragraph');
+  if (!firstParagraph?.content) {
+    throw new Error('Shell story missing ID: Each story must start with a story ID like `st001`');
+  }
+  
+  const {titleString, storyId, jiraUrl, descriptionString} = extractTitleParts(firstParagraph.content);
+  if (!storyId) {
+    throw new Error('Shell story missing ID: Each story must start with a story ID like `st001`');
+  }
+  
+  if (!titleString) {
+    throw new Error(`Shell story ${storyId} missing title or separator (⟩): Format must be \`${storyId}\` **Title** ⟩ Description`);
+  }
+  
+  if (!descriptionString) {
+    throw new Error(`Shell story ${storyId} missing description after separator (⟩)`);
+  }
+  
+  // Convert entire listItem to markdown for AI prompts (preserves original formatting)
+  const rawShellStoryMarkdown = convertAdfNodesToMarkdown([listItem]);
+  
+  return {
+    id: storyId.text || '',
+    title: titleString,
+    description: descriptionString, // used to generate story prompt
+    jiraUrl: jiraUrl, // used for completion checking
+    screens: extractScreens(listItem.content), // Figma URLs, used in prompts
+    dependencies: extractDependencies(listItem.content), // used for dependency blocker links when writing Jira stories
+    rawShellStoryMarkdown, // used to generate story prompt
+  };
 }
