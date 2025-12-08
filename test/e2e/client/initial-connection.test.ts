@@ -20,8 +20,8 @@
  */
 
 import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';
-import { startTestServer, stopTestServer } from '../../helpers/test-server.js';
-import { validateRfc6750Compliance } from '../../helpers/assertions.js';
+import { startTestServer, stopTestServer } from '../helpers/test-server.js';
+import { validateRfc6750Compliance } from '../helpers/assertions.js';
 
 describe('Standards: Initial Connection', () => {
   let serverUrl: string;

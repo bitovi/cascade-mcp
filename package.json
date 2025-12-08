@@ -123,7 +123,7 @@
       "!server/**/*.test.{js,ts}"
     ],
     "setupFilesAfterEnv": [
-      "<rootDir>/specs/shared/config/jest-setup.js"
+      "<rootDir>/test/e2e/config/jest-setup.js"
     ]
   }
 }
