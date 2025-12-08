@@ -12,9 +12,10 @@ import { MissingCredentialsError } from '../provider-errors.js';
  * 
  * Looks for API key in the following order (for backward compatibility):
  * 1. x-anthropic-key header (legacy, primary for Anthropic)
- * 2. ANTHROPIC_API_KEY env var (legacy, primary for Anthropic)
- * 3. x-llmclient-anthropic-api-key header (new standard with llmclient prefix)
- * 4. LLMCLIENT_ANTHROPIC_API_KEY env var (new standard with llmclient prefix)
+ * 2. x-anthropic-token header (alias for compatibility)
+ * 3. ANTHROPIC_API_KEY env var (legacy, primary for Anthropic)
+ * 4. x-llmclient-anthropic-api-key header (new standard with llmclient prefix)
+ * 5. LLMCLIENT_ANTHROPIC_API_KEY env var (new standard with llmclient prefix)
  * 
  * @param headers - Request headers (case-insensitive, normalized to lowercase by Express)
  * @returns Anthropic provider function
@@ -23,13 +24,14 @@ import { MissingCredentialsError } from '../provider-errors.js';
 export function createProviderFromHeaders(headers: Record<string, string>) {
   // Check legacy names first, then standard names with llmclient prefix
   const apiKey = headers['x-anthropic-key'] ||              // Legacy header (primary)
+                 headers['x-anthropic-token'] ||             // Alias for compatibility
                  process.env.ANTHROPIC_API_KEY ||            // Legacy env (primary)
                  headers['x-llmclient-anthropic-api-key'] || // Standard header
                  process.env.LLMCLIENT_ANTHROPIC_API_KEY;    // Standard env
   
   if (!apiKey) {
     throw new MissingCredentialsError(
-      'Anthropic requires: x-anthropic-key header or ANTHROPIC_API_KEY env var ' +
+      'Anthropic requires: x-anthropic-key or x-anthropic-token header or ANTHROPIC_API_KEY env var ' +
       '(legacy, primary) OR x-llmclient-anthropic-api-key header or LLMCLIENT_ANTHROPIC_API_KEY env var (standard)'
     );
   }

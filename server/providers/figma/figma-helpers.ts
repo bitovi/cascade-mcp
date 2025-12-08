@@ -27,16 +27,55 @@ export class FigmaUnrecoverableError extends Error {
 }
 
 /**
+ * Figma user info from /v1/me endpoint
+ */
+export interface FigmaUserInfo {
+  id: string;
+  email: string;
+  handle: string;
+  img_url?: string;
+}
+
+/**
+ * Fetch current Figma user information
+ * Shared helper extracted from figma-get-user tool
+ * 
+ * **Note:** This endpoint only works with OAuth tokens, not Personal Access Tokens (PATs)
+ * 
+ * @param client - Figma API client
+ * @returns User info including email and handle
+ * @throws Error if request fails or token is a PAT
+ */
+export async function fetchFigmaUserInfo(client: FigmaClient): Promise<FigmaUserInfo> {
+  const apiUrl = `${client.getBaseUrl()}/me`;
+  
+  try {
+    const response = await client.fetch(apiUrl);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Figma /v1/me API error: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+    
+    return await response.json() as FigmaUserInfo;
+  } catch (error: any) {
+    throw new Error(`Failed to fetch Figma user info: ${error.message}`);
+  }
+}
+
+/**
  * Create a user-friendly 403 Forbidden error message
+ * 
  * @param url - The Figma API URL that was called
  * @param response - The fetch Response object
+ * @param client - Figma API client (not used but kept for API compatibility)
  * @returns Formatted error message
  */
-export function create403ErrorMessage(
+export async function create403ErrorMessage(
   url: string,
-  response: Response
-): string {
-
+  response: Response,
+  client: FigmaClient
+): Promise<string> {
   return `Figma API access denied (403 Forbidden) for ${url}.
 
 This means the authenticated Figma user doesn't have the required permission level to view this file.
@@ -47,7 +86,7 @@ Common causes:
 - File is in a private workspace/team you're not a member of
 - Your access level was recently changed or revoked
 
-Solution: Ask the file owner to share it with your Figma account (the one you used for OAuth) with at least "Can view" permissions.`;
+Solution: Ask the file owner to share it with your Figma account with at least "Can view" permissions.`;
 }
 
 /**
@@ -234,7 +273,8 @@ export async function fetchFigmaFileMetadata(
       
       // Handle 403 Forbidden
       if (response.status === 403) {
-        throw new FigmaUnrecoverableError(create403ErrorMessage(figmaApiUrl, response), response.status);
+        const message = await create403ErrorMessage(figmaApiUrl, response, client);
+        throw new FigmaUnrecoverableError(message, response.status);
       }
       
       throw new Error(`Figma API error: ${response.status} ${response.statusText} - ${errorText}`);
@@ -329,7 +369,8 @@ export async function fetchFigmaFile(
       
       // Handle 403 Forbidden as unrecoverable (authentication/permission issue)
       if (response.status === 403) {
-        throw new FigmaUnrecoverableError(create403ErrorMessage(figmaApiUrl, response), response.status);
+        const message = await create403ErrorMessage(figmaApiUrl, response, client);
+        throw new FigmaUnrecoverableError(message, response.status);
       }
       
       throw new Error(`Figma API error: ${response.status} ${response.statusText} - ${errorText}`);
@@ -415,7 +456,8 @@ export async function fetchFigmaNode(
       
       // Handle 403 Forbidden as unrecoverable (authentication/permission issue)
       if (response.status === 403) {
-        throw new FigmaUnrecoverableError(create403ErrorMessage(figmaApiUrl, response), response.status);
+        const message = await create403ErrorMessage(figmaApiUrl, response, client);
+        throw new FigmaUnrecoverableError(message, response.status);
       }
       
       throw new Error(`Figma API error: ${response.status} ${response.statusText} - ${errorText}`);
@@ -704,7 +746,8 @@ export async function downloadFigmaImage(
       
       // Handle 403 Forbidden as unrecoverable (authentication/permission issue)
       if (response.status === 403) {
-        throw new FigmaUnrecoverableError(create403ErrorMessage(`${figmaApiUrl}?${params}`, response), response.status);
+        const message = await create403ErrorMessage(`${figmaApiUrl}?${params}`, response, client);
+        throw new FigmaUnrecoverableError(message, response.status);
       }
       
       throw new Error(`Figma images API error: ${response.status} ${response.statusText}`);
@@ -926,7 +969,8 @@ async function fetchFigmaNodesBatchSingle(
       
       // Handle 403 Forbidden
       if (response.status === 403) {
-        throw new FigmaUnrecoverableError(create403ErrorMessage(figmaApiUrl, response), response.status);
+        const message = await create403ErrorMessage(figmaApiUrl, response, client);
+        throw new FigmaUnrecoverableError(message, response.status);
       }
       
       throw new Error(`Figma API error: ${response.status} ${response.statusText} - ${errorText}`);
@@ -1095,7 +1139,8 @@ async function downloadFigmaImagesBatchSingle(
       
       // Handle 403 Forbidden
       if (response.status === 403) {
-        throw new FigmaUnrecoverableError(create403ErrorMessage(`${figmaApiUrl}?${params}`, response), response.status);
+        const message = await create403ErrorMessage(`${figmaApiUrl}?${params}`, response, client);
+        throw new FigmaUnrecoverableError(message, response.status);
       }
       
       throw new Error(`Figma images API error: ${response.status} ${response.statusText}`);
