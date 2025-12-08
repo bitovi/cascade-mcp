@@ -71,3 +71,6 @@ jobs:
           aws_ec2_instance_root_vol_size: 16
 
           repo_env: repo_env
+
+          aws_resource_identifier: ${{ inputs.environment == 'prod' && 'bitovi-jira-mcp-auth-bridge-prod' || '' }} 
+          tf_state_bucket: ${{ inputs.environment == 'prod' && 'bitovi-jira-mcp-auth-bridge-prod-tf-state' || '' }}
