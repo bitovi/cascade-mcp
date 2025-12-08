@@ -24,12 +24,12 @@
  * Based on Python SDK docs: https://github.com/modelcontextprotocol/python-sdk/blob/main/README.md
  */
 import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';
-import { startTestServer, stopTestServer } from '../../shared/helpers/test-server.js';
+import { startTestServer, stopTestServer } from '../../helpers/test-server.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
 describe('MCP SDK: OAuth Flow to Token', () => {
-  let serverUrl;
+  let serverUrl: string;
 
   beforeAll(async () => {
     // Start server with mock Atlassian endpoints enabled
@@ -37,7 +37,8 @@ describe('MCP SDK: OAuth Flow to Token', () => {
     
     serverUrl = await startTestServer({
       testMode: true,
-      logLevel: 'info'
+      logLevel: 'info',
+      port: parseInt(process.env.PORT || '3000', 10)
     });
   }, 60000);
 
@@ -62,9 +63,9 @@ describe('MCP SDK: OAuth Flow to Token', () => {
       console.log('  Site Name:', siteName);
       
       // Create a minimal OAuth provider - MCP SDK will handle the heavy lifting
-      let storedCodeVerifier = null;
-      let storedTokens = null;
-      let storedAuthCode = null;
+      let storedCodeVerifier: string | null = null;
+      let storedTokens: any = null;
+      let storedAuthCode: string | null = null;
       
       const authProvider = {
         get redirectUrl() {
@@ -103,7 +104,7 @@ describe('MCP SDK: OAuth Flow to Token', () => {
         },
         
         // Save tokens after successful OAuth
-        saveTokens: async (tokens) => {
+        saveTokens: async (tokens: any) => {
           console.log('  💾 OAuth completed! Tokens received:', { 
             access_token: tokens.access_token ? '***' : null,
             token_type: tokens.token_type,
@@ -113,7 +114,7 @@ describe('MCP SDK: OAuth Flow to Token', () => {
         },
         
         // Complete OAuth flow programmatically using fetch
-        redirectToAuthorization: async (authUrl) => {
+        redirectToAuthorization: async (authUrl: URL) => {
           console.log('  🌐 MCP SDK requesting authorization at:', authUrl.href);
           
           try {
@@ -190,13 +191,14 @@ describe('MCP SDK: OAuth Flow to Token', () => {
             }
             
           } catch (error) {
-            console.log('  ❌ OAuth flow error:', error.message);
+            const err = error as Error;
+            console.log('  ❌ OAuth flow error:', err.message);
             throw error; // Re-throw to let the transport handle the error
           }
         },
         
         // Save PKCE code verifier during OAuth flow
-        saveCodeVerifier: async (verifier) => {
+        saveCodeVerifier: async (verifier: string) => {
           console.log('  🔐 Saving PKCE code verifier');
           storedCodeVerifier = verifier;
         },
@@ -204,7 +206,7 @@ describe('MCP SDK: OAuth Flow to Token', () => {
         // Retrieve PKCE code verifier for token exchange
         codeVerifier: async () => {
           console.log('  🔓 Retrieving PKCE code verifier');
-          return storedCodeVerifier;
+          return storedCodeVerifier ?? '';
         }
       };
 
@@ -227,22 +229,18 @@ describe('MCP SDK: OAuth Flow to Token', () => {
       try {
         console.log('🔌 Connecting MCP client to server...');
         
-        // Connect to the server - MCP SDK should discover OAuth is needed
+        // Connect to the server - MCP SDK should discover OAuth is needed and initialize automatically
         await client.connect(transport);
-        
-        console.log('🚀 Initializing MCP client...');
-        
-        // Initialize - MCP SDK should handle OAuth automatically
-        await client.initialize();
         
         console.log('✅ MCP SDK completed OAuth and initialized successfully');
         
       } catch (error) {
+        const err = error as Error;
         console.log('🔄 Initial connection failed as expected, completing OAuth manually...');
         
         // If we got a BROWSER_REDIRECT_REQUIRED error and have an auth code, complete the OAuth
-        if (error.message && error.message.includes('BROWSER_REDIRECT_REQUIRED') && storedAuthCode) {
-          console.log('🎯 Completing OAuth with authorization code:', storedAuthCode.substring(0, 10) + '...');
+        if (err.message && err.message.includes('BROWSER_REDIRECT_REQUIRED') && storedAuthCode) {
+          console.log('🎯 Completing OAuth with authorization code:', (storedAuthCode as string).substring(0, 10) + '...');
           
           // Use the transport's finishAuth method to complete the OAuth flow
           await transport.finishAuth(storedAuthCode);
@@ -275,7 +273,7 @@ describe('MCP SDK: OAuth Flow to Token', () => {
           console.log('✅ MCP SDK completed OAuth and initialized successfully');
           
           // Store the authenticated client for the rest of the test
-          globalThis.testClient = newClient;
+          (globalThis as any).testClient = newClient;
         } else {
           // Re-throw if it's not the expected OAuth error
           throw error;
@@ -285,7 +283,7 @@ describe('MCP SDK: OAuth Flow to Token', () => {
       try {
         
         // Use the authenticated client (either original if OAuth worked, or new one if we had to complete manually)
-        const activeClient = globalThis.testClient || client;
+        const activeClient = (globalThis as any).testClient || client;
         
         // Test that we can list tools after OAuth
         console.log('📋 Listing tools...');
@@ -296,7 +294,7 @@ describe('MCP SDK: OAuth Flow to Token', () => {
         console.log(`✅ Retrieved ${tools.tools.length} tools after OAuth`);
         
         // Verify we got expected Jira tools
-        const toolNames = tools.tools.map(t => t.name);
+        const toolNames = tools.tools.map((t: any) => t.name);
         expect(toolNames).toContain('get-accessible-sites');
         expect(toolNames).toContain('get-jira-issue');
         
@@ -330,17 +328,18 @@ describe('MCP SDK: OAuth Flow to Token', () => {
         console.log('✅ Tool call completed successfully after OAuth');
         
       } catch (error) {
-        console.log('❌ MCP SDK OAuth flow failed:', error.message);
+        const err = error as Error;
+        console.log('❌ MCP SDK OAuth flow failed:', err.message);
         
         // For now, fail the test if OAuth doesn't complete successfully
         // This will force us to fix the OAuth flow issues
-        throw new Error(`OAuth flow must complete successfully for this test to pass. Error: ${error.message}`);
+        throw new Error(`OAuth flow must complete successfully for this test to pass. Error: ${err.message}`);
         
       } finally {
         console.log('🔌 Closing MCP client...');
-        const activeClient = globalThis.testClient || client;
+        const activeClient = (globalThis as any).testClient || client;
         await activeClient.close();
-        if (globalThis.testClient && globalThis.testClient !== client) {
+        if ((globalThis as any).testClient && (globalThis as any).testClient !== client) {
           await client.close(); // Also close the original client if we created a new one
         }
         console.log('✅ MCP client closed');
