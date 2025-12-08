@@ -243,7 +243,7 @@ export async function checkStoryChanges(
   client: ApiClient,
   params: CheckStoryChangesParams,
 ): Promise<CheckStoryChangesResult> {
-  console.log(`Calling writeShellStories for epic: ${params.epicKey}`);
+  console.log(`Calling checkStoryChanges for story: ${params.epicKey}`);
 
   const response = await client.post('/api/check-story-changes', params);
 
