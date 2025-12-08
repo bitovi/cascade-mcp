@@ -85,13 +85,18 @@ export function addCompletionMarkerToShellStory(
   let storyFound = false;
   forEachWithContent(newSection, { type: 'bulletList' }, (bulletList) => {
     forEachWithContent(bulletList.content, { type: 'listItem' }, (listItem) => {
-      const id = extractStoryId(listItem.content);
+      const id = extractNestedStoryId(listItem.content);
       if (id !== storyId) return;
       storyFound = true;
       forEachWithContent(listItem.content, { type: 'paragraph' }, (paragraph) => {
-        const parts = findTitleParts(paragraph.content);
-        for (const node of parts.titleNodes) addLinkToNode(node, issueUrl);
-        appendOrUpdateTimestamp(paragraph.content);
+        const { titleNodes, timestamp } = extractTitleParts(paragraph.content);
+        for (const node of titleNodes) addLinkToNode(node, issueUrl);
+        if (timestamp) {
+          timestamp.text = `(${new Date().toISOString()})`;
+        } else  {
+          paragraph.content.push({ type: 'text', text: ' ' });
+          paragraph.content.push({ type: 'text', text: `(${new Date().toISOString()})`, marks: [{ type: 'em' }] });
+        }
       });
     });
   });
@@ -106,31 +111,87 @@ function isNodeWithContent(node: ADFNode): node is ADFNodeWithContent {
   return !!node.content;
 }
 
-// Generic helper: iterate nodes with matching type that have content
-function forEachWithContent(source: ADFNode[] | ADFNode, match: { type: string }, callback: (node: ADFNodeWithContent) => void): void {
+// Generic helper: iterate nodes with matching type that have content.
+// Accepts an optional `predicate` on the `match` object to further filter
+// matching nodes (for example: only paragraphs that contain a `text` node).
+function forEachWithContent(
+  source: ADFNode[] | ADFNode,
+  match: { type: string; predicate?: (node: ADFNodeWithContent) => boolean },
+  callback: (node: ADFNodeWithContent) => void
+): void {
   const nodes = Array.isArray(source) ? source : [source];
   for (const node of nodes) {
-    if (node.type === match.type && isNodeWithContent(node)) callback(node);
+    if (node.type === match.type && isNodeWithContent(node)) {
+      if (!match.predicate || match.predicate(node)) callback(node);
+    }
   }
 }
 
-// Find title parts from a paragraph content: title nodes between ID and separator
-function findTitleParts(content: ADFNode[]): { titleNodes: ADFNode[] } {
+/**
+ * Extract all title parts from paragraph content: ID, title nodes, timestamp
+ * Also extracts title string and jiraUrl for convenience
+ * @param content - Paragraph content nodes
+ * @returns Object with nodes and extracted string values
+ */
+function extractTitleParts(content: ADFNode[]): {
+  titleNodes: ADFNode[];
+  titleString: string;
+  storyId?: ADFNode;
+  descriptionString?: string;
+  timestamp?: ADFNode;
+  jiraUrl?: string;
+} {
   const titleNodes: ADFNode[] = [];
-  let passedId = false;
-  let seenSeparator = false;
+  let storyId: ADFNode | undefined = undefined;
+  let timestamp: ADFNode | undefined = undefined;
+  let titleString = '';
+  let descriptionString = '';
+  let jiraUrl: string | undefined;
+
+  let afterId = false;
+  let afterSeparator = false;
   for (const node of content) {
-    if (node.type === 'text' && hasMarkType(node, 'code')) {
-      passedId = true;
-      continue;
+    // Find story ID
+    if (node.type === 'text' && hasMarkType(node, 'code') && node.text?.match(/^st\d+$/)) {
+      storyId = node;
+      afterId = true;
+      continue; // Move to next node
     }
+    
+    // Find separator (marks end of title and start of description)
     if (node.type === 'text' && node.text?.includes('⟩')) {
-      seenSeparator = true;
-      break;
+      afterSeparator = true;
     }
-    if (passedId && !seenSeparator && node.type === 'text') titleNodes.push(node);
+    
+    // Collect title nodes (between ID and separator)
+    if (afterId && !afterSeparator && node.type === 'text' && !hasMarkType(node, 'em')) {
+      titleNodes.push(node);
+      if (hasMarkType(node, 'link')) {
+        jiraUrl = getMarkAttribute(node, 'link', 'href');
+      }
+      titleString += (node.text || '').trim() + ' ';
+      continue; // to next node
+    }
+
+    // Collect description nodes (after separator & before timestamp)
+    if (afterSeparator && node.type === 'text' && !hasMarkType(node, 'em')) {
+      // remove separator from start of description
+      let descText = node.text || '';
+      if (descText.startsWith('⟩')) {
+        descText = descText.replace('⟩', '').trimStart();
+      }
+      descriptionString += descText + ' ';
+      console.log('descriptionString in if:', descriptionString);
+      continue; // to next node
+    }
+
+    // Find timestamp (can appear anywhere, but typically after separator)
+    if (node.type === 'text' && hasMarkType(node, 'em')) {
+      timestamp = node;
+    }
   }
-  return { titleNodes };
+  titleString = titleString.trim();
+  return { titleNodes, storyId, timestamp, titleString, jiraUrl, descriptionString };
 }
 
 // Add link mark to a text node
@@ -139,42 +200,6 @@ function addLinkToNode(textNode: ADFNode, url: string): void {
   if (!textNode.marks) textNode.marks = [];
   const hasLink = textNode.marks.some(m => m.type === 'link');
   if (!hasLink) textNode.marks.push({ type: 'link', attrs: { href: url } });
-}
-
-// Appends or updates timestamp at end of ADFNode
-function appendOrUpdateTimestamp(content: ADFNode[]): void {
-  const now = new Date().toISOString();
-  const existingIdx = content.findIndex(n => n.type === 'text' && hasMarkType(n, 'em'));
-  if (existingIdx >= 0) {
-    const node = content[existingIdx];
-    if (node.type === 'text') {
-      node.text = `(${now})`;
-    }
-    return;
-  }
-  content.push({ type: 'text', text: ' ' });
-  content.push({ type: 'text', text: `(${now})`, marks: [{ type: 'em' }] });
-}
-
-/**
- * Extract text content from ADF nodes (recursive)
- * @param nodes - ADF nodes to extract text from
- * @returns Plain text string
- */
-function extractTextFromAdfNodes(nodes: ADFNode[] | undefined): string {
-  if (!nodes) return '';
-  
-  let text = '';
-  for (const node of nodes) {
-    if (node.type === 'text') {
-      text += node.text || '';
-    } else if (node.type === 'hardBreak') {
-      text += '\n';
-    } else if (node.content) {
-      text += extractTextFromAdfNodes(node.content);
-    }
-  }
-  return text;
 }
 
 /**
@@ -204,87 +229,21 @@ function getMarkAttribute(node: ADFNode, markType: string, attrName: string): st
  * @param itemContent - List item content nodes
  * @returns Story ID or null if not found
  */
-function extractStoryId(itemContent: ADFNode[]): string | null {
-  const para = itemContent.find(node => node.type === 'paragraph') ?? null;
-  if (!para?.content) return null;
-  
-  for (const textNode of para.content) {
-    if (textNode.type === 'text' && hasMarkType(textNode, 'code')) {
-      const match = textNode.text?.match(/^st\d+$/);
-      if (match) return match[0];
-    }
-  }
-  return null;
-}
-
-/**
- * Extract title and check for completion marker
- * @param itemContent - List item content nodes
- * @returns Object with title and optional jiraUrl, or null if not found
- */
-function extractTitleInfo(itemContent: ADFNode[]): { title: string, jiraUrl?: string } | null {
-  const paragraph = itemContent.find(node => node.type === 'paragraph') ?? null;
-  if (!paragraph?.content) return null;
-  
-  let foundId = false;
-  let foundSeparator = false;
-  let title = '';
-  let jiraUrl: string | undefined;
-  
-  for (const textNode of paragraph.content) {
-    // Skip story ID (code mark)
-    if (textNode.type === 'text' && hasMarkType(textNode, 'code')) {
-      foundId = true;
-      continue;
-    }
-    
-    // Look for separator (⟩)
-    if (textNode.type === 'text' && textNode.text?.includes('⟩')) {
-      foundSeparator = true;
-      const parts = textNode.text.split('⟩');
-      if (parts[0]) title += parts[0].trim();
-      break; // Title extraction ends at separator
-    }
-    
-    // Collect title text (between ID and separator)
-    if (foundId && !foundSeparator && textNode.type === 'text') {
-      if (hasMarkType(textNode, 'link')) {
-        jiraUrl = getMarkAttribute(textNode, 'link', 'href');
+function extractNestedStoryId(itemContent: ADFNode[]): string | null {
+  let foundId: string | null = null;
+  forEachWithContent(itemContent, { type: 'paragraph' }, (paragraph) => {
+    if (foundId) return; // Already found, skip remaining paragraphs
+    for (const textNode of paragraph.content) {
+      if (textNode.type === 'text' && hasMarkType(textNode, 'code')) {
+        const match = textNode.text?.match(/^st\d+$/);
+        if (match) {
+          foundId = match[0];
+          return;
+        }
       }
-      title += (textNode.text || '').trim() + ' ';
     }
-  }
-  
-  return foundId && foundSeparator && title ? { title: title.trim(), jiraUrl } : null;
-}
-
-/**
- * Extract description from list item content
- * @param itemContent - List item content nodes
- * @returns Description text (text after ⟩ separator)
- */
-function extractDescription(itemContent: ADFNode[]): string {
-  const paragraph = itemContent.find(node => node.type === 'paragraph') ?? null;
-  if (!paragraph?.content) return '';
-  
-  let foundSeparator = false;
-  let description = '';
-  
-  for (const textNode of paragraph.content) {
-    if (textNode.type === 'text') {
-      if (textNode.text?.includes('⟩')) {
-        foundSeparator = true;
-        const parts = textNode.text.split('⟩');
-        if (parts[1]) description += parts[1].trim();
-      } else if (foundSeparator && !hasMarkType(textNode, 'em')) {
-        description += ' ' + (textNode.text || '').trim();
-      }
-    } else if (foundSeparator && textNode.type === 'hardBreak') {
-      description += '\n';
-    }
-  }
-  
-  return description.trim();
+  });
+  return foundId;
 }
 
 /**
@@ -328,7 +287,7 @@ function extractDependencies(itemContent: ADFNode[]): string[] {
         const isDependenciesLine = firstNode?.type === 'text' && !!firstNode.text && firstNode.text.includes('DEPENDENCIES:');
         if (!isDependenciesLine) return;
 
-        const paragraphText = extractTextFromAdfNodes(content);
+        const paragraphText = convertAdfNodesToMarkdown(content);
         const depsText = paragraphText.replace(/^DEPENDENCIES:\s*/, '').trim();
         if (depsText.toLowerCase() === 'none') return;
         for (const dep of depsText.split(',')) {
@@ -349,18 +308,19 @@ function extractDependencies(itemContent: ADFNode[]): string[] {
 function parseShellStoryFromListItem(listItem: ADFNode): ParsedShellStoryADF | null {
   if (listItem.type !== 'listItem' || !listItem.content) return null;
   
-  const storyId = extractStoryId(listItem.content);
+  const firstParagraph = listItem.content.find(node => node.type === 'paragraph');
+  if (!firstParagraph?.content) return null;
+  
+  const {titleString, storyId, jiraUrl, descriptionString} = extractTitleParts(firstParagraph.content);
   if (!storyId) {
     throw new Error('Shell story missing ID: Each story must start with a story ID like `st001`');
   }
   
-  const titleInfo = extractTitleInfo(listItem.content);
-  if (!titleInfo) {
+  if (!titleString) {
     throw new Error(`Shell story ${storyId} missing title or separator (⟩): Format must be \`${storyId}\` **Title** ⟩ Description`);
   }
   
-  const description = extractDescription(listItem.content);
-  if (!description) {
+  if (!descriptionString) {
     throw new Error(`Shell story ${storyId} missing description after separator (⟩)`);
   }
   
@@ -368,10 +328,10 @@ function parseShellStoryFromListItem(listItem: ADFNode): ParsedShellStoryADF | n
   const rawShellStoryMarkdown = convertAdfNodesToMarkdown([listItem]);
   
   return {
-    id: storyId,
-    title: titleInfo.title,
-    description, // used to generate story prompt
-    jiraUrl: titleInfo.jiraUrl, // used for completion checking
+    id: storyId.text || '',
+    title: titleString,
+    description: descriptionString, // used to generate story prompt
+    jiraUrl: jiraUrl, // used for completion checking
     screens: extractScreens(listItem.content), // Figma URLs, used in prompts
     dependencies: extractDependencies(listItem.content), // used for dependency blocker links when writing Jira stories
     rawShellStoryMarkdown, // used to generate story prompt
