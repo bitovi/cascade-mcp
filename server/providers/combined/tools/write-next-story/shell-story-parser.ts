@@ -89,8 +89,10 @@ export function addCompletionMarkerToShellStory(
       if (id !== storyId) return;
       storyFound = true;
       forEachWithContent(listItem.content, { type: 'paragraph' }, (paragraph) => {
-        const { titleNodes, timestamp } = extractTitleParts(paragraph.content);
-        for (const node of titleNodes) addLinkToNode(node, issueUrl);
+        const { titleNode, timestamp } = extractTitleParts(paragraph.content);
+        if (!titleNode) throw new Error(`Title not found for story ${storyId}`);
+
+        addLinkToNode(titleNode, issueUrl);
         if (timestamp) {
           timestamp.text = `(${new Date().toISOString()})`;
         } else  {
@@ -134,14 +136,14 @@ function forEachWithContent(
  * @returns Object with nodes and extracted string values
  */
 function extractTitleParts(content: ADFNode[]): {
-  titleNodes: ADFNode[];
+  titleNode?: ADFNode;
   titleString: string;
   storyId?: ADFNode;
   descriptionString?: string;
   timestamp?: ADFNode;
   jiraUrl?: string;
 } {
-  const titleNodes: ADFNode[] = [];
+  let titleNode: ADFNode | undefined = undefined;
   let storyId: ADFNode | undefined = undefined;
   let timestamp: ADFNode | undefined = undefined;
   let titleString = '';
@@ -165,23 +167,22 @@ function extractTitleParts(content: ADFNode[]): {
     
     // Collect title nodes (between ID and separator)
     if (afterId && !afterSeparator && node.type === 'text' && !hasMarkType(node, 'em')) {
-      titleNodes.push(node);
+      titleNode = node;
+      titleString = (node.text || '');
       if (hasMarkType(node, 'link')) {
         jiraUrl = getMarkAttribute(node, 'link', 'href');
       }
-      titleString += (node.text || '').trim() + ' ';
       continue; // to next node
     }
 
-    // Collect description nodes (after separator & before timestamp)
+    // Collect description node (after separator & before timestamp)
     if (afterSeparator && node.type === 'text' && !hasMarkType(node, 'em')) {
       // remove separator from start of description
       let descText = node.text || '';
       if (descText.startsWith('⟩')) {
         descText = descText.replace('⟩', '').trimStart();
       }
-      descriptionString += descText + ' ';
-      console.log('descriptionString in if:', descriptionString);
+      descriptionString = descText;
       continue; // to next node
     }
 
@@ -191,7 +192,7 @@ function extractTitleParts(content: ADFNode[]): {
     }
   }
   titleString = titleString.trim();
-  return { titleNodes, storyId, timestamp, titleString, jiraUrl, descriptionString };
+  return { titleNode, storyId, timestamp, titleString, jiraUrl, descriptionString };
 }
 
 // Add link mark to a text node
