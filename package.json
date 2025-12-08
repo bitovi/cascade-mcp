@@ -14,6 +14,7 @@
     "test:e2e:rest-api": "jest test/e2e/api-workflow.test.ts --testTimeout=600000 --runInBand --testMatch='**/test/e2e/**/*.test.ts'",
     "test:e2e:client": "jest test/e2e/client --testTimeout=600000 --runInBand --testMatch='**/test/e2e/client/**/*.test.ts'",
     "test:e2e:client:initial-connection": "jest test/e2e/client/standards/initial-connection.test.ts --testTimeout=600000 --runInBand --testMatch='**/test/e2e/client/**/*.test.ts'",
+    "test:e2e:client:mcp-sdk": "jest test/e2e/client/mcp-sdk --testTimeout=600000 --runInBand --testMatch='**/test/e2e/client/mcp-sdk/**/*.test.ts'",
     "test:e2e:mcp-sdk:mock": "TEST_USE_MOCK_ATLASSIAN=true jest specs/mcp-sdk --testTimeout=30000 --runInBand --testMatch='**/specs/**/*.test.js' --testMatch='**/specs/**/*.test.ts' --testPathIgnorePatterns='/node_modules/'",
     "validate-pat-tokens": "node --import ./loader.mjs scripts/validate-pat-tokens.ts"
   },
