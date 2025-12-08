@@ -52,9 +52,9 @@ All providers use a consistent naming pattern that includes the `llmclient` pref
 
 **Credentials:**
 - **API Key** (required)
-  - Legacy header: `X-Anthropic-Key` or `x-anthropic-key` (primary)
+  - Legacy headers: `X-Anthropic-Key` or `x-anthropic-key` `X-Anthropic-Token` or `x-anthropic-token`
   - Standard header: `X-LLMClient-Anthropic-Api-Key` or `x-llmclient-anthropic-api-key`
-  - Legacy env: `ANTHROPIC_API_KEY` (primary)
+  - Legacy env: `ANTHROPIC_API_KEY` 
   - Standard env: `LLMCLIENT_ANTHROPIC_API_KEY`
 
 **Get API Key:** https://console.anthropic.com/account/keys

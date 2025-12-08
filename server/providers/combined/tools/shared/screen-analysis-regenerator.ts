@@ -178,7 +178,6 @@ export async function regenerateScreenAnalyses(
     const screen = screensToAnalyze[i];
     const originalIndex = screens.indexOf(screen);
     
-    console.log(`    🤖 Analyzing: ${screen.name}`);
     if (notify) {
       await notify(`🤖 Analyzing: ${screen.name}`);
     }
@@ -270,6 +269,21 @@ export async function regenerateScreenAnalyses(
       
     } catch (error: any) {
       console.log(`  ⚠️  Failed to analyze ${screen.name}: ${error.message}`);
+      
+      // Check if this is an authentication/credentials error for better error message
+      if (error.message && (
+        error.message.includes('invalid x-api-key') ||
+        error.message.includes('invalid API key') ||
+        error.message.includes('API key') ||
+        error.message.includes('authentication') ||
+        error.message.includes('unauthorized') ||
+        error.message.includes('401')
+      )) {
+        throw new Error(`AI analysis failed - likely invalid LLM API credentials: ${error.message}`);
+      }
+      
+      // For all errors, throw immediately since downstream requires all screens analyzed
+      throw new Error(`Failed to analyze screen ${screen.name}: ${error.message}`);
     }
   }
   

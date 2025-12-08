@@ -150,13 +150,11 @@ async function generateScopeAnalysis(params: {
   
   await notify('📝 Feature Identification: Analyzing features and scope...');
   
-  // screens.yaml content is provided directly (always generated, optionally written to file)
-  const screensYamlContent = yamlContent;
-  
   // Construct file cache path for analysis files (always available)
   const fileCachePath = getFigmaFileCachePath(figmaFileKey);
   
   // Read all analysis files with URLs from file cache
+  // Note: Files are guaranteed to exist because regenerateScreenAnalyses already created them
   const analysisFiles: Array<{ screenName: string; content: string; url: string }> = [];
   for (const screen of screens) {
     const analysisPath = path.join(fileCachePath, `${screen.name}.analysis.md`);
@@ -168,18 +166,14 @@ async function generateScopeAnalysis(params: {
         url: screen.url
       });
     } catch (error: any) {
-      console.log(`    ⚠️ Could not read analysis for ${screen.name}: ${error.message}`);
+      // This should never happen since pipeline already created these files
+      throw new Error(`Failed to read analysis file for screen ${screen.name} at ${analysisPath}. This indicates a filesystem error or race condition. Original error: ${error.message}`);
     }
-  }
-  
-  if (analysisFiles.length === 0) {
-    await notify('⚠️ No analysis files found - skipping scope analysis generation');
-    throw new Error('No screen analysis files found for scope analysis generation');
   }
   
   // Generate feature identification prompt
   const prompt = generateFeatureIdentificationPrompt(
-    screensYamlContent,
+    yamlContent,
     analysisFiles,
     epicContext
   );
