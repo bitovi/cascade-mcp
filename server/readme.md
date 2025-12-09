@@ -77,6 +77,40 @@ curl -X POST http://localhost:3000/api/write-shell-stories \
 
 MCP tool connections do NOT use Anthropic API - they use MCP sampling/createMessage endpoint for LLM completions via the connected MCP client.
 
+### Browser MCP Client
+
+The server includes a built-in browser-based MCP client UI for testing and development. When running the server:
+
+```bash
+npm run start-local
+# Open http://localhost:3000 in your browser
+```
+
+**Features:**
+- OAuth authentication with PKCE flow
+- Tool listing and selection
+- Dynamic form generation from JSON Schema
+- Sampling support via Anthropic API (direct browser calls)
+- Real-time progress logging
+
+**Development:**
+```bash
+# Run both client and server in dev mode
+npm run dev
+
+# Build client only
+npm run build:client
+
+# Run client dev server only (with API proxy)
+npm run dev:client
+```
+
+**Architecture:**
+- Frontend: Vite + React + Tailwind CSS
+- MCP Client: Uses `@modelcontextprotocol/sdk` with `StreamableHTTPClientTransport`
+- OAuth: Custom `OAuthClientProvider` implementation with `sessionStorage`
+- Sampling: Direct Anthropic API calls from browser
+
 ## Module Responsibilities
 
 - **server.ts** - Application Bootstrap  

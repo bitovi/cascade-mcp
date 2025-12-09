@@ -4,7 +4,8 @@ import { webcrypto } from 'crypto';
 
 // Polyfill crypto for jose library
 if (!globalThis.crypto) {
-  globalThis.crypto = webcrypto;
+  // Type assertion needed because Node's webcrypto types don't perfectly match browser Crypto types
+  globalThis.crypto = webcrypto as unknown as Crypto;
 }
 
 // Generic JWT payload structure

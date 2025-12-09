@@ -7,6 +7,7 @@ import session from 'express-session';
 import dotenv from 'dotenv';
 import morgan from 'morgan';
 import path from 'path';
+import fs from 'fs';
 import {
   oauthMetadata,
   oauthProtectedResourceMetadata,
@@ -109,7 +110,7 @@ app.use('/auth', (req, res, next) => {
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'OPTIONS', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'mcp-session-id', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'mcp-session-id', 'Authorization', 'mcp-protocol-version'],
   exposedHeaders: ['mcp-session-id'],
   maxAge: 86400
 }));
@@ -169,28 +170,53 @@ app.get('/favicon.ico', (req, res) => {
   res.sendFile('favicon.ico', { root: 'static' });
 });
 
-// Root endpoint for service discovery
-app.get('/', (req, res) => {
-  const baseUrl = process.env.VITE_AUTH_SERVER_URL!;
+// Determine if React client build exists
+const projectRoot = getProjectRoot();
+const clientDistPath = path.join(projectRoot, 'dist', 'client');
+const clientIndexPath = path.join(clientDistPath, 'index.html');
+const hasClientBuild = fs.existsSync(clientIndexPath);
 
-  res.send(`
-    <h1>Cascade MCP Service</h1>
-    <p>MCP tools that help software teams. Integrates Jira and Figma. See <a href="https://github.com/bitovi/cascade-mcp">Cascade MCP on GitHub</a> for guides and documentation.</p>
-    <p>Note: some tools require <a href="https://modelcontextprotocol.io/specification/2025-06-18/client/sampling">sampling</a>. Make sure your agent supports sampling.</p>
-    <h2>Available Endpoints</h2>
-    <ul>
-      <li><a href="/mcp">MCP Endpoint</a> - <code>${baseUrl}/mcp</code></li>
-      <li><a href="/.well-known/oauth-authorization-server">OAuth Server Metadata</a></li>
-      <li><a href="/.well-known/oauth-protected-resource">Protected Resource Metadata</a></li>
-      <li><a href="/get-access-token">Manual Token Retrieval</a></li>
-    </ul>
-    <h2>REST API Endpoints (PAT Authentication)</h2>
-    <ul>
-      <li><strong>POST /api/write-shell-stories</strong> - Generate shell stories from Figma designs</li>
-      <li><strong>POST /api/write-next-story</strong> - Write next Jira story from shell stories</li>
-    </ul>
-  `);
-});
+if (hasClientBuild) {
+  console.log(`\n========== REACT CLIENT ==========`);
+  console.log(`Serving React app from: ${clientDistPath}`);
+  console.log(`========== REACT CLIENT END ==========\n`);
+  
+  // Serve static assets from Vite build (JS, CSS, etc.)
+  app.use('/assets', express.static(path.join(clientDistPath, 'assets')));
+  
+  // Serve the React app at the homepage
+  app.get('/', (req, res) => {
+    res.sendFile(clientIndexPath);
+  });
+} else {
+  console.log(`\n========== FALLBACK HOMEPAGE ==========`);
+  console.log(`React client not built. Using fallback HTML homepage.`);
+  console.log(`Run 'npm run build:client' to build the React app.`);
+  console.log(`========== FALLBACK HOMEPAGE END ==========\n`);
+  
+  // Fallback: Root endpoint for service discovery (original HTML)
+  app.get('/', (req, res) => {
+    const baseUrl = process.env.VITE_AUTH_SERVER_URL!;
+
+    res.send(`
+      <h1>Cascade MCP Service</h1>
+      <p>MCP tools that help software teams. Integrates Jira and Figma. See <a href="https://github.com/bitovi/cascade-mcp">Cascade MCP on GitHub</a> for guides and documentation.</p>
+      <p>Note: some tools require <a href="https://modelcontextprotocol.io/specification/2025-06-18/client/sampling">sampling</a>. Make sure your agent supports sampling.</p>
+      <h2>Available Endpoints</h2>
+      <ul>
+        <li><a href="/mcp">MCP Endpoint</a> - <code>${baseUrl}/mcp</code></li>
+        <li><a href="/.well-known/oauth-authorization-server">OAuth Server Metadata</a></li>
+        <li><a href="/.well-known/oauth-protected-resource">Protected Resource Metadata</a></li>
+        <li><a href="/get-access-token">Manual Token Retrieval</a></li>
+      </ul>
+      <h2>REST API Endpoints (PAT Authentication)</h2>
+      <ul>
+        <li><strong>POST /api/write-shell-stories</strong> - Generate shell stories from Figma designs</li>
+        <li><strong>POST /api/write-next-story</strong> - Write next Jira story from shell stories</li>
+      </ul>
+    `);
+  });
+}
 
 app.get('/.well-known/oauth-authorization-server', oauthMetadata);
 

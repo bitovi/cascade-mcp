@@ -1,3 +1,15 @@
+
+
+`Analyze the story against the epic
+
+<story-content>${}</story-content>
+
+<story-content>${}</story-content>
+
+`
+
+
+
 /**
  * Scope Analysis Prompt
  * 

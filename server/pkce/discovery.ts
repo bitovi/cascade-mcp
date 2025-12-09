@@ -41,6 +41,12 @@ export { serverStartTime, serverInstanceScope };
  */
 export const oauthMetadata: OAuthHandler = (req: Request, res: Response): void => {
   console.log('↔️ Received request for OAuth metadata');
+  
+  // Explicit CORS headers for cross-origin browser requests
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
   res.json({
     issuer: process.env.VITE_AUTH_SERVER_URL,
     authorization_endpoint: process.env.VITE_AUTH_SERVER_URL + '/auth/connect',
@@ -63,6 +69,11 @@ export const oauthProtectedResourceMetadata: OAuthHandler = (req: Request, res: 
     headers: req.headers,
     query: req.query,
   });
+  
+  // Explicit CORS headers for cross-origin browser requests
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   
   const baseUrl = process.env.VITE_AUTH_SERVER_URL;
   const metadata = {

@@ -19,6 +19,14 @@ import { handleAnalyzeFeatureScope } from './analyze-feature-scope.js';
 export function registerRestApiRoutes(app: Express): void {
   console.log('Registering REST API routes...');
   
+  // Config endpoint for frontend to get runtime configuration
+  app.get('/api/config', (req, res) => {
+    res.json({
+      baseUrl: process.env.VITE_AUTH_SERVER_URL || `${req.protocol}://${req.get('host')}`
+    });
+  });
+  console.log('  ✓ GET /api/config');
+  
   // Generate shell stories from Figma designs in a Jira epic
   // Wrap handler to match Express signature (req, res) => void
   app.post('/api/write-shell-stories', (req, res) => handleWriteShellStories(req, res));

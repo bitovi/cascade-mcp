@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
-    "lib": ["ESNext"],
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "outDir": "./dist",
     "rootDir": "./",
     "strict": true,
@@ -16,12 +16,13 @@
     "skipLibCheck": true,
     "allowImportingTsExtensions": true,
     "noEmit": true,
+    "jsx": "react-jsx",
     "paths": {
       "undici-types": ["./node_modules/undici/types"]
     },
     "sourceMap": true,
     "types": ["node", "jest"]
   },
-  "include": ["server/**/*", "specs/**/*", "test/**/*", "scripts/**/*"],
+  "include": ["server/**/*", "specs/**/*", "test/**/*", "scripts/**/*", "src/**/*"],
   "exclude": ["node_modules", "dist"]
 }
