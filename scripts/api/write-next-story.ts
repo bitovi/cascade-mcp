@@ -1,14 +1,14 @@
 /**
  * CLI Script: Write Next Story
- * 
+ *
  * Writes the next Jira story from shell stories in an epic
- * 
+ *
  * Usage:
  *   node --import ./loader.mjs scripts/api/write-next-story.ts <jira-url>
- * 
+ *
  * Example:
  *   node --import ./loader.mjs scripts/api/write-next-story.ts https://bitovi.atlassian.net/browse/PLAY-123
- * 
+ *
  * Environment Variables Required:
  *   ATLASSIAN_TEST_PAT - Atlassian Personal Access Token
  *   FIGMA_TEST_PAT - Figma Personal Access Token
@@ -26,7 +26,7 @@ dotenv.config();
 async function main() {
   // Parse command-line arguments
   const args = process.argv.slice(2);
-  
+
   if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
     console.log(`
 Write Next Story - Create the next Jira story from shell stories
@@ -61,23 +61,23 @@ Example:
   const jiraUrl = args[0];
   const cloudIdIndex = args.indexOf('--cloud-id');
   const cloudId = cloudIdIndex !== -1 ? args[cloudIdIndex + 1] : undefined;
-  
+
   const providerIndex = args.indexOf('--provider');
   const provider = providerIndex !== -1 ? args[providerIndex + 1] : undefined;
-  
+
   const modelIndex = args.indexOf('--model');
   const model = modelIndex !== -1 ? args[modelIndex + 1] : undefined;
 
   try {
     // Parse Jira URL to extract epic key and site name
     console.log('🔍 Parsing Jira URL...');
-    const { epicKey, siteName } = parseJiraUrl(jiraUrl);
-    console.log(`  Epic Key: ${epicKey}`);
+    const { ticketKey, siteName } = parseJiraUrl(jiraUrl);
+    console.log(`  Epic Key: ${ticketKey}`);
     console.log(`  Site Name: ${siteName}`);
 
     // Create API client
     console.log('\n📡 Creating API client...');
-    
+
     // Build headers for LLM provider if specified
     const headers: Record<string, string> = {};
     if (provider) {
@@ -88,7 +88,7 @@ Example:
       headers['X-LLM-Model'] = model;
       console.log(`  Model: ${model}`);
     }
-    
+
     const client = createApiClient({
       headers: Object.keys(headers).length > 0 ? headers : undefined,
     });
@@ -96,14 +96,14 @@ Example:
 
     // Call API
     console.log('\n🤖 Writing next story...');
-    console.log(`  Epic: ${epicKey}`);
+    console.log(`  Epic: ${ticketKey}`);
     console.log(`  Site: ${siteName}`);
     if (cloudId) {
       console.log(`  Cloud ID: ${cloudId}`);
     }
 
     const result = await writeNextStory(client, {
-      epicKey,
+      epicKey: ticketKey,
       siteName,
       cloudId,
     });
@@ -120,28 +120,28 @@ Example:
       console.log(`📝 Issue:  ${result.issueKey}`);
       console.log(`📋 Title:  ${result.storyTitle}`);
       console.log('═══════════════════════════════════════════════════════════════');
-      
+
       console.log(`\n🔗 View Story: https://${siteName}.atlassian.net/browse/${result.issueKey}`);
-      console.log(`🔗 View Epic:  https://${siteName}.atlassian.net/browse/${epicKey}`);
-      
+      console.log(`🔗 View Epic:  https://${siteName}.atlassian.net/browse/${ticketKey}`);
+
       console.log('\n💡 Run this command again to write the next story');
     }
 
     process.exit(0);
   } catch (error: any) {
     console.error('\n❌ Error:', error.message);
-    
+
     if (error.message.includes('Plain epic key')) {
       console.error('\n💡 Tip: Use the full Jira URL instead of just the epic key');
       console.error('   Example: https://bitovi.atlassian.net/browse/PLAY-123');
     } else if (error.message.includes('environment variable')) {
       console.error('\n💡 Tip: Make sure all required environment variables are set in your .env file');
     }
-    
+
     if (process.env.NODE_ENV === 'development') {
       console.error('\nStack trace:', error.stack);
     }
-    
+
     process.exit(1);
   }
 }
