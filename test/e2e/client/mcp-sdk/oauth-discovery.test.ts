@@ -49,18 +49,9 @@ describe('MCP SDK: OAuth Flow to Token', () => {
   describe('MCP SDK Direct OAuth', () => {
     test('MCP SDK discovers OAuth endpoints and initiates authentication flow', async () => {
       // Check for required test environment variables upfront
-      const issueKey = process.env.JIRA_TEST_ISSUE_KEY;
-      const siteName = 'bitovi'; // Jira site subdomain
-      
-      if (!issueKey) {
-        throw new Error('JIRA_TEST_ISSUE_KEY environment variable is required for this test');
-      }
-      
       console.log('🥚 Creating MCP SDK client with OAuth provider...');
       console.log('🔍 Debug environment variables:');
       console.log('  VITE_JIRA_CALLBACK_URL:', process.env.VITE_JIRA_CALLBACK_URL);
-      console.log('  JIRA_TEST_ISSUE_KEY:', process.env.JIRA_TEST_ISSUE_KEY);
-      console.log('  Site Name:', siteName);
       
       // Create a minimal OAuth provider - MCP SDK will handle the heavy lifting
       let storedCodeVerifier: string | null = null;
