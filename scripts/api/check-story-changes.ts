@@ -50,11 +50,11 @@ Example:
   const cloudId = cloudIdIndex !== -1 ? args[cloudIdIndex + 1] : undefined;
 
   try {
-    const { epicKey, siteName } = parseJiraUrl(jiraUrl);
+    const { ticketKey, siteName } = parseJiraUrl(jiraUrl);
     const client = createApiClient();
 
     const result = await checkStoryChanges(client, {
-      epicKey,
+      storyKey: ticketKey,
       siteName,
       cloudId,
     });
