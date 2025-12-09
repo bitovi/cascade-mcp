@@ -210,7 +210,7 @@ export async function reviewWorkItem(
 // ===== Check Story Changes =====
 
 export interface CheckStoryChangesParams {
-  epicKey: string;
+  storyKey: string;
   cloudId?: string;
   siteName?: string;
   sessionId?: string;
@@ -243,7 +243,7 @@ export async function checkStoryChanges(
   client: ApiClient,
   params: CheckStoryChangesParams,
 ): Promise<CheckStoryChangesResult> {
-  console.log(`Calling checkStoryChanges for story: ${params.epicKey}`);
+  console.log(`Calling checkStoryChanges for story: ${params.storyKey}`);
 
   const response = await client.post('/api/check-story-changes', params);
 
