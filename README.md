@@ -48,7 +48,26 @@ See the **[LLM Provider Guide](./server/llm-client/README.md)** for complete doc
 
 ## Use
 
-### Copilot
+There are two main ways to use CascadeMCP:
+
+- With an MCP client that has sampling capabilities (like VSCode Copilot), shown below.
+- With a Jira automation, shown [here](https://bitovi.atlassian.net/wiki/spaces/AIEnabledDevelopment/pages/1734148141/Jira+Automation+Setup).
+
+If you're just trying to see it work, we recommend using VSCode Copilot.
+
+### VSCode Copilot
+
+In this example, we will use VSCode to connect to CascadeMCP and ask CascadeMCP to analyze some Figma images, write shell stories, and the write a story.
+
+#### Prerequisites
+
+Before using the tool, you'll need the following:
+
+- Figma design(s) for some functionality you want to write stories
+- Access to a Jira instance. [Here's a video showing how to create a new Jira instance](https://www.youtube.com/watch?v=Wcv92pAlryk)
+- Visual Studio Code with Github Copilot [Download here](https://code.visualstudio.com/)
+
+#### Creating a Jira Ticket
 
 In your project, create a `.vscode/mcp.json` file
 
