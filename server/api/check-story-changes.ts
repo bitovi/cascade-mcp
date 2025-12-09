@@ -33,7 +33,7 @@ function convertDescriptionToText(description: any): string {
 
 export async function handleCheckStoryChanges(req: Request, res: Response) {
   try {
-    const { epicKey, cloudId } = req.body;
+    const { storyKey, cloudId } = req.body;
 
     const tokens = validateApiHeaders(req.headers, res);
     if (!tokens) return;
@@ -44,9 +44,9 @@ export async function handleCheckStoryChanges(req: Request, res: Response) {
     const generateText = createLLMClient();
 
     // Fetch child story
-    const childResponse = await getJiraIssue(atlassianClient, cloudId, epicKey, undefined);
+    const childResponse = await getJiraIssue(atlassianClient, cloudId, storyKey, undefined);
     if (!childResponse.ok) {
-      throw new Error(`Error fetching issue ${epicKey}: ${childResponse.status} ${childResponse.statusText}`);
+      throw new Error(`Error fetching issue ${storyKey}: ${childResponse.status} ${childResponse.statusText}`);
     }
 
     const childData = (await childResponse.json()) as JiraIssueResponse;
@@ -66,7 +66,7 @@ export async function handleCheckStoryChanges(req: Request, res: Response) {
     const comparisonRequest = {
       parentKey,
       parentDescription,
-      childKey: epicKey,
+      childKey: storyKey,
       childDescription,
       instructions: `Analyze these two Jira issue descriptions and identify any diverging points where the child story deviates from or adds information not present in the parent epic. Focus on:
 1. Conflicting requirements or specifications
@@ -93,7 +93,7 @@ Return your analysis in a structured JSON format:
       messages: [
         { role: 'system', content: JSON.stringify(comparisonRequest, null, 2) },
         {
-          role: 'user',
+          role: 'system',
           content:
             'You are a technical project analyst specializing in software requirements analysis. You will receive a JSON object with parent and child descriptions. Provide precise, actionable insights about requirement divergences. Return ONLY valid JSON without markdown code blocks.',
         },
@@ -119,7 +119,7 @@ Return your analysis in a structured JSON format:
       analysis: divergenceAnalysis,
       metadata: {
         parentKey,
-        childKey: epicKey,
+        childKey: storyKey,
         tokensUsed: llmResponse.metadata?.usage?.totalTokens,
       },
     });
