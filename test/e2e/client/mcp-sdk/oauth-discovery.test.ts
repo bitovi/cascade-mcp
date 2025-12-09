@@ -124,14 +124,41 @@ describe('MCP SDK: OAuth Flow to Token', () => {
               redirect: 'manual'  // Don't follow redirects automatically
             });
             
-            // The bridge server should return a 302 redirect
-            if (response.status === 302) {
-              const redirectLocation = response.headers.get('location');
-              console.log('  ↩️  OAuth redirect location:', redirectLocation);
+            let atlassianAuthUrl: string | null = null;
+            
+            // The bridge server may return:
+            // - 200 with connection hub HTML (browser-based flow) - need to extract /auth/connect/atlassian URL
+            // - 302 direct redirect to Atlassian (direct OAuth flow)
+            if (response.status === 200) {
+              // Connection hub HTML - extract the Atlassian authorization URL
+              const html = await response.text();
+              console.log('  📄 Received connection hub HTML (200 OK)');
               
-              if (redirectLocation && (redirectLocation.includes('auth.atlassian.com') || redirectLocation.includes('localhost:3001'))) {
-                // Handle both real Atlassian and mock server URLs
-                let finalUrl;
+              // Build the Atlassian auth URL by appending query params to /auth/connect/atlassian
+              const baseUrl = authUrl.origin;
+              const atlassianConnectUrl = new URL(`${baseUrl}/auth/connect/atlassian`);
+              
+              // Copy all query parameters from the original auth URL
+              authUrl.searchParams.forEach((value, key) => {
+                atlassianConnectUrl.searchParams.set(key, value);
+              });
+              
+              atlassianAuthUrl = atlassianConnectUrl.href;
+              console.log('  🔗 Constructed Atlassian auth URL:', atlassianAuthUrl);
+              
+              // Now fetch the Atlassian endpoint to get the redirect
+              const atlassianResponse = await fetch(atlassianAuthUrl, {
+                method: 'GET',
+                redirect: 'manual'
+              });
+              
+              if (atlassianResponse.status === 302) {
+                const redirectLocation = atlassianResponse.headers.get('location');
+                console.log('  ↩️  OAuth redirect location:', redirectLocation);
+                
+                if (redirectLocation && (redirectLocation.includes('auth.atlassian.com') || redirectLocation.includes('localhost:3001'))) {
+                  // Handle both real Atlassian and mock server URLs
+                  let finalUrl;
                 
                 if (redirectLocation.includes('localhost:3001')) {
                   // Already pointing to mock server, use as-is
@@ -187,8 +214,73 @@ describe('MCP SDK: OAuth Flow to Token', () => {
                 throw new Error('Expected redirect to auth.atlassian.com or localhost:3001 but got: ' + redirectLocation);
               }
             } else {
-              throw new Error(`Bridge server unexpected response status: ${response.status}`);
+              throw new Error(`Atlassian auth endpoint unexpected response status: ${atlassianResponse.status}`);
             }
+          } else if (response.status === 302) {
+            // Direct redirect (302) - process normally
+            const redirectLocation = response.headers.get('location');
+            console.log('  ↩️  OAuth redirect location (direct):', redirectLocation);
+            
+            if (redirectLocation && (redirectLocation.includes('auth.atlassian.com') || redirectLocation.includes('localhost:3001'))) {
+              // Handle both real Atlassian and mock server URLs
+              let finalUrl;
+              
+              if (redirectLocation.includes('localhost:3001')) {
+                // Already pointing to mock server, use as-is
+                finalUrl = redirectLocation;
+                console.log('  ✅ Server correctly redirected to mock server');
+              } else {
+                // Replace the real Atlassian URL with our mock server URL
+                const atlassianUrl = new URL(redirectLocation);
+                const mockUrl = new URL(`http://localhost:3001/authorize`);
+                
+                // Copy all query parameters from the real URL to the mock URL
+                atlassianUrl.searchParams.forEach((value, key) => {
+                  mockUrl.searchParams.set(key, value);
+                });
+                
+                finalUrl = mockUrl.href;
+                console.log('  🔄 Redirecting to mock Atlassian server:', finalUrl);
+              }
+              
+              // Call the mock server to get the authorization code
+              const mockResponse = await fetch(finalUrl, {
+                method: 'GET',
+                redirect: 'manual'
+              });
+              
+              if (mockResponse.status === 302) {
+                const mockRedirectLocation = mockResponse.headers.get('location');
+                console.log('  ↩️  Mock redirect location:', mockRedirectLocation);
+                
+                if (mockRedirectLocation) {
+                  const callbackUrl = new URL(mockRedirectLocation);
+                  const authCode = callbackUrl.searchParams.get('code');
+                  
+                  if (authCode) {
+                    console.log('  ✅ Authorization code received:', authCode.substring(0, 10) + '...');
+                    
+                    // Store the auth code for manual completion after this function returns
+                    storedAuthCode = authCode;
+                    
+                    // Throw the browser redirect error as expected by MCP SDK
+                    // We'll complete the OAuth manually after this
+                    throw new Error('BROWSER_REDIRECT_REQUIRED');
+                  } else {
+                    throw new Error('No authorization code found in mock redirect location');
+                  }
+                } else {
+                  throw new Error('No redirect location header from mock server');
+                }
+              } else {
+                throw new Error(`Mock server unexpected response status: ${mockResponse.status}`);
+              }
+            } else {
+              throw new Error('Expected redirect to auth.atlassian.com or localhost:3001 but got: ' + redirectLocation);
+            }
+          } else {
+            throw new Error(`Bridge server unexpected response status: ${response.status}`);
+          }
             
           } catch (error) {
             const err = error as Error;
