@@ -6,10 +6,10 @@ services:
     build: .
     ports:
       - $PORT:$PORT
-    volumes:
-      - .:/app
-      # needed for the deployment. comment out if you want to manage node_modules from your local machine
-      # better approach: if you need to add or remove node_modules, just rebuild the image `docker-compose up --build`
-      - /app/node_modules
+    # Note: Volume mounts are for local development only
+    # The production deployment uses the built image directly without volume mounts
+    # volumes:
+    #   - .:/app
+    #   - /app/node_modules
     stdin_open: true
     tty: true

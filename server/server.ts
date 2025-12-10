@@ -178,6 +178,26 @@ app.get('/debug-paths', (req, res) => {
   const cwdPath = process.cwd();
   const cwdClientIndexPath = path.join(cwdPath, 'dist', 'client', 'index.html');
   
+  // List actual files in /app
+  let appContents: string[] = [];
+  let distContents: string[] = [];
+  let distClientContents: string[] = [];
+  try {
+    appContents = fs.readdirSync('/app');
+  } catch (e) {
+    appContents = [`Error: ${e}`];
+  }
+  try {
+    distContents = fs.readdirSync('/app/dist');
+  } catch (e) {
+    distContents = [`Error: ${e}`];
+  }
+  try {
+    distClientContents = fs.readdirSync('/app/dist/client');
+  } catch (e) {
+    distClientContents = [`Error: ${e}`];
+  }
+  
   res.json({
     'process.cwd()': cwdPath,
     projectRoot: debugProjectRoot,
@@ -186,6 +206,9 @@ app.get('/debug-paths', (req, res) => {
     'fs.existsSync(clientIndexPath)': fs.existsSync(debugClientIndexPath),
     cwdClientIndexPath,
     'fs.existsSync(cwdClientIndexPath)': fs.existsSync(cwdClientIndexPath),
+    '/app contents': appContents,
+    '/app/dist contents': distContents,
+    '/app/dist/client contents': distClientContents,
   });
 });
 
