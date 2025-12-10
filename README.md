@@ -69,7 +69,12 @@ If you want to do the story writing workflow, you'll need:
 
 In this example, you'll use the mini MCP client hosted at [https://cascade.bitovi.com/](https://cascade-staging.bitovi.com/) to create stories from a Jira epic.
 
-In order to use the mini MCP client, you'll need an Anthropic SDK API token.
+In order to use the mini MCP client, you'll need an Anthropic SDK API token. 
+
+1. Go to [https://cascade.bitovi.com/](https://cascade-staging.bitovi.com/)
+2. Enter your Anthropic SDK API (this isn't sent to the server, but if anyone asks you to share a key like this, make sure you give one you can delete after).
+3. Click connect
+4. Authorize Jira and Figma
 
 
 
