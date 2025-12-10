@@ -22,6 +22,18 @@
 import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';
 import { startTestServer, stopTestServer } from '../../helpers/test-server.js';
 import { validateRfc6750Compliance } from '../../helpers/assertions.js';
+import type { OAuthProtectedResourceMetadata, OAuthMetadata } from '@modelcontextprotocol/sdk/shared/auth.js';
+import { JSONRPCError } from '@modelcontextprotocol/sdk/types.js';
+
+/**
+ * Jest test + TypeScript assertion helper to verify a value is truthy (not null, undefined, false, 0, '', or NaN)
+ * @param value The value to check
+ * Fails the test if the value is falsy (null, undefined, false, 0, '', or NaN)
+ * If the value is truthy, narrows its type for TypeScript
+ */
+function assertTruthy<T>(value: T | null | undefined): asserts value is T {
+  expect(value).toBeTruthy();
+}
 
 describe('Standards: Initial Connection', () => {
   let serverUrl: string;
@@ -69,8 +81,8 @@ describe('Standards: Initial Connection', () => {
       expect(response.status).toBe(401);
 
       // RFC 6750 Section 3: WWW-Authenticate header MUST be present
-      const wwwAuthHeader = response.headers.get('WWW-Authenticate') ?? '';
-      expect(wwwAuthHeader).toBeTruthy();
+      const wwwAuthHeader = response.headers.get('WWW-Authenticate');
+      assertTruthy(wwwAuthHeader);
 
       // Validate RFC 6750 compliance
       validateRfc6750Compliance(wwwAuthHeader);
@@ -83,15 +95,16 @@ describe('Standards: Initial Connection', () => {
 
       // Extract and validate metadata URL
       const metadataMatch = wwwAuthHeader.match(/resource_metadata="([^"]+)"/);
-      expect(metadataMatch).toBeTruthy();
-      const metadataUrl = metadataMatch && metadataMatch[1] ? metadataMatch[1] : '';
+      assertTruthy(metadataMatch);
+
+      const metadataUrl = metadataMatch[1];
       expect(metadataUrl).toContain('/.well-known/oauth-protected-resource');
 
       // Validate metadata URL is accessible
       const metadataResponse = await fetch(metadataUrl);
       expect(metadataResponse.ok).toBe(true);
 
-      const metadata = await metadataResponse.json() as any;
+      const metadata = await metadataResponse.json() as OAuthProtectedResourceMetadata;
       expect(metadata.resource).toBeDefined();
       expect(metadata.authorization_servers).toBeDefined();
       expect(Array.isArray(metadata.authorization_servers)).toBe(true);
@@ -131,7 +144,7 @@ describe('Standards: Initial Connection', () => {
 
       expect(response.status).toBe(401);
 
-      const errorResponse = await response.json() as any;
+      const errorResponse = await response.json() as JSONRPCError;
 
       // JSON-RPC 2.0 error response format
       expect(errorResponse.jsonrpc).toBe('2.0');
@@ -161,8 +174,12 @@ describe('Standards: Initial Connection', () => {
         })
       });
 
-      const wwwAuth = authResponse.headers.get('WWW-Authenticate') ?? '';
-      const metadataMatch = wwwAuth.match(/resource_metadata="([^"]+)"/) ?? ['', ''];
+      const wwwAuth = authResponse.headers.get('WWW-Authenticate');
+      assertTruthy(wwwAuth);
+      
+      const metadataMatch = wwwAuth.match(/resource_metadata="([^"]+)"/);
+      assertTruthy(metadataMatch);
+      
       const metadataUrl = metadataMatch[1];
 
       // RFC 9728: Resource metadata should return valid OAuth metadata
@@ -170,11 +187,11 @@ describe('Standards: Initial Connection', () => {
       expect(metadataResponse.ok).toBe(true);
       expect(metadataResponse.headers.get('Content-Type')).toMatch(/application\/json/);
 
-      const metadata = await metadataResponse.json() as any;
+      const metadata = await metadataResponse.json() as OAuthProtectedResourceMetadata;
 
       // RFC 9728 Section 3.3: Required fields
       expect(metadata.resource).toBeDefined();
-      expect(metadata.authorization_servers).toBeDefined();
+      assertTruthy(metadata.authorization_servers);
       expect(Array.isArray(metadata.authorization_servers)).toBe(true);
       expect(metadata.authorization_servers.length).toBeGreaterThan(0);
 
@@ -186,14 +203,15 @@ describe('Standards: Initial Connection', () => {
     test('authorization server metadata contains required endpoints', async () => {
       // Get the authorization server metadata URL
       const protectedResourceResponse = await fetch(`${serverUrl}/.well-known/oauth-protected-resource`);
-      const protectedResource = await protectedResourceResponse.json() as any;
+      const protectedResource = await protectedResourceResponse.json() as OAuthProtectedResourceMetadata;
+      assertTruthy(protectedResource.authorization_servers);
       const authServerUrl = protectedResource.authorization_servers[0];
 
       // RFC 8414: Authorization server metadata
       const authMetadataResponse = await fetch(`${authServerUrl}/.well-known/oauth-authorization-server`);
       expect(authMetadataResponse.ok).toBe(true);
 
-      const authMetadata = await authMetadataResponse.json() as any;
+      const authMetadata = await authMetadataResponse.json() as OAuthMetadata;
 
       // RFC 8414 Section 2: Required metadata fields
       expect(authMetadata.issuer).toBeDefined();
