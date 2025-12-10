@@ -170,91 +170,24 @@ app.get('/favicon.ico', (req, res) => {
   res.sendFile('favicon.ico', { root: 'static' });
 });
 
-// Debug endpoint to check paths (temporary)
-app.get('/debug-paths', (req, res) => {
-  const debugProjectRoot = getProjectRoot();
-  const debugClientDistPath = path.join(debugProjectRoot, 'dist', 'client');
-  const debugClientIndexPath = path.join(debugClientDistPath, 'index.html');
-  const cwdPath = process.cwd();
-  const cwdClientIndexPath = path.join(cwdPath, 'dist', 'client', 'index.html');
-  
-  // List actual files in /app
-  let appContents: string[] = [];
-  let distContents: string[] = [];
-  let distClientContents: string[] = [];
-  try {
-    appContents = fs.readdirSync('/app');
-  } catch (e) {
-    appContents = [`Error: ${e}`];
-  }
-  try {
-    distContents = fs.readdirSync('/app/dist');
-  } catch (e) {
-    distContents = [`Error: ${e}`];
-  }
-  try {
-    distClientContents = fs.readdirSync('/app/dist/client');
-  } catch (e) {
-    distClientContents = [`Error: ${e}`];
-  }
-  
-  res.json({
-    'process.cwd()': cwdPath,
-    projectRoot: debugProjectRoot,
-    clientDistPath: debugClientDistPath,
-    clientIndexPath: debugClientIndexPath,
-    'fs.existsSync(clientIndexPath)': fs.existsSync(debugClientIndexPath),
-    cwdClientIndexPath,
-    'fs.existsSync(cwdClientIndexPath)': fs.existsSync(cwdClientIndexPath),
-    '/app contents': appContents,
-    '/app/dist contents': distContents,
-    '/app/dist/client contents': distClientContents,
-  });
-});
-
 // Determine if React client build exists
 const projectRoot = getProjectRoot();
 const clientDistPath = path.join(projectRoot, 'dist', 'client');
 const clientIndexPath = path.join(clientDistPath, 'index.html');
-
-// Also try with process.cwd() as fallback
-const cwdClientDistPath = path.join(process.cwd(), 'dist', 'client');
-const cwdClientIndexPath = path.join(cwdClientDistPath, 'index.html');
-
-// Debug: Log path resolution
-console.log(`\n========== PATH DEBUG ==========`);
-console.log(`process.cwd(): ${process.cwd()}`);
-console.log(`projectRoot: ${projectRoot}`);
-console.log(`clientDistPath: ${clientDistPath}`);
-console.log(`clientIndexPath: ${clientIndexPath}`);
-console.log(`fs.existsSync(clientIndexPath): ${fs.existsSync(clientIndexPath)}`);
-console.log(`cwdClientDistPath: ${cwdClientDistPath}`);
-console.log(`cwdClientIndexPath: ${cwdClientIndexPath}`);
-console.log(`fs.existsSync(cwdClientIndexPath): ${fs.existsSync(cwdClientIndexPath)}`);
-console.log(`========== PATH DEBUG END ==========\n`);
-
-// Use whichever path works
-const hasClientBuild = fs.existsSync(clientIndexPath) || fs.existsSync(cwdClientIndexPath);
-const finalClientDistPath = fs.existsSync(clientIndexPath) ? clientDistPath : cwdClientDistPath;
-const finalClientIndexPath = fs.existsSync(clientIndexPath) ? clientIndexPath : cwdClientIndexPath;
+const hasClientBuild = fs.existsSync(clientIndexPath);
 
 if (hasClientBuild) {
-  console.log(`\n========== REACT CLIENT ==========`);
-  console.log(`Serving React app from: ${finalClientDistPath}`);
-  console.log(`========== REACT CLIENT END ==========\n`);
+  console.log(`Serving React app from: ${clientDistPath}`);
   
   // Serve static assets from Vite build (JS, CSS, etc.)
-  app.use('/assets', express.static(path.join(finalClientDistPath, 'assets')));
+  app.use('/assets', express.static(path.join(clientDistPath, 'assets')));
   
   // Serve the React app at the homepage
   app.get('/', (req, res) => {
-    res.sendFile(finalClientIndexPath);
+    res.sendFile(clientIndexPath);
   });
 } else {
-  console.log(`\n========== FALLBACK HOMEPAGE ==========`);
   console.log(`React client not built. Using fallback HTML homepage.`);
-  console.log(`Run 'npm run build:client' to build the React app.`);
-  console.log(`========== FALLBACK HOMEPAGE END ==========\n`);
   
   // Fallback: Root endpoint for service discovery (original HTML)
   app.get('/', (req, res) => {
