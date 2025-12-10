@@ -21,6 +21,10 @@
 import type { Request, Response } from 'express';
 import crypto from 'crypto';
 
+// All providers that must be connected for auto-redirect to /auth/done
+// If only some providers are connected, user can manually click "Done" button
+const REQUIRED_PROVIDERS = ['atlassian', 'figma'] as const;
+
 /**
  * Renders the connection hub UI
  * Shows available providers with connection status
@@ -30,6 +34,17 @@ export function renderConnectionHub(req: Request, res: Response): void {
   
   const connectedProviders = req.session.connectedProviders || [];
   console.log(`  Currently connected providers: ${connectedProviders.join(', ') || 'none'}`);
+  
+  // Auto-redirect ONLY when ALL providers are connected
+  // This saves the user from clicking "Done" when they've connected everything
+  const allProvidersConnected = REQUIRED_PROVIDERS.every(
+    provider => connectedProviders.includes(provider)
+  );
+  if (allProvidersConnected) {
+    console.log('  ALL providers connected - auto-redirecting to /auth/done');
+    res.redirect('/auth/done');
+    return;
+  }
   
   // Store MCP client's PKCE parameters from query string (only on first visit)
   // These were sent by the MCP client when initiating the OAuth flow

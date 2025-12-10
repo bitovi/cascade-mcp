@@ -52,6 +52,38 @@ server/providers/combined/tools/write-next-story/
 
 This is an **OAuth 2.0 bridge server** that enables MCP (Model Context Protocol) clients like VS Code Copilot to access Jira through secure authentication. The system has three main components:
 
+### Dual Interface Pattern (MCP + REST API)
+
+Tools are exposed via **both** MCP protocol and REST API without code duplication:
+
+**Pattern:**
+- `server/providers/{provider}/tools/{tool}/core-logic.ts` - Shared business logic (`executeWriteShellStories`, etc.)
+- `server/providers/{provider}/tools/{tool}/{tool}.ts` - MCP tool wrapper (uses OAuth context)
+- `server/api/{tool}.ts` - REST API wrapper (uses PAT headers)
+
+**New tools should support both interfaces.** Copy existing patterns from `write-shell-stories` or `analyze-feature-scope`.
+
+### Authentication: OAuth vs PAT
+
+| Method | Used By | Auth Header | Token Source |
+|--------|---------|-------------|--------------|
+| **OAuth** | MCP clients (VS Code Copilot, Claude Desktop) | `Authorization: Bearer <JWT>` | Our PKCE OAuth flow |
+| **PAT** | REST API, scripts, server-to-server | `X-Atlassian-Token`, `X-Figma-Token` | User's personal access tokens |
+
+**PKCE Bridge Pattern (MCP OAuth):**
+1. MCP client initiates PKCE OAuth with our server (`server/pkce/`)
+2. We initiate traditional OAuth with providers (Atlassian, Figma)
+3. Provider tokens embedded in JWT returned to MCP client
+4. MCP client sends JWT → we extract provider tokens → call provider APIs
+
+### LLM Integration for Tools
+
+Tools needing AI can work with **both** auth methods:
+- **MCP**: Uses MCP sampling (client provides LLM) OR falls back to `X-Anthropic-Token` header
+- **REST API**: Requires `X-Anthropic-Token` (or other LLM provider header)
+
+Use `createProviderFromHeaders()` for REST API, `ToolDependencies.llmClient` for shared logic.
+
 ## Relevant Specifications
 
 This project implements several key specifications. Always refer to these when making authentication or protocol decisions:
@@ -88,6 +120,12 @@ This project implements several key specifications. Always refer to these when m
 - **Auth Pattern**: All tools use `getAuthInfoSafe(context, toolName)` which throws `InvalidTokenError` for automatic OAuth re-authentication
 
 ## Development Workflows
+
+### Running Commands
+**Prefer VS Code tasks over terminal commands.** Tasks allow checking logs at any time without blocking. Use `create_and_run_task` or `run_task` tools instead of `run_in_terminal` for:
+- Long-running processes (servers, watchers)
+- Build commands
+- Any command whose output you may need to review later
 
 ### Running the Server
 ```bash
@@ -212,3 +250,26 @@ try {
 - **401 errors**: Check `InvalidTokenError` throwing in tools - should trigger automatic re-auth
 - **Session cleanup**: Ensure transport `onclose` handlers call `clearAuthContext()`
 - **PKCE failures**: Verify `code_challenge`/`code_verifier` pairs in OAuth flow
+
+## Frontend (Browser MCP Client)
+
+**Purpose:** Provides a simple way to test MCP tools without setting up an external MCP client (VS Code Copilot, Claude Desktop, etc.).
+
+### Structure
+- `src/` - React frontend (Vite + TypeScript)
+  - `main.tsx` - Entry point
+  - `react/App.tsx` - Main component, MCP connection logic
+  - `react/components/` - UI (ConnectionPanel, ToolSelector, ToolForm, ProgressLog, ResultDisplay)
+  - `react/hooks/` - `useConfig`, `useMcpClient`
+  - `mcp-client/` - Browser MCP client implementation
+
+### Commands
+- `npm run dev` - Run server (3000) + Vite client (5173) concurrently
+- `npm run dev:client` - Vite only
+- `npm run build` - Build to `dist/client/`
+
+### Dev Proxy (`vite.config.ts`)
+Routes `/mcp`, `/api`, `/auth`, `/.well-known`, `/register` → `localhost:3000`
+
+### Production Serving (`server/server.ts`)
+Express serves `dist/client/` if `index.html` exists, else fallback HTML.
