@@ -72,7 +72,7 @@ export function ConnectionPanel({
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
           />
           <p className="text-xs text-gray-500 mt-1">
-            Only needed if tools require LLM sampling. Stored locally in your browser.
+            Only needed if tools require LLM sampling. Stored locally in your browser. It's best practice to give a short lived API key.
           </p>
         </div>
 
