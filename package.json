@@ -13,8 +13,6 @@
     "test:e2e": "jest test/e2e --testTimeout=600000 --runInBand --testMatch='**/test/e2e/**/*.test.ts'",
     "test:e2e:rest-api": "jest test/e2e/api-workflow.test.ts --testTimeout=600000 --runInBand --testMatch='**/test/e2e/**/*.test.ts'",
     "test:e2e:client": "jest test/e2e/client --testTimeout=600000 --runInBand --testMatch='**/test/e2e/client/**/*.test.ts'",
-    "test:e2e:client:initial-connection": "jest test/e2e/client/standards/initial-connection.test.ts --testTimeout=600000 --runInBand --testMatch='**/test/e2e/client/**/*.test.ts'",
-    "test:e2e:client:mcp-sdk:mock": "jest test/e2e/client/mcp-sdk --testTimeout=300000 --runInBand --testMatch='**/test/e2e/client/mcp-sdk/**/*.test.ts'",
     "validate-pat-tokens": "node --import ./loader.mjs scripts/validate-pat-tokens.ts"
   },
   "lint-staged": {
