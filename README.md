@@ -50,24 +50,38 @@ See the **[LLM Provider Guide](./server/llm-client/README.md)** for complete doc
 
 There are two main ways to use CascadeMCP:
 
+- With the mini MCP client hosted at [https://cascade.bitovi.com/](https://cascade-staging.bitovi.com/)
 - With an MCP client that has sampling capabilities (like VSCode Copilot), shown below.
 - With a Jira automation, shown [here](https://bitovi.atlassian.net/wiki/spaces/AIEnabledDevelopment/pages/1734148141/Jira+Automation+Setup).
 
-If you're just trying to see it work, we recommend using VSCode Copilot.
+If you're just trying to see it work, we recommend using the mini MCP client.
+
+#### Prerequisites
+
+If you want to do the story writing workflow, you'll need:
+
+- Figma design(s) for some functionality that will need stories
+- Access to a Jira instance. [Here's a video showing how to create a new Jira instance](https://www.youtube.com/watch?v=Wcv92pAlryk)
+- A Jira epic with links to the figma designs and any additional context about what's in and out of scope for the epic
+
+
+### Mini MCP Client
+
+In this example, you'll use the mini MCP client hosted at [https://cascade.bitovi.com/](https://cascade-staging.bitovi.com/) to create stories from a Jira epic.
+
+In order to use the mini MCP client, you'll need an Anthropic SDK API token.
+
+
 
 ### VSCode Copilot
 
 In this example, we will use VSCode to connect to CascadeMCP and ask CascadeMCP to analyze some Figma images, write shell stories, and the write a story.
 
-#### Prerequisites
-
 Before using the tool, you'll need the following:
 
-- Figma design(s) for some functionality you want to write stories
-- Access to a Jira instance. [Here's a video showing how to create a new Jira instance](https://www.youtube.com/watch?v=Wcv92pAlryk)
+
 - Visual Studio Code with Github Copilot [Download here](https://code.visualstudio.com/)
 
-#### Creating a Jira Ticket
 
 In your project, create a `.vscode/mcp.json` file
 
