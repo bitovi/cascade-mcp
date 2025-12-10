@@ -9,6 +9,8 @@
 import type { ToolDependencies } from '../types.js';
 import { getJiraIssue, resolveCloudId } from '../../../atlassian/atlassian-helpers.js';
 import { convertAdfToMarkdown } from '../../../atlassian/markdown-converter.js';
+import { CHECK_STORY_CHANGES_SYSTEM_PROMPT, generateCheckWhatChangedPrompt } from './strategies/prompt-check-story-changes.js';
+import { CHECK_STORY_CHANGES_MAX_TOKENS } from './strategies/prompt-check-story-changes.js';
 
 /**
  * Parameters for executing the check-story-changes workflow
@@ -138,43 +140,17 @@ export async function executeCheckStoryChanges(
   // ==========================================
   // PHASE 4: Compare descriptions with LLM
   // ==========================================
-  const comparisonRequest = {
-    parentKey,
-    parentDescription,
-    childKey: storyKey,
-    childDescription,
-    instructions: `Analyze these two Jira issue descriptions and identify any diverging points where the child story deviates from or adds information not present in the parent epic. Focus on:
-1. Conflicting requirements or specifications
-2. Additional features or details in the child not mentioned in the parent
-3. Different interpretations or implementations
-4. Missing context that should be aligned
-
-Return your analysis in a structured JSON format:
-{
-  "hasDivergences": boolean,
-  "divergences": [
-    {
-      "category": "conflict" | "addition" | "missing" | "interpretation",
-      "description": "Clear description of the divergence",
-      "childContext": "Relevant excerpt from child story",
-      "parentContext": "Relevant excerpt from parent epic (or null if not applicable)"
-    }
-  ],
-  "summary": "Brief summary of alignment status"
-}`,
-  };
 
   console.log('  Requesting LLM analysis...');
   const llmResponse = await generateText({
     messages: [
       {
         role: 'system',
-        content:
-          'You are a technical project analyst specializing in software requirements analysis. You will receive a JSON object with parent and child descriptions. Provide precise, actionable insights about requirement divergences. Return ONLY valid JSON without markdown code blocks.',
+        content: CHECK_STORY_CHANGES_SYSTEM_PROMPT,
       },
-      { role: 'user', content: JSON.stringify(comparisonRequest, null, 2) },
+      { role: 'user', content: generateCheckWhatChangedPrompt(parentKey, storyKey, parentDescription, childDescription) },
     ],
-    maxTokens: 4000,
+    maxTokens: CHECK_STORY_CHANGES_MAX_TOKENS,
   });
 
   // Strip markdown code blocks if present
