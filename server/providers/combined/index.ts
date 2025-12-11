@@ -8,6 +8,7 @@ import type { McpServer } from '../../mcp-core/mcp-types.js';
 import { registerWriteShellStoriesTool } from './tools/writing-shell-stories/index.js';
 import { registerWriteNextStoryTool } from './tools/write-next-story/index.js';
 import { registerAnalyzeFeatureScopeTool } from './tools/analyze-feature-scope/index.js';
+import { registerCheckStoryChangesTool } from './tools/check-story-changes/index.js';
 // import { registerTestJiraUpdateTool } from './tools/writing-shell-stories/test-jira-update.js';
 
 /**
@@ -24,6 +25,7 @@ export const combinedProvider = {
     registerWriteShellStoriesTool(mcp);
     registerWriteNextStoryTool(mcp);
     registerAnalyzeFeatureScopeTool(mcp);
+    registerCheckStoryChangesTool(mcp);
     // registerTestJiraUpdateTool(mcp); // Quick test tool for debugging
   },
 };
