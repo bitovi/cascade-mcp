@@ -16,7 +16,7 @@
  */
 
 import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';
-import { startTestServer, stopTestServer } from '../../specs/shared/helpers/test-server.js';
+import { startTestServer, stopTestServer } from './helpers/test-server.js';
 import { createApiClient } from './helpers/api-client.js';
 import { analyzeFeatureScope, writeShellStories, writeNextStory } from './helpers/api-endpoints.js';
 import { createAtlassianClientWithPAT } from '../../server/providers/atlassian/atlassian-api-client.js';
