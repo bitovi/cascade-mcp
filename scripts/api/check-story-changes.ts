@@ -59,27 +59,7 @@ Example:
       cloudId,
     });
 
-    console.log(JSON.stringify(result, null, 2));
-    // Display results
-    // console.log('\n📊 Summary:', result.analysis.summary);
-
-    // if (result.analysis.divergences && result.analysis.divergences.length > 0) {
-    //   console.log('\n📝 Divergences:');
-    //   result.analysis.divergences.forEach((div, index) => {
-    //     console.log(`\n  ${index + 1}. [${div.category.toUpperCase()}]`);
-    //     console.log(`     ${div.description}`);
-    //     if (div.childContext) {
-    //       console.log(`     Child: "${div.childContext.substring(0, 80)}${div.childContext.length > 80 ? '...' : ''}"`);
-    //     }
-    //     if (div.parentContext) {
-    //       console.log(
-    //         `     Parent: "${div.parentContext.substring(0, 80)}${div.parentContext.length > 80 ? '...' : ''}"`,
-    //       );
-    //     }
-    //   });
-    // } else {
-    //   console.log('   No divergences detected.');
-    // }
+    // console.log(JSON.stringify(result, null, 2));
 
     console.log('\n📌 Metadata:');
     console.log(`   Parent: ${result.metadata.parentKey} | Child: ${result.metadata.childKey}`);
