@@ -360,7 +360,7 @@ export async function generateStoryContent(
   allStories: ParsedShellStoryADF[],
   notify: ToolDependencies['notify']
 ): Promise<string> {
-  await notify('Generating story content...');
+  await notify('🤖 Generating story content...');
   
   if (debugDir) {
     console.log(`  Using debug directory: ${debugDir}`);
@@ -370,7 +370,7 @@ export async function generateStoryContent(
   const fileCachePath = getFigmaFileCachePath(setupResult.figmaFileKey);
   
   // Check which analysis files exist and which are missing
-  const screenInfo: Array<{ url: string; name: string; exists: boolean }> = [];
+  const screenInfo: Array<{ url: string; name: string; filename: string; exists: boolean }> = [];
   
   for (const screenUrl of story.screens) {
     const matchingScreen = setupResult.screens.find(s => s.url === screenUrl);
@@ -381,20 +381,21 @@ export async function generateStoryContent(
     }
     
     const screenName = matchingScreen.name;
+    const filename = matchingScreen.filename || screenName;
     
     if (fileCachePath) {
-      const analysisPath = path.join(fileCachePath, `${screenName}.analysis.md`);
+      const analysisPath = path.join(fileCachePath, `${filename}.analysis.md`);
       try {
         await fs.access(analysisPath);
-        screenInfo.push({ url: screenUrl, name: screenName, exists: true });
-        console.log(`  ✅ Found cached analysis: ${screenName}.analysis.md`);
+        screenInfo.push({ url: screenUrl, name: screenName, filename, exists: true });
+        console.log(`  ✅ Found cached analysis: ${filename}.analysis.md`);
       } catch {
-        screenInfo.push({ url: screenUrl, name: screenName, exists: false });
-        console.log(`  ⚠️  Missing analysis: ${screenName}.analysis.md`);
+        screenInfo.push({ url: screenUrl, name: screenName, filename, exists: false });
+        console.log(`  ⚠️  Missing analysis: ${filename}.analysis.md`);
       }
     } else {
       // No file cache - no cached analyses available
-      screenInfo.push({ url: screenUrl, name: screenName, exists: false });
+      screenInfo.push({ url: screenUrl, name: screenName, filename, exists: false });
     }
   }
   
@@ -428,14 +429,14 @@ export async function generateStoryContent(
   const analysisFiles: Array<{ screenName: string; content: string }> = [];
   
   for (const screen of screenInfo) {
-    const analysisPath = path.join(fileCachePath, `${screen.name}.analysis.md`);
+    const analysisPath = path.join(fileCachePath, `${screen.filename}.analysis.md`);
     
     try {
       const analysisContent = await fs.readFile(analysisPath, 'utf-8');
       analysisFiles.push({ screenName: screen.name, content: analysisContent });
-      console.log(`  ✅ Loaded analysis: ${screen.name}.analysis.md`);
+      console.log(`  ✅ Loaded analysis: ${screen.filename}.analysis.md`);
     } catch (error: any) {
-      console.warn(`  ⚠️  Still missing after regeneration: ${screen.name}.analysis.md`);
+      console.warn(`  ⚠️  Still missing after regeneration: ${screen.filename}.analysis.md`);
     }
   }
   

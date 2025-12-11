@@ -116,9 +116,21 @@ async function fetchFigmaMetadataFromUrls(
         
         // Semi-recursive extraction: getFramesAndNotesForNode() extracts:
         // - For CANVAS nodes: all direct child FRAME nodes (one level recursion)
+        // - For SECTION nodes: all direct child FRAME nodes (expanded from SECTION)
         // - For FRAME nodes: just that single frame
         // - Notes at any level within the node
         const framesAndNotes = getFramesAndNotesForNode({ document: nodeData }, nodeId);
+        
+        // Check if the original URL pointed to a SECTION - if so, tag all extracted frames
+        if (nodeData.type === 'SECTION') {
+          console.log(`    📦 Tagging ${framesAndNotes.length} frames with SECTION context: "${nodeData.name}"`);
+          framesAndNotes.forEach(frame => {
+            if (frame.type === 'FRAME') {
+              (frame as any).sectionName = nodeData.name;
+              (frame as any).sectionId = nodeData.id;
+            }
+          });
+        }
         
         // Accumulate into array (maintains same structure as before)
         allFramesAndNotes.push({
@@ -152,6 +164,9 @@ async function fetchFigmaMetadataFromUrls(
  * - Notes (INSTANCE type with name "Note") can appear at any level
  * 
  * This helper consolidates all accumulated metadata into separate arrays for processing.
+ * Deduplicates frames and notes by ID to handle cases where:
+ * - Epic has both a CANVAS/SECTION URL and individual frame URLs
+ * - SECTION expansion returns frames that are also directly referenced
  * 
  * @param allFramesAndNotes - Array of metadata from potentially multiple Figma URLs/nodes
  * @returns Object containing separate arrays of frames and notes
@@ -159,8 +174,8 @@ async function fetchFigmaMetadataFromUrls(
 function separateFramesAndNotes(
   allFramesAndNotes: Array<{ url: string; metadata: FigmaNodeMetadata[] }>
 ): { frames: FigmaNodeMetadata[]; notes: FigmaNodeMetadata[] } {
-  const allFrames: FigmaNodeMetadata[] = [];
-  const allNotes: FigmaNodeMetadata[] = [];
+  const frameMap = new Map<string, FigmaNodeMetadata>();
+  const noteMap = new Map<string, FigmaNodeMetadata>();
   
   for (const item of allFramesAndNotes) {
     // Frames are type === "FRAME"
@@ -171,11 +186,24 @@ function separateFramesAndNotes(
       n.type === 'INSTANCE' && n.name === 'Note'
     );
     
-    allFrames.push(...frames);
-    allNotes.push(...notes);
+    // Deduplicate by ID
+    for (const frame of frames) {
+      if (!frameMap.has(frame.id)) {
+        frameMap.set(frame.id, frame);
+      }
+    }
+    
+    for (const note of notes) {
+      if (!noteMap.has(note.id)) {
+        noteMap.set(note.id, note);
+      }
+    }
   }
   
-  return { frames: allFrames, notes: allNotes };
+  return { 
+    frames: Array.from(frameMap.values()), 
+    notes: Array.from(noteMap.values()) 
+  };
 }
 
 /**
@@ -234,6 +262,10 @@ export interface ScreenWithNotes {
   name: string;        // Node ID (e.g., "1234:5678")
   url: string;         // Full Figma URL
   notes: string[];     // Associated note texts
+  filename?: string;   // Generated filename (e.g., "frame-name_1234-5678")
+  frameName?: string;  // Original frame name
+  sectionName?: string; // Parent SECTION name (if applicable)
+  sectionId?: string;   // Parent SECTION node ID (if applicable)
 }
 
 /**

@@ -35,6 +35,8 @@ export function generateScreenAnalysisPrompt(
 - **Has Notes:** ${hasNotes ? 'Yes' : 'No'}
 - **Has Epic Context:** ${hasEpicContext ? 'Yes' : 'No'}
 
+**IMPORTANT:** If the screen name contains a breakpoint indicator (e.g., *-320px, *-768px, *-1024px, *-1440px), this is one view of a responsive design. Pay special attention to the "Layout Structure Analysis" section to precisely document the layout structure at this specific breakpoint.
+
 ## Design Notes & Annotations
 
 ${notesContent ? notesContent : 'No design notes available for this screen.'}
@@ -72,6 +74,50 @@ Document the overall page layout:
 - **Header/Navigation:** Describe top-level navigation, branding, search, user controls
 - **Page Title:** Main heading and any subtitle/description
 - **Layout:** Overall page structure (sidebar, main content area, footer, etc.)
+
+## Layout Structure Analysis
+
+Analyze how content is organized on this screen:
+
+1. **Scan the layout systematically (left-to-right, top-to-bottom):**
+   - Identify all distinct visual sections/blocks
+   - Count major content areas
+   
+2. **Identify the layout pattern(s):**
+   - **If grid-based (elements align in rows AND columns):**
+     **CRITICAL - Think like a developer implementing CSS Grid:**
+     You are counting grid cells, not semantic sections. Text blocks, headings, cards, images, and forms all occupy grid cells equally.
+     Do NOT separate elements by type (e.g., "heading area" + "content area") - they are all cells in the same grid.
+     
+     1. **Count columns:** Look at the TOP ROW from left to right. Count EVERY element sitting side-by-side, including headings, text blocks, cards, images - everything. That's your COLUMN count.
+     2. **Count rows:** Look at the LEFTMOST COLUMN from top to bottom. Count EVERY element stacked vertically. That's your ROW count.
+     3. **Your grid is:** [COLUMN count] columns × [ROW count] rows
+     4. **Map EVERY element:** List what occupies each [column, row] position including headings, text, and cards (e.g., "Heading text block [1,1], Card 1 [2,1], Card 2 [3,1], Card 3 [1,2], Card 4 [2,2]...")
+     5. **Check spanning:** Do any elements occupy multiple columns/rows?
+     6. **VERIFY - Critical check:**
+        - Count elements in TOP ROW again: ___
+        - Count elements in LEFTMOST COLUMN again: ___
+        - Does your grid "[X] columns × [Y] rows" match these counts?
+        - If not, you made an error - recount treating ALL elements as equal grid cells.
+     
+   - **If single-column:** Describe the vertical stacking order
+   - **If multiple distinct sections with different layouts:** Describe each section's layout separately (e.g., "Header: single row, Main: 3-column grid, Footer: 4-column grid")
+   - **If freeform:** Describe spatial relationships (left/right, overlapping, absolute positioning)
+   
+3. **Note breakpoint context (if applicable):**
+   - What is the viewport width? (often in filename like *-768px, *-1024px)
+   - Is this one of multiple responsive variations?
+
+4. **Check for consistency:**
+   - Do all major elements follow the same grid/layout system?
+   - Are there sections that break the pattern?
+
+**Document the result as:**
+- Primary layout pattern: "3-column grid" or "Single column flow" or "Mixed layout"
+- If grid: "[X] columns × [Y] rows" with complete element mapping showing [column, row] positions for ALL elements
+- If multiple grids: Describe each section separately
+- If single column: Note the stacking order and major sections
+- Responsive context: Breakpoint width if identifiable
 
 ## Primary UI Elements
 
@@ -128,6 +174,11 @@ Document the actual content shown:
 ## Analysis Guidelines
 
 - Read epic context and design notes first to understand priorities and scope
+- **Analyze layout systematically based on the pattern you observe:**
+  - **Grid layouts** (cards in rows/columns): Count columns, rows, map element positions
+  - **Single-column layouts** (forms, articles): Describe vertical flow and sections
+  - **Complex layouts** (multiple distinct areas): Break down each section separately
+  - **Note responsive context** if screen name indicates breakpoint (*-768px, etc.)
 - Be exhaustive in documenting every visible element
 - Include exact labels, button text, column headers
 - Note all visual states (active, hover, disabled, selected)

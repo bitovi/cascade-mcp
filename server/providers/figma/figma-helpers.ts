@@ -607,6 +607,45 @@ export function extractFramesAndNotes(fileData: any): FigmaNodeMetadata[] {
  * @param nodeId - Node ID in API format (e.g., "123:456"), optional
  * @returns Array of frame and note nodes
  */
+/**
+ * Helper: Extract first-level frames and notes from a container node's children
+ * Used by both CANVAS and SECTION handling
+ * 
+ * Automatically expands SECTION nodes to get their child frames.
+ * 
+ * @param containerNode - The parent node (CANVAS or SECTION)
+ * @returns Array of frame and note metadata
+ */
+function extractFramesAndNotesFromChildren(
+  containerNode: any
+): FigmaNodeMetadata[] {
+  const results: FigmaNodeMetadata[] = [];
+  
+  if (containerNode.children && Array.isArray(containerNode.children)) {
+    for (const child of containerNode.children) {
+      // Frames are type === "FRAME"
+      if (child.type === 'FRAME') {
+        const metadata = extractNodeMetadata(child);
+        results.push(metadata);
+      }
+      // Notes are type === "INSTANCE" with name === "Note"
+      else if (child.type === 'INSTANCE' && child.name === 'Note') {
+        const metadata = extractNodeMetadata(child);
+        results.push(metadata);
+      }
+      // SECTION nodes should be automatically expanded to get their child frames
+      else if (child.type === 'SECTION') {
+        console.log(`  Found SECTION: "${child.name}" - expanding to get child frames`);
+        const sectionResults = extractFramesAndNotesFromChildren(child);
+        console.log(`    Collected ${sectionResults.length} frames/notes from SECTION`);
+        results.push(...sectionResults);
+      }
+    }
+  }
+  
+  return results;
+}
+
 export function getFramesAndNotesForNode(
   fileData: any,
   nodeId?: string
@@ -629,26 +668,16 @@ export function getFramesAndNotesForNode(
   // Check if this is a CANVAS (page)
   if (targetNode.type === 'CANVAS') {
     console.log('  Node is CANVAS - collecting first-level frames and notes');
-    
-    // Get only first-level children that are frames or notes
-    const results: FigmaNodeMetadata[] = [];
-    
-    if (targetNode.children && Array.isArray(targetNode.children)) {
-      for (const child of targetNode.children) {
-        // Frames are type === "FRAME"
-        if (child.type === 'FRAME') {
-          const metadata = extractNodeMetadata(child);
-          results.push(metadata);
-        }
-        // Sticky notes are type === "INSTANCE" and name === "Note"
-        else if (child.type === 'INSTANCE' && child.name === 'Note') {
-          const metadata = extractNodeMetadata(child);
-          results.push(metadata);
-        }
-      }
-    }
-    
+    const results = extractFramesAndNotesFromChildren(targetNode);
     console.log(`  Collected ${results.length} first-level frames/notes from CANVAS`);
+    return results;
+  }
+  
+  // Check if this is a SECTION
+  if (targetNode.type === 'SECTION') {
+    console.log(`  Node is SECTION: "${targetNode.name}" - expanding to child frames`);
+    const results = extractFramesAndNotesFromChildren(targetNode);
+    console.log(`  Collected ${results.length} frames/notes from SECTION`);
     return results;
   }
   
@@ -664,8 +693,46 @@ export function getFramesAndNotesForNode(
     return [extractNodeMetadata(targetNode)];
   }
   
-  console.log(`  Node type ${targetNode.type} is not a CANVAS, FRAME, or Note - returning empty`);
+  console.log(`  Node type ${targetNode.type} is not a CANVAS, SECTION, FRAME, or Note - returning empty`);
   return [];
+}
+
+/**
+ * Convert string to kebab-case slug
+ * @param str - Input string
+ * @returns Kebab-case slug
+ */
+export function toKebabCase(str: string): string {
+  return str
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '')  // Remove special chars except spaces and dashes
+    .replace(/\s+/g, '-')       // Spaces to dashes
+    .replace(/-+/g, '-')        // Collapse multiple dashes
+    .replace(/^-|-$/g, '');     // Trim leading/trailing dashes
+}
+
+/**
+ * Generate filename for a screen analysis file
+ * 
+ * Format: {frame-slug}_{node-id}
+ * 
+ * Examples:
+ * - "workshop-grid-1024px_5101-4299"
+ * - "dashboard-main_1234-5678"
+ * 
+ * @param frameName - Name of the frame
+ * @param nodeId - Node ID in API format (e.g., "5101:4299")
+ * @returns Filename without extension
+ */
+export function generateScreenFilename(
+  frameName: string,
+  nodeId: string
+): string {
+  const frameSlug = toKebabCase(frameName);
+  const nodeIdSlug = nodeId.replace(/:/g, '-'); // Convert "5101:4299" to "5101-4299"
+  
+  return `${frameSlug}_${nodeIdSlug}`;
 }
 
 /**

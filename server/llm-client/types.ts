@@ -96,4 +96,13 @@ export interface LLMResponse {
  * - MCP: Uses mcp.server.request({ method: "sampling/createMessage" })
  * - Anthropic: Uses anthropic.messages.create()
  */
-export type GenerateTextFn = (request: LLMRequest) => Promise<LLMResponse>;
+export type GenerateTextFn = {
+  (request: LLMRequest): Promise<LLMResponse>;
+  
+  /**
+   * Whether this client supports parallel requests.
+   * - true: Multiple requests can be in-flight simultaneously (AI SDK)
+   * - false/undefined: Requests must be sequential (MCP sampling)
+   */
+  supportsParallelRequests?: boolean;
+};

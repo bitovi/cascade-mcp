@@ -5,6 +5,7 @@
  */
 
 import type { FigmaNodeMetadata } from '../../../figma/figma-helpers.js';
+import { generateScreenFilename } from '../../../figma/figma-helpers.js';
 
 /**
  * Calculate Euclidean distance between two points
@@ -46,9 +47,15 @@ export function calculateRectangleDistance(
  * Screen with associated notes
  */
 export interface Screen {
-  name: string;
-  url: string;
-  notes: string[];
+  name: string;           // Node ID (existing)
+  url: string;            // Figma URL (existing)
+  notes: string[];        // Associated notes (existing)
+  
+  // New fields for enhanced metadata
+  frameName?: string;     // Human-readable frame name
+  sectionName?: string;   // Parent SECTION name if applicable
+  sectionId?: string;     // Parent SECTION ID if applicable
+  filename?: string;      // Filename without extension for .analysis.md and .png files
 }
 
 /**
@@ -149,16 +156,23 @@ export function associateNotesWithFrames(
       `${baseUrl}?node-id=${note.id.replace(/:/g, '-')}`
     );
     
-    // Create screen entry
+    // Create screen entry with enhanced metadata
     const screenName = frame.name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
     
+    // Generate filename using new utility
+    const filename = generateScreenFilename(frame.name, frame.id);
+    
     screens.push({
       name: screenName || `screen-${screens.length + 1}`,
       url: `${baseUrl}?node-id=${frame.id.replace(/:/g, '-')}`,
       notes: assignedNoteUrls,
+      frameName: frame.name,
+      sectionName: (frame as any).sectionName,
+      sectionId: (frame as any).sectionId,
+      filename: filename,
     });
   }
   
