@@ -95,9 +95,11 @@ export async function executeCheckStoryChanges(
   deps: ToolDependencies
 ): Promise<ExecuteCheckStoryChangesResult> {
   const { storyKey, cloudId, siteName } = params;
-  const { atlassianClient, generateText } = deps;
+  const { atlassianClient, generateText, notify } = deps;
 
   console.log('check-story-changes: Analyzing story', { storyKey, cloudId, siteName });
+
+  await notify('📝 Checking story changes...');
 
   // ==========================================
   // PHASE 1: Resolve site identifier
@@ -109,6 +111,8 @@ export async function executeCheckStoryChanges(
   // ==========================================
   // PHASE 2: Fetch child story
   // ==========================================
+  await notify('Fetching child story and parent epic...');
+  
   const childResponse = await getJiraIssue(atlassianClient, resolvedCloudId, storyKey, undefined);
   if (!childResponse.ok) {
     throw new Error(`Error fetching issue ${storyKey}: ${childResponse.status} ${childResponse.statusText}`);
@@ -140,6 +144,7 @@ export async function executeCheckStoryChanges(
   // ==========================================
   // PHASE 4: Compare descriptions with LLM
   // ==========================================
+  await notify('Analyzing divergences with AI...');
 
   console.log('  Requesting LLM analysis...');
   const llmResponse = await generateText({
@@ -166,6 +171,33 @@ export async function executeCheckStoryChanges(
   console.log('  ✅ Analysis complete');
   console.log(`    Divergences found: ${divergenceAnalysis.hasDivergences}`);
   console.log(`    Number of divergences: ${divergenceAnalysis.divergences.length}`);
+
+  // Format divergences notification
+  if (divergenceAnalysis.hasDivergences) {
+    const emojiMap = {
+      conflict: '🔴',
+      addition: '🟢',
+      missing: '🟡',
+      interpretation: '🔵'
+    };
+
+    let notificationText = `Analysis Complete: Found ${divergenceAnalysis.divergences.length} divergence(s) between ${storyKey} and ${parentKey}\n\n`;
+    notificationText += `Summary:\n${divergenceAnalysis.summary}\n\n`;
+    notificationText += `Divergences:\n`;
+    
+    divergenceAnalysis.divergences.forEach((div, index) => {
+      const emoji = emojiMap[div.category];
+      notificationText += `${index + 1}. ${emoji} ${div.category.toUpperCase()}: ${div.description}\n\n`;
+      notificationText += `   Child:\n   ${div.childContext}\n\n`;
+      if (div.parentContext) {
+        notificationText += `   Parent:\n   ${div.parentContext}\n\n`;
+      }
+    });
+
+    await notify(notificationText);
+  } else {
+    await notify(`Analysis Complete: No divergences found between ${storyKey} and ${parentKey}.\n\n${divergenceAnalysis.summary}`);
+  }
 
   return {
     success: true,
