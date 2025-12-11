@@ -24,7 +24,7 @@ import type { GenerateTextFn, LLMRequest, LLMResponse, Message } from './types.j
  * ```
  */
 export function wrapLanguageModel(model: LanguageModel): GenerateTextFn {
-  return async (request: LLMRequest): Promise<LLMResponse> => {
+  const generateTextFn: GenerateTextFn = async (request: LLMRequest): Promise<LLMResponse> => {
     // Validate messages array
     if (!request.messages || request.messages.length === 0) {
       throw new Error('LLMRequest must include at least one message');
@@ -103,4 +103,9 @@ export function wrapLanguageModel(model: LanguageModel): GenerateTextFn {
       );
     }
   };
+  
+  // Mark as supporting parallel requests (AI SDK can handle concurrent calls)
+  generateTextFn.supportsParallelRequests = true;
+  
+  return generateTextFn;
 }

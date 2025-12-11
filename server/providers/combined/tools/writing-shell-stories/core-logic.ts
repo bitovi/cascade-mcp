@@ -16,6 +16,7 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import type { ToolDependencies } from '../types.js';
+import type { Screen } from './screen-analyzer.js';
 import { getDebugDir, getBaseCacheDir } from './temp-directory-manager.js';
 import { getFigmaFileCachePath } from '../../../figma/figma-cache.js';
 import { setupFigmaScreens } from './figma-screen-setup.js';
@@ -210,7 +211,7 @@ export async function executeWriteShellStories(
  */
 async function generateShellStoriesFromAnalyses(params: {
   generateText: ToolDependencies['generateText'];
-  screens: Array<{ name: string; url: string; notes: string[] }>;
+  screens: Screen[];
   debugDir: string | null;
   figmaFileKey: string;
   yamlContent: string;
@@ -232,13 +233,14 @@ async function generateShellStoriesFromAnalyses(params: {
   // Read all analysis files from file cache
   const analysisFiles: Array<{ screenName: string; content: string }> = [];
   for (const screen of screens) {
-    const analysisPath = path.join(fileCachePath, `${screen.name}.analysis.md`);
+    const filename = screen.filename || screen.name;
+    const analysisPath = path.join(fileCachePath, `${filename}.analysis.md`);
     try {
       const content = await fs.readFile(analysisPath, 'utf-8');
       analysisFiles.push({ screenName: screen.name, content });
-      console.log(`    ✅ Read analysis: ${screen.name}.analysis.md`);
+      console.log(`    ✅ Read analysis: ${filename}.analysis.md`);
     } catch (error: any) {
-      console.log(`    ⚠️ Could not read analysis for ${screen.name}: ${error.message}`);
+      console.log(`    ⚠️ Could not read analysis for ${filename}: ${error.message}`);
     }
   }
   

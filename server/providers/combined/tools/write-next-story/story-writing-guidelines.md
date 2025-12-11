@@ -14,10 +14,8 @@ As a shopper,
 ## Supporting Artifacts
 
 - [Wishlist Feature Design](https://www.figma.com/design/abc123/Wishlist)
-- [Screen Analysis: Product List](./product-list.analysis.md)
-- [Screen Analysis: Wishlist Page](./wishlist.analysis.md)
 
-## Out of Scope
+## ❌ Out of Scope
 
 - Sharing wishlists with other users
 - Wishlist notifications or reminders
@@ -81,10 +79,18 @@ A short description of a feature from the user's perspective:
 Links to other resources related to the user story.
 
 **Guidelines**:
+- Include Figma design links for visual reference
 - Provide context: Briefly describe what the resource is and how it relates
-- Include direct links (Figma designs, screen analysis files, etc.)
 - Highlight key sections if referencing larger documents
 - Keep references up-to-date and versioned correctly
+
+**Example**:
+```markdown
+## Supporting Artifacts
+
+- [Wishlist Feature Design](https://www.figma.com/design/abc123/Wishlist)
+- [API Documentation: User Preferences](https://docs.example.com/api/preferences)
+```
 
 **Note**: Figma allows direct linking to specific nodes. Use Figma plugins to embed images in Jira when helpful.
 
@@ -99,7 +105,27 @@ Explicitly state what is NOT included in this story to prevent scope creep.
 
 **Purpose**: Particularly important when partially implementing designs.
 
-### 4. Non-Functional Requirements
+### 4. Remaining Questions (if applicable)
+
+Any unresolved questions or ambiguities from the shell story that need clarification.
+
+**Guidelines**:
+- Source these from the ❓ bullets in the shell story
+- List specific questions that need answers before or during implementation
+- Reference relevant designs or documentation where applicable
+- Flag dependencies on other teams or decisions
+- Include only questions that directly impact this story's implementation
+
+**Example**:
+```markdown
+## ❓ Remaining Questions
+
+- Should the wishlist icon badge show a maximum count (e.g., "99+") or unlimited?
+- What happens to wishlist items if a product is discontinued?
+- Should users receive a notification when a wishlisted item goes on sale?
+```
+
+### 5. Non-Functional Requirements
 
 Requirements a user would not directly see (performance, security, technical constraints).
 
@@ -109,7 +135,7 @@ Requirements a user would not directly see (performance, security, technical con
 - Keep it relevant to the specific story
 - Avoid repeating team-wide standards (those belong in Definition of Done)
 
-### 5. Developer Notes
+### 6. Developer Notes
 
 Information useful during implementation.
 

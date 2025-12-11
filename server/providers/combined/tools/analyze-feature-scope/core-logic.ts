@@ -9,6 +9,7 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import type { ToolDependencies } from '../types.js';
+import type { Screen } from '../writing-shell-stories/screen-analyzer.js';
 import { getBaseCacheDir } from '../writing-shell-stories/temp-directory-manager.js';
 import { getFigmaFileCachePath } from '../../../figma/figma-cache.js';
 import { executeScreenAnalysisPipeline } from '../shared/screen-analysis-pipeline.js';
@@ -134,7 +135,7 @@ export async function executeAnalyzeFeatureScope(
  */
 async function generateScopeAnalysis(params: {
   generateText: ToolDependencies['generateText'];
-  screens: Array<{ name: string; url: string; notes: string[] }>;
+  screens: Screen[];
   debugDir: string | null;
   figmaFileKey: string;
   yamlContent: string;
@@ -157,7 +158,8 @@ async function generateScopeAnalysis(params: {
   // Note: Files are guaranteed to exist because regenerateScreenAnalyses already created them
   const analysisFiles: Array<{ screenName: string; content: string; url: string }> = [];
   for (const screen of screens) {
-    const analysisPath = path.join(fileCachePath, `${screen.name}.analysis.md`);
+    const filename = screen.filename || screen.name;
+    const analysisPath = path.join(fileCachePath, `${filename}.analysis.md`);
     try {
       const content = await fs.readFile(analysisPath, 'utf-8');
       analysisFiles.push({

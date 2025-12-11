@@ -29,6 +29,10 @@ export interface ScreenToAnalyze {
   name: string;           // Node ID (e.g., "1234:5678")
   url: string;            // Full Figma URL
   notes?: string[];       // Optional notes from Figma
+  frameName?: string;     // Human-readable frame name
+  sectionName?: string;   // Parent SECTION name if applicable
+  sectionId?: string;     // Parent SECTION ID if applicable
+  filename?: string;      // Filename without extension
 }
 
 /**
@@ -93,15 +97,32 @@ export async function regenerateScreenAnalyses(
   const cachedScreens: string[] = [];
   
   for (const screen of screens) {
-    const analysisPath = path.join(fileCachePath, `${screen.name}.analysis.md`);
+    // Use filename if available, fallback to screen.name for backward compatibility
+    const filename = screen.filename || screen.name;
+    const analysisPath = path.join(fileCachePath, `${filename}.analysis.md`);
+    
+    // Also check legacy filename format for backward compatibility
+    const legacyPath = path.join(fileCachePath, `${screen.name}.analysis.md`);
+    
     try {
       await fs.access(analysisPath);
       // File exists - skip this screen
-      console.log(`     ✓ Cache hit: ${screen.name}`);
+      console.log(`     ✓ Cache hit: ${filename}`);
       cachedScreens.push(screen.name);
     } catch {
-      // File doesn't exist - need to analyze
-      console.log(`     ✗ Cache miss: ${screen.name}`);
+      // Check legacy format if new format not found
+      try {
+        if (filename !== screen.name) {
+          await fs.access(legacyPath);
+          console.log(`     ✓ Cache hit (legacy): ${screen.name}`);
+          cachedScreens.push(screen.name);
+          continue;
+        }
+      } catch {
+        // Neither format exists - need to analyze
+      }
+      
+      console.log(`     ✗ Cache miss: ${filename}`);
       screensToAnalyze.push(screen);
     }
   }
@@ -154,10 +175,6 @@ export async function regenerateScreenAnalyses(
       { format: 'png', scale: 1 }
     );
     
-    if (notify) {
-      await notify(`✅ Downloaded ${Array.from(imagesMap.values()).filter(v => v !== null).length} images. Starting AI analysis...`);
-    }
-    
   } catch (error: any) {
     console.log(`  ⚠️  Batch download failed: ${error.message}`);
     
@@ -171,119 +188,81 @@ export async function regenerateScreenAnalyses(
   }
   
   // ==========================================
-  // Phase B: Analyze screens with pre-downloaded images
+  // Phase B: Analyze screens (parallel if supported, sequential otherwise)
   // ==========================================
   
-  for (let i = 0; i < screensToAnalyze.length; i++) {
-    const screen = screensToAnalyze[i];
-    const originalIndex = screens.indexOf(screen);
+  // Check if parallel requests are supported (AI SDK = true, MCP sampling = false/undefined)
+  if (generateText.supportsParallelRequests) {
+    console.log(`  🚀 Parallel analysis mode (AI SDK)`);
     
     if (notify) {
-      await notify(`🤖 Analyzing: ${screen.name}`);
+      const imageCount = Array.from(imagesMap.values()).filter(v => v !== null).length;
+      await notify(`✅ Downloaded ${imageCount} images. Starting AI analysis in parallel...`);
     }
     
-    // Find the frame for this screen
-    const frame = allFrames.find(f => 
-      screen.url.includes(f.id.replace(/:/g, '-'))
-    );
-    
-    if (!frame) {
-      console.log(`  ⚠️  Frame not found for screen: ${screen.name}`);
-      continue;
-    }
-    
-    // Step 1: Prepare notes file for this screen (if notes provided)
-    if (screen.notes && screen.notes.length > 0) {
-      const notesWritten = await writeNotesForScreen(
-        { name: screen.name, url: screen.url, notes: screen.notes },
-        allNotes,
-        fileCachePath  // Save to cache directory
-      );
-      if (notesWritten > 0) {
-        downloadedNotes++;
-      }
-    }
-    
-    // Step 2: Get pre-downloaded image
-    const imageResult = imagesMap.get(frame.id);
-    
-    if (!imageResult) {
-      console.log(`  ⚠️  No image for ${screen.name}`);
-      continue;
-    }
-    
-    // Save image to cache directory
-    const imagePath = path.join(fileCachePath, `${screen.name}.png`);
-    const imageBuffer = Buffer.from(imageResult.base64Data, 'base64');
-    await fs.writeFile(imagePath, imageBuffer);
-    
-    downloadedImages++;
-    
-    // Step 3: Run AI analysis on screen
-    try {
-      // Read notes content if available
-      let notesContent = '';
-      const notesPath = path.join(fileCachePath, `${screen.name}.notes.md`);
-      try {
-        notesContent = await fs.readFile(notesPath, 'utf-8');
-      } catch {
-        // No notes file, that's okay
-      }
+    // Parallel execution for REST API
+    const analysisPromises = screensToAnalyze.map(async (screen) => {
+      const originalIndex = screens.indexOf(screen);
       
-      // Generate analysis prompt using helper
-      const screenPosition = `${originalIndex + 1} of ${screens.length}`;
-      const analysisPrompt = generateScreenAnalysisPrompt(
-        screen.name,
-        screen.url,
-        screenPosition,
-        notesContent || undefined,
-        epicContext
-      );
-
-      // Generate analysis using injected LLM client (with image)
-      const analysisResponse = await generateText({
-        messages: [
-          { role: 'system', content: SCREEN_ANALYSIS_SYSTEM_PROMPT },
-          { 
-            role: 'user', 
-            content: [
-              { type: 'text', text: analysisPrompt },
-              { type: 'image', data: imageResult.base64Data, mimeType: 'image/png' }
-            ]
-          }
-        ],
-        maxTokens: SCREEN_ANALYSIS_MAX_TOKENS
+      const result = await analyzeScreen(screen, {
+        generateText,
+        allFrames,
+        allNotes,
+        imagesMap,
+        fileCachePath,
+        epicContext,
+        originalIndex,
+        totalScreens: screens.length
       });
       
-      const analysisText = analysisResponse.text;
-      if (!analysisText) {
-        throw new Error('No analysis content received from AI');
+      // Notify after each completes
+      if (notify && result.analyzed) {
+        await notify(`✅ Analyzed: ${screen.name}`);
       }
       
-      // Step 4: Save analysis result to cache directory with Figma URL prepended
-      const analysisWithUrl = `**Figma URL:** ${screen.url}\n\n${analysisText}`;
-      const analysisPath = path.join(fileCachePath, `${screen.name}.analysis.md`);
-      await fs.writeFile(analysisPath, analysisWithUrl, 'utf-8');
+      return result;
+    });
+    
+    const analysisResults = await Promise.all(analysisPromises);
+    
+    // Count successes
+    downloadedImages = analysisResults.filter(r => r.analyzed).length;
+    analyzedScreens = analysisResults.filter(r => r.analyzed).length;
+    downloadedNotes = analysisResults.reduce((sum, r) => sum + r.notesWritten, 0);
+    
+  } else {
+    console.log(`  🔄 Sequential analysis mode (MCP sampling)`);
+    
+    if (notify) {
+      const imageCount = Array.from(imagesMap.values()).filter(v => v !== null).length;
+      await notify(`✅ Downloaded ${imageCount} images. Starting AI analysis sequentially...`);
+    }
+    
+    // Sequential execution for MCP tools
+    for (const screen of screensToAnalyze) {
+      const originalIndex = screens.indexOf(screen);
       
-      analyzedScreens++;
-      
-    } catch (error: any) {
-      console.log(`  ⚠️  Failed to analyze ${screen.name}: ${error.message}`);
-      
-      // Check if this is an authentication/credentials error for better error message
-      if (error.message && (
-        error.message.includes('invalid x-api-key') ||
-        error.message.includes('invalid API key') ||
-        error.message.includes('API key') ||
-        error.message.includes('authentication') ||
-        error.message.includes('unauthorized') ||
-        error.message.includes('401')
-      )) {
-        throw new Error(`AI analysis failed - likely invalid LLM API credentials: ${error.message}`);
+      // Notify as we start each screen (current behavior)
+      if (notify) {
+        await notify(`🤖 Analyzing: ${screen.name}`);
       }
       
-      // For all errors, throw immediately since downstream requires all screens analyzed
-      throw new Error(`Failed to analyze screen ${screen.name}: ${error.message}`);
+      const result = await analyzeScreen(screen, {
+        generateText,
+        allFrames,
+        allNotes,
+        imagesMap,
+        fileCachePath,
+        epicContext,
+        originalIndex,
+        totalScreens: screens.length
+      });
+      
+      if (result.analyzed) {
+        downloadedImages++;
+        analyzedScreens++;
+      }
+      downloadedNotes += result.notesWritten;
     }
   }
   
@@ -299,3 +278,136 @@ export async function regenerateScreenAnalyses(
   return { downloadedImages, analyzedScreens, downloadedNotes, usedCache: false };
 }
 
+/**
+ * Analyze a single screen with pre-downloaded image
+ * 
+ * @param screen - Screen to analyze
+ * @param params - Analysis parameters (generateText, paths, image data, etc.)
+ * @returns Analysis metadata (success, filename, notes written)
+ */
+async function analyzeScreen(
+  screen: ScreenToAnalyze,
+  params: {
+    generateText: GenerateTextFn;
+    allFrames: FigmaNodeMetadata[];
+    allNotes: FigmaNodeMetadata[];
+    imagesMap: Map<string, any>;
+    fileCachePath: string;
+    epicContext?: string;
+    originalIndex: number;
+    totalScreens: number;
+  }
+): Promise<{ filename: string; analyzed: boolean; notesWritten: number }> {
+  const { generateText, allFrames, allNotes, imagesMap, fileCachePath, epicContext, originalIndex, totalScreens } = params;
+  
+  // Find the frame for this screen
+  const frame = allFrames.find(f => 
+    screen.url.includes(f.id.replace(/:/g, '-'))
+  );
+  
+  if (!frame) {
+    console.log(`  ⚠️  Frame not found for screen: ${screen.name}`);
+    return { filename: screen.filename || screen.name, analyzed: false, notesWritten: 0 };
+  }
+  
+  // Use filename if available, fallback to screen.name for backward compatibility
+  const filename = screen.filename || screen.name;
+  
+  // Step 1: Prepare notes file for this screen (if notes provided)
+  let notesWritten = 0;
+  if (screen.notes && screen.notes.length > 0) {
+    notesWritten = await writeNotesForScreen(
+      { name: screen.name, url: screen.url, notes: screen.notes },
+      allNotes,
+      fileCachePath
+    );
+  }
+  
+  // Step 2: Get pre-downloaded image
+  const imageResult = imagesMap.get(frame.id);
+  
+  if (!imageResult) {
+    console.log(`  ⚠️  No image for ${screen.name}`);
+    return { filename, analyzed: false, notesWritten };
+  }
+  
+  // Save image to cache directory using new filename format
+  const imagePath = path.join(fileCachePath, `${filename}.png`);
+  const imageBuffer = Buffer.from(imageResult.base64Data, 'base64');
+  await fs.writeFile(imagePath, imageBuffer);
+  
+  // Step 3: Run AI analysis on screen
+  try {
+    // Read notes content if available
+    let notesContent = '';
+    const notesPath = path.join(fileCachePath, `${screen.name}.notes.md`);
+    try {
+      notesContent = await fs.readFile(notesPath, 'utf-8');
+    } catch {
+      // No notes file, that's okay
+    }
+    
+    // Generate analysis prompt using helper
+    const screenPosition = `${originalIndex + 1} of ${totalScreens}`;
+    const analysisPrompt = generateScreenAnalysisPrompt(
+      screen.name,
+      screen.url,
+      screenPosition,
+      notesContent || undefined,
+      epicContext
+    );
+
+    // Generate analysis using injected LLM client (with image)
+    const analysisResponse = await generateText({
+      messages: [
+        { role: 'system', content: SCREEN_ANALYSIS_SYSTEM_PROMPT },
+        { 
+          role: 'user', 
+          content: [
+            { type: 'text', text: analysisPrompt },
+            { type: 'image', data: imageResult.base64Data, mimeType: 'image/png' }
+          ]
+        }
+      ],
+      maxTokens: SCREEN_ANALYSIS_MAX_TOKENS
+    });
+    
+    const analysisText = analysisResponse.text;
+    if (!analysisText) {
+      throw new Error('No analysis content received from AI');
+    }
+    
+    // Step 4: Prepend SECTION context header if applicable
+    let finalAnalysisContent = analysisText;
+    
+    if (screen.sectionName) {
+      const sectionHeader = `# ${screen.frameName}\n\n**Part of SECTION:** ${screen.sectionName}\n**Frame ID:** ${frame.id}\n\n---\n\n`;
+      finalAnalysisContent = sectionHeader + analysisText;
+    }
+    
+    // Step 5: Save analysis result to cache directory with Figma URL prepended
+    const analysisWithUrl = `**Figma URL:** ${screen.url}\n\n${finalAnalysisContent}`;
+    const analysisPath = path.join(fileCachePath, `${filename}.analysis.md`);
+    await fs.writeFile(analysisPath, analysisWithUrl, 'utf-8');
+    
+    return { filename, analyzed: true, notesWritten };
+    
+  } catch (error: any) {
+    console.log(`  ⚠️  Failed to analyze ${screen.name}: ${error.message}`);
+    
+    // Check if this is an authentication/credentials error for better error message
+    if (error.message && (
+      error.message.includes('invalid x-api-key') ||
+      error.message.includes('invalid API key') ||
+      error.message.includes('API key') ||
+      error.message.includes('authentication') ||
+      error.message.includes('unauthorized') ||
+      error.message.includes('401')
+    )) {
+      throw new Error(`AI analysis failed - likely invalid LLM API credentials: ${error.message}`);
+    }
+    
+    // For all errors, throw immediately since downstream requires all screens analyzed
+    throw new Error(`Failed to analyze screen ${screen.name}: ${error.message}`);
+  }
+}
