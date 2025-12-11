@@ -97,12 +97,15 @@ export async function regenerateScreenAnalyses(
   const cachedScreens: string[] = [];
   
   for (const screen of screens) {
-    // Use filename if available, fallback to screen.name for backward compatibility
-    const filename = screen.filename || screen.name;
-    const analysisPath = path.join(fileCachePath, `${filename}.analysis.md`);
+    // Invalidate cache if filename property is missing (old format)
+    if (!screen.filename) {
+      console.log(`     ⚠️  Missing filename property - invalidating cache for screen`);
+      screensToAnalyze.push(screen);
+      continue;
+    }
     
-    // Also check legacy filename format for backward compatibility
-    const legacyPath = path.join(fileCachePath, `${screen.name}.analysis.md`);
+    const filename = screen.filename;
+    const analysisPath = path.join(fileCachePath, `${filename}.analysis.md`);
     
     try {
       await fs.access(analysisPath);
@@ -110,18 +113,6 @@ export async function regenerateScreenAnalyses(
       console.log(`     ✓ Cache hit: ${filename}`);
       cachedScreens.push(screen.name);
     } catch {
-      // Check legacy format if new format not found
-      try {
-        if (filename !== screen.name) {
-          await fs.access(legacyPath);
-          console.log(`     ✓ Cache hit (legacy): ${screen.name}`);
-          cachedScreens.push(screen.name);
-          continue;
-        }
-      } catch {
-        // Neither format exists - need to analyze
-      }
-      
       console.log(`     ✗ Cache miss: ${filename}`);
       screensToAnalyze.push(screen);
     }
