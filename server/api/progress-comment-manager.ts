@@ -176,7 +176,13 @@ export function createProgressCommentManager(
     
     // Build and post/update comment
     const markdown = buildCommentMarkdown();
-    await tryUpdateComment(markdown);
+    const success = await tryUpdateComment(markdown);
+    
+    // If update failed and we haven't disabled commenting yet, throw error
+    // This ensures failures surface to the caller for proper error handling
+    if (!success && !isCommentingDisabled) {
+      throw new Error(`Failed to update progress comment on ${context.epicKey}`);
+    }
   }
 
   /**
