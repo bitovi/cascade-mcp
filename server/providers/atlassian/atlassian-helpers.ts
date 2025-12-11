@@ -216,13 +216,17 @@ export async function resolveCloudId(
   }
 
   // For OAuth tokens, use accessible-resources endpoint
+  const accessibleResourcesUrl = process.env.TEST_USE_MOCK_ATLASSIAN === 'true'
+    ? 'http://localhost:3001/oauth/token/accessible-resources'
+    : 'https://api.atlassian.com/oauth/token/accessible-resources';
+    
   logger.info('Fetching accessible sites from Atlassian API (OAuth)', { 
     reason: siteName ? 'siteName lookup' : 'auto-detection',
     siteName: siteName || 'none',
-    apiUrl: 'https://api.atlassian.com/oauth/token/accessible-resources',
+    apiUrl: accessibleResourcesUrl,
   });
   
-  const siteRes = await client.fetch('https://api.atlassian.com/oauth/token/accessible-resources');
+  const siteRes = await client.fetch(accessibleResourcesUrl);
 
   logger.info('Atlassian accessible-resources API response', {
     status: siteRes.status,
