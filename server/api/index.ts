@@ -10,6 +10,7 @@ import { handleWriteShellStories } from './write-shell-stories.js';
 import { handleWriteNextStory } from './write-next-story.js';
 import { handleIdentifyFeatures } from './identify-features.js';
 import { handleAnalyzeFeatureScope } from './analyze-feature-scope.js';
+import { handleReviewWorkItem } from './review-work-item.js';
 
 /**
  * Register all REST API routes with the Express app
@@ -46,6 +47,10 @@ export function registerRestApiRoutes(app: Express): void {
   // Wrap handler to match Express signature (req, res) => void
   app.post('/api/identify-features', (req, res) => handleAnalyzeFeatureScope(req, res));
   console.log('  ✓ POST /api/identify-features (legacy - redirects to analyze-feature-scope)');
+  
+  // Review work item completeness and post questions as comments
+  app.post('/api/review-work-item', (req, res) => handleReviewWorkItem(req, res));
+  console.log('  ✓ POST /api/review-work-item');
   
   console.log('REST API routes registered successfully');
 }

@@ -126,11 +126,53 @@ The tool:
 - If a note is too far from any screen (>500px), it's listed as "unassociated" but still available for context
 - Add notes near screens in Figma to explain interactions, business logic, or design intent
 
+**Using Confluence for Additional Context:**
+
+The tool automatically extracts and processes Confluence page links from your epic description. This provides additional requirements context beyond what's in Figma designs.
+
+**How it works:**
+1. Add Confluence page URLs anywhere in your epic description
+2. The tool automatically fetches and processes linked pages
+3. Each page is scored for relevance to scope analysis
+4. Relevant documents are included as context for AI analysis
+
+**Supported Confluence URL formats:**
+```
+# Full page URLs
+https://yoursite.atlassian.net/wiki/spaces/SPACE/pages/123456/Page+Title
+
+# Short links (automatically resolved)
+https://yoursite.atlassian.net/wiki/x/AbCdEf
+```
+
+**What Confluence documents are used for:**
+- **Requirements documents (PRDs)** - Feature specifications, acceptance criteria, business rules
+- **Technical architecture docs** - Implementation constraints, API references, system design
+- **Definition of Done** - Quality gates, testing requirements, compliance standards
+- **General context** - Background information, stakeholder decisions, prior research
+
+**How documents are prioritized:**
+- Documents are automatically classified by type (requirements, technical, context, dod)
+- Each document receives a relevance score for scope analysis
+- Only documents meeting a relevance threshold are included in the prompt
+- Epic description always takes precedence when there's a conflict with Confluence content
+
+**Best practices for Confluence links:**
+- Link PRDs that define detailed feature requirements
+- Link technical specs that constrain implementation options
+- Link Definition of Done if your team has specific quality gates
+- Avoid linking large wiki pages with unrelated content (they dilute relevance)
+
+**Note**: Confluence pages are cached for 7 days with version-based invalidation. If you update a Confluence page, the tool will fetch the latest version on the next run.
+
 Example epic description:
 ```markdown
 # User Dashboard Enhancement
 
 Design: https://www.figma.com/design/yRyWXdNtJ8KwS1GVqRBL1O/Dashboard-redesign?node-id=246-3414
+
+Requirements: https://bitovi.atlassian.net/wiki/spaces/PROJ/pages/123456/Dashboard+PRD
+Technical Spec: https://bitovi.atlassian.net/wiki/x/AbCdEf
 
 ## Context
 - Priority: Focus on core dashboard widgets first

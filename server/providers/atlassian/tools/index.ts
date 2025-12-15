@@ -5,6 +5,7 @@ import { registerAtlassianGetAttachmentsTool } from './atlassian-get-attachments
 import { registerAtlassianUpdateIssueDescriptionTool } from './atlassian-update-issue-description.js';
 import { registerAtlassianFetchTool } from './atlassian-fetch.js';
 import { registerAtlassianSearchTool } from './atlassian-search.js';
+import { registerConfluenceAnalyzePageTool } from './confluence-analyze-page.js';
 
 /**
  * Register all Atlassian-specific tools with the MCP server
@@ -23,6 +24,9 @@ export function registerAtlassianTools(mcp: McpServer, authContext: any): void {
   // ChatGPT-compatible tools (follow OpenAI MCP patterns)
   registerAtlassianFetchTool(mcp);
   registerAtlassianSearchTool(mcp);
+  
+  // Debug tools (gated behind environment variable)
+  registerConfluenceAnalyzePageTool(mcp);
   
   console.log('  All Atlassian tools registered (including ChatGPT-compatible fetch/search)');
 }

@@ -13,10 +13,12 @@ import type { Screen } from '../writing-shell-stories/screen-analyzer.js';
 import { getBaseCacheDir } from '../writing-shell-stories/temp-directory-manager.js';
 import { getFigmaFileCachePath } from '../../../figma/figma-cache.js';
 import { executeScreenAnalysisPipeline } from '../shared/screen-analysis-pipeline.js';
+import { setupConfluenceContext, type ConfluenceDocument } from '../shared/confluence-setup.js';
 import {
   generateFeatureIdentificationPrompt,
   FEATURE_IDENTIFICATION_SYSTEM_PROMPT,
-  FEATURE_IDENTIFICATION_MAX_TOKENS
+  FEATURE_IDENTIFICATION_MAX_TOKENS,
+  type ConfluenceDocumentContext
 } from './strategies/prompt-scope-analysis-2.js';
 import {
   convertMarkdownToAdf,
@@ -83,6 +85,7 @@ export async function executeAnalyzeFeatureScope(
     yamlContent,
     epicWithoutShellStoriesMarkdown: epicContext,
     epicWithoutShellStoriesAdf,
+    epicDescriptionAdf,
     cloudId: resolvedCloudId,
     siteName: resolvedSiteName,
     analyzedScreens
@@ -90,6 +93,38 @@ export async function executeAnalyzeFeatureScope(
 
   console.log(`🔍 analyze-feature-scope: Received ${screens.length} screens from pipeline`);
   console.log(`   Analyzed screens count: ${analyzedScreens}`);
+
+  // ==========================================
+  // PHASE 4.5: Setup Confluence context (if any linked docs)
+  // ==========================================
+  let confluenceDocs: ConfluenceDocumentContext[] = [];
+  
+  if (epicDescriptionAdf) {
+    try {
+      const confluenceContext = await setupConfluenceContext({
+        epicAdf: epicDescriptionAdf,
+        atlassianClient,
+        generateText,
+        siteName: resolvedSiteName,
+        notify,
+      });
+      
+      // Filter to docs relevant for scope analysis
+      confluenceDocs = confluenceContext.byRelevance.analyzeScope.map((doc: ConfluenceDocument) => ({
+        title: doc.title,
+        url: doc.url,
+        markdown: doc.markdown,
+        documentType: doc.metadata.relevance?.documentType,
+        relevanceScore: doc.metadata.relevance?.toolScores.find(t => t.toolId === 'analyze-feature-scope')?.overallScore,
+        summary: doc.metadata.summary?.text,
+      }));
+      
+      console.log(`   📚 Confluence docs for scope analysis: ${confluenceDocs.length}`);
+    } catch (error: any) {
+      console.log(`   ⚠️ Confluence context setup failed: ${error.message}`);
+      // Continue without Confluence context - it's optional
+    }
+  }
 
   // ==========================================
   // PHASE 5: Generate scope analysis
@@ -101,7 +136,8 @@ export async function executeAnalyzeFeatureScope(
     figmaFileKey,
     yamlContent,
     notify,
-    epicContext
+    epicContext,
+    confluenceDocs
   });
 
   // ==========================================
@@ -141,13 +177,14 @@ async function generateScopeAnalysis(params: {
   yamlContent: string;
   notify: ToolDependencies['notify'];
   epicContext?: string;
+  confluenceDocs?: ConfluenceDocumentContext[];
 }): Promise<{
   scopeAnalysisContent: string;
   featureAreasCount: number;
   questionsCount: number;
   scopeAnalysisPath: string;
 }> {
-  const { generateText, screens, debugDir, figmaFileKey, yamlContent, notify, epicContext } = params;
+  const { generateText, screens, debugDir, figmaFileKey, yamlContent, notify, epicContext, confluenceDocs } = params;
   
   await notify('📝 Feature Identification: Analyzing features and scope...');
   
@@ -177,7 +214,8 @@ async function generateScopeAnalysis(params: {
   const prompt = generateFeatureIdentificationPrompt(
     yamlContent,
     analysisFiles,
-    epicContext
+    epicContext,
+    confluenceDocs
   );
   
   // Save prompt to debug directory for debugging (if enabled)

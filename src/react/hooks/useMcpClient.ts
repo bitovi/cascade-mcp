@@ -80,7 +80,7 @@ export function useMcpClient(options: UseMcpClientOptions = {}): UseMcpClientRet
     const hasCallback = BrowserMcpClient.hasOAuthCallback();
     console.log('[useMcpClient] 🔍 Has OAuth callback?', hasCallback);
     console.log('[useMcpClient]   URL search params:', window.location.search);
-    console.log('[useMcpClient]   All sessionStorage keys:', Object.keys(sessionStorage));
+    console.log('[useMcpClient]   All localStorage keys:', Object.keys(localStorage).filter(k => k.startsWith('mcp_')));
     
     // Prevent duplicate handling in React Strict Mode
     if (hasCallback && oauthHandledRef.current) {
@@ -95,7 +95,7 @@ export function useMcpClient(options: UseMcpClientOptions = {}): UseMcpClientRet
       oauthHandledRef.current = true;
       
       // Get stored server URL and reconnect
-      const storedUrl = sessionStorage.getItem('mcp_pending_server_url');
+      const storedUrl = localStorage.getItem('mcp_pending_server_url');
       console.log('[useMcpClient] 📦 Stored server URL:', storedUrl);
       
       if (storedUrl) {
@@ -108,7 +108,7 @@ export function useMcpClient(options: UseMcpClientOptions = {}): UseMcpClientRet
           if (clientRef.current) {
             clientRef.current.connect(storedUrl).then(() => {
               console.log('[useMcpClient] 🎉 Auto-connect succeeded!');
-              sessionStorage.removeItem('mcp_pending_server_url');
+              localStorage.removeItem('mcp_pending_server_url');
               // Fetch tools after successful connection
               return clientRef.current!.listTools();
             }).then((toolList) => {
@@ -121,12 +121,34 @@ export function useMcpClient(options: UseMcpClientOptions = {}): UseMcpClientRet
         }, 100);
       } else {
         console.log('[useMcpClient] ⚠️ No stored URL found for OAuth callback!');
-        console.log('[useMcpClient]   sessionStorage contents:', JSON.stringify(Object.fromEntries(
-          Object.keys(sessionStorage).map(k => [k, sessionStorage.getItem(k)?.substring(0, 50)])
+        console.log('[useMcpClient]   localStorage contents:', JSON.stringify(Object.fromEntries(
+          Object.keys(localStorage).filter(k => k.startsWith('mcp_')).map(k => [k, localStorage.getItem(k)?.substring(0, 50)])
         )));
       }
     } else {
       console.log('[useMcpClient] ℹ️ No OAuth callback detected');
+      
+      // Check if we have stored tokens and can auto-reconnect
+      const storedUrl = localStorage.getItem('mcp_last_server_url');
+      if (storedUrl && !oauthHandledRef.current) {
+        oauthHandledRef.current = true;
+        console.log('[useMcpClient] 🔑 Found stored server URL, attempting auto-reconnect:', storedUrl);
+        setTimeout(() => {
+          if (clientRef.current) {
+            clientRef.current.connect(storedUrl).then(() => {
+              console.log('[useMcpClient] 🎉 Auto-reconnect succeeded!');
+              return clientRef.current!.listTools();
+            }).then((toolList) => {
+              console.log('[useMcpClient] 📋 Got tools:', toolList.length);
+              setTools(toolList);
+            }).catch((err) => {
+              console.error('[useMcpClient] ❌ Auto-reconnect failed:', err);
+              // Clear stored URL if reconnect fails (likely token expired)
+              // localStorage.removeItem('mcp_last_server_url');
+            });
+          }
+        }, 100);
+      }
     }
 
     return () => {
@@ -184,9 +206,9 @@ export function useMcpClient(options: UseMcpClientOptions = {}): UseMcpClientRet
       return;
     }
 
-    // Store server URL for OAuth callback
-    console.log('[useMcpClient] 💾 Storing server URL in sessionStorage');
-    sessionStorage.setItem('mcp_pending_server_url', serverUrl);
+    // Store server URL for OAuth callback and auto-reconnect
+    console.log('[useMcpClient] 💾 Storing server URL in localStorage');
+    localStorage.setItem('mcp_pending_server_url', serverUrl);
 
     try {
       addLog('info', `Connecting to ${serverUrl}...`);
@@ -207,8 +229,9 @@ export function useMcpClient(options: UseMcpClientOptions = {}): UseMcpClientRet
       setTools(toolList);
       addLog('info', `Found ${toolList.length} tools`);
       
-      // Clean up stored URL
-      sessionStorage.removeItem('mcp_pending_server_url');
+      // Save as last successful server URL for auto-reconnect, clean up pending
+      localStorage.setItem('mcp_last_server_url', serverUrl);
+      localStorage.removeItem('mcp_pending_server_url');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Connection failed';
       addLog('error', message);
@@ -244,11 +267,11 @@ export function useMcpClient(options: UseMcpClientOptions = {}): UseMcpClientRet
 
   const setAnthropicKey = useCallback((key: string) => {
     setAnthropicKeyState(key);
-    // Store in sessionStorage for persistence across page reloads
+    // Store in localStorage for persistence across page reloads
     if (key) {
-      sessionStorage.setItem('mcp_anthropic_key', key);
+      localStorage.setItem('mcp_anthropic_key', key);
     } else {
-      sessionStorage.removeItem('mcp_anthropic_key');
+      localStorage.removeItem('mcp_anthropic_key');
     }
   }, []);
 
@@ -258,7 +281,7 @@ export function useMcpClient(options: UseMcpClientOptions = {}): UseMcpClientRet
 
   // Load stored API key on mount
   useEffect(() => {
-    const storedKey = sessionStorage.getItem('mcp_anthropic_key');
+    const storedKey = localStorage.getItem('mcp_anthropic_key');
     if (storedKey && !anthropicKey) {
       setAnthropicKeyState(storedKey);
     }

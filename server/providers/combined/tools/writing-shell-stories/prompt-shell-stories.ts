@@ -32,20 +32,75 @@ OUTPUT REQUIREMENT:
 export const SHELL_STORY_MAX_TOKENS = 16000;
 
 /**
+ * Confluence document for prompt context
+ */
+export interface ConfluenceDocumentContext {
+  title: string;
+  url: string;
+  markdown: string;
+  documentType?: 'requirements' | 'technical' | 'context' | 'dod' | 'unknown';
+  relevanceScore?: number;
+  summary?: string;
+}
+
+/**
  * Generate shell story creation prompt
  * 
  * @param screensYaml - Content of screens.yaml file (screen ordering)
  * @param analysisFiles - Array of screen analysis files (unused but kept for backward compatibility)
  * @param scopeAnalysis - Extracted scope analysis section from epic
  * @param remainingContext - Epic context without scope analysis section
+ * @param confluenceDocs - Optional array of relevant Confluence documents
  * @returns Complete prompt for shell story generation
  */
 export function generateShellStoryPrompt(
   screensYaml: string,
   analysisFiles: Array<{ screenName: string; content: string }>,
   scopeAnalysis: string,
-  remainingContext: string
+  remainingContext: string,
+  confluenceDocs?: ConfluenceDocumentContext[]
 ): string {
+
+  // Build Confluence documentation section if provided
+  const confluenceSection = confluenceDocs && confluenceDocs.length > 0
+    ? `**REFERENCED DOCUMENTATION (from Confluence):**
+
+The following linked documents provide additional context for story planning:
+
+${confluenceDocs.map(doc => {
+  const typeLabel = doc.documentType && doc.documentType !== 'unknown' 
+    ? ` (${doc.documentType})` 
+    : '';
+  return `<confluence_doc title="${doc.title}"${typeLabel}>
+
+**Document**: [${doc.title}](${doc.url})
+**Type**: ${doc.documentType || 'unknown'}
+
+${doc.summary || doc.markdown}
+
+</confluence_doc>`;
+}).join('\n\n')}
+
+**Use referenced documentation for:**
+- Technical requirements and API specifications
+- Definition of Done criteria (quality gates, testing requirements)
+- Architecture constraints that affect story sequencing
+- Cross-cutting concerns (security, accessibility, performance)
+
+**LINKING STRATEGY for documents:**
+- Always include links to referenced documents in relevant story bullets
+- For documents spanning multiple stories:
+  - Link to the document in each relevant story's ☐ bullets
+  - Explicitly call out what sections apply to that specific story
+  - Add ❓ questions if scope is unclear
+- For Definition of Done: Link, don't duplicate content
+
+**When scope analysis and documentation conflict:**
+- Scope analysis takes precedence for feature inclusion
+- Add ❓ question if the conflict affects story implementation
+
+`
+    : '';
 
   const epicContextSection = `**SCOPE ANALYSIS (from Epic Description):**
 
@@ -97,7 +152,7 @@ ${remainingContext}
 
 ## INPUTS (provided below)
 
-${epicContextSection}**SCREEN ORDERING (from screens.yaml):**
+${epicContextSection}${confluenceSection}**SCREEN ORDERING (from screens.yaml):**
 \`\`\`yaml
 ${screensYaml}
 \`\`\`

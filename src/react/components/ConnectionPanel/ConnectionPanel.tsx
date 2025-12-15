@@ -19,7 +19,7 @@ export function ConnectionPanel({
   onDisconnect,
 }: ConnectionPanelProps) {
   const [anthropicKey, setAnthropicKey] = useState(
-    () => sessionStorage.getItem('mcp_anthropic_key') || ''
+    () => localStorage.getItem('mcp_anthropic_key') || ''
   );
   const [isConnecting, setIsConnecting] = useState(false);
 
@@ -40,11 +40,11 @@ export function ConnectionPanel({
 
   const handleAnthropicKeyChange = (value: string) => {
     setAnthropicKey(value);
-    // Store in sessionStorage for persistence
+    // Store in localStorage for persistence across refreshes
     if (value) {
-      sessionStorage.setItem('mcp_anthropic_key', value);
+      localStorage.setItem('mcp_anthropic_key', value);
     } else {
-      sessionStorage.removeItem('mcp_anthropic_key');
+      localStorage.removeItem('mcp_anthropic_key');
     }
   };
 

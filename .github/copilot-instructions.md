@@ -76,6 +76,13 @@ Tools are exposed via **both** MCP protocol and REST API without code duplicatio
 3. Provider tokens embedded in JWT returned to MCP client
 4. MCP client sends JWT → we extract provider tokens → call provider APIs
 
+### Atlassian API Client Pattern
+
+All Atlassian API requests go through `AtlassianClient` (`server/providers/atlassian/atlassian-api-client.ts`):
+- `createAtlassianClient(token)` for OAuth, `createAtlassianClientWithPAT(credentials)` for PAT
+- Use `client.getJiraBaseUrl(cloudId)` / `client.getConfluenceBaseUrl(cloudId)` for API URLs
+- Use `resolveCloudId(client, undefined, siteName)` to get cloudId from site name
+
 ### LLM Integration for Tools
 
 Tools needing AI can work with **both** auth methods:

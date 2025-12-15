@@ -8,6 +8,7 @@ import { sanitizeObjectWithJWTs } from '../../tokens.ts';
 import type { ADFDocument } from './markdown-converter.ts';
 import { convertMarkdownToAdf } from './markdown-converter.ts';
 import type { AtlassianClient } from './atlassian-api-client.js';
+import type { JiraIssuePayload } from './types.ts';
 
 // Atlassian site information structure
 export interface AtlassianSite {
@@ -427,6 +428,41 @@ export async function getJiraIssue(
 }
 
 /**
+ * Get Jira project information
+ * @param client - Atlassian API client
+ * @param cloudId - Cloud ID for the Jira site
+ * @param projectKey - Project key (e.g., "PROJ")
+ * @returns Response from the Jira API with project details
+ * @throws Error if fetch fails
+ */
+export async function getJiraProject(
+  client: AtlassianClient,
+  cloudId: string,
+  projectKey: string
+): Promise<Response> {
+  const projectUrl = `${client.getJiraBaseUrl(cloudId)}/project/${projectKey}`;
+
+  logger.info('Making Jira API request for project details', {
+    projectKey,
+    cloudId,
+    fetchUrl: projectUrl,
+  });
+
+  const projectRes = await client.fetch(projectUrl);
+
+  logger.info('Project fetch response', {
+    projectKey,
+    status: projectRes.status,
+    statusText: projectRes.statusText,
+    contentType: projectRes.headers.get('content-type')
+  });
+
+  await handleJiraAuthError(projectRes, `Get project ${projectKey}`);
+
+  return projectRes;
+}
+
+/**
  * Delete a Jira issue
  * @param client - Atlassian API client
  * @param cloudId - Cloud ID for the Jira site
@@ -552,25 +588,6 @@ export async function createJiraIssue(
   return createResponse;
 }
 
-// Jira issue creation payload interface
-export interface JiraIssuePayload {
-  fields: {
-    project: {
-      key: string;
-    };
-    issuetype: {
-      id?: string;
-      name?: string;
-    };
-    summary: string;
-    description: ADFDocument;
-    priority?: {
-      name: string;
-    };
-    labels?: string[];
-    assignee?: {
-      accountId: string;
-    };
-    [key: string]: any;
-  };
-}
+// JiraIssuePayload is now imported from ./types.ts
+// Re-export for backwards compatibility
+export type { JiraIssuePayload } from './types.ts';

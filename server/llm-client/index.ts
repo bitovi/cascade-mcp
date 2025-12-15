@@ -13,5 +13,8 @@ export { createLLMClient, createProviderFromHeaders, getModelFromHeaders } from 
 // MCP Client
 export { createMcpLLMClient } from './mcp-sampling-client.js';
 
+// Queue Wrapper
+export { createQueuedGenerateText } from './queued-generate-text.js';
+
 // Errors
 export { UnsupportedProviderError, InvalidProviderError, MissingCredentialsError } from './provider-errors.js';

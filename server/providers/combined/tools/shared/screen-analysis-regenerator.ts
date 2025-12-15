@@ -179,83 +179,48 @@ export async function regenerateScreenAnalyses(
   }
   
   // ==========================================
-  // Phase B: Analyze screens (parallel if supported, sequential otherwise)
+  // Phase B: Analyze screens
+  // Queue wrapper handles parallel vs sequential automatically:
+  // - AI SDK: actual parallel execution
+  // - MCP sampling: queued sequential execution
   // ==========================================
   
-  // Check if parallel requests are supported (AI SDK = true, MCP sampling = false/undefined)
-  if (generateText.supportsParallelRequests) {
-    console.log(`  🚀 Parallel analysis mode (AI SDK)`);
+  console.log(`  📷 Analyzing ${screensToAnalyze.length} screens...`);
+  
+  if (notify) {
+    const imageCount = Array.from(imagesMap.values()).filter(v => v !== null).length;
+    await notify(`✅ Downloaded ${imageCount} images. Starting AI analysis...`);
+  }
+  
+  // Use Promise.all - queue wrapper handles sequencing for MCP sampling
+  const analysisPromises = screensToAnalyze.map(async (screen) => {
+    const originalIndex = screens.indexOf(screen);
     
-    if (notify) {
-      const imageCount = Array.from(imagesMap.values()).filter(v => v !== null).length;
-      await notify(`✅ Downloaded ${imageCount} images. Starting AI analysis in parallel...`);
-    }
-    
-    // Parallel execution for REST API
-    const analysisPromises = screensToAnalyze.map(async (screen) => {
-      const originalIndex = screens.indexOf(screen);
-      
-      const result = await analyzeScreen(screen, {
-        generateText,
-        allFrames,
-        allNotes,
-        imagesMap,
-        fileCachePath,
-        epicContext,
-        originalIndex,
-        totalScreens: screens.length
-      });
-      
-      // Notify after each completes
-      if (notify && result.analyzed) {
-        await notify(`✅ Analyzed: ${screen.name}`);
-      }
-      
-      return result;
+    const result = await analyzeScreen(screen, {
+      generateText,
+      allFrames,
+      allNotes,
+      imagesMap,
+      fileCachePath,
+      epicContext,
+      originalIndex,
+      totalScreens: screens.length
     });
     
-    const analysisResults = await Promise.all(analysisPromises);
-    
-    // Count successes
-    downloadedImages = analysisResults.filter(r => r.analyzed).length;
-    analyzedScreens = analysisResults.filter(r => r.analyzed).length;
-    downloadedNotes = analysisResults.reduce((sum, r) => sum + r.notesWritten, 0);
-    
-  } else {
-    console.log(`  🔄 Sequential analysis mode (MCP sampling)`);
-    
-    if (notify) {
-      const imageCount = Array.from(imagesMap.values()).filter(v => v !== null).length;
-      await notify(`✅ Downloaded ${imageCount} images. Starting AI analysis sequentially...`);
+    // Notify after each completes
+    if (notify && result.analyzed) {
+      await notify(`✅ Analyzed: ${screen.name}`);
     }
     
-    // Sequential execution for MCP tools
-    for (const screen of screensToAnalyze) {
-      const originalIndex = screens.indexOf(screen);
-      
-      // Notify as we start each screen (current behavior)
-      if (notify) {
-        await notify(`🤖 Analyzing: ${screen.name}`);
-      }
-      
-      const result = await analyzeScreen(screen, {
-        generateText,
-        allFrames,
-        allNotes,
-        imagesMap,
-        fileCachePath,
-        epicContext,
-        originalIndex,
-        totalScreens: screens.length
-      });
-      
-      if (result.analyzed) {
-        downloadedImages++;
-        analyzedScreens++;
-      }
-      downloadedNotes += result.notesWritten;
-    }
-  }
+    return result;
+  });
+  
+  const analysisResults = await Promise.all(analysisPromises);
+  
+  // Count successes
+  downloadedImages = analysisResults.filter(r => r.analyzed).length;
+  analyzedScreens = analysisResults.filter(r => r.analyzed).length;
+  downloadedNotes = analysisResults.reduce((sum, r) => sum + r.notesWritten, 0);
   
   // After successful analysis, save metadata to enable cache validation
   try {
