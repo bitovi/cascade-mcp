@@ -16,7 +16,7 @@ import type { ToolDependencies } from '../types.js';
 import { getDebugDir } from '../writing-shell-stories/temp-directory-manager.js';
 import { setupFigmaScreens } from '../writing-shell-stories/figma-screen-setup.js';
 import { regenerateScreenAnalyses } from './screen-analysis-regenerator.js';
-import type { ADFNode } from '../../../atlassian/markdown-converter.js';
+import type { ADFNode, ADFDocument } from '../../../atlassian/markdown-converter.js';
 
 /**
  * Parameters for screen analysis pipeline
@@ -40,6 +40,7 @@ export interface ScreenAnalysisResult {
   yamlContent: string;
   epicWithoutShellStoriesMarkdown: string;
   epicWithoutShellStoriesAdf: ADFNode[];
+  epicDescriptionAdf: ADFDocument;  // Full epic description (for Confluence extraction)
   figmaUrls: string[];
   cloudId: string;
   siteName: string;
@@ -97,6 +98,7 @@ export async function executeScreenAnalysisPipeline(
     yamlContent,
     epicWithoutShellStoriesMarkdown,
     epicWithoutShellStoriesAdf,
+    epicDescriptionAdf,
     figmaUrls,
     cloudId: resolvedCloudId,
     siteName: resolvedSiteName
@@ -137,6 +139,7 @@ export async function executeScreenAnalysisPipeline(
     yamlContent,
     epicWithoutShellStoriesMarkdown,
     epicWithoutShellStoriesAdf,
+    epicDescriptionAdf,
     figmaUrls,
     cloudId: resolvedCloudId,
     siteName: resolvedSiteName,

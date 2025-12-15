@@ -11,6 +11,7 @@ import { getAuthInfoSafe } from '../../../../mcp-core/auth-helpers.js';
 import { createAtlassianClient } from '../../../atlassian/atlassian-api-client.js';
 import { createFigmaClient } from '../../../figma/figma-api-client.js';
 import { createMcpLLMClient } from '../../../../llm-client/mcp-sampling-client.js';
+import { createQueuedGenerateText } from '../../../../llm-client/queued-generate-text.js';
 import { createProgressNotifier } from '../writing-shell-stories/progress-notifier.js';
 import { executeWriteNextStory } from './core-logic.js';
 
@@ -74,7 +75,7 @@ export function registerWriteNextStoryTool(mcp: McpServer): void {
         // Create API clients with tokens captured in closures
         const atlassianClient = createAtlassianClient(atlassianToken);
         const figmaClient = createFigmaClient(figmaToken);
-        const generateText = createMcpLLMClient(context);
+        const generateText = createQueuedGenerateText(createMcpLLMClient(context));
         const notify = createProgressNotifier(context, 8);
         
         // Execute core logic (tokens NOT passed - clients have them baked in!)

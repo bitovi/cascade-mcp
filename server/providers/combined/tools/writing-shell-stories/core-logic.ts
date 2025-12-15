@@ -20,11 +20,13 @@ import type { Screen } from './screen-analyzer.js';
 import { getDebugDir, getBaseCacheDir } from './temp-directory-manager.js';
 import { getFigmaFileCachePath } from '../../../figma/figma-cache.js';
 import { setupFigmaScreens } from './figma-screen-setup.js';
+import { setupConfluenceContext, type ConfluenceDocument } from '../shared/confluence-setup.js';
 import { regenerateScreenAnalyses } from '../shared/screen-analysis-regenerator.js';
 import {
   generateShellStoryPrompt,
   SHELL_STORY_SYSTEM_PROMPT,
-  SHELL_STORY_MAX_TOKENS
+  SHELL_STORY_MAX_TOKENS,
+  type ConfluenceDocumentContext
 } from './prompt-shell-stories.js';
 import { 
   convertMarkdownToAdf,
@@ -124,6 +126,7 @@ export async function executeWriteShellStories(
     figmaFileKey,
     epicWithoutShellStoriesMarkdown,
     epicWithoutShellStoriesAdf,
+    epicDescriptionAdf,
     figmaUrls,
     cloudId: resolvedCloudId,
     siteName: resolvedSiteName,
@@ -132,6 +135,38 @@ export async function executeWriteShellStories(
   
   console.log(`  Phase 1-3 complete: ${figmaUrls.length} Figma URLs, ${screens.length} screens, ${allNotes.length} notes`);
   await notify(`✅ Preparation Complete: ${screens.length} screens ready`);
+
+  // ==========================================
+  // PHASE 3.5: Setup Confluence context (if any linked docs)
+  // ==========================================
+  let confluenceDocs: ConfluenceDocumentContext[] = [];
+  
+  if (epicDescriptionAdf) {
+    try {
+      const confluenceContext = await setupConfluenceContext({
+        epicAdf: epicDescriptionAdf,
+        atlassianClient,
+        generateText,
+        siteName: resolvedSiteName,
+        notify,
+      });
+      
+      // Filter to docs relevant for shell story writing
+      confluenceDocs = confluenceContext.byRelevance.writeStories.map((doc: ConfluenceDocument) => ({
+        title: doc.title,
+        url: doc.url,
+        markdown: doc.markdown,
+        documentType: doc.metadata.relevance?.documentType,
+        relevanceScore: doc.metadata.relevance?.toolScores.find(t => t.toolId === 'write-shell-stories')?.overallScore,
+        summary: doc.metadata.summary?.text,
+      }));
+      
+      console.log(`   📚 Confluence docs for shell stories: ${confluenceDocs.length}`);
+    } catch (error: any) {
+      console.log(`   ⚠️ Confluence context setup failed: ${error.message}`);
+      // Continue without Confluence context - it's optional
+    }
+  }
 
   // ==========================================
   // PHASE 4: Download images and analyze screens
@@ -168,7 +203,8 @@ export async function executeWriteShellStories(
     figmaFileKey,
     yamlContent,
     notify,
-    epicContext: epicWithoutShellStoriesMarkdown
+    epicContext: epicWithoutShellStoriesMarkdown,
+    confluenceDocs
   });
 
   // ==========================================
@@ -217,8 +253,9 @@ async function generateShellStoriesFromAnalyses(params: {
   yamlContent: string;
   notify: ToolDependencies['notify'];
   epicContext?: string;
+  confluenceDocs?: ConfluenceDocumentContext[];
 }): Promise<{ storyCount: number; analysisCount: number; shellStoriesPath: string | null; shellStoriesText: string | null }> {
-  const { generateText, screens, debugDir, figmaFileKey, yamlContent, notify, epicContext } = params;
+  const { generateText, screens, debugDir, figmaFileKey, yamlContent, notify, epicContext, confluenceDocs } = params;
   
   console.log('  Phase 5: Generating shell stories from analyses...');
   
@@ -271,7 +308,8 @@ async function generateShellStoriesFromAnalyses(params: {
     screensYamlContent,
     analysisFiles,
     scopeAnalysis,
-    remainingContext
+    remainingContext,
+    confluenceDocs
   );
   
   // Save prompt to debug directory for debugging (if enabled)

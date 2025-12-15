@@ -11,6 +11,7 @@ import { getAuthInfoSafe } from '../../../../mcp-core/auth-helpers.js';
 import { createAtlassianClient } from '../../../atlassian/atlassian-api-client.js';
 import { createFigmaClient } from '../../../figma/figma-api-client.js';
 import { createMcpLLMClient } from '../../../../llm-client/mcp-sampling-client.js';
+import { createQueuedGenerateText } from '../../../../llm-client/queued-generate-text.js';
 import { createProgressNotifier } from '../writing-shell-stories/progress-notifier.js';
 import { executeAnalyzeFeatureScope } from './core-logic.js';
 
@@ -96,7 +97,7 @@ export function registerAnalyzeFeatureScopeTool(mcp: McpServer): void {
         // Create API clients with tokens
         const atlassianClient = createAtlassianClient(atlassianToken);
         const figmaClient = createFigmaClient(figmaToken);
-        const generateText = createMcpLLMClient(context);
+        const generateText = createQueuedGenerateText(createMcpLLMClient(context));
         const notify = createProgressNotifier(context, 6); // 6 phases total
         
         // Execute core logic

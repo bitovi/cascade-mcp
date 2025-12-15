@@ -30,12 +30,13 @@ import {
 } from '../../../figma/figma-helpers.js';
 import { resolveCloudId, getJiraIssue, handleJiraAuthError } from '../../../atlassian/atlassian-helpers.js';
 import { 
-  convertAdfNodesToMarkdown,
   countADFSectionsByHeading,
-  extractADFSection,
   type ADFNode,
   type ADFDocument,
 } from '../../../atlassian/markdown-converter.js';
+import { buildIssueContext } from '../shared/issue-context-builder.js';
+import { extractFigmaUrlsFromADF } from '../../../atlassian/adf-utils.js';
+import type { JiraIssue } from '../../../atlassian/types.js';
 import { associateNotesWithFrames } from './screen-analyzer.js';
 import { generateScreensYaml } from './yaml-generator.js';
 // import { writeNotesForScreen } from './note-text-extractor.js';
@@ -206,53 +207,7 @@ function separateFramesAndNotes(
   };
 }
 
-/**
- * Extract all Figma URLs from an ADF (Atlassian Document Format) document
- * @param adf - The ADF document to parse
- * @returns Array of unique Figma URLs found
- */
-function extractFigmaUrlsFromADF(adf: ADFDocument): string[] {
-  const figmaUrls = new Set<string>();
-  
-  function traverse(node: ADFNode) {
-    // Check inlineCard nodes for Figma URLs
-    if (node.type === 'inlineCard' && node.attrs?.url) {
-      const url = node.attrs.url;
-      if (url.includes('figma.com')) {
-        figmaUrls.add(url);
-      }
-    }
-    
-    // Check text nodes with link marks
-    if (node.type === 'text' && node.marks) {
-      for (const mark of node.marks) {
-        if (mark.type === 'link' && mark.attrs?.href) {
-          const url = mark.attrs.href;
-          if (url.includes('figma.com')) {
-            figmaUrls.add(url);
-          }
-        }
-      }
-    }
-    
-    // Check plain text for Figma URLs (basic regex)
-    if (node.type === 'text' && node.text) {
-      const urlRegex = /https?:\/\/[^\s]+figma\.com[^\s]*/g;
-      const matches = node.text.match(urlRegex);
-      if (matches) {
-        matches.forEach(url => figmaUrls.add(url));
-      }
-    }
-    
-    // Recursively traverse child nodes
-    if (node.content) {
-      node.content.forEach(traverse);
-    }
-  }
-  
-  traverse(adf);
-  return Array.from(figmaUrls);
-}
+// extractFigmaUrlsFromADF is now imported from adf-utils.ts
 
 
 /**
@@ -266,19 +221,6 @@ export interface ScreenWithNotes {
   frameName?: string;  // Original frame name
   sectionName?: string; // Parent SECTION name (if applicable)
   sectionId?: string;   // Parent SECTION node ID (if applicable)
-}
-
-/**
- * Jira issue structure (simplified)
- */
-interface JiraIssue {
-  id: string;
-  key: string;
-  fields: {
-    summary: string;
-    description?: ADFDocument;
-    [key: string]: any;
-  };
 }
 
 /**
@@ -381,11 +323,16 @@ export async function setupFigmaScreens(
     throw new Error(`Epic ${epicKey} contains ${shellStoriesCount} "## Shell Stories" sections. Please consolidate into one section.`);
   }
   
-  // Extract Shell Stories section using ADF operations
-  const { section: shellStoriesAdf, remainingContent: epicWithoutShellStoriesAdf } = 
-    extractADFSection(description.content || [], 'Shell Stories');
-
-  const epicWithoutShellStoriesMarkdown = convertAdfNodesToMarkdown(epicWithoutShellStoriesAdf);
+  // Extract epic context and Shell Stories section using shared helper
+  const issueContext = buildIssueContext(
+    [{ key: epicKey, fields: { summary: issue.fields?.summary || '', description } }],
+    { excludeSections: ['Shell Stories'] }
+  );
+  
+  const epicWithoutShellStoriesAdf = issueContext.adf;
+  const epicWithoutShellStoriesMarkdown = issueContext.markdown;
+  const shellStoriesExtracted = issueContext.extractedSections.get('Shell Stories');
+  const shellStoriesAdf = shellStoriesExtracted?.adf || [];
   
   console.log(`    Epic context: ${epicWithoutShellStoriesAdf.length} ADF nodes`);
   console.log(`    Shell stories: ${shellStoriesAdf.length} ADF nodes`);

@@ -2,7 +2,7 @@
  * Browser-based OAuth Client Provider for MCP
  * 
  * Implements the OAuthClientProvider interface from MCP SDK for browser environments.
- * Handles PKCE flow, token storage in sessionStorage, and dynamic client registration.
+ * Handles PKCE flow, token storage in localStorage (persists across refreshes), and dynamic client registration.
  */
 
 import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
@@ -25,7 +25,8 @@ function getStorageKey(serverUrl: string, key: string): string {
 /**
  * Browser OAuth Client Provider
  * 
- * Stores OAuth state in sessionStorage for security (cleared when browser closes).
+ * Stores OAuth tokens and client info in localStorage (persists across page refreshes).
+ * Stores code_verifier in sessionStorage (security-sensitive, cleared when browser closes).
  * Supports dynamic client registration per RFC 7591.
  */
 export class BrowserOAuthClientProvider implements OAuthClientProvider {
@@ -77,7 +78,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
    */
   clientInformation(): OAuthClientInformation | undefined {
     const key = getStorageKey(this.serverUrl, 'client_info');
-    const stored = sessionStorage.getItem(key);
+    const stored = localStorage.getItem(key);
     console.log('[OAuth Provider] 📋 clientInformation() called:', { key, hasStored: !!stored });
     if (!stored) return undefined;
     
@@ -97,7 +98,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   saveClientInformation(clientInformation: OAuthClientInformationFull): void {
     const key = getStorageKey(this.serverUrl, 'client_info');
     console.log('[OAuth Provider] 💾 saveClientInformation() called:', { key, client_id: clientInformation.client_id });
-    sessionStorage.setItem(key, JSON.stringify(clientInformation));
+    localStorage.setItem(key, JSON.stringify(clientInformation));
   }
 
   /**
@@ -105,7 +106,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
    */
   tokens(): OAuthTokens | undefined {
     const key = getStorageKey(this.serverUrl, 'tokens');
-    const stored = sessionStorage.getItem(key);
+    const stored = localStorage.getItem(key);
     console.log('[OAuth Provider] 🔑 tokens() called:', { key, hasStored: !!stored });
     if (!stored) return undefined;
     
@@ -129,7 +130,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       hasAccessToken: !!tokens.access_token,
       hasRefreshToken: !!tokens.refresh_token 
     });
-    sessionStorage.setItem(key, JSON.stringify(tokens));
+    localStorage.setItem(key, JSON.stringify(tokens));
   }
 
   /**
@@ -167,12 +168,13 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
    */
   invalidateCredentials(scope: 'all' | 'client' | 'tokens' | 'verifier'): void {
     if (scope === 'all' || scope === 'tokens') {
-      sessionStorage.removeItem(getStorageKey(this.serverUrl, 'tokens'));
+      localStorage.removeItem(getStorageKey(this.serverUrl, 'tokens'));
     }
     if (scope === 'all' || scope === 'client') {
-      sessionStorage.removeItem(getStorageKey(this.serverUrl, 'client_info'));
+      localStorage.removeItem(getStorageKey(this.serverUrl, 'client_info'));
     }
     if (scope === 'all' || scope === 'verifier') {
+      // code_verifier stays in sessionStorage for security
       sessionStorage.removeItem(getStorageKey(this.serverUrl, 'code_verifier'));
     }
   }

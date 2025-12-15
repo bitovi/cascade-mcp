@@ -165,3 +165,53 @@ export async function writeNextStory(
 
   return result as WriteNextStoryResult;
 }
+
+// ===== Review Work Item =====
+
+export interface ReviewWorkItemParams {
+  issueKey: string;
+  cloudId?: string;
+  siteName?: string;
+  maxDepth?: number;
+}
+
+export interface ReviewWorkItemResult {
+  success: true;
+  issueKey: string;
+  reviewContent: string;
+  questionCount: number;
+  wellDefined: boolean;
+  commentId: string;
+}
+
+/**
+ * Review a Jira work item and post questions as a comment
+ * 
+ * POST /api/review-work-item
+ */
+export async function reviewWorkItem(
+  client: ApiClient,
+  params: ReviewWorkItemParams
+): Promise<ReviewWorkItemResult> {
+  console.log(`Calling reviewWorkItem for issue: ${params.issueKey}`);
+
+  const response = await client.post('/api/review-work-item', params);
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `API call failed with status ${response.status}: ${errorText}`
+    );
+  }
+
+  const result: any = await response.json();
+
+  if (!result.success) {
+    throw new Error(`API returned error: ${result.error || 'Unknown error'}`);
+  }
+
+  const statusEmoji = result.wellDefined ? '✨' : '❓';
+  console.log(`  ${statusEmoji} Review complete: ${result.questionCount} questions identified`);
+
+  return result as ReviewWorkItemResult;
+}

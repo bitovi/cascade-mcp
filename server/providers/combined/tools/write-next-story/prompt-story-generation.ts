@@ -10,6 +10,18 @@ import { resolveServerPath } from '../../../../utils/file-paths.js';
 import type { ParsedShellStoryADF } from './shell-story-parser.js';
 
 /**
+ * Confluence document for prompt context
+ */
+export interface ConfluenceDocumentContext {
+  title: string;
+  url: string;
+  markdown: string;
+  documentType?: 'requirements' | 'technical' | 'context' | 'dod' | 'unknown';
+  relevanceScore?: number;
+  summary?: string;
+}
+
+/**
  * System prompt for story generation
  * Sets the role and fundamental constraints for the AI
  */
@@ -51,13 +63,15 @@ async function loadStoryWritingGuidelines(): Promise<string> {
  * @param dependencyStories - Array of dependency shell stories for context
  * @param analysisFiles - Array of { screenName, content } for screen analyses
  * @param epicContext - Optional epic description for background context (does not change story scope)
+ * @param confluenceDocs - Optional array of relevant Confluence documents
  * @returns Complete prompt for story generation
  */
 export async function generateStoryPrompt(
   shellStory: ParsedShellStoryADF,
   dependencyStories: ParsedShellStoryADF[],
   analysisFiles: Array<{ screenName: string; content: string }>,
-  epicContext?: string
+  epicContext?: string,
+  confluenceDocs?: ConfluenceDocumentContext[]
 ): Promise<string> {
   // Load guidelines
   const guidelines = await loadStoryWritingGuidelines();
@@ -69,6 +83,35 @@ export async function generateStoryPrompt(
 **IMPORTANT**: This epic context is provided to help you understand the broader project goals and constraints. However, you MUST NOT expand the scope of this story beyond what is defined in the shell story below. Write only what is specified in the shell story's included functionality (☐ bullets).
 
 ${epicContext}
+
+---
+
+`
+    : '';
+  
+  // Build Confluence documentation section if provided
+  const confluenceSection = confluenceDocs && confluenceDocs.length > 0
+    ? `## Referenced Documentation (Confluence)
+
+The following linked documents provide additional context for this story. For documents spanning multiple stories, focus only on sections relevant to THIS story's shell story scope.
+
+${confluenceDocs.map(doc => {
+  const typeLabel = doc.documentType && doc.documentType !== 'unknown' 
+    ? ` (${doc.documentType})` 
+    : '';
+  return `### ${doc.title}${typeLabel}
+
+**Document Link**: [${doc.title}](${doc.url})
+
+${doc.summary || doc.markdown}
+`;
+}).join('\n---\n\n')}
+
+**Usage Guidelines for Documentation**:
+- Link to documents in "Reference Materials" section of the story
+- For technical docs: Only include sections that apply to THIS story's features
+- For DoD: Link but don't duplicate - just ensure acceptance criteria align
+- Add "Out of Scope for This Story" if document sections don't apply yet
 
 ---
 
@@ -107,7 +150,7 @@ ${guidelines}
 
 ---
 
-${epicSection}${dependencySection}${analysisSection}
+${epicSection}${confluenceSection}${dependencySection}${analysisSection}
 ## Shell Story to Write
 
 **Story ID**: ${shellStory.id}

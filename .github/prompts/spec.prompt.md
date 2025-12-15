@@ -7,4 +7,3 @@ Add any questions you have for me in a `## Questions` section at the end of the 
 Please modify existing content as needed for clarity. 
 
 Do not include timing in the plan. Only include what incremental steps we should take and how we can know each step is working.
-

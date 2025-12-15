@@ -70,17 +70,31 @@ OUTPUT REQUIREMENT:
 export const FEATURE_IDENTIFICATION_MAX_TOKENS = 8000;
 
 /**
+ * Confluence document for prompt context
+ */
+export interface ConfluenceDocumentContext {
+  title: string;
+  url: string;
+  markdown: string;
+  documentType?: 'requirements' | 'technical' | 'context' | 'dod' | 'unknown';
+  relevanceScore?: number;
+  summary?: string;
+}
+
+/**
  * Generate feature identification prompt
  * 
  * @param screensYaml - Content of screens.yaml file (screen ordering)
  * @param analysisFiles - Array of { screenName, content, url } for each analysis file
  * @param epicContext - Optional epic description content (excluding Scope Analysis section)
+ * @param confluenceDocs - Optional array of relevant Confluence documents
  * @returns Complete prompt for feature identification
  */
 export function generateFeatureIdentificationPrompt(
   screensYaml: string,
   analysisFiles: Array<{ screenName: string; content: string; url: string }>,
-  epicContext?: string
+  epicContext?: string,
+  confluenceDocs?: ConfluenceDocumentContext[]
 ): string {
   // Build epic context section if provided
   const epicContextSection = epicContext?.trim()
@@ -121,6 +135,39 @@ ${epicContext}
 `
     : '';
 
+  // Build Confluence documentation section if provided
+  const confluenceSection = confluenceDocs && confluenceDocs.length > 0
+    ? `**REFERENCED DOCUMENTATION (from Confluence):**
+
+The following linked documents provide additional context for scope decisions:
+
+${confluenceDocs.map(doc => {
+  const typeLabel = doc.documentType && doc.documentType !== 'unknown' 
+    ? ` (${doc.documentType})` 
+    : '';
+  return `<confluence_doc title="${doc.title}"${typeLabel}>
+
+**Document**: [${doc.title}](${doc.url})
+**Type**: ${doc.documentType || 'unknown'}
+
+${doc.summary || doc.markdown}
+
+</confluence_doc>`;
+}).join('\n\n')}
+
+**Use referenced documentation for:**
+- Additional requirements not covered in epic description
+- Technical constraints and architecture decisions
+- Definition of Done criteria (quality gates, testing requirements)
+- Cross-cutting concerns (security, accessibility, performance)
+
+**When epic context and documentation conflict:**
+- Epic description takes precedence for scope decisions
+- Add a ❓ question if the conflict is significant
+
+`
+    : '';
+
   // Build analysis section with URLs
   const analysisSection = analysisFiles
     .map(({ screenName, content, url }) => {
@@ -144,7 +191,7 @@ Produce a scope analysis document that:
 
 ## INPUTS
 
-${epicContextSection}**SCREEN ORDERING (from screens.yaml):**
+${epicContextSection}${confluenceSection}**SCREEN ORDERING (from screens.yaml):**
 \`\`\`yaml
 ${screensYaml}
 \`\`\`

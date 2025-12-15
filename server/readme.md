@@ -159,6 +159,37 @@ npm run dev:client
   - **api/progress-comment-manager.ts** - Progress tracking via Jira comments
   - **api/api-error-helpers.ts** - Shared error handling and validation
 
+- **providers/atlassian/atlassian-api-client.ts** - Atlassian API Client Factory  
+  Creates pre-configured clients for making authenticated Atlassian API requests.
+  - `createAtlassianClient(accessToken)` - OAuth client (routes through api.atlassian.com gateway)
+  - `createAtlassianClientWithPAT(base64Credentials)` - PAT client (direct site URLs)
+  - `client.fetch(url, options)` - Makes authenticated requests with token in closure
+  - `client.getJiraBaseUrl(cloudId)` - Returns Jira API base URL for cloud ID
+  - `client.getConfluenceBaseUrl(cloudId)` - Returns Confluence API base URL for cloud ID
+  - *Note*: OAuth tokens **must** route through `api.atlassian.com/ex/{product}/{cloudId}/` gateway
+  - *Example*: `const client = createAtlassianClient(token); await client.fetch(client.getJiraBaseUrl(cloudId) + '/issue/PROJ-123')`
+
+- **providers/atlassian/adf-utils.ts** - ADF Traversal Utilities  
+  Generic traversal and manipulation utilities for ADF (Atlassian Document Format) documents.
+  - `traverseADF(adf, visitor)` - Depth-first traversal with visitor callback
+  - `extractUrlsFromADF(adf, { urlPattern })` - Extract URLs matching a pattern
+  - `extractFigmaUrlsFromADF(adf)` / `extractConfluenceUrlsFromADF(adf)` - Convenience functions
+  - `findNodesByType(adf, nodeType)` / `collectTextFromADF(adf)` - Query helpers
+
+- **providers/atlassian/confluence-*.ts** - Confluence Integration  
+  Extracts and processes Confluence page content from epic descriptions for additional context.
+  - **confluence-helpers.ts** - URL extraction and API client (parse page URLs, fetch page content, resolve short links)
+  - **confluence-cache.ts** - Caching with timestamp validation (7-day retention, invalidates on page update)
+  - **confluence-relevance.ts** - LLM-based relevance scoring for each tool's decision points
+  - *Example*: `extractConfluenceUrlsFromADF(epicAdf)` returns array of page URLs
+
+- **providers/combined/tools/shared/confluence-setup.ts** - Confluence Context Orchestration  
+  Main setup function for extracting and processing Confluence context from epics.
+  - Extracts URLs, fetches pages, converts to markdown, scores relevance
+  - Returns documents sorted by relevance for each tool (analyzeScope, writeStories, writeNextStory)
+  - Caches results with Confluence version-based invalidation
+  - *Example*: `setupConfluenceContext({ epicAdf, atlassianClient, generateText, siteName })`
+
 - **llm-client/** - LLM Client Integration (Vercel AI SDK)  
   Abstracts LLM access for API routes (Anthropic via AI SDK). MCP tools use MCP sampling separately.
   - **llm-client/types.ts** - Core types: `LLMRequest` (messages array), `LLMResponse`, `GenerateTextFn`
@@ -196,6 +227,7 @@ Advanced workflow tools that integrate multiple services:
   - Analyzes screens against epic requirements to identify in-scope/out-of-scope features
   - Categorizes features as: ✅ confirmed, ❌ out-of-scope, ❓ needs-clarification, ⏬ low-priority
   - Updates epic description with structured scope analysis grouped by feature areas
+  - **Confluence Context**: Automatically extracts and uses linked Confluence pages for additional requirements context
   - Parameters: `epicKey`, `figmaUrl`, optional `cloudId`
   - Example: `analyze-feature-scope({ epicKey: "PLAY-123", figmaUrl: "https://..." })`
   - **Run this first** before write-shell-stories to establish scope
@@ -204,8 +236,33 @@ Advanced workflow tools that integrate multiple services:
   - **PREREQUISITE**: Epic must have a "## Scope Analysis" section (run analyze-feature-scope first)
   - Creates prioritized shell stories based on scope analysis categorizations
   - Organizes features into incremental delivery plan (stories)
+  - **Confluence Context**: References linked PRDs and technical docs for story planning
   - Updates epic description with shell stories section
   - Parameters: `epicKey`, optional `cloudId` or `siteName`
+
+- **write-next-story** - Write the next Jira story from shell stories
+  - **PREREQUISITE**: Epic must have shell stories (run write-shell-stories first)
+  - Generates detailed Jira story with acceptance criteria from shell story
+  - Validates dependencies before writing each story
+  - **Confluence Context**: Includes relevant technical documentation and links to referenced docs
+  - Parameters: `epicKey`, optional `cloudId` or `siteName`
+
+- **review-work-item** - Review a Jira work item and identify gaps/questions
+  - Gathers context from parent hierarchy, linked Confluence docs, and project description
+  - **Figma Analysis**: Downloads and analyzes linked Figma screens with AI vision
+  - Generates comprehensive review questions grouped by feature area
+  - Posts review as a Jira comment for team discussion
+  - Identifies Definition of Ready compliance issues
+  - Parameters: `issueKey`, optional `cloudId`, `siteName`, `maxDepth`
+  - Example: `review-work-item({ issueKey: "PLAY-456" })`
+
+**Confluence Context Feature**: 
+All combined tools automatically extract and process Confluence page links from the epic description:
+- PRDs (Product Requirement Documents) - Used for feature identification and acceptance criteria
+- Technical architecture docs - Used for implementation constraints and API references
+- Definition of Done - Linked (not duplicated) in generated stories
+- Cached with timestamp-based validation (7-day retention)
+- Scored for relevance to each tool's specific needs
 
 ### ChatGPT-Compatible Tools
 These tools follow OpenAI's MCP specification patterns for optimal ChatGPT integration:

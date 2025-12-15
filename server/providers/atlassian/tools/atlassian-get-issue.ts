@@ -10,6 +10,7 @@ import { sanitizeObjectWithJWTs } from '../../../tokens.ts';
 import type { McpServer } from '../../../mcp-core/mcp-types.ts';
 import { getJiraIssue } from '../atlassian-helpers.ts';
 import { createAtlassianClient } from '../atlassian-api-client.ts';
+import type { JiraIssue } from '../types.ts';
 
 // Tool parameters interface
 interface GetJiraIssueParams {
@@ -17,24 +18,6 @@ interface GetJiraIssueParams {
   cloudId?: string;
   siteName?: string;
   fields?: string;
-}
-
-// Jira issue interfaces (basic structure)
-interface JiraIssue {
-  id: string;
-  key: string;
-  fields: {
-    summary: string;
-    description?: any;
-    status: {
-      name: string;
-    };
-    attachment?: any[];
-    comment?: {
-      total: number;
-    };
-    [key: string]: any;
-  };
 }
 
 /**

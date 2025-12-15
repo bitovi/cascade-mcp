@@ -23,12 +23,14 @@ import type { FigmaClient } from '../../../figma/figma-api-client.js';
 import { getDebugDir, getBaseCacheDir } from '../writing-shell-stories/temp-directory-manager.js';
 import { getFigmaFileCachePath } from '../../../figma/figma-cache.js';
 import { setupFigmaScreens, type FigmaScreenSetupResult } from '../writing-shell-stories/figma-screen-setup.js';
+import { setupConfluenceContext, type ConfluenceDocument } from '../shared/confluence-setup.js';
 import { regenerateScreenAnalyses } from '../shared/screen-analysis-regenerator.js';
 import { parseShellStoriesFromAdf, addCompletionMarkerToShellStory, type ParsedShellStoryADF } from './shell-story-parser.js';
 import { 
   generateStoryPrompt, 
   STORY_GENERATION_SYSTEM_PROMPT, 
-  STORY_GENERATION_MAX_TOKENS 
+  STORY_GENERATION_MAX_TOKENS,
+  type ConfluenceDocumentContext
 } from './prompt-story-generation.js';
 import { 
   convertMarkdownToAdf,
@@ -93,6 +95,36 @@ export async function executeWriteNextStory(
   });
   
   console.log(`  ✅ Setup complete: ${setupResult.screens.length} screens, ${setupResult.figmaUrls.length} Figma URLs`);
+  
+  // Step 1.5: Setup Confluence context (if any linked docs)
+  let confluenceDocs: ConfluenceDocumentContext[] = [];
+  
+  if (setupResult.epicDescriptionAdf) {
+    try {
+      const confluenceContext = await setupConfluenceContext({
+        epicAdf: setupResult.epicDescriptionAdf,
+        atlassianClient,
+        generateText,
+        siteName: setupResult.siteName,
+        notify,
+      });
+      
+      // Filter to docs relevant for story writing
+      confluenceDocs = confluenceContext.byRelevance.writeNextStory.map((doc: ConfluenceDocument) => ({
+        title: doc.title,
+        url: doc.url,
+        markdown: doc.markdown,
+        documentType: doc.metadata.relevance?.documentType,
+        relevanceScore: doc.metadata.relevance?.toolScores.find(t => t.toolId === 'write-next-story')?.overallScore,
+        summary: doc.metadata.summary?.text,
+      }));
+      
+      console.log(`   📚 Confluence docs for story writing: ${confluenceDocs.length}`);
+    } catch (error: any) {
+      console.log(`   ⚠️ Confluence context setup failed: ${error.message}`);
+      // Continue without Confluence context - it's optional
+    }
+  }
   
   // Step 2-3: Extract shell stories from epic
   const shellStories = await extractShellStoriesFromSetup(setupResult, notify);
@@ -175,7 +207,8 @@ Each story must follow this format:
     debugDir,
     nextStory,
     shellStories,
-    notify
+    notify,
+    confluenceDocs
   );
   console.log(`  Story content generated (${storyContent.length} characters)`);
   
@@ -358,7 +391,8 @@ export async function generateStoryContent(
   debugDir: string | null,
   story: ParsedShellStoryADF,
   allStories: ParsedShellStoryADF[],
-  notify: ToolDependencies['notify']
+  notify: ToolDependencies['notify'],
+  confluenceDocs?: ConfluenceDocumentContext[]
 ): Promise<string> {
   await notify('🤖 Generating story content...');
   
@@ -478,7 +512,7 @@ No screen analysis files are available for story ${story.id}
   console.log(`  Using ${dependencyStories.length} dependency stories for context`);
   
   // Generate prompt
-  const storyPrompt = await generateStoryPrompt(story, dependencyStories, analysisFiles, setupResult.epicWithoutShellStoriesMarkdown);
+  const storyPrompt = await generateStoryPrompt(story, dependencyStories, analysisFiles, setupResult.epicWithoutShellStoriesMarkdown, confluenceDocs);
   console.log(`  Generated prompt (${storyPrompt.length} characters)`);
   
   // Request story generation via LLM

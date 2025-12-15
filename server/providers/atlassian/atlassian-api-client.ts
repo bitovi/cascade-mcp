@@ -33,6 +33,13 @@ export interface AtlassianClient {
   getJiraBaseUrl: (cloudId: string) => string;
   
   /**
+   * Get the base Confluence API URL for a specific cloud ID
+   * @param cloudId - The Atlassian cloud ID
+   * @returns Base URL for Confluence REST API v2
+   */
+  getConfluenceBaseUrl: (cloudId: string) => string;
+  
+  /**
    * Authentication type used by this client
    */
   authType: 'oauth' | 'pat';
@@ -73,6 +80,10 @@ export function createAtlassianClient(accessToken: string): AtlassianClient {
     
     getJiraBaseUrl: (cloudId: string) => {
       return `https://api.atlassian.com/ex/jira/${cloudId}/rest/api/3`;
+    },
+    
+    getConfluenceBaseUrl: (cloudId: string) => {
+      return `https://api.atlassian.com/ex/confluence/${cloudId}/wiki/api/v2`;
     },
   };
 }
@@ -134,6 +145,11 @@ export function createAtlassianClientWithPAT(base64Credentials: string): Atlassi
     getJiraBaseUrl: (cloudId: string) => {
       // For Basic Auth, use the direct site URL
       return `https://bitovi.atlassian.net/rest/api/3`;
+    },
+    
+    getConfluenceBaseUrl: (cloudId: string) => {
+      // For Basic Auth, use the direct site URL
+      return `https://bitovi.atlassian.net/wiki/api/v2`;
     },
   };
 }
