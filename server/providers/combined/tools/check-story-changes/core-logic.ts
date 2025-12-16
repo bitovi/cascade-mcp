@@ -7,7 +7,7 @@
  */
 
 import type { ToolDependencies } from '../types.js';
-import { getJiraIssue, resolveCloudId } from '../../../atlassian/atlassian-helpers.js';
+import { getJiraIssue, resolveCloudId, addIssueComment } from '../../../atlassian/atlassian-helpers.js';
 import { convertAdfToMarkdown } from '../../../atlassian/markdown-converter.js';
 import { CHECK_STORY_CHANGES_SYSTEM_PROMPT, generateCheckWhatChangedPrompt } from './strategies/prompt-check-story-changes.js';
 import { CHECK_STORY_CHANGES_MAX_TOKENS } from './strategies/prompt-check-story-changes.js';
@@ -22,27 +22,11 @@ export interface ExecuteCheckStoryChangesParams {
 }
 
 /**
- * Divergence analysis result from LLM
- */
-export interface DivergenceItem {
-  category: 'conflict' | 'addition' | 'missing' | 'interpretation';
-  description: string;
-  childContext: string;
-  parentContext: string | null;
-}
-
-export interface DivergenceAnalysis {
-  hasDivergences: boolean;
-  divergences: DivergenceItem[];
-  summary: string;
-}
-
-/**
  * Result from executing the check-story-changes workflow
  */
 export interface ExecuteCheckStoryChangesResult {
   success: true;
-  analysis: DivergenceAnalysis;
+  analysis: string;
   metadata: {
     parentKey: string;
     childKey: string;
@@ -113,6 +97,7 @@ export async function executeCheckStoryChanges(
   // ==========================================
   await notify('Fetching child story and parent epic...');
   
+  // TODO: MAKE SURE IT IS CONVERTING ADL TO MARKDOWN / TEXT 
   const childResponse = await getJiraIssue(atlassianClient, resolvedCloudId, storyKey, undefined);
   if (!childResponse.ok) {
     throw new Error(`Error fetching issue ${storyKey}: ${childResponse.status} ${childResponse.statusText}`);
@@ -131,6 +116,7 @@ export async function executeCheckStoryChanges(
   // ==========================================
   // PHASE 3: Fetch parent epic
   // ==========================================
+  // TODO: MAKE SURE IT IS CONVERTING ADL TO MARKDOWN / TEXT 
   const parentResponse = await getJiraIssue(atlassianClient, resolvedCloudId, parentKey, undefined);
   if (!parentResponse.ok) {
     throw new Error(`Error fetching issue ${parentKey}: ${parentResponse.status} ${parentResponse.statusText}`);
@@ -138,6 +124,18 @@ export async function executeCheckStoryChanges(
 
   const parentData = (await parentResponse.json()) as JiraIssueResponse; // TODO: IS TYPE CASTING NECESSARY?
   const parentDescription = convertDescriptionToText(parentData.fields?.description);
+
+  console.log({parentDescription, childDescription});
+
+  // return {
+  //   success: true,
+  //   analysis: {} as DivergenceAnalysis,
+  //   metadata: {
+  //     parentKey,
+  //     childKey: storyKey,
+  //     tokensUsed: 0,
+  //   },
+  // }
 
   console.log('  Fetched parent and child descriptions');
 
@@ -158,50 +156,27 @@ export async function executeCheckStoryChanges(
     maxTokens: CHECK_STORY_CHANGES_MAX_TOKENS,
   });
 
-  // Strip markdown code blocks if present
-  let responseText = llmResponse.text.trim();
-  if (responseText.startsWith('```json')) {
-    responseText = responseText.replace(/^```json\s*/, '').replace(/```\s*$/, '');
-  } else if (responseText.startsWith('```')) {
-    responseText = responseText.replace(/^```\s*/, '').replace(/```\s*$/, '');
-  }
-
-  const divergenceAnalysis: DivergenceAnalysis = JSON.parse(responseText);
+  const markdownAnalysis = llmResponse.text.trim();
 
   console.log('  ✅ Analysis complete');
-  console.log(`    Divergences found: ${divergenceAnalysis.hasDivergences}`);
-  console.log(`    Number of divergences: ${divergenceAnalysis.divergences.length}`);
 
-  // Format divergences notification
-  if (divergenceAnalysis.hasDivergences) {
-    const emojiMap = {
-      conflict: '🔴',
-      addition: '🟢',
-      missing: '🟡',
-      interpretation: '🔵'
-    };
+  // ==========================================
+  // PHASE 5: Post analysis as comment to Jira
+  // ==========================================
+  await notify('Posting analysis to Jira...');
 
-    let notificationText = `Analysis Complete: Found ${divergenceAnalysis.divergences.length} divergence(s) between ${storyKey} and ${parentKey}\n\n`;
-    notificationText += `Summary:\n${divergenceAnalysis.summary}\n\n`;
-    notificationText += `Divergences:\n`;
-    
-    divergenceAnalysis.divergences.forEach((div, index) => {
-      const emoji = emojiMap[div.category];
-      notificationText += `${index + 1}. ${emoji} ${div.category.toUpperCase()}: ${div.description}\n\n`;
-      notificationText += `   Child:\n   ${div.childContext}\n\n`;
-      if (div.parentContext) {
-        notificationText += `   Parent:\n   ${div.parentContext}\n\n`;
-      }
-    });
+  await addIssueComment(atlassianClient, resolvedCloudId, storyKey, markdownAnalysis);
 
-    await notify(notificationText);
-  } else {
-    await notify(`Analysis Complete: No divergences found between ${storyKey} and ${parentKey}.\n\n${divergenceAnalysis.summary}`);
-  }
+  console.log('  ✅ Comment posted to Jira');
+
+  // ==========================================
+  // PHASE 5: Notify success
+  // ==========================================
+  await notify('✅ Analysis complete and posted to Jira');
 
   return {
     success: true,
-    analysis: divergenceAnalysis,
+    analysis: markdownAnalysis,
     metadata: {
       parentKey,
       childKey: storyKey,

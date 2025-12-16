@@ -59,7 +59,10 @@ Example:
       cloudId,
     });
 
-    // console.log(JSON.stringify(result, null, 2));
+    // TODO: post the result to Jira as comment
+
+    console.log('\n✅ Story Change Analysis Result:\n');
+    console.log(result.analysis);
 
     console.log('\n📌 Metadata:');
     console.log(`   Parent: ${result.metadata.parentKey} | Child: ${result.metadata.childKey}`);

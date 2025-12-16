@@ -3,11 +3,17 @@ export const CHECK_STORY_CHANGES_MAX_TOKENS = 4000;
 export const CHECK_STORY_CHANGES_SYSTEM_PROMPT = 
           `You are a technical project analyst specializing in software requirements analysis. 
           
-          You will receive a JSON object with parent and child descriptions. 
+          You will receive a parent epic description and a child story description for analysis. 
           
-          Provide precise, actionable insights about requirement divergences. 
+          Provide precise, actionable insights about requirement divergences.
           
-          Return ONLY valid JSON without markdown code blocks.`;
+          IMPORTANT: Keep your response concise to fit within Jira comment size limits (~8KB markdown max).
+          - Use brief, clear language
+          - Limit context excerpts to 1-2 sentences max
+          - Focus on the most significant items
+          - Avoid redundant explanations
+          
+          Return your response in markdown format with proper structure and formatting.`;
 
 export const generateCheckWhatChangedPrompt = (parentKey: string, storyKey: string, parentDescription: string, childDescription: string) => {
   return `
@@ -26,26 +32,54 @@ export const generateCheckWhatChangedPrompt = (parentKey: string, storyKey: stri
   </jira-child-description>
   
   
-  Analyze these two Jira issue descriptions and identify any diverging points where the child story deviates from or adds information not present in the parent epic. Focus on:
-  1. Conflicting requirements or specifications
-  2. Additional features or details in the child not mentioned in the parent
-  3. Different interpretations or implementations
-  4. Missing context that should be aligned
+  Analyze these two Jira issue descriptions, identifying both aligned and diverging points between the child story and parent epic.
   
-  Return your analysis in a structured JSON format:
-  \`\`\`json
-  {
-    "hasDivergences": boolean,
-    "divergences": [
-      {
-        "category": "conflict" | "addition" | "missing" | "interpretation",
-        "description": "Clear description of the divergence",
-        "childContext": "Relevant excerpt from child story",
-        "parentContext": "Relevant excerpt from parent epic (or null if not applicable)"
-      }
-    ],
-    "summary": "Brief summary of alignment status"
-  }
+  Note: In agile methodology, it's expected that child stories contain more specific implementation details while parent epics remain generic and high-level. This is normal and should not be flagged as a divergence unless the specifics conflict with or contradict the epic's intent.
+  
+  Focus on:
+  1. Conflicting requirements or specifications that contradict the parent epic
+  2. Additional features or scope in the child that go beyond the parent's intended boundaries
+  3. Different interpretations that misalign with the parent's objectives
+  4. Missing critical context that should be aligned with the parent
+  5. Aligned requirements that properly implement the epic's intent
+  
+  Do NOT flag as divergences:
+  - Implementation details that naturally expand on generic epic requirements
+  - Technical specifications that realize the epic's high-level goals
+  - Specific acceptance criteria that implement broader epic outcomes
+  
+  Structure your analysis with clear markdown formatting:
+  
+  \`\`\`markdown
+  Summary: [One-sentence summary of overall alignment]
+  
+  Findings:
+  
+  1. ✅ Aligned: [Brief Title]
+     - Context: Child implements "[brief quote]" from epic's "[brief quote]"
+
+  2. ⚠️ Conflict: [Brief Title]
+      - Child: "[1-2 sentence quote]"
+      - Parent: "[1-2 sentence quote or 'Not mentioned']"
+  
+  3. ➕ Addition: [Brief Title]
+      - Child: "[1-2 sentence quote]"
+      - Parent: "[1-2 sentence quote or 'Not mentioned']"
+  
+  4. ➖ Missing: [Brief Title]
+      - Child: "[1-2 sentence quote]"
+      - Parent: "[1-2 sentence quote]"
+  
+  5. 🔄 Interpretation: [Brief Title]
+      - Child: "[1-2 sentence quote]"
+      - Parent: "[1-2 sentence quote]"
+  
+  _(List all findings - both aligned and divergent items in a single numbered list)_
   \`\`\`
+  
+  Remember: 
+  - Keep all quotes brief (1-2 sentences max) and focus on clarity over detail
+  - Include both aligned items (✅) and divergences (⚠️➕➖🔄) in the same numbered list
+  - Categories: ✅ aligned | ⚠️ conflict | ➕ addition | ➖ missing | 🔄 interpretation
   `;
 }

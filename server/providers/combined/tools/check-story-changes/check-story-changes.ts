@@ -11,6 +11,7 @@ import { getAuthInfoSafe } from '../../../../mcp-core/auth-helpers.js';
 import { createAtlassianClient } from '../../../atlassian/atlassian-api-client.js';
 import { createMcpLLMClient } from '../../../../llm-client/mcp-sampling-client.js';
 import { executeCheckStoryChanges } from './core-logic.js';
+import { createProgressNotifier } from '../writing-shell-stories/progress-notifier.js';
 
 /**
  * Tool parameters interface
@@ -30,7 +31,7 @@ export function registerCheckStoryChangesTool(mcp: McpServer): void {
     'check-story-changes',
     {
       title: 'Check Story Changes',
-      description: 'Analyze divergences between a child story and its parent epic. Identifies conflicts, additions, missing content, and interpretation differences between the story description and the parent epic.',
+      description: 'Analyze differences between a child story and its parent epic. Identifies conflicts, additions, missing content, and interpretation differences between the story description and the parent epic\'s shell story.',
       inputSchema: {
         storyKey: z.string()
           .describe('The Jira story key (e.g., "PROJ-123", "USER-10"). The story must have a parent epic.'),
@@ -62,6 +63,7 @@ export function registerCheckStoryChangesTool(mcp: McpServer): void {
         // Create API clients with token captured in closure
         const atlassianClient = createAtlassianClient(atlassianToken);
         const generateText = createMcpLLMClient(context);
+        const notify = createProgressNotifier(context, 4);
         
         // Execute core logic (token NOT passed - client has it baked in!)
         const result = await executeCheckStoryChanges(
@@ -75,14 +77,14 @@ export function registerCheckStoryChangesTool(mcp: McpServer): void {
             generateText,
             // Unused dependencies for this tool
             figmaClient: null as any,
-            notify: async () => {}, // No-op for MCP mode (no progress notifications needed)
+            notify,
           }
         );
 
         return {
           content: [{
             type: 'text',
-            text: JSON.stringify(result, null, 2),
+            text: result.analysis,
           }],
         };
 
