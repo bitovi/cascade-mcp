@@ -52,9 +52,8 @@ export function registerRestApiRoutes(app: Express): void {
   // Review work item completeness and post questions as comments
   app.post('/api/review-work-item', (req, res) => handleReviewWorkItem(req, res));
   console.log('  ✓ POST /api/review-work-item');
-  
 
-  // ====================== TEST ======================
+  // Check story changes against parent epic
   app.post('/api/check-story-changes', (req, res) => handleCheckStoryChanges(req, res));
   console.log('  ✓ POST /api/check-story-changes');
 

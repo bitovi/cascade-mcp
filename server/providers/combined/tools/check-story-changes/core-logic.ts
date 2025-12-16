@@ -125,18 +125,6 @@ export async function executeCheckStoryChanges(
   const parentData = (await parentResponse.json()) as JiraIssueResponse; // TODO: IS TYPE CASTING NECESSARY?
   const parentDescription = convertDescriptionToText(parentData.fields?.description);
 
-  console.log({parentDescription, childDescription});
-
-  // return {
-  //   success: true,
-  //   analysis: {} as DivergenceAnalysis,
-  //   metadata: {
-  //     parentKey,
-  //     childKey: storyKey,
-  //     tokensUsed: 0,
-  //   },
-  // }
-
   console.log('  Fetched parent and child descriptions');
 
   // ==========================================
@@ -183,6 +171,4 @@ export async function executeCheckStoryChanges(
       tokensUsed: llmResponse.metadata?.usage?.totalTokens,
     },
   };
-
-  // TODO: ERROR HANDLING
 }
