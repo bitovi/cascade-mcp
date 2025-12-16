@@ -1,6 +1,6 @@
 # Mini MCP Client
 
-In this example, you'll use the mini MCP client hosted at [https://cascade.bitovi.com/](https://cascade-staging.bitovi.com/) to:
+In this example, you'll use the mini MCP client hosted at [https://cascade.bitovi.com/](https://cascade.bitovi.com/) to:
 
 - Verify the Figma connection works
 - Verify the Jira connection works
@@ -8,7 +8,7 @@ In this example, you'll use the mini MCP client hosted at [https://cascade.bitov
 
 ## Verify the Figma connection works
 
-1. Go to [https://cascade.bitovi.com/](https://cascade-staging.bitovi.com/)
+1. Go to [https://cascade.bitovi.com/](https://cascade.bitovi.com/)
 2. Click `Connect`:
    > <img width="900" height="388" alt="CascadeMCP_Client" src="https://github.com/user-attachments/assets/0a0a3865-3757-4806-bee2-4268ef82ad66" />
 3. Click `Connect Figma`
@@ -29,7 +29,7 @@ Before starting, you might need to disconnect the current connection:
 
 Then complete the following steps:
 
-1. Go to [https://cascade.bitovi.com/](https://cascade-staging.bitovi.com/)
+1. Go to [https://cascade.bitovi.com/](https://cascade.bitovi.com/)
 2. Click `Connect`:
    > <img width="900" height="388" alt="CascadeMCP_Client" src="https://github.com/user-attachments/assets/0a0a3865-3757-4806-bee2-4268ef82ad66" />
 3. Click `Connect Atlassian`
