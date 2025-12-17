@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import { validateAtlassianHeaders, handleApiError, type ErrorCommentContext } from './api-error-helpers.js';
 import { createAtlassianClientWithPAT, type AtlassianClient } from '../providers/atlassian/atlassian-api-client.js';
-import { createLLMClient } from '../llm-client/provider-factory.js';
+import { createProviderFromHeaders } from '../llm-client/index.js';
 import { executeCheckStoryChanges as defaultExecuteCheckStoryChanges, type ExecuteCheckStoryChangesParams } from '../providers/combined/tools/check-story-changes/core-logic.js';
 import type { ToolDependencies } from '../providers/combined/tools/types.js';
 import { resolveCloudId } from '../providers/atlassian/atlassian-helpers.js';
@@ -73,7 +73,7 @@ export async function handleCheckStoryChanges(req: Request, res: Response, deps:
 
     // Create API clients
     const atlassianClient = createAtlassianClientFn(atlassianToken);
-    const generateText = createLLMClient();
+    const generateText = createProviderFromHeaders(req.headers as Record<string, string>);
 
     // Resolve cloudId BEFORE calling execute (needed for commenting)
     console.log('  Resolving cloud ID...');
