@@ -9,6 +9,7 @@
 import type { ToolDependencies } from '../types.js';
 import { getJiraIssue, resolveCloudId, addIssueComment } from '../../../atlassian/atlassian-helpers.js';
 import { convertAdfToMarkdown } from '../../../atlassian/markdown-converter.js';
+import type { JiraIssue } from '../../../atlassian/types.js';
 import { CHECK_STORY_CHANGES_SYSTEM_PROMPT, generateCheckWhatChangedPrompt } from './strategies/prompt-check-story-changes.js';
 import { CHECK_STORY_CHANGES_MAX_TOKENS } from './strategies/prompt-check-story-changes.js';
 
@@ -34,16 +35,30 @@ export interface ExecuteCheckStoryChangesResult {
   };
 }
 
-interface JiraIssueResponse { // TODO: DO WE HAVE A TYPE FOR THE TICKET?
-  fields?: {
-    parent?: { key?: string };
-    description?: string | any;
-  };
-}
-
-/**  
- * TODO: IS convertDescriptionToText NECESSARY?
- * Convert Jira description (ADF or string) to plain text
+/**
+ * Convert Jira description to markdown text
+ * 
+ * Handles multiple description formats returned by the Jira API:
+ * - ADF (Atlassian Document Format) objects - converted to markdown
+ * - Plain strings - returned as-is
+ * - Null/undefined - returns empty string
+ * - Other objects - JSON stringified as fallback
+ * 
+ * @param description - Jira issue description (ADF object, string, or null)
+ * @returns Markdown or plain text representation of the description
+ * 
+ * @example
+ * // ADF object
+ * const adf = { type: 'doc', content: [...] };
+ * convertDescriptionToText(adf); // Returns: "# Title\n\nContent..."
+ * 
+ * @example
+ * // Plain string
+ * convertDescriptionToText("Simple description"); // Returns: "Simple description"
+ * 
+ * @example
+ * // Null or undefined
+ * convertDescriptionToText(null); // Returns: ""
  */
 function convertDescriptionToText(description: any): string {
   if (!description) return '';
@@ -97,15 +112,14 @@ export async function executeCheckStoryChanges(
   // ==========================================
   await notify('Fetching child story and parent epic...');
   
-  // TODO: MAKE SURE IT IS CONVERTING ADL TO MARKDOWN / TEXT 
   const childResponse = await getJiraIssue(atlassianClient, resolvedCloudId, storyKey, undefined);
   if (!childResponse.ok) {
     throw new Error(`Error fetching issue ${storyKey}: ${childResponse.status} ${childResponse.statusText}`);
   }
 
-  const childData = (await childResponse.json()) as JiraIssueResponse;
-  const childDescription = convertDescriptionToText(childData.fields?.description);
-  const parentKey = childData.fields?.parent?.key || '';
+  const childData = (await childResponse.json()) as JiraIssue;
+  const childDescription = convertDescriptionToText(childData.fields.description);
+  const parentKey = childData.fields.parent?.key || '';
 
   if (!parentKey) {
     throw new Error(`Story ${storyKey} has no parent epic`);
@@ -116,14 +130,13 @@ export async function executeCheckStoryChanges(
   // ==========================================
   // PHASE 3: Fetch parent epic
   // ==========================================
-  // TODO: MAKE SURE IT IS CONVERTING ADL TO MARKDOWN / TEXT 
   const parentResponse = await getJiraIssue(atlassianClient, resolvedCloudId, parentKey, undefined);
   if (!parentResponse.ok) {
     throw new Error(`Error fetching issue ${parentKey}: ${parentResponse.status} ${parentResponse.statusText}`);
   }
 
-  const parentData = (await parentResponse.json()) as JiraIssueResponse; // TODO: IS TYPE CASTING NECESSARY?
-  const parentDescription = convertDescriptionToText(parentData.fields?.description);
+  const parentData = (await parentResponse.json()) as JiraIssue;
+  const parentDescription = convertDescriptionToText(parentData.fields.description);
 
   console.log('  Fetched parent and child descriptions');
 
