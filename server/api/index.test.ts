@@ -9,6 +9,16 @@
 import type { Request, Response } from 'express';
 import { handleWriteNextStory } from './write-next-story.js';
 
+// Mock the Atlassian helpers to prevent actual API calls
+jest.mock('../providers/atlassian/atlassian-helpers.js', () => ({
+  ...jest.requireActual('../providers/atlassian/atlassian-helpers.js'),
+  addIssueComment: jest.fn().mockResolvedValue({
+    commentId: 'mock-comment-id',
+    response: { ok: true }
+  }),
+  updateIssueComment: jest.fn().mockResolvedValue({ ok: true })
+}));
+
 describe('REST API Handler - Token Isolation', () => {
   it('should call executeWriteNextStory with params that do NOT contain tokens', async () => {
     // Create a mock for executeWriteNextStory to capture what it's called with
@@ -41,7 +51,10 @@ describe('REST API Handler - Token Isolation', () => {
     // Call the REAL handler with injected mock dependencies
     await handleWriteNextStory(mockReq, mockRes, {
       executeWriteNextStory: mockExecute,
-      createAtlassianClient: jest.fn().mockReturnValue({ fetch: jest.fn() }),
+      createAtlassianClient: jest.fn().mockReturnValue({ 
+        fetch: jest.fn(),
+        getJiraBaseUrl: jest.fn().mockReturnValue('https://test.atlassian.net')
+      }),
       createFigmaClient: jest.fn().mockReturnValue({ fetch: jest.fn() }),
       // createLLMClient is now imported directly from llm-client
     });
@@ -63,9 +76,8 @@ describe('REST API Handler - Token Isolation', () => {
     // Params should only have business data, never auth tokens
     expect(params).toEqual({
       epicKey: 'PROJ-456',
-      cloudId: 'cloud-456',
-      siteName: 'my-site',
-      sessionId: undefined
+      cloudId: 'cloud-456',  // resolvedCloudId
+      siteName: 'my-site'
     });
     expect(params).not.toHaveProperty('atlassianToken');
     expect(params).not.toHaveProperty('figmaToken');

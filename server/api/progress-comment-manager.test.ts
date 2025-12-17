@@ -198,7 +198,9 @@ describe('Progress Comment Manager', () => {
       (addIssueComment as jest.Mock).mockRejectedValue(new Error('Network error'));
 
       const manager = createProgressCommentManager(context);
-      await manager.notify('Test message');
+      
+      // notify() throws on failure, but console.log should still be called first
+      await expect(manager.notify('Test message')).rejects.toThrow();
 
       expect(consoleLogSpy).toHaveBeenCalledWith('[Progress] Test message');
     });
@@ -210,9 +212,11 @@ describe('Progress Comment Manager', () => {
 
       const manager = createProgressCommentManager(context);
       
-      // First 3 failures should try to create comment
-      await manager.notify('Message 1');
-      await manager.notify('Message 2');
+      // First 2 failures should throw errors
+      await expect(manager.notify('Message 1')).rejects.toThrow();
+      await expect(manager.notify('Message 2')).rejects.toThrow();
+      
+      // 3rd failure triggers disable and does NOT throw (commenting disabled)
       await manager.notify('Message 3');
       
       expect(addIssueComment).toHaveBeenCalledTimes(3);
@@ -224,7 +228,7 @@ describe('Progress Comment Manager', () => {
         })
       );
       
-      // 4th message should not attempt to create comment
+      // 4th message should not attempt to create comment (commenting disabled)
       await manager.notify('Message 4');
       expect(addIssueComment).toHaveBeenCalledTimes(3); // Still 3, not 4
       
@@ -248,9 +252,9 @@ describe('Progress Comment Manager', () => {
 
       const manager = createProgressCommentManager(context);
       
-      // First 2 calls fail
-      await manager.notify('Message 1');
-      await manager.notify('Message 2');
+      // First 2 calls fail and throw
+      await expect(manager.notify('Message 1')).rejects.toThrow();
+      await expect(manager.notify('Message 2')).rejects.toThrow();
       
       // 3rd call succeeds
       await manager.notify('Message 3');
@@ -336,7 +340,9 @@ describe('Progress Comment Manager', () => {
       (addIssueComment as jest.Mock).mockRejectedValue(new Error('Network error'));
 
       const manager = createProgressCommentManager(context);
-      await manager.notify('Test message');
+      
+      // notify() throws on failure, but logger.error should still be called
+      await expect(manager.notify('Test message')).rejects.toThrow();
 
       expect(logger.error).toHaveBeenCalledWith(
         'Failed to update progress comment',
