@@ -1,28 +1,78 @@
 import type { Request, Response } from 'express';
-import { validateApiHeaders, handleApiError, type ErrorCommentContext } from './api-error-helpers.js';
-import { createAtlassianClientWithPAT } from '../providers/atlassian/atlassian-api-client.js';
+import { validateAtlassianHeaders, handleApiError, type ErrorCommentContext } from './api-error-helpers.js';
+import { createAtlassianClientWithPAT, type AtlassianClient } from '../providers/atlassian/atlassian-api-client.js';
 import { createLLMClient } from '../llm-client/provider-factory.js';
-import { executeCheckStoryChanges } from '../providers/combined/tools/check-story-changes/core-logic.js';
+import { executeCheckStoryChanges as defaultExecuteCheckStoryChanges, type ExecuteCheckStoryChangesParams } from '../providers/combined/tools/check-story-changes/core-logic.js';
+import type { ToolDependencies } from '../providers/combined/tools/types.js';
 import { resolveCloudId } from '../providers/atlassian/atlassian-helpers.js';
 import { 
   createProgressCommentManager,
   type ProgressCommentManager 
 } from './progress-comment-manager.js';
 
-export async function handleCheckStoryChanges(req: Request, res: Response) {
+/**
+ * Dependencies that can be injected for testing
+ */
+export interface CheckStoryChangesHandlerDeps {
+  executeCheckStoryChanges?: (params: ExecuteCheckStoryChangesParams, deps: ToolDependencies) => Promise<any>;
+  createAtlassianClient?: typeof createAtlassianClientWithPAT;
+}
+
+/**
+ * POST /api/check-story-changes
+ * 
+ * Analyze divergences between a child story and its parent epic
+ * 
+ * Headers:
+ *   X-Atlassian-Token: ATATT...  (Atlassian PAT)
+ *   X-Atlassian-Email: user@example.com  (Email for Basic Auth)
+ *   X-Anthropic-Token: sk-...    (Anthropic API key)
+ * 
+ * Request body:
+ * {
+ *   "storyKey": "PROJ-124",
+ *   "siteName": "my-jira-site",  // optional
+ *   "cloudId": "uuid"            // optional
+ * }
+ * 
+ * Response:
+ * {
+ *   "success": true,
+ *   "analysis": "# Divergence Analysis\n\n...",
+ *   "metadata": {
+ *     "parentKey": "PROJ-100",
+ *     "childKey": "PROJ-124",
+ *     "tokensUsed": 500
+ *   }
+ * }
+ * 
+ * @param deps - Optional dependencies for testing (defaults to production implementations)
+ */
+export async function handleCheckStoryChanges(req: Request, res: Response, deps: CheckStoryChangesHandlerDeps = {}) {
+  // Use injected dependencies or defaults
+  const executeCheckStoryChangesFn = deps.executeCheckStoryChanges || defaultExecuteCheckStoryChanges;
+  const createAtlassianClientFn = deps.createAtlassianClient || createAtlassianClientWithPAT;
+  
   let commentContext: ErrorCommentContext | null = null;
   let progressManager: ProgressCommentManager | null = null;
   
   try {
-    const { storyKey, cloudId, siteName } = req.body;
+    const { cloudId, siteName } = req.body;
 
-    const tokens = validateApiHeaders(req.headers, res);
+    // Validate storyKey
+    const storyKey = req.body.storyKey;
+    if (!storyKey) {
+      res.status(400).json({ success: false, error: 'Missing required field: storyKey' });
+      return;
+    }
+
+    const tokens = validateAtlassianHeaders(req.headers, res);
     if (!tokens) return;
 
     const { atlassianToken } = tokens;
 
     // Create API clients
-    const atlassianClient = createAtlassianClientWithPAT(atlassianToken);
+    const atlassianClient = createAtlassianClientFn(atlassianToken);
     const generateText = createLLMClient();
 
     // Resolve cloudId BEFORE calling execute (needed for commenting)
@@ -42,7 +92,7 @@ export async function handleCheckStoryChanges(req: Request, res: Response) {
     });
 
     // Execute core logic
-    const result = await executeCheckStoryChanges(
+    const result = await executeCheckStoryChangesFn(
       { storyKey, cloudId: resolvedCloudId, siteName },
       {
         atlassianClient,

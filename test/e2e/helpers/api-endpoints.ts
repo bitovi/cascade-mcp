@@ -218,17 +218,7 @@ export interface CheckStoryChangesParams {
 
 export interface CheckStoryChangesResult {
   success: true;
-  analysis: {
-    hasDivergences: boolean | null;
-    divergences: Array<{
-      category: 'conflict' | 'addition' | 'missing' | 'interpretation';
-      description: string;
-      childContext: string;
-      parentContext: string | null;
-    }>;
-    summary: string;
-    rawResponse?: string;
-  };
+  analysis: string;
   metadata: {
     parentKey: string;
     childKey: string;

@@ -18,7 +18,7 @@
 import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';
 import { startTestServer, stopTestServer } from '../../specs/shared/helpers/test-server.js';
 import { createApiClient } from './helpers/api-client.js';
-import { analyzeFeatureScope, writeShellStories, writeNextStory } from './helpers/api-endpoints.js';
+import { analyzeFeatureScope, writeShellStories, writeNextStory, checkStoryChanges } from './helpers/api-endpoints.js';
 import { createAtlassianClientWithPAT } from '../../server/providers/atlassian/atlassian-api-client.js';
 import { createJiraIssue, getJiraIssue, deleteJiraIssue, resolveCloudId } from '../../server/providers/atlassian/atlassian-helpers.js';
 import { convertMarkdownToAdf } from '../../server/providers/atlassian/markdown-converter.js';
@@ -270,6 +270,27 @@ describe('REST API: Write Shell Stories E2E', () => {
       
       console.log(`✅ Created story ${writeNextStoryResult.issueKey}: ${writeNextStoryResult.storyTitle}`);
       console.log(`   View at: https://bitovi.atlassian.net/browse/${writeNextStoryResult.issueKey}`);
+      
+      // ==========================================
+      // Step 6: Call check-story-changes API to analyze divergences
+      // ==========================================
+      console.log(`\n🔍 Step 6: Calling check-story-changes API for ${writeNextStoryResult.issueKey}...`);
+      
+      const checkStoryChangesResult = await checkStoryChanges(apiClient, {
+        storyKey: writeNextStoryResult.issueKey,
+        siteName: JIRA_SITE_NAME
+      });
+      
+      console.log('📋 Check-story-changes API Response:', JSON.stringify(checkStoryChangesResult, null, 2));
+      
+      expect(checkStoryChangesResult.success).toBe(true);
+      expect(checkStoryChangesResult.metadata.childKey).toBe(writeNextStoryResult.issueKey);
+      expect(checkStoryChangesResult.metadata.parentKey).toBe(createdEpicKey);
+      expect(checkStoryChangesResult.analysis).toBeTruthy();
+      expect(typeof checkStoryChangesResult.analysis).toBe('string');
+      
+      console.log(`✅ Story changes analyzed successfully`);
+      console.log(`   Analysis preview: ${checkStoryChangesResult.analysis.substring(0, 150)}...`);
     }
     
     console.log('\n🎉 E2E test completed successfully!');
