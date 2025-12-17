@@ -17,7 +17,8 @@ jest.mock('../providers/atlassian/atlassian-helpers.js', () => ({
     commentId: 'mock-comment-id',
     response: { ok: true }
   }),
-  updateIssueComment: jest.fn().mockResolvedValue({ ok: true })
+  updateIssueComment: jest.fn().mockResolvedValue({ ok: true }),
+  resolveCloudId: jest.fn().mockResolvedValue({ cloudId: 'cloud-456', siteName: 'my-site' })
 }));
 
 describe('REST API Handler - Token Isolation', () => {
