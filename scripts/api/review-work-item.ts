@@ -74,8 +74,8 @@ Example:
   try {
     // Parse Jira URL to extract issue key and site name
     console.log('🔍 Parsing Jira URL...');
-    const { epicKey: issueKey, siteName } = parseJiraUrl(jiraUrl);
-    console.log(`  Issue Key: ${issueKey}`);
+    const { ticketKey, siteName } = parseJiraUrl(jiraUrl);
+    console.log(`  Issue Key: ${ticketKey}`);
     console.log(`  Site Name: ${siteName}`);
 
     // Create API client
@@ -99,7 +99,7 @@ Example:
 
     // Call API
     console.log('\n🔍 Reviewing work item...');
-    console.log(`  Issue: ${issueKey}`);
+    console.log(`  Issue: ${ticketKey}`);
     console.log(`  Site: ${siteName}`);
     if (cloudId) {
       console.log(`  Cloud ID: ${cloudId}`);
@@ -109,7 +109,7 @@ Example:
     }
 
     const result = await reviewWorkItem(client, {
-      issueKey,
+      ticketKey,
       siteName,
       cloudId,
       maxDepth,
@@ -118,7 +118,7 @@ Example:
     // Display results
     console.log('\n✅ Review Complete!\n');
     console.log('═══════════════════════════════════════════════════════════════');
-    console.log(`📝 Issue:     ${result.issueKey}`);
+    console.log(`📝 Issue:     ${result.ticketKey}`);
     console.log(`❓ Questions: ${result.questionCount}`);
     console.log(`📊 Status:    ${result.wellDefined ? 'Well-defined ✨' : 'Needs clarification'}`);
     console.log(`💬 Comment:   ${result.commentId}`);
@@ -129,7 +129,7 @@ Example:
     console.log(result.reviewContent);
     console.log('───────────────────────────────────────────────────────────────');
     
-    console.log(`\n🔗 View Issue: https://${siteName}.atlassian.net/browse/${issueKey}`);
+    console.log(`\n🔗 View Issue: https://${siteName}.atlassian.net/browse/${ticketKey}`);
     
     if (!result.wellDefined) {
       console.log('\n💡 Tip: Address the questions above, then re-run the review to verify improvements');

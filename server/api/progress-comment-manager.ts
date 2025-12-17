@@ -43,6 +43,12 @@ export interface ProgressCommentManager {
   appendError(errorMarkdown: string): Promise<void>;
   
   /**
+   * Append content to comment (not as numbered item)
+   * Appends content after numbered list with a separator
+   */
+  append(markdown: string): Promise<void>;
+  
+  /**
    * Get the notify function to pass to core logic
    */
   getNotifyFunction(): (message: string) => Promise<void>;
@@ -61,6 +67,7 @@ export function createProgressCommentManager(
   let commentId: string | null = null;
   let messages: string[] = [];
   let errorDetails: string | null = null;
+  let appendedContent: string[] = [];
   let consecutiveFailures = 0;
   let isCommentingDisabled = false;
 
@@ -75,7 +82,13 @@ export function createProgressCommentManager(
       markdown += `${index + 1}. ${msg}\n`;
     });
     
-    // If there's an error, append it after the list
+    // Append any additional content (each separated by ----)
+    appendedContent.forEach((content) => {
+      markdown += '\n---\n\n';
+      markdown += content;
+    });
+    
+    // If there's an error, append it at the very end
     if (errorDetails) {
       markdown += '\n---\n\n';
       markdown += errorDetails;
@@ -209,6 +222,26 @@ export function createProgressCommentManager(
   }
 
   /**
+   * Implementation of append() - append content (not as numbered item)
+   */
+  async function append(markdown: string): Promise<void> {
+    // Always log to console as backup
+    console.log(`[Progress] Appending content`);
+    
+    // If commenting is disabled, return early
+    if (isCommentingDisabled) {
+      return;
+    }
+    
+    // Add content to the appended list
+    appendedContent.push(markdown);
+    
+    // Build and post/update comment
+    const fullMarkdown = buildCommentMarkdown();
+    await tryUpdateComment(fullMarkdown);
+  }
+
+  /**
    * Get the notify function to pass to core logic
    */
   function getNotifyFunction(): (message: string) => Promise<void> {
@@ -219,6 +252,7 @@ export function createProgressCommentManager(
   return {
     notify,
     appendError,
+    append,
     getNotifyFunction
   };
 }

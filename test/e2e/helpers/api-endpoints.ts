@@ -160,7 +160,7 @@ export async function writeNextStory(client: ApiClient, params: WriteNextStoryPa
 // ===== Review Work Item =====
 
 export interface ReviewWorkItemParams {
-  issueKey: string;
+  ticketKey: string;
   cloudId?: string;
   siteName?: string;
   maxDepth?: number;
@@ -168,7 +168,7 @@ export interface ReviewWorkItemParams {
 
 export interface ReviewWorkItemResult {
   success: true;
-  issueKey: string;
+  ticketKey: string;
   reviewContent: string;
   questionCount: number;
   wellDefined: boolean;
@@ -184,7 +184,7 @@ export async function reviewWorkItem(
   client: ApiClient,
   params: ReviewWorkItemParams
 ): Promise<ReviewWorkItemResult> {
-  console.log(`Calling reviewWorkItem for issue: ${params.issueKey}`);
+  console.log(`Calling reviewWorkItem for issue: ${params.ticketKey}`);
 
   const response = await client.post('/api/review-work-item', params);
 

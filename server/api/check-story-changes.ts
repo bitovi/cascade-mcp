@@ -52,8 +52,10 @@ export async function handleCheckStoryChanges(req: Request, res: Response) {
       }
     );
 
-    // Core logic already posted the analysis to Jira via notify()
-    // Just return the result to the API caller
+    // Append the analysis result to the progress comment
+    await progressManager.append(result.analysis);
+
+    // Return the result to the API caller
     res.json({
       success: result.success,
       analysis: result.analysis,

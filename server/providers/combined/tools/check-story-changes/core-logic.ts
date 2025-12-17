@@ -149,18 +149,9 @@ export async function executeCheckStoryChanges(
   console.log('  ✅ Analysis complete');
 
   // ==========================================
-  // PHASE 5: Post analysis as comment to Jira
-  // ==========================================
-  await notify('Posting analysis to Jira...');
-
-  await addIssueComment(atlassianClient, resolvedCloudId, storyKey, markdownAnalysis);
-
-  console.log('  ✅ Comment posted to Jira');
-
-  // ==========================================
   // PHASE 5: Notify success
   // ==========================================
-  await notify('✅ Analysis complete and posted to Jira');
+  await notify('✅ Analysis complete');
 
   return {
     success: true,
