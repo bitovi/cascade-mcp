@@ -29,6 +29,7 @@ import {
 } from './provider-server-oauth/index.js';
 import { atlassianProvider } from './providers/atlassian/index.js';
 import { figmaProvider } from './providers/figma/index.js';
+import { googleProvider } from './providers/google/index.js';
 import { logEnvironmentInfo } from './debug-helpers.js';
 import { registerRestApiRoutes } from './api/index.js';
 import { getProjectRoot } from './utils/file-paths.js';
@@ -232,6 +233,8 @@ app.get('/auth/connect/atlassian', makeAuthorize(atlassianProvider));
 app.get('/auth/callback/atlassian', makeCallback(atlassianProvider, { onSuccess: hubCallbackHandler }));
 app.get('/auth/connect/figma', makeAuthorize(figmaProvider));
 app.get('/auth/callback/figma', makeCallback(figmaProvider, { onSuccess: hubCallbackHandler }));
+app.get('/auth/connect/google', makeAuthorize(googleProvider));
+app.get('/auth/callback/google', makeCallback(googleProvider, { onSuccess: hubCallbackHandler }));
 app.get('/auth/done', handleConnectionDone);
 
 // --- MCP HTTP Endpoints ---

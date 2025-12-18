@@ -15,6 +15,7 @@ import type { AuthContext } from './auth-context-store.ts';
 // Import provider implementations
 import { atlassianProvider } from '../providers/atlassian/index.js';
 import { figmaProvider } from '../providers/figma/index.js';
+import { googleProvider } from '../providers/google/index.js';
 import { utilityProvider } from '../providers/utility/index.js';
 import { combinedProvider } from '../providers/combined/index.js';
 
@@ -77,6 +78,12 @@ export function createMcpServer(authContext: AuthContext): McpServer {
     console.log('  Registering Figma tools');
     figmaProvider.registerTools(mcp, authContext);
     registeredProviders.push('figma');
+  }
+
+  if (authContext.google) {
+    console.log('  Registering Google Drive tools');
+    googleProvider.registerTools(mcp, authContext);
+    registeredProviders.push('google');
   }
 
   // Register combined tools only if BOTH providers are available

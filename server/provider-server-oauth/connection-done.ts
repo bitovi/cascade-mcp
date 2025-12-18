@@ -52,12 +52,13 @@ export async function handleConnectionDone(req: Request, res: Response): Promise
   
   try {
     // Build nested JWT payload per Q21
-    // Structure: { atlassian: { access_token, refresh_token, expires_at, scope }, figma: {...} }
+    // Structure: { atlassian: { access_token, refresh_token, expires_at, scope }, figma: {...}, google: {...} }
     
     const atlassianTokens = providerTokens['atlassian'];
     const figmaTokens = providerTokens['figma'];
+    const googleTokens = providerTokens['google'];
     
-    if (!atlassianTokens && !figmaTokens) {
+    if (!atlassianTokens && !figmaTokens && !googleTokens) {
       throw new Error('No provider tokens found - please connect at least one service');
     }
     
@@ -91,10 +92,22 @@ export async function handleConnectionDone(req: Request, res: Response): Promise
       };
     }
     
+    // Add Google tokens if present
+    if (googleTokens) {
+      console.log('  Adding Google credentials to JWT');
+      jwtPayload.google = {
+        access_token: googleTokens.access_token,
+        refresh_token: googleTokens.refresh_token,
+        expires_at: googleTokens.expires_at,
+        scope: googleTokens.scope,
+      };
+    }
+    
     // Calculate JWT expiration (use shortest provider token expiration)
     let minExpiresAt = Infinity;
     if (atlassianTokens?.expires_at) minExpiresAt = Math.min(minExpiresAt, atlassianTokens.expires_at);
     if (figmaTokens?.expires_at) minExpiresAt = Math.min(minExpiresAt, figmaTokens.expires_at);
+    if (googleTokens?.expires_at) minExpiresAt = Math.min(minExpiresAt, googleTokens.expires_at);
     
     if (minExpiresAt !== Infinity) {
       // JWT expires 1 minute before shortest provider token
@@ -108,7 +121,7 @@ export async function handleConnectionDone(req: Request, res: Response): Promise
     const { jwtSign } = await import('../tokens.js');
     const jwt = await jwtSign(jwtPayload);
     
-    console.log('  JWT created successfully with providers:', Object.keys(jwtPayload).filter(k => ['atlassian', 'figma'].includes(k)));
+    console.log('  JWT created successfully with providers:', Object.keys(jwtPayload).filter(k => ['atlassian', 'figma', 'google'].includes(k)));
     
     // Clear session provider data (tokens now embedded in JWT)
     delete req.session.providerTokens;
