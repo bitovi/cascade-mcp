@@ -15,29 +15,29 @@ export const CHECK_STORY_CHANGES_SYSTEM_PROMPT =
           
           Return your response in markdown format with proper structure and formatting.`;
 
-export const generateCheckWhatChangedPrompt = (parentKey: string, storyKey: string, parentDescription: string, childDescription: string) => {
+export const generateCheckWhatChangedPrompt = (parentKey: string, storyKey: string, parentContext: string, childContext: string) => {
   return `
-  You have 2 Jira issue descriptions: one for a parent epic and one for a child story.
+  You have Shell Stories from a parent epic (or full description if Shell Stories section not found) and the full child story description.
   
   <jira-epic-key>${parentKey}</jira-epic-key>
   
   <jira-child-key>${storyKey}</jira-child-key>
   
-  <jira-epic-description>
-  ${parentDescription}
-  </jira-epic-description>
+  <jira-epic-shell-stories>
+  ${parentContext}
+  </jira-epic-shell-stories>
   
   <jira-child-description>
-  ${childDescription}
+  ${childContext}
   </jira-child-description>
   
   
-  Analyze these two Jira issue descriptions, identifying both aligned and diverging points between the child story and parent epic.
+  Analyze these two sections, identifying both aligned and diverging points between the child story and parent epic's shell stories.
   
   Note: In agile methodology, it's expected that child stories contain more specific implementation details while parent epics remain generic and high-level. This is normal and should not be flagged as a divergence unless the specifics conflict with or contradict the epic's intent.
   
   Focus on:
-  1. Conflicting requirements or specifications that contradict the parent epic
+  1. Conflicting requirements or specifications that contradict the parent epic's shell stories
   2. Additional features or scope in the child that go beyond the parent's intended boundaries
   3. Different interpretations that misalign with the parent's objectives
   4. Missing critical context that should be aligned with the parent

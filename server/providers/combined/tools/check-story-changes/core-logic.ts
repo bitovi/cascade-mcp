@@ -8,7 +8,7 @@
 
 import type { ToolDependencies } from '../types.js';
 import { getJiraIssue, resolveCloudId, addIssueComment } from '../../../atlassian/atlassian-helpers.js';
-import { convertAdfToMarkdown } from '../../../atlassian/markdown-converter.js';
+import { convertAdfToMarkdown, extractADFSection } from '../../../atlassian/markdown-converter.js';
 import type { JiraIssue } from '../../../atlassian/types.js';
 import { CHECK_STORY_CHANGES_SYSTEM_PROMPT, generateCheckWhatChangedPrompt } from './strategies/prompt-check-story-changes.js';
 import { CHECK_STORY_CHANGES_MAX_TOKENS } from './strategies/prompt-check-story-changes.js';
@@ -33,50 +33,6 @@ export interface ExecuteCheckStoryChangesResult {
     childKey: string;
     tokensUsed?: number;
   };
-}
-
-/**
- * Convert Jira description to markdown text
- * 
- * Handles multiple description formats returned by the Jira API:
- * - ADF (Atlassian Document Format) objects - converted to markdown
- * - Plain strings - returned as-is
- * - Null/undefined - returns empty string
- * - Other objects - JSON stringified as fallback
- * 
- * @param description - Jira issue description (ADF object, string, or null)
- * @returns Markdown or plain text representation of the description
- * 
- * @example
- * // ADF object
- * const adf = { type: 'doc', content: [...] };
- * convertDescriptionToText(adf); // Returns: "# Title\n\nContent..."
- * 
- * @example
- * // Plain string
- * convertDescriptionToText("Simple description"); // Returns: "Simple description"
- * 
- * @example
- * // Null or undefined
- * convertDescriptionToText(null); // Returns: ""
- */
-function convertDescriptionToText(description: any): string {
-  if (!description) return '';
-
-  if (typeof description === 'string') {
-    return description;
-  }
-
-  if (typeof description === 'object') {
-    try {
-      return convertAdfToMarkdown(description);
-    } catch (error) {
-      console.error('Failed to convert ADF:', error);
-      return JSON.stringify(description);
-    }
-  }
-
-  return '';
 }
 
 /**
@@ -118,7 +74,9 @@ export async function executeCheckStoryChanges(
   }
 
   const childData = (await childResponse.json()) as JiraIssue;
-  const childDescription = convertDescriptionToText(childData.fields.description);
+  const childDescription = childData.fields.description 
+    ? convertAdfToMarkdown(childData.fields.description) 
+    : '';
   const parentKey = childData.fields.parent?.key || '';
 
   if (!parentKey) {
@@ -136,12 +94,43 @@ export async function executeCheckStoryChanges(
   }
 
   const parentData = (await parentResponse.json()) as JiraIssue;
-  const parentDescription = convertDescriptionToText(parentData.fields.description);
+  const parentDescription = parentData.fields.description 
+    ? convertAdfToMarkdown(parentData.fields.description) 
+    : '';
 
   console.log('  Fetched parent and child descriptions');
 
   // ==========================================
-  // PHASE 4: Compare descriptions with LLM
+  // PHASE 4: Extract focused sections
+  // ==========================================
+  let parentContext = parentDescription;
+  const childContext = childDescription; // Always use full child description
+  let analysisMode = 'full-descriptions';
+
+  // Try to extract Shell Stories from parent (if ADF)
+  if (parentData.fields.description && typeof parentData.fields.description === 'object') {
+    const { section: parentShellStories } = extractADFSection(
+      parentData.fields.description.content || [],
+      'Shell Stories'
+    );
+    
+    if (parentShellStories.length > 0) {
+      parentContext = convertAdfToMarkdown({ type: 'doc', version: 1, content: parentShellStories });
+      analysisMode = parentContext.includes('Shell Stories') ? 'shell-stories' : analysisMode;
+    }
+  }
+
+  // Notify user about analysis mode
+  if (analysisMode === 'shell-stories') {
+    console.log('  ✅ Using Shell Stories ↔ Full child description comparison');
+    await notify('✅ Using Shell Stories ↔ Full child description comparison');
+  } else {
+    console.log('  ⚠️ Using full descriptions (Shell Stories section not found)');
+    await notify('⚠️ Using full descriptions (Shell Stories section not found)');
+  }
+
+  // ==========================================
+  // PHASE 5: Compare descriptions with LLM
   // ==========================================
   await notify('Analyzing divergences with AI...');
 
@@ -152,7 +141,7 @@ export async function executeCheckStoryChanges(
         role: 'system',
         content: CHECK_STORY_CHANGES_SYSTEM_PROMPT,
       },
-      { role: 'user', content: generateCheckWhatChangedPrompt(parentKey, storyKey, parentDescription, childDescription) },
+      { role: 'user', content: generateCheckWhatChangedPrompt(parentKey, storyKey, parentContext, childContext) },
     ],
     maxTokens: CHECK_STORY_CHANGES_MAX_TOKENS,
   });
@@ -162,7 +151,7 @@ export async function executeCheckStoryChanges(
   console.log('  ✅ Analysis complete');
 
   // ==========================================
-  // PHASE 5: Notify success
+  // PHASE 6: Notify success
   // ==========================================
   await notify('✅ Analysis complete');
 
