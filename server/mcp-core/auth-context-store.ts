@@ -28,6 +28,7 @@ export interface AuthContext {
   // Multi-provider tokens (nested structure per Q21, Q22)
   atlassian?: ProviderAuthInfo;
   figma?: ProviderAuthInfo;
+  google?: ProviderAuthInfo;
   // JWT metadata (preserved for compatibility)
   iss?: string;
   aud?: string;
@@ -68,11 +69,17 @@ function getTokenLogInfo(token?: string, prefix: string = 'Token'): Record<strin
 export function setAuthContext(transportId: string, authInfo: AuthContext): void {
   const atlassianToken = authInfo?.atlassian?.access_token;
   const figmaToken = authInfo?.figma?.access_token;
+  const googleToken = authInfo?.google?.access_token;
   const now = Math.floor(Date.now() / 1000);
   
   // Calculate expiry for Atlassian tokens
   const atlassianExpiresIn = authInfo?.atlassian?.expires_at 
     ? authInfo.atlassian.expires_at - now 
+    : null;
+  
+  // Calculate expiry for Google tokens
+  const googleExpiresIn = authInfo?.google?.expires_at 
+    ? authInfo.google.expires_at - now 
     : null;
   
   logger.info('Storing auth context for transport', {
@@ -91,6 +98,15 @@ export function setAuthContext(transportId: string, authInfo: AuthContext): void
         ...getTokenLogInfo(figmaToken, 'figmaToken'),
         hasRefreshToken: !!authInfo.figma.refresh_token,
         scope: authInfo.figma.scope,
+      } : null,
+      google: authInfo?.google ? {
+        ...getTokenLogInfo(googleToken, 'googleToken'),
+        hasRefreshToken: !!authInfo.google.refresh_token,
+        scope: authInfo.google.scope,
+        expiresIn: googleExpiresIn,
+        expiresAt: authInfo.google.expires_at 
+          ? new Date(authInfo.google.expires_at * 1000).toISOString() 
+          : null,
       } : null,
     },
     issuer: authInfo?.iss,
@@ -146,7 +162,7 @@ export function getAuthContext(transportId: string): AuthContext | undefined {
  */
 export function getAuthInfo(context: any): AuthContext | null {
   // First try to get from context if it's directly available
-  if (context?.authInfo && (context.authInfo.atlassian || context.authInfo.figma)) {
+  if (context?.authInfo && (context.authInfo.atlassian || context.authInfo.figma || context.authInfo.google)) {
     return context.authInfo;
   }
 
@@ -156,7 +172,7 @@ export function getAuthInfo(context: any): AuthContext | null {
   if (sessionId) {
     const authInfo = authContextStore.get(sessionId);
     
-    if (authInfo && (authInfo.atlassian || authInfo.figma)) {
+    if (authInfo && (authInfo.atlassian || authInfo.figma || authInfo.google)) {
       return authInfo;
     }
   }
