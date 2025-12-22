@@ -2,12 +2,12 @@
  * Core business logic for check-story-changes tool
  * 
  * This module contains the pure business logic for analyzing divergences between
- * a child story and its parent epic. It is independent of MCP-specific concerns
+ * a child story and its parent epic's shell story. It is independent of MCP-specific concerns
  * (authentication, context, etc.) and can be used from both MCP handlers and REST API endpoints.
  */
 
 import type { ToolDependencies } from '../types.js';
-import { getJiraIssue, resolveCloudId, addIssueComment } from '../../../atlassian/atlassian-helpers.js';
+import { getJiraIssue, resolveCloudId } from '../../../atlassian/atlassian-helpers.js';
 import { convertAdfToMarkdown, extractADFSection } from '../../../atlassian/markdown-converter.js';
 import type { JiraIssue } from '../../../atlassian/types.js';
 import { CHECK_STORY_CHANGES_SYSTEM_PROMPT, generateCheckWhatChangedPrompt } from './strategies/prompt-check-story-changes.js';

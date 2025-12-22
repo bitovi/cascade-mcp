@@ -59,8 +59,6 @@ Example:
       cloudId,
     });
 
-    // TODO: post the result to Jira as comment
-
     console.log('\n✅ Story Change Analysis Result:\n');
     console.log(result.analysis);
 

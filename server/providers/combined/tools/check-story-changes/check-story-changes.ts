@@ -2,7 +2,7 @@
  * Check Story Changes Tool - MCP Handler
  * 
  * Thin MCP wrapper that handles authentication and delegates to core logic.
- * This tool analyzes divergences between a child story and its parent epic.
+ * This tool analyzes divergences between a child story and its parent epic's shell story.
  */
 
 import { z } from 'zod';
