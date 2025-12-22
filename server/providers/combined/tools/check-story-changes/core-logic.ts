@@ -35,8 +35,6 @@ export interface ExecuteCheckStoryChangesResult {
   };
 }
 
-const NOTIFY_FLAG = false;
-
 /**
  * Execute the check-story-changes workflow
  * 
@@ -56,9 +54,7 @@ export async function executeCheckStoryChanges(
 
   console.log('check-story-changes: Analyzing story', { storyKey, cloudId, siteName });
 
-  if (NOTIFY_FLAG) {
-    await notify('📝 Checking story changes...');
-  }
+  await notify('📝 Checking story changes...');
 
   // ==========================================
   // PHASE 1: Resolve site identifier
@@ -71,9 +67,7 @@ export async function executeCheckStoryChanges(
   // PHASE 2: Fetch child story
   // ==========================================
   
-  if (NOTIFY_FLAG) {
-    await notify('Fetching child story and parent epic...');
-  }
+  await notify('Fetching child story and parent epic...');
   
   const childResponse = await getJiraIssue(atlassianClient, resolvedCloudId, storyKey, undefined);
   if (!childResponse.ok) {
@@ -110,40 +104,30 @@ export async function executeCheckStoryChanges(
   // ==========================================
   // PHASE 4: Extract focused sections
   // ==========================================
-  let parentContext = parentDescription;
   const childContext = childDescription; // Always use full child description
-  let analysisMode = 'full-descriptions';
 
-  // Try to extract Shell Stories from parent (if ADF)
-  if (parentData.fields.description && typeof parentData.fields.description === 'object') {
-    const { section: parentShellStories } = extractADFSection(
-      parentData.fields.description.content || [],
-      'Shell Stories'
-    );
-    
-    if (parentShellStories.length > 0) {
-      parentContext = convertAdfToMarkdown({ type: 'doc', version: 1, content: parentShellStories });
-      analysisMode = parentContext.includes('Shell Stories') ? 'shell-stories' : analysisMode;
-    }
+  // Extract Shell Stories from parent (if ADF)
+  if (!parentData.fields.description || typeof parentData.fields.description !== 'object') {
+    throw new Error(`Parent epic ${parentKey} does not have ADF description format`);
   }
 
-  if (NOTIFY_FLAG) {
-    // Notify user about analysis mode
-    if (analysisMode === 'shell-stories') {
-      console.log('  ✅ Using Shell Stories ↔ Full child description comparison');
-      await notify('✅ Using Shell Stories ↔ Full child description comparison');
-    } else {
-      console.log('  ⚠️ Using full descriptions (Shell Stories section not found)');
-      await notify('⚠️ Using full descriptions (Shell Stories section not found)');
-    }
+  const { section: parentShellStories } = extractADFSection(
+    parentData.fields.description.content || [],
+    'Shell Stories'
+  );
+  
+  if (parentShellStories.length === 0) {
+    throw new Error(`Parent epic ${parentKey} does not contain a "Shell Stories" section`);
   }
+
+  const parentContext = convertAdfToMarkdown({ type: 'doc', version: 1, content: parentShellStories });
+  
+  console.log('  ✅ Using Shell Stories ↔ Full child description comparison');
 
   // ==========================================
   // PHASE 5: Compare descriptions with LLM
   // ==========================================
-  if (NOTIFY_FLAG) {
-    await notify('Analyzing divergences with AI...');
-  }
+  await notify('Analyzing divergences with AI...');
 
   console.log('  Requesting LLM analysis...');
   const llmResponse = await generateText({
@@ -164,9 +148,7 @@ export async function executeCheckStoryChanges(
   // ==========================================
   // PHASE 6: Notify success
   // ==========================================
-  if (NOTIFY_FLAG) {
-    await notify('✅ Analysis complete');
-  }
+  await notify('✅ Analysis complete');
 
   return {
     success: true,

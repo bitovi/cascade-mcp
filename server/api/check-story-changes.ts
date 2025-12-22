@@ -102,8 +102,8 @@ export async function handleCheckStoryChanges(req: Request, res: Response, deps:
       }
     );
 
-    // Append the analysis result to the progress comment
-    await progressManager.append(result.analysis);
+    // Replace progress comment with clean analysis result
+    await progressManager.replaceWithFinalContent(result.analysis);
 
     // Return the result to the API caller
     res.json({

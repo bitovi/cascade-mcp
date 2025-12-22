@@ -43,10 +43,10 @@ export interface ProgressCommentManager {
   appendError(errorMarkdown: string): Promise<void>;
   
   /**
-   * Append content to comment (not as numbered item)
-   * Appends content after numbered list with a separator
+   * Replace progress comment with final content (removes progress tracking)
+   * Updates the existing comment to contain only the final content
    */
-  append(markdown: string): Promise<void>;
+  replaceWithFinalContent(markdown: string): Promise<void>;
   
   /**
    * Get the notify function to pass to core logic
@@ -67,7 +67,6 @@ export function createProgressCommentManager(
   let commentId: string | null = null;
   let messages: string[] = [];
   let errorDetails: string | null = null;
-  let appendedContent: string[] = [];
   let consecutiveFailures = 0;
   let isCommentingDisabled = false;
 
@@ -80,12 +79,6 @@ export function createProgressCommentManager(
     // Add numbered list of progress messages
     messages.forEach((msg, index) => {
       markdown += `${index + 1}. ${msg}\n`;
-    });
-    
-    // Append any additional content (each separated by ----)
-    appendedContent.forEach((content) => {
-      markdown += '\n---\n\n';
-      markdown += content;
     });
     
     // If there's an error, append it at the very end
@@ -222,23 +215,39 @@ export function createProgressCommentManager(
   }
 
   /**
-   * Implementation of append() - append content (not as numbered item)
+   * Implementation of replaceWithFinalContent() - replace progress with clean final content
    */
-  async function append(markdown: string): Promise<void> {
+  async function replaceWithFinalContent(markdown: string): Promise<void> {
     // Always log to console as backup
-    console.log(`[Progress] Appending content`);
+    console.log(`[Progress] Replacing with final content`);
     
-    // If commenting is disabled, return early
-    if (isCommentingDisabled) {
+    // If commenting is disabled or no comment was created, just return
+    if (isCommentingDisabled || commentId === null) {
       return;
     }
     
-    // Add content to the appended list
-    appendedContent.push(markdown);
-    
-    // Build and post/update comment
-    const fullMarkdown = buildCommentMarkdown();
-    await tryUpdateComment(fullMarkdown);
+    try {
+      // Update the existing comment with just the final content (no progress list)
+      await updateIssueComment(
+        context.client,
+        context.cloudId,
+        context.epicKey,
+        commentId,
+        markdown
+      );
+      
+      logger.info('Progress comment replaced with final content', {
+        epicKey: context.epicKey,
+        commentId
+      });
+    } catch (error: any) {
+      logger.error('Failed to replace progress with final content', { 
+        epicKey: context.epicKey,
+        commentId,
+        error: error.message
+      });
+      // Don't throw - operation already succeeded, commenting is best-effort
+    }
   }
 
   /**
@@ -252,7 +261,7 @@ export function createProgressCommentManager(
   return {
     notify,
     appendError,
-    append,
+    replaceWithFinalContent,
     getNotifyFunction
   };
 }
