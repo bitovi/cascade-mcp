@@ -355,8 +355,8 @@ describe('Progress Comment Manager', () => {
     });
   });
 
-  describe('append() - Appending Content', () => {
-    it('should append content after numbered list with separator', async () => {
+  describe('replaceWithFinalContent() - Replacing Progress with Clean Final Content', () => {
+    it('should update existing comment with only final content (removing progress list)', async () => {
       (addIssueComment as jest.Mock).mockResolvedValue({
         commentId: 'comment-1',
         response: { ok: true }
@@ -368,28 +368,28 @@ describe('Progress Comment Manager', () => {
       // Add some progress messages first
       await manager.notify('Starting operation...');
       await manager.notify('Phase 1 complete');
+      await manager.notify('Phase 2 complete');
       
-      // Append content (not as numbered item)
-      const appendedMarkdown = '# Analysis Result\n\nThis is the analysis content.';
-      await manager.append(appendedMarkdown);
+      // Replace with final content
+      const finalContent = '# Analysis Result\n\nThis is the final analysis without progress tracking.';
+      await manager.replaceWithFinalContent(finalContent);
 
-      const lastUpdateCall = (updateIssueComment as jest.Mock).mock.calls[1];
+      // Should have called updateIssueComment (not create a new comment)
+      expect(updateIssueComment).toHaveBeenCalledTimes(3); // 2 from notify, 1 from replace
+      
+      const lastUpdateCall = (updateIssueComment as jest.Mock).mock.calls[2];
       const markdown = lastUpdateCall[4];
       
-      // Check numbered list is still there
-      expect(markdown).toContain('1. Starting operation...');
-      expect(markdown).toContain('2. Phase 1 complete');
+      // Check that progress list is NOT there
+      expect(markdown).not.toContain('1. Starting operation...');
+      expect(markdown).not.toContain('2. Phase 1 complete');
+      expect(markdown).not.toContain('🔄 **Test Operation Progress**');
       
-      // Check appended content is after separator
-      expect(markdown).toContain('---');
-      expect(markdown).toContain('# Analysis Result');
-      expect(markdown).toContain('This is the analysis content.');
-      
-      // Ensure appended content is NOT in numbered list
-      expect(markdown).not.toContain('3. # Analysis Result');
+      // Check only final content is present
+      expect(markdown).toBe(finalContent);
     });
 
-    it('should append multiple pieces of content with separators', async () => {
+    it('should log to console when replacing with final content', async () => {
       (addIssueComment as jest.Mock).mockResolvedValue({
         commentId: 'comment-1',
         response: { ok: true }
@@ -397,70 +397,14 @@ describe('Progress Comment Manager', () => {
       (updateIssueComment as jest.Mock).mockResolvedValue({ ok: true });
 
       const manager = createProgressCommentManager(context);
-      
       await manager.notify('Starting...');
       
-      // Append multiple pieces of content
-      await manager.append('## First Analysis\n\nContent 1');
-      await manager.append('## Second Analysis\n\nContent 2');
+      await manager.replaceWithFinalContent('# Final Result');
 
-      const lastUpdateCall = (updateIssueComment as jest.Mock).mock.calls[1];
-      const markdown = lastUpdateCall[4];
-      
-      // Check both appended contents exist with separators
-      expect(markdown).toContain('1. Starting...');
-      expect(markdown).toContain('---');
-      expect(markdown).toContain('## First Analysis');
-      expect(markdown).toContain('Content 1');
-      expect(markdown).toContain('## Second Analysis');
-      expect(markdown).toContain('Content 2');
-      
-      // Count separators (should have 2: one before each appended content)
-      const separatorCount = (markdown.match(/---/g) || []).length;
-      expect(separatorCount).toBe(2);
+      expect(consoleLogSpy).toHaveBeenCalledWith('[Progress] Replacing with final content');
     });
 
-    it('should place error details after appended content', async () => {
-      (addIssueComment as jest.Mock).mockResolvedValue({
-        commentId: 'comment-1',
-        response: { ok: true }
-      });
-      (updateIssueComment as jest.Mock).mockResolvedValue({ ok: true });
-
-      const manager = createProgressCommentManager(context);
-      
-      await manager.notify('Starting...');
-      await manager.append('## Analysis\n\nSome analysis content');
-      await manager.appendError('## Error\n\nSomething went wrong');
-
-      const lastUpdateCall = (updateIssueComment as jest.Mock).mock.calls[1];
-      const markdown = lastUpdateCall[4];
-      
-      // Check order: numbered list -> appended content -> error details
-      const numberedListIndex = markdown.indexOf('1. Starting...');
-      const appendedContentIndex = markdown.indexOf('## Analysis');
-      const errorIndex = markdown.indexOf('## Error');
-      
-      expect(numberedListIndex).toBeLessThan(appendedContentIndex);
-      expect(appendedContentIndex).toBeLessThan(errorIndex);
-      
-      // Check that failure indicator is in the numbered list
-      expect(markdown).toContain('2. ❌ **Operation Failed**');
-    });
-
-    it('should log to console when appending content', async () => {
-      (addIssueComment as jest.Mock).mockResolvedValue({
-        commentId: 'comment-1',
-        response: { ok: true }
-      });
-
-      const manager = createProgressCommentManager(context);
-      await manager.append('Test appended content');
-
-      expect(consoleLogSpy).toHaveBeenCalledWith('[Progress] Appending content');
-    });
-
-    it('should not attempt to append if commenting is disabled', async () => {
+    it('should not attempt to replace if commenting is disabled', async () => {
       (addIssueComment as jest.Mock).mockRejectedValue(new Error('Network error'));
 
       const manager = createProgressCommentManager(context);
@@ -470,36 +414,62 @@ describe('Progress Comment Manager', () => {
       await expect(manager.notify('Message 2')).rejects.toThrow();
       await manager.notify('Message 3'); // 3rd failure disables commenting
       
-      const callCountBefore = (addIssueComment as jest.Mock).mock.calls.length;
+      const callCountBefore = (updateIssueComment as jest.Mock).mock.calls.length;
       
-      // Try to append content - should not make API call
-      await manager.append('Some content');
+      // Try to replace - should not make API call
+      await manager.replaceWithFinalContent('Final content');
       
-      const callCountAfter = (addIssueComment as jest.Mock).mock.calls.length;
+      const callCountAfter = (updateIssueComment as jest.Mock).mock.calls.length;
       expect(callCountAfter).toBe(callCountBefore); // No new calls
       
       // But should still log to console
-      expect(consoleLogSpy).toHaveBeenCalledWith('[Progress] Appending content');
+      expect(consoleLogSpy).toHaveBeenCalledWith('[Progress] Replacing with final content');
     });
 
-    it('should create comment on first append if no notify called yet', async () => {
+    it('should not attempt to replace if no comment was created yet', async () => {
+      const manager = createProgressCommentManager(context);
+      
+      // Try to replace without creating comment first
+      await manager.replaceWithFinalContent('Final content');
+      
+      // Should not attempt any API calls
+      expect(addIssueComment).not.toHaveBeenCalled();
+      expect(updateIssueComment).not.toHaveBeenCalled();
+      
+      // But should still log to console
+      expect(consoleLogSpy).toHaveBeenCalledWith('[Progress] Replacing with final content');
+    });
+
+    it('should not throw error if replace fails (best-effort)', async () => {
       (addIssueComment as jest.Mock).mockResolvedValue({
         commentId: 'comment-1',
         response: { ok: true }
       });
+      // Replace update should fail
+      (updateIssueComment as jest.Mock).mockRejectedValue(new Error('Update failed'));
 
       const manager = createProgressCommentManager(context);
       
-      // First call is append (not notify)
-      await manager.append('# Direct Append\n\nContent without prior notify');
-
-      expect(addIssueComment).toHaveBeenCalledTimes(1);
-      const markdown = (addIssueComment as jest.Mock).mock.calls[0][3];
+      await manager.notify('Starting...');
       
-      expect(markdown).toContain('🔄 **Test Operation Progress**');
-      expect(markdown).toContain('---');
-      expect(markdown).toContain('# Direct Append');
-      expect(markdown).not.toContain('1.'); // No numbered items
+      // Clear previous mocks to isolate replace behavior
+      jest.clearAllMocks();
+      
+      // Should not throw even if update fails
+      await manager.replaceWithFinalContent('Final content');
+      
+      // Verify update was attempted
+      expect(updateIssueComment).toHaveBeenCalledTimes(1);
+      
+      // Should log error
+      expect(logger.error).toHaveBeenCalledWith(
+        'Failed to replace progress with final content',
+        expect.objectContaining({
+          epicKey: 'TEST-123',
+          commentId: 'comment-1',
+          error: 'Update failed'
+        })
+      );
     });
   });
 });
