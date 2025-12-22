@@ -35,6 +35,8 @@ export interface ExecuteCheckStoryChangesResult {
   };
 }
 
+const NOTIFY_FLAG = false;
+
 /**
  * Execute the check-story-changes workflow
  * 
@@ -54,7 +56,9 @@ export async function executeCheckStoryChanges(
 
   console.log('check-story-changes: Analyzing story', { storyKey, cloudId, siteName });
 
-  await notify('📝 Checking story changes...');
+  if (NOTIFY_FLAG) {
+    await notify('📝 Checking story changes...');
+  }
 
   // ==========================================
   // PHASE 1: Resolve site identifier
@@ -66,7 +70,10 @@ export async function executeCheckStoryChanges(
   // ==========================================
   // PHASE 2: Fetch child story
   // ==========================================
-  await notify('Fetching child story and parent epic...');
+  
+  if (NOTIFY_FLAG) {
+    await notify('Fetching child story and parent epic...');
+  }
   
   const childResponse = await getJiraIssue(atlassianClient, resolvedCloudId, storyKey, undefined);
   if (!childResponse.ok) {
@@ -120,19 +127,23 @@ export async function executeCheckStoryChanges(
     }
   }
 
-  // Notify user about analysis mode
-  if (analysisMode === 'shell-stories') {
-    console.log('  ✅ Using Shell Stories ↔ Full child description comparison');
-    await notify('✅ Using Shell Stories ↔ Full child description comparison');
-  } else {
-    console.log('  ⚠️ Using full descriptions (Shell Stories section not found)');
-    await notify('⚠️ Using full descriptions (Shell Stories section not found)');
+  if (NOTIFY_FLAG) {
+    // Notify user about analysis mode
+    if (analysisMode === 'shell-stories') {
+      console.log('  ✅ Using Shell Stories ↔ Full child description comparison');
+      await notify('✅ Using Shell Stories ↔ Full child description comparison');
+    } else {
+      console.log('  ⚠️ Using full descriptions (Shell Stories section not found)');
+      await notify('⚠️ Using full descriptions (Shell Stories section not found)');
+    }
   }
 
   // ==========================================
   // PHASE 5: Compare descriptions with LLM
   // ==========================================
-  await notify('Analyzing divergences with AI...');
+  if (NOTIFY_FLAG) {
+    await notify('Analyzing divergences with AI...');
+  }
 
   console.log('  Requesting LLM analysis...');
   const llmResponse = await generateText({
@@ -153,7 +164,9 @@ export async function executeCheckStoryChanges(
   // ==========================================
   // PHASE 6: Notify success
   // ==========================================
-  await notify('✅ Analysis complete');
+  if (NOTIFY_FLAG) {
+    await notify('✅ Analysis complete');
+  }
 
   return {
     success: true,
