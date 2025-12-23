@@ -107,19 +107,20 @@ export function validateApiHeaders(
   headers: Record<string, string | string[] | undefined>,
   res: Response
 ): { atlassianToken: string; figmaToken: string } | null {
-  const atlassianToken = headers['x-atlassian-token'] as string;
-  const figmaToken = headers['x-figma-token'] as string;
-  
-  if (!atlassianToken) {
-    res.status(401).json({ success: false, error: 'Missing required header: X-Atlassian-Token' });
+  // Validate Atlassian token first
+  const atlassianResult = validateAtlassianHeaders(headers, res);
+  if (!atlassianResult) {
     return null;
   }
+  
+  // Validate Figma token
+  const figmaToken = headers['x-figma-token'] as string;
   if (!figmaToken) {
     res.status(401).json({ success: false, error: 'Missing required header: X-Figma-Token' });
     return null;
   }
   
-  return { atlassianToken, figmaToken };
+  return { atlassianToken: atlassianResult.atlassianToken, figmaToken };
 }
 
 /**
