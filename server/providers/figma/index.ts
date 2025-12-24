@@ -7,12 +7,13 @@
  */
 
 import type { McpServer } from '../../mcp-core/mcp-types.js';
-import type { 
-  OAuthProvider, 
-  AuthUrlParams, 
-  TokenExchangeParams, 
-  StandardTokenResponse, 
-  CallbackParams 
+import type {
+  OAuthProvider,
+  AuthUrlParams,
+  TokenExchangeParams,
+  StandardTokenResponse,
+  CallbackParams,
+  RefreshTokenParams,
 } from '../provider-interface.js';
 import { registerFigmaTools } from './tools/index.js';
 
@@ -119,7 +120,73 @@ export const figmaProvider: OAuthProvider = {
   getDefaultScopes(): string[] {
     return ['file_content:read', 'file_comments:read'];
   },
-  
+
+  /**
+   * Refresh an access token using a refresh token
+   * Figma uses a different refresh endpoint and HTTP Basic Auth
+   * ⚠️ CRITICAL: Figma does NOT return a new refresh_token - the same one remains valid
+   * @param params - Refresh parameters including the refresh token
+   * @returns New access token and the ORIGINAL refresh token
+   */
+  async refreshAccessToken(
+    params: RefreshTokenParams
+  ): Promise<StandardTokenResponse> {
+    const clientId = process.env.FIGMA_CLIENT_ID!;
+    const clientSecret = process.env.FIGMA_CLIENT_SECRET!;
+
+    console.log('[FIGMA] Refreshing access token');
+    console.log('[FIGMA]   - Refresh token length:', params.refreshToken.length);
+    console.log(
+      '[FIGMA]   - Using endpoint: https://api.figma.com/v1/oauth/refresh'
+    );
+
+    // Figma uses HTTP Basic Auth for refresh (different from token exchange!)
+    const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString(
+      'base64'
+    );
+
+    const response = await fetch('https://api.figma.com/v1/oauth/refresh', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Basic ${basicAuth}`,
+      },
+      body: new URLSearchParams({
+        refresh_token: params.refreshToken,
+      }).toString(),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[FIGMA] Token refresh failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText,
+      });
+      throw new Error(
+        `Figma token refresh failed (${response.status}): ${errorText}`
+      );
+    }
+
+    const tokenData = (await response.json()) as any;
+    console.log('[FIGMA] Token refresh successful:', {
+      hasAccessToken: !!tokenData.access_token,
+      hasRefreshToken: !!tokenData.refresh_token, // Should be false
+      expiresIn: tokenData.expires_in,
+    });
+
+    // Figma response: { access_token, token_type, expires_in } - NO refresh_token!
+    return {
+      access_token: tokenData.access_token,
+      // ⚠️ KEY: Figma doesn't return a refresh token, so we return the ORIGINAL
+      // input token. This ensures the caller gets a valid refresh_token to embed
+      // in the new JWT, even though Figma didn't provide one.
+      refresh_token: params.refreshToken,
+      token_type: tokenData.token_type || 'Bearer',
+      expires_in: tokenData.expires_in || 7776000,
+    };
+  },
+
   /**
    * Register Figma-specific MCP tools
    * Tools will be registered with 'figma-' prefix per Q13

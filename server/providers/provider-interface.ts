@@ -35,6 +35,11 @@ export interface TokenExchangeParams {
   redirectUri?: string;
 }
 
+// Parameters for refresh token exchange
+export interface RefreshTokenParams {
+  refreshToken: string;
+}
+
 // Callback parameters extracted from request
 export interface CallbackParams {
   code: string;
@@ -96,7 +101,21 @@ export interface OAuthProvider {
    * @returns true if valid, false otherwise
    */
   validateTokenResponse?(response: any): boolean;
-  
+
+  /**
+   * Refresh an access token using a refresh token
+   * Handles provider-specific refresh flows (different endpoints, auth methods)
+   * @param params - Refresh parameters including the refresh token
+   * @returns New access token and optionally new refresh token
+   *
+   * NOTE: Some providers (Atlassian) rotate refresh tokens on each refresh,
+   * while others (Figma) reuse the same refresh token indefinitely.
+   * The returned refresh_token should be:
+   * - The NEW refresh token if provider rotates (Atlassian)
+   * - The ORIGINAL refresh token if provider doesn't rotate (Figma)
+   */
+  refreshAccessToken?(params: RefreshTokenParams): Promise<StandardTokenResponse>;
+
   /**
    * Register provider-specific MCP tools
    * Called during dynamic MCP server creation based on authenticated providers

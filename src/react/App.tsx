@@ -19,6 +19,7 @@ export default function App() {
     disconnect,
     callTool,
     setAnthropicKey,
+    refreshTokens,
   } = useMcpClient();
 
   const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
@@ -106,6 +107,7 @@ export default function App() {
             status={state.status}
             onConnect={handleConnect}
             onDisconnect={handleDisconnect}
+            onRefreshTokens={refreshTokens}
           />
 
           {/* Tool Selection - only show when connected */}

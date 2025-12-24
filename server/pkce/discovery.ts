@@ -36,6 +36,28 @@ const serverInstanceScope = /*`server-instance`;*/ `server-instance-${serverStar
 export { serverStartTime, serverInstanceScope };
 
 /**
+ * Get the base URL for OAuth metadata responses.
+ * In development with a proxy (like Vite), use the forwarded origin or request's origin/host.
+ * In production, use the configured VITE_AUTH_SERVER_URL.
+ */
+function getBaseUrl(req: Request): string {
+  // Check for forwarded origin header (set by Vite proxy)
+  const forwardedOrigin = req.headers['x-forwarded-origin'] as string | undefined;
+  if (forwardedOrigin) {
+    return forwardedOrigin;
+  }
+  
+  // If request has an origin header (direct browser request), use it
+  const origin = req.headers.origin;
+  if (origin) {
+    return origin;
+  }
+  
+  // Otherwise use configured URL or derive from request
+  return process.env.VITE_AUTH_SERVER_URL || `${req.protocol}://${req.get('host')}`;
+}
+
+/**
  * OAuth Metadata Endpoint
  * Provides OAuth server configuration for clients
  */
@@ -47,11 +69,14 @@ export const oauthMetadata: OAuthHandler = (req: Request, res: Response): void =
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   
+  const baseUrl = getBaseUrl(req);
+  console.log('  Using baseUrl:', baseUrl);
+  
   res.json({
-    issuer: process.env.VITE_AUTH_SERVER_URL,
-    authorization_endpoint: process.env.VITE_AUTH_SERVER_URL + '/auth/connect',
-    token_endpoint: process.env.VITE_AUTH_SERVER_URL + '/access-token',
-    registration_endpoint: process.env.VITE_AUTH_SERVER_URL + '/register',
+    issuer: baseUrl,
+    authorization_endpoint: baseUrl + '/auth/connect',
+    token_endpoint: baseUrl + '/access-token',
+    registration_endpoint: baseUrl + '/register',
     code_challenge_methods_supported: ['S256'],
     response_types_supported: ['code'],
     grant_types_supported: ['authorization_code', 'refresh_token'],
@@ -75,7 +100,9 @@ export const oauthProtectedResourceMetadata: OAuthHandler = (req: Request, res: 
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   
-  const baseUrl = process.env.VITE_AUTH_SERVER_URL;
+  const baseUrl = getBaseUrl(req);
+  console.log('  Using baseUrl:', baseUrl);
+  
   const metadata = {
     resource: baseUrl,
     authorization_servers: [baseUrl],

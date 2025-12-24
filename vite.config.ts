@@ -21,12 +21,58 @@ export default defineConfig({
     port: 5173,
     proxy: {
       // Proxy MCP and API requests to backend during dev
-      '/mcp': 'http://localhost:3000',
-      '/api': 'http://localhost:3000',
-      '/auth': 'http://localhost:3000',
-      '/.well-known': 'http://localhost:3000',
-      '/register': 'http://localhost:3000',
-      '/get-access-token': 'http://localhost:3000',
+      // Configure to forward origin header for OAuth metadata
+      '/mcp': {
+        target: 'http://localhost:3000',
+        changeOrigin: false,
+        headers: { 'X-Forwarded-Origin': 'http://localhost:5173' },
+      },
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: false,
+        headers: { 'X-Forwarded-Origin': 'http://localhost:5173' },
+      },
+      '/auth': {
+        target: 'http://localhost:3000',
+        changeOrigin: false,
+        headers: { 'X-Forwarded-Origin': 'http://localhost:5173' },
+      },
+      '/.well-known': {
+        target: 'http://localhost:3000',
+        changeOrigin: false,
+        headers: { 'X-Forwarded-Origin': 'http://localhost:5173' },
+      },
+      '/register': {
+        target: 'http://localhost:3000',
+        changeOrigin: false,
+        headers: { 'X-Forwarded-Origin': 'http://localhost:5173' },
+      },
+      '/get-access-token': {
+        target: 'http://localhost:3000',
+        changeOrigin: false,
+        headers: { 'X-Forwarded-Origin': 'http://localhost:5173' },
+      },
+      // OAuth token endpoints (used by MCP SDK)
+      '/token': {
+        target: 'http://localhost:3000',
+        changeOrigin: false,
+        headers: { 'X-Forwarded-Origin': 'http://localhost:5173' },
+      },
+      '/access-token': {
+        target: 'http://localhost:3000',
+        changeOrigin: false,
+        headers: { 'X-Forwarded-Origin': 'http://localhost:5173' },
+      },
+      '/authorize': {
+        target: 'http://localhost:3000',
+        changeOrigin: false,
+        headers: { 'X-Forwarded-Origin': 'http://localhost:5173' },
+      },
+      '/callback': {
+        target: 'http://localhost:3000',
+        changeOrigin: false,
+        headers: { 'X-Forwarded-Origin': 'http://localhost:5173' },
+      },
     },
   },
 });

@@ -22,8 +22,15 @@
  */
 
 import type { Request, Response } from 'express';
-import { createJiraMCPAuthToken } from '../pkce/token-helpers.js';
-import { generateAuthorizationCode, storeAuthorizationCode } from '../pkce/authorization-code-store.js';
+import {
+  createMultiProviderAccessToken,
+  createMultiProviderRefreshToken,
+  type MultiProviderTokens,
+} from '../pkce/token-helpers.js';
+import {
+  generateAuthorizationCode,
+  storeAuthorizationCode,
+} from '../pkce/authorization-code-store.js';
 
 /**
  * Handles the "Done" button click
@@ -51,9 +58,7 @@ export async function handleConnectionDone(req: Request, res: Response): Promise
   console.log(`  Creating JWT for providers: ${connectedProviders.join(', ')}`);
   
   try {
-    // Build nested JWT payload per Q21
-    // Structure: { atlassian: { access_token, refresh_token, expires_at, scope }, figma: {...} }
-    
+    // Build multi-provider tokens structure for JWT creation
     const atlassianTokens = providerTokens['atlassian'];
     const figmaTokens = providerTokens['figma'];
     
@@ -61,54 +66,56 @@ export async function handleConnectionDone(req: Request, res: Response): Promise
       throw new Error('No provider tokens found - please connect at least one service');
     }
     
-    // Build nested JWT payload manually to support multiple providers
-    const jwtPayload: any = {
-      sub: 'user-' + Math.random().toString(36).substring(7),
-      iss: process.env.VITE_AUTH_SERVER_URL,
-      aud: req.session.mcpResource || process.env.VITE_AUTH_SERVER_URL,
-      scope: req.session.mcpScope || '',
-    };
+    // Build MultiProviderTokens structure
+    const multiProviderTokens: MultiProviderTokens = {};
     
-    // Add Atlassian tokens if present
-    if (atlassianTokens) {
+    if (atlassianTokens && atlassianTokens.access_token && atlassianTokens.refresh_token) {
       console.log('  Adding Atlassian credentials to JWT');
-      jwtPayload.atlassian = {
+      multiProviderTokens.atlassian = {
         access_token: atlassianTokens.access_token,
         refresh_token: atlassianTokens.refresh_token,
         expires_at: atlassianTokens.expires_at,
         scope: atlassianTokens.scope,
       };
+    } else if (atlassianTokens) {
+      console.log('  Warning: Atlassian tokens incomplete (missing access or refresh token)');
     }
     
-    // Add Figma tokens if present
-    if (figmaTokens) {
+    if (figmaTokens && figmaTokens.access_token && figmaTokens.refresh_token) {
       console.log('  Adding Figma credentials to JWT');
-      jwtPayload.figma = {
+      multiProviderTokens.figma = {
         access_token: figmaTokens.access_token,
         refresh_token: figmaTokens.refresh_token,
         expires_at: figmaTokens.expires_at,
         scope: figmaTokens.scope,
       };
+    } else if (figmaTokens) {
+      console.log('  Warning: Figma tokens incomplete (missing access or refresh token)');
     }
     
-    // Calculate JWT expiration (use shortest provider token expiration)
-    let minExpiresAt = Infinity;
-    if (atlassianTokens?.expires_at) minExpiresAt = Math.min(minExpiresAt, atlassianTokens.expires_at);
-    if (figmaTokens?.expires_at) minExpiresAt = Math.min(minExpiresAt, figmaTokens.expires_at);
+    // Create JWT access token with nested provider structure
+    const tokenOptions = {
+      resource: req.session.mcpResource || process.env.VITE_AUTH_SERVER_URL,
+      scope: req.session.mcpScope || '',
+    };
     
-    if (minExpiresAt !== Infinity) {
-      // JWT expires 1 minute before shortest provider token
-      jwtPayload.exp = Math.floor(minExpiresAt / 1000) - 60;
-    } else {
-      // Fallback to 1 hour
-      jwtPayload.exp = Math.floor(Date.now() / 1000) + 3600;
-    }
+    const jwt = await createMultiProviderAccessToken(
+      multiProviderTokens,
+      tokenOptions
+    );
+    console.log('  JWT access token created successfully');
     
-    // Create JWT with nested provider structure
-    const { jwtSign } = await import('../tokens.js');
-    const jwt = await jwtSign(jwtPayload);
+    // Create JWT refresh token with nested provider refresh tokens
+    const { refreshToken } = await createMultiProviderRefreshToken(
+      multiProviderTokens,
+      tokenOptions
+    );
+    console.log('  JWT refresh token created successfully');
     
-    console.log('  JWT created successfully with providers:', Object.keys(jwtPayload).filter(k => ['atlassian', 'figma'].includes(k)));
+    console.log(
+      '  Tokens created with providers:',
+      Object.keys(multiProviderTokens)
+    );
     
     // Clear session provider data (tokens now embedded in JWT)
     delete req.session.providerTokens;
@@ -119,11 +126,12 @@ export async function handleConnectionDone(req: Request, res: Response): Promise
     // Check if this was initiated by an MCP client (has redirect URI)
     if (req.session.mcpRedirectUri && req.session.usingMcpPkce) {
       // OAuth 2.0 Authorization Code Flow (RFC 6749 Section 4.1.2)
-      // Generate authorization code and store JWT mapping
+      // Generate authorization code and store JWT mapping (both access and refresh tokens)
       const authCode = generateAuthorizationCode();
       storeAuthorizationCode(
         authCode,
         jwt,
+        refreshToken,
         req.session.mcpClientId,
         req.session.mcpRedirectUri
       );

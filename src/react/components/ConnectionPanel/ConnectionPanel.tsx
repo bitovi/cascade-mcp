@@ -11,17 +11,21 @@ interface ConnectionPanelProps {
   status: ConnectionStatus;
   onConnect: (anthropicKey: string) => Promise<void>;
   onDisconnect: () => Promise<void>;
+  onRefreshTokens?: () => Promise<{ success: boolean; providers: string[]; error?: string }>;
 }
 
 export function ConnectionPanel({
   status,
   onConnect,
   onDisconnect,
+  onRefreshTokens,
 }: ConnectionPanelProps) {
   const [anthropicKey, setAnthropicKey] = useState(
     () => localStorage.getItem('mcp_anthropic_key') || ''
   );
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshResult, setRefreshResult] = useState<{ success: boolean; providers: string[]; error?: string } | null>(null);
 
   const handleConnect = async () => {
     setIsConnecting(true);
@@ -36,6 +40,23 @@ export function ConnectionPanel({
 
   const handleDisconnect = async () => {
     await onDisconnect();
+  };
+
+  const handleRefreshTokens = async () => {
+    if (!onRefreshTokens) return;
+    
+    setIsRefreshing(true);
+    setRefreshResult(null);
+    try {
+      const result = await onRefreshTokens();
+      setRefreshResult(result);
+      // Auto-clear result after 5 seconds
+      setTimeout(() => setRefreshResult(null), 5000);
+    } catch (error) {
+      setRefreshResult({ success: false, providers: [], error: error instanceof Error ? error.message : 'Unknown error' });
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const handleAnthropicKeyChange = (value: string) => {
@@ -98,8 +119,8 @@ export function ConnectionPanel({
           </span>
         </div>
 
-        {/* Connect/Disconnect Button */}
-        <div className="flex gap-2">
+        {/* Connect/Disconnect/Refresh Buttons */}
+        <div className="flex gap-2 flex-wrap">
           {!isConnected ? (
             <button
               onClick={handleConnect}
@@ -109,14 +130,48 @@ export function ConnectionPanel({
               {isLoading ? 'Connecting...' : 'Connect'}
             </button>
           ) : (
-            <button
-              onClick={handleDisconnect}
-              className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
-            >
-              Disconnect
-            </button>
+            <>
+              <button
+                onClick={handleDisconnect}
+                className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+              >
+                Disconnect
+              </button>
+              {onRefreshTokens && (
+                <button
+                  onClick={handleRefreshTokens}
+                  disabled={isRefreshing}
+                  className="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 disabled:bg-amber-300 disabled:cursor-not-allowed transition-colors"
+                  title="Test refresh token flow - refreshes both Atlassian and Figma tokens"
+                >
+                  {isRefreshing ? '🔄 Refreshing...' : '🔄 Refresh Tokens'}
+                </button>
+              )}
+            </>
           )}
         </div>
+
+        {/* Refresh Result Display */}
+        {refreshResult && (
+          <div className={`p-3 rounded-md text-sm ${
+            refreshResult.success 
+              ? 'bg-green-50 border border-green-200 text-green-800' 
+              : 'bg-red-50 border border-red-200 text-red-800'
+          }`}>
+            {refreshResult.success ? (
+              <span>
+                ✅ Tokens refreshed successfully!
+                {refreshResult.providers.length > 0 && (
+                  <span className="ml-1">
+                    Providers: <strong>{refreshResult.providers.join(', ')}</strong>
+                  </span>
+                )}
+              </span>
+            ) : (
+              <span>❌ Refresh failed: {refreshResult.error}</span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

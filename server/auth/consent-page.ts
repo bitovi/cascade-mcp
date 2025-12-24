@@ -6,7 +6,7 @@
  */
 
 import type { Request, Response } from 'express';
-import { createJiraMCPAuthToken } from '../pkce/token-helpers.js';
+import { createJiraMCPAuthToken, createJiraMCPRefreshToken } from '../pkce/token-helpers.js';
 import { generateAuthorizationCode, storeAuthorizationCode } from '../pkce/authorization-code-store.js';
 
 /**
@@ -217,17 +217,24 @@ export async function handleConnectionDone(req: Request, res: Response): Promise
     }
     
     // Create JWT - the createJiraMCPAuthToken function already creates nested structure
-    const jwt = await createJiraMCPAuthToken({
+    const atlassianTokenResponse = {
       access_token: atlassianTokens.access_token,
       refresh_token: atlassianTokens.refresh_token || '',
-      token_type: 'Bearer',
+      token_type: 'Bearer' as const,
       expires_in: Math.floor((atlassianTokens.expires_at - Date.now()) / 1000),
       scope: atlassianTokens.scope || '',
-    }, { 
+    };
+    
+    const jwt = await createJiraMCPAuthToken(atlassianTokenResponse, { 
       resource: req.session.mcpResource 
     });
     
-    console.log('  JWT created successfully');
+    // Create refresh token JWT
+    const { refreshToken } = await createJiraMCPRefreshToken(atlassianTokenResponse, {
+      resource: req.session.mcpResource
+    });
+    
+    console.log('  JWT access and refresh tokens created successfully');
     
     // Clear session provider data (tokens now embedded in JWT)
     delete req.session.providerTokens;
@@ -238,11 +245,12 @@ export async function handleConnectionDone(req: Request, res: Response): Promise
     // Check if this was initiated by an MCP client (has redirect URI)
     if (req.session.mcpRedirectUri && req.session.usingMcpPkce) {
       // OAuth 2.0 Authorization Code Flow (RFC 6749 Section 4.1.2)
-      // Generate authorization code and store JWT mapping
+      // Generate authorization code and store JWT mapping (both access and refresh tokens)
       const authCode = generateAuthorizationCode();
       storeAuthorizationCode(
         authCode,
         jwt,
+        refreshToken,
         req.session.mcpClientId,
         req.session.mcpRedirectUri
       );
