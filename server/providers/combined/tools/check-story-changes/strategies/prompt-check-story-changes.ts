@@ -28,16 +28,18 @@ For each question from Step 1:
 
 Note: Only count as "answered" if child makes a decision or provides concrete answer. Phrases like "needs clarification", "to be determined", "unclear" mean NOT answered.
 
-### Step 3: Identify Business Requirements in Parent
-- [ ] Extract non-question requirements from parent shell story
-- [ ] Focus on business rules, user needs, acceptance criteria
-- [ ] Ignore technical implementation suggestions in parent
+### Step 3: Extract Parent Acceptance Criteria
+- [ ] List all ☐ checkboxes from parent shell story
+- [ ] List any other business requirements (not marked with ⏬ deferred or ❌ out of scope)
+- [ ] Ignore technical implementation suggestions
 
-### Step 4: Check Requirements Against Child Story
-For each requirement:
-- [ ] Does child address this requirement?
-- [ ] If yes, does child's approach conflict or align with parent?
-- [ ] If conflict exists, is it a business-level conflict (flag it) or technical detail (ignore)?
+### Step 4: Check Each AC Against Child Story
+For each AC from Step 3:
+- [ ] Break down the AC into its components (UI element, behavior, outcome)
+- [ ] Does child describe ALL components?
+  - Example: "Clear button to reset search" = button exists + click behavior + result
+- [ ] If child only mentions some parts → Section 1: Note missing parts
+- [ ] If child contradicts parent → Section 2: Note conflict
 
 ### Step 5: Apply Agile Methodology Filter
 Before flagging any item as divergence, verify:
@@ -214,6 +216,39 @@ Structure your response as:
 - Section 1 contains items that say "no action needed" or "already answered"
 - If question is already answered in child, it should ONLY appear in Section 2 (Update Parent)
 - Section 1 should ONLY contain things child is MISSING
+
+### Example 3: Missing Partial Coverage of Multi-Part AC ❌
+
+\`\`\`markdown
+# Action Items: FE-651 vs FE-645
+
+## 🔄 Update Child Story
+
+1. **❓ URL query parameters**
+   - Parent: ❓ "Is search state stored in URL query parameters?"
+   - Child: Missing
+   - Action: Clarify whether search state should be in URL
+
+## 🔼 Update Parent Epic Shell Story
+
+1. **❓ Case sensitivity**
+   - Parent: ❓ "Is search case-sensitive or case-insensitive?"
+   - Child: "Implement search as case-insensitive matching"
+   - Action: Remove question from parent (answered)
+
+2. **⚠️ Clear button functionality**
+   - Parent: ☐ "Clear button (X icon) to reset search query and return to full task list"
+   - Child: "Clear button (X icon) should only be visible when search input contains text"
+   - Action: Already addressed in child
+\`\`\`
+
+**Why this is bad:**
+- Item 2 in Section 2 is wrong - it should be in Section 1
+- Parent AC has 3 parts: (1) clear button UI, (2) reset behavior, (3) return to full list
+- Child only mentions part 1 (button visibility)
+- Child is MISSING parts 2 & 3 (what happens when clicked)
+- Tool incorrectly said "Already addressed" and put it in Section 2
+- Should be in Section 1: "⚠️ Clear button click behavior - Parent: '☐ Clear button (X icon) to reset search query and return to full task list' - Child: Only visibility mentioned, missing click behavior - Action: Add AC for clear button click action (clear input, hide button, show all tasks)"
 `;
 
 export const generateCheckWhatChangedPrompt = (parentKey: string, storyKey: string, parentShellStory: string, childContext: string) => {
