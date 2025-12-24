@@ -24,12 +24,14 @@
  */
 
 import { Request, Response } from 'express';
-import { 
+import {
   sanitizeObjectWithJWTs,
   jwtVerify,
 } from '../tokens.ts';
 import { getAtlassianConfig } from '../atlassian-auth-code-flow.ts';
-import { 
+import {
+  createMCPAccessToken,
+  createMCPRefreshToken,
   createJiraMCPAuthToken,
   createJiraMCPRefreshToken,
 } from './token-helpers.ts';
@@ -143,89 +145,132 @@ export const refreshToken: OAuthHandler = async (req: Request, res: Response): P
       return;
     }
 
-    // Use the Atlassian refresh token to get a new access token
-    let newAtlassianTokens: any;
-    try {
-      const ATLASSIAN_CONFIG = getAtlassianConfig();
-      console.log('🔄 REFRESH TOKEN FLOW - Making request to Atlassian token endpoint:', {
-        atlassian_token_url: ATLASSIAN_CONFIG.tokenUrl,
-        atlassian_client_id: ATLASSIAN_CONFIG.clientId,
-        has_client_secret: !!ATLASSIAN_CONFIG.clientSecret,
-        client_secret_length: ATLASSIAN_CONFIG.clientSecret?.length,
-        atlassian_refresh_token_length: refreshPayload.atlassian_refresh_token?.length,
-        atlassian_refresh_token_prefix: refreshPayload.atlassian_refresh_token ? 
-          refreshPayload.atlassian_refresh_token.substring(0, 20) + '...' : 'none',
-      });
-      
-      const atlassianRequestBody = {
-        grant_type: 'refresh_token',
-        client_id: ATLASSIAN_CONFIG.clientId,
-        client_secret: ATLASSIAN_CONFIG.clientSecret,
-        refresh_token: refreshPayload.atlassian_refresh_token,
-      };
-      
-      console.log('🔄 REFRESH TOKEN FLOW - Atlassian request body:', {
-        grant_type: atlassianRequestBody.grant_type,
-        client_id: atlassianRequestBody.client_id,
-        has_client_secret: !!atlassianRequestBody.client_secret,
-        has_refresh_token: !!atlassianRequestBody.refresh_token,
-        refresh_token_sample: atlassianRequestBody.refresh_token ? 
-          atlassianRequestBody.refresh_token.substring(0, 30) + '...' : 'none',
-      });
-      
-      console.log('  Using Atlassian refresh token to get new access token');
-      const tokenRes = await fetch(ATLASSIAN_CONFIG.tokenUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(atlassianRequestBody),
-      });
+    // Refresh provider tokens
+    const newProviderTokens: Record<string, any> = {};
+    let hasAtlassianError = false;
+    let hasFigmaError = false;
+    let atlassianErrorMessage = '';
+    let figmaErrorMessage = '';
 
-      console.log('🔄 REFRESH TOKEN FLOW - Atlassian response received:', {
-        status: tokenRes.status,
-        status_text: tokenRes.statusText,
-        ok: tokenRes.ok,
-        headers: Object.fromEntries(tokenRes.headers.entries()),
-      });
+    // === Refresh Atlassian Tokens (if present) ===
+    if (refreshPayload.atlassian?.refresh_token) {
+      try {
+        const ATLASSIAN_CONFIG = getAtlassianConfig();
+        console.log('🔄 REFRESH TOKEN FLOW - Refreshing Atlassian tokens');
 
-      newAtlassianTokens = await tokenRes.json();
-      
-      console.log('🔄 REFRESH TOKEN FLOW - Atlassian response body:', {
-        has_access_token: !!(newAtlassianTokens as any).access_token,
-        has_refresh_token: !!(newAtlassianTokens as any).refresh_token,
-        expires_in: (newAtlassianTokens as any).expires_in,
-        token_type: (newAtlassianTokens as any).token_type,
-        scope: (newAtlassianTokens as any).scope,
-        error: (newAtlassianTokens as any).error,
-        error_description: (newAtlassianTokens as any).error_description,
-        response_keys: Object.keys(newAtlassianTokens as any),
-      });
-      
-      if (!(newAtlassianTokens as any).access_token) {
-        const errorDetails = {
-          atlassian_error: (newAtlassianTokens as any).error,
-          atlassian_error_description: (newAtlassianTokens as any).error_description,
-          full_response: newAtlassianTokens,
-          http_status: tokenRes.status,
+        const atlassianRequestBody = {
+          grant_type: 'refresh_token',
+          client_id: ATLASSIAN_CONFIG.clientId,
+          client_secret: ATLASSIAN_CONFIG.clientSecret,
+          refresh_token: refreshPayload.atlassian.refresh_token,
         };
-        console.error('🔄 REFRESH TOKEN FLOW - ERROR: No access token in Atlassian response:', errorDetails);
-        throw new Error(`Atlassian refresh failed: ${JSON.stringify(errorDetails)}`);
+
+        const tokenRes = await fetch(ATLASSIAN_CONFIG.tokenUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(atlassianRequestBody),
+        });
+
+        const responseData = await tokenRes.json();
+
+        if (responseData.access_token) {
+          newProviderTokens.atlassian = responseData;
+          console.log('  🔑 Atlassian refresh successful');
+        } else {
+          hasAtlassianError = true;
+          atlassianErrorMessage = responseData.error_description || 'No access token in response';
+          console.error('🔄 REFRESH TOKEN FLOW - Atlassian refresh failed:', {
+            error: responseData.error,
+            description: responseData.error_description,
+          });
+        }
+      } catch (error) {
+        hasAtlassianError = true;
+        atlassianErrorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error('🔄 REFRESH TOKEN FLOW - Atlassian refresh error:', atlassianErrorMessage);
       }
-      
-      console.log('  🔑 Atlassian refresh token exchange successful:', sanitizeObjectWithJWTs(newAtlassianTokens));
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('🔄 REFRESH TOKEN FLOW - ERROR: Atlassian refresh token exchange failed:', {
-        error_name: error instanceof Error ? error.constructor.name : 'Unknown',
-        error_message: errorMessage,
-        is_fetch_error: error instanceof Error && (error.name === 'FetchError' || (error as any).code === 'FETCH_ERROR'),
-      });
-      sendErrorResponse(res, 'invalid_grant', 'Failed to refresh Atlassian access token');
+    }
+
+    // === Refresh Figma Tokens (if present) ===
+    if (refreshPayload.figma?.refresh_token) {
+      try {
+        console.log('🔄 REFRESH TOKEN FLOW - Refreshing Figma tokens');
+
+        // Figma uses different endpoint and auth method than Atlassian
+        // POST https://api.figma.com/v1/oauth/refresh
+        // With Basic Auth: Authorization: Basic <base64(client_id:client_secret)>
+        const clientId = process.env.FIGMA_CLIENT_ID;
+        const clientSecret = process.env.FIGMA_CLIENT_SECRET;
+
+        if (!clientId || !clientSecret) {
+          throw new Error('Missing FIGMA_CLIENT_ID or FIGMA_CLIENT_SECRET environment variables');
+        }
+
+        // Figma uses form-urlencoded body with refresh_token parameter
+        const figmaRequestBody = new URLSearchParams({
+          refresh_token: refreshPayload.figma.refresh_token,
+        });
+
+        // Figma uses Basic Auth (base64(client_id:client_secret))
+        const authHeader = 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+
+        const tokenRes = await fetch('https://api.figma.com/v1/oauth/refresh', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Authorization': authHeader,
+          },
+          body: figmaRequestBody.toString(),
+        });
+
+        const responseData = await tokenRes.json();
+
+        if (responseData.access_token) {
+          // CRITICAL: Figma does NOT return a new refresh_token - preserve the original!
+          newProviderTokens.figma = {
+            access_token: responseData.access_token,
+            refresh_token: refreshPayload.figma.refresh_token, // Reuse the original
+            token_type: responseData.token_type || 'Bearer',
+            expires_in: responseData.expires_in || 7776000, // Figma default: 90 days
+            scope: responseData.scope,
+          };
+          console.log('  🔑 Figma refresh successful (reused original refresh_token)');
+        } else {
+          hasFigmaError = true;
+          figmaErrorMessage = responseData.error_description || responseData.message || 'No access token in response';
+          console.error('🔄 REFRESH TOKEN FLOW - Figma refresh failed:', {
+            error: responseData.error,
+            message: responseData.message,
+          });
+        }
+      } catch (error) {
+        hasFigmaError = true;
+        figmaErrorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error('🔄 REFRESH TOKEN FLOW - Figma refresh error:', figmaErrorMessage);
+      }
+    }
+
+    // If either provider refresh failed, fail the entire refresh
+    // This keeps token state simple: either both succeed or both fail
+    if (hasAtlassianError || hasFigmaError) {
+      const errors = [];
+      if (hasAtlassianError) errors.push(`Atlassian: ${atlassianErrorMessage}`);
+      if (hasFigmaError) errors.push(`Figma: ${figmaErrorMessage}`);
+      console.error('🔄 REFRESH TOKEN FLOW - FAILURE: One or more providers failed to refresh:', errors.join('; '));
+      sendErrorResponse(res, 'invalid_grant', `Token refresh failed: ${errors.join('; ')}`);
       return;
     }
 
-    // Create new access token with new Atlassian tokens
-    console.log('🔄 REFRESH TOKEN FLOW - Creating new JWT access token');
-    const newAccessToken = await createJiraMCPAuthToken(newAtlassianTokens, {
+    // Ensure we have at least one provider token
+    if (Object.keys(newProviderTokens).length === 0) {
+      console.error('🔄 REFRESH TOKEN FLOW - ERROR: No providers in original token to refresh');
+      sendErrorResponse(res, 'invalid_grant', 'No provider tokens to refresh');
+      return;
+    }
+
+    // Create new access token with refreshed provider tokens
+    console.log('🔄 REFRESH TOKEN FLOW - Creating new JWT access token from refreshed provider tokens');
+    const newAccessToken = await createMCPAccessToken(newProviderTokens, {
       resource: refreshPayload.aud,
       scope: refreshPayload.scope,
       sub: refreshPayload.sub,
@@ -236,9 +281,9 @@ export const refreshToken: OAuthHandler = async (req: Request, res: Response): P
       token_prefix: newAccessToken ? newAccessToken.substring(0, 20) + '...' : 'none',
     });
 
-    // Create new refresh token (Atlassian always provides a new rotating refresh token)
+    // Create new refresh token with provider refresh tokens
     console.log('🔄 REFRESH TOKEN FLOW - Creating new JWT refresh token');
-    const { refreshToken: newRefreshToken } = await createJiraMCPRefreshToken(newAtlassianTokens, {
+    const { refreshToken: newRefreshToken } = await createMCPRefreshToken(newProviderTokens, {
       resource: refreshPayload.aud,
       scope: refreshPayload.scope,
       sub: refreshPayload.sub,
@@ -252,7 +297,15 @@ export const refreshToken: OAuthHandler = async (req: Request, res: Response): P
     console.log('🔄 REFRESH TOKEN FLOW - SUCCESS: OAuth refresh token exchange successful for client:', client_id);
 
     // Return new tokens
-    const jwtExpiresIn = Math.max(60, ((newAtlassianTokens as any).expires_in || 3600) - 60);
+    // Calculate expires_in from the earliest provider expiration
+    let minExpiresIn = 3600; // Default 1 hour
+    if (newProviderTokens.atlassian?.expires_in) {
+      minExpiresIn = Math.min(minExpiresIn, newProviderTokens.atlassian.expires_in);
+    }
+    if (newProviderTokens.figma?.expires_in) {
+      minExpiresIn = Math.min(minExpiresIn, newProviderTokens.figma.expires_in);
+    }
+    const jwtExpiresIn = Math.max(60, minExpiresIn - 60);
     const responsePayload = {
       access_token: newAccessToken,
       token_type: 'Bearer',

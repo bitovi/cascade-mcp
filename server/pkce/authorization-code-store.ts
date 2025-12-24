@@ -20,6 +20,7 @@ import crypto from 'crypto';
 
 interface AuthCodeEntry {
   jwt: string;
+  refreshToken?: string;
   expiresAt: number;
   clientId?: string;
   redirectUri?: string;
@@ -28,7 +29,7 @@ interface AuthCodeEntry {
 /**
  * In-memory store for authorization codes
  * Key: authorization code
- * Value: JWT token and metadata
+ * Value: JWT token, refresh token, and metadata
  */
 const authorizationCodes = new Map<string, AuthCodeEntry>();
 
@@ -69,59 +70,65 @@ export function generateAuthorizationCode(): string {
 }
 
 /**
- * Store an authorization code with its associated JWT
- * 
+ * Store an authorization code with its associated JWT and optional refresh token
+ *
  * @param code - The authorization code
  * @param jwt - The JWT token to return when code is exchanged
  * @param clientId - Optional client ID for validation
  * @param redirectUri - Optional redirect URI for validation
+ * @param refreshToken - Optional JWT refresh token to return with access token
  */
 export function storeAuthorizationCode(
-  code: string, 
+  code: string,
   jwt: string,
   clientId?: string,
-  redirectUri?: string
+  redirectUri?: string,
+  refreshToken?: string
 ): void {
   const expiresAt = Date.now() + CODE_EXPIRATION_MS;
-  
+
   authorizationCodes.set(code, {
     jwt,
+    refreshToken,
     expiresAt,
     clientId,
     redirectUri,
   });
-  
-  console.log(`📝 Stored authorization code (expires in ${CODE_EXPIRATION_MS / 1000}s)`);
+
+  console.log(`📝 Stored authorization code (expires in ${CODE_EXPIRATION_MS / 1000}s)${refreshToken ? ' with refresh token' : ''}`);
 }
 
 /**
  * Retrieve and consume an authorization code
- * 
+ *
  * Per RFC 6749, authorization codes are single-use and must be deleted after retrieval.
- * 
+ *
  * @param code - The authorization code to retrieve
- * @returns The stored JWT, or null if code is invalid/expired
+ * @returns Object with access token JWT and optional refresh token, or null if code is invalid/expired
  */
-export function consumeAuthorizationCode(code: string): string | null {
+export function consumeAuthorizationCode(code: string): { accessToken: string; refreshToken?: string } | null {
   const entry = authorizationCodes.get(code);
-  
+
   if (!entry) {
     console.log('  ❌ Authorization code not found');
     return null;
   }
-  
+
   // Check expiration
   if (entry.expiresAt < Date.now()) {
     authorizationCodes.delete(code);
     console.log('  ⏰ Authorization code expired');
     return null;
   }
-  
+
   // Delete code (single-use per RFC 6749)
   authorizationCodes.delete(code);
   console.log('  ✅ Authorization code consumed');
-  
-  return entry.jwt;
+
+  return {
+    accessToken: entry.jwt,
+    refreshToken: entry.refreshToken,
+  };
 }
 
 /**
