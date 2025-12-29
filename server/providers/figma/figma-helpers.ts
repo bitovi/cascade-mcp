@@ -1287,12 +1287,113 @@ async function downloadFigmaImagesBatchSingle(
     
   } catch (error: any) {
     clearTimeout(timeoutId);
-    
+
     if (error.name === 'AbortError') {
       logger.error('Figma API request timed out');
       throw new Error('Figma images API request timed out after 60 seconds');
     }
-    
+
+    throw error;
+  }
+}
+
+/**
+ * Refresh a Figma OAuth token using a refresh token
+ *
+ * Per Figma OAuth documentation:
+ * - Endpoint: POST https://api.figma.com/v1/oauth/refresh
+ * - Auth: HTTP Basic Auth with base64(client_id:client_secret)
+ * - Body: form-urlencoded with refresh_token parameter
+ * - Response: { access_token, token_type, expires_in } - NO new refresh_token
+ * - The same refresh_token remains valid and must be reused on subsequent refreshes
+ *
+ * @param clientId - Figma OAuth client ID
+ * @param clientSecret - Figma OAuth client secret
+ * @param refreshToken - Current Figma refresh token
+ * @returns New access token with expiration
+ * @throws Error if refresh fails
+ */
+export async function refreshFigmaToken(
+  clientId: string,
+  clientSecret: string,
+  refreshToken: string
+): Promise<{ access_token: string; expires_in: number }> {
+  console.log('🔄 FIGMA REFRESH - Starting Figma token refresh');
+
+  const FIGMA_TOKEN_URL = 'https://api.figma.com/v1/oauth/refresh';
+
+  try {
+    // Create Basic Auth header: base64(client_id:client_secret)
+    const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+
+    console.log('🔄 FIGMA REFRESH - Making request to Figma token endpoint:', {
+      url: FIGMA_TOKEN_URL,
+      has_refresh_token: !!refreshToken,
+      refresh_token_length: refreshToken?.length,
+      refresh_token_prefix: refreshToken ? refreshToken.substring(0, 15) + '...' : 'none',
+    });
+
+    // Per Figma docs: form-urlencoded body with refresh_token parameter
+    const formBody = new URLSearchParams();
+    formBody.append('refresh_token', refreshToken);
+
+    const response = await fetch(FIGMA_TOKEN_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${credentials}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: formBody.toString(),
+    });
+
+    console.log('🔄 FIGMA REFRESH - Response received:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+    });
+
+    const responseData = await response.json() as any;
+
+    if (!response.ok) {
+      console.error('🔄 FIGMA REFRESH - ERROR: Token refresh failed:', {
+        status: response.status,
+        error: responseData.error,
+        error_description: responseData.error_description,
+        response_keys: Object.keys(responseData),
+      });
+      throw new Error(`Figma token refresh failed: ${responseData.error || response.statusText}`);
+    }
+
+    if (!responseData.access_token) {
+      console.error('🔄 FIGMA REFRESH - ERROR: No access token in response:', {
+        response_keys: Object.keys(responseData),
+        has_access_token: !!responseData.access_token,
+        has_token_type: !!responseData.token_type,
+        has_expires_in: !!responseData.expires_in,
+      });
+      throw new Error('Figma refresh response missing access_token');
+    }
+
+    console.log('🔄 FIGMA REFRESH - Success:', {
+      has_access_token: !!responseData.access_token,
+      access_token_length: responseData.access_token?.length,
+      access_token_prefix: responseData.access_token ? responseData.access_token.substring(0, 15) + '...' : 'none',
+      expires_in: responseData.expires_in,
+      token_type: responseData.token_type,
+    });
+
+    // CRITICAL: Figma does NOT return a new refresh_token
+    // The original refresh_token remains valid and should be preserved
+    return {
+      access_token: responseData.access_token,
+      expires_in: responseData.expires_in || 3600,
+    };
+  } catch (error: any) {
+    console.error('🔄 FIGMA REFRESH - FATAL ERROR:', {
+      error_name: error.name,
+      error_message: error.message,
+      is_fetch_error: error instanceof TypeError,
+    });
     throw error;
   }
 }
