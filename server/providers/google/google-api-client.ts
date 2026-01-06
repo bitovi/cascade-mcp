@@ -10,6 +10,11 @@
  * - Encrypted Service Account: Uses RSA-encrypted service account credentials (secure storage)
  */
 
+import type { 
+  DriveAboutResponse, 
+  DriveFileListResponse, 
+  DriveFileListParams 
+} from './types.js';
 import type { DriveAboutResponse, GoogleServiceAccountCredentials } from './types.js';
 import { googleKeyManager } from '../../utils/key-manager.js';
 
@@ -28,16 +33,13 @@ export interface GoogleClient {
    */
   fetch: (url: string, options?: RequestInit) => Promise<Response>;
   
-  /**
-   * Get user information from Google Drive API
-   * @returns Promise resolving to Drive user information
-   */
-  fetchAboutUser(): Promise<DriveAboutResponse>;
   
   /**
    * Authentication type used by this client
    */
   authType: 'oauth' | 'service-account';
+  listFiles(params?: DriveFileListParams): Promise<DriveFileListResponse>;
+  getDocumentContent(fileId: string): Promise<string>;
 }
 
 /**
@@ -89,10 +91,71 @@ export function createGoogleClient(accessToken: string): GoogleClient {
       }
       
       return response.json() as Promise<DriveAboutResponse>;
+    },
+    
+    async listFiles(params?: DriveFileListParams): Promise<DriveFileListResponse> {
+      // Build query parameters
+      const queryParams = new URLSearchParams();
+      
+      // Default fields to return (can be overridden)
+      const defaultFields = 'kind,files(id,name,mimeType,kind,createdTime,modifiedTime,size,webViewLink,owners),nextPageToken,incompleteSearch';
+      queryParams.append('fields', params?.fields || defaultFields);
+      
+      // Add optional parameters
+      if (params?.query) {
+        queryParams.append('q', params.query);
+      }
+      if (params?.pageSize) {
+        queryParams.append('pageSize', params.pageSize.toString());
+      }
+      if (params?.pageToken) {
+        queryParams.append('pageToken', params.pageToken);
+      }
+      if (params?.orderBy) {
+        queryParams.append('orderBy', params.orderBy);
+      }
+      
+      const response = await fetch(
+        `https://www.googleapis.com/drive/v3/files?${queryParams.toString()}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+          },
+        }
+      );
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Drive API list files error (${response.status}): ${errorText}`);
+      }
+      
+      return response.json() as Promise<DriveFileListResponse>;
+    },
+    
+    async getDocumentContent(fileId: string): Promise<string> {
+      // Export Google Doc as plain text
+      const response = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=text/plain`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+        }
+      );
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Drive API get document error (${response.status}): ${errorText}`);
+      }
+      
+      return response.text();
     }
   };
 }
 
+
+// TODO: Does not make sense. Google does not support PAT. This is using OAuth token as PAT.
 /**
  * Create a Google API client using Encrypted Service Account credentials
  * 

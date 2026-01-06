@@ -3,6 +3,8 @@
 Auto-generated from all feature plans. Last updated: 2025-12-18
 
 ## Active Technologies
+- TypeScript 5.x (strict mode enabled) (002-google-docs-mcp)
+- N/A (read-only operations) (002-google-docs-mcp)
 
 - (001-google-drive-oauth)
 
@@ -23,6 +25,7 @@ tests/
 : Follow standard conventions
 
 ## Recent Changes
+- 002-google-docs-mcp: Added TypeScript 5.x (strict mode enabled)
 
 - 001-google-drive-oauth: Added
 

@@ -12,6 +12,9 @@ import { handleIdentifyFeatures } from './identify-features.js';
 import { handleAnalyzeFeatureScope } from './analyze-feature-scope.js';
 import { handleReviewWorkItem } from './review-work-item.js';
 import { handleDriveAboutUser } from './drive-about-user.js';
+import { handleDriveListFiles } from './drive-list-files.js';
+import { handleDriveGetDocument } from './drive-get-document.js';
+import { handleDriveFindAndGetDocument } from './drive-find-and-get-document.js';
 
 /**
  * Register all REST API routes with the Express app
@@ -56,6 +59,18 @@ export function registerRestApiRoutes(app: Express): void {
   // Get Google Drive user info
   app.post('/api/drive-about-user', (req, res) => handleDriveAboutUser(req, res));
   console.log('  ✓ POST /api/drive-about-user');
+  
+  // List Google Drive files
+  app.post('/api/drive-list-files', (req, res) => handleDriveListFiles(req, res));
+  console.log('  ✓ POST /api/drive-list-files');
+  
+  // Get Google Drive document content
+  app.post('/api/drive-get-document', (req, res) => handleDriveGetDocument(req, res));
+  console.log('  ✓ POST /api/drive-get-document');
+  
+  // Find and get Google Drive document (convenience endpoint)
+  app.post('/api/drive-find-and-get-document', (req, res) => handleDriveFindAndGetDocument(req, res));
+  console.log('  ✓ POST /api/drive-find-and-get-document');
   
   console.log('REST API routes registered successfully');
 }

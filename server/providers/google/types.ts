@@ -69,3 +69,58 @@ export interface DriveUser {
 export interface DriveAboutResponse {
   user: DriveUser;
 }
+
+/**
+ * Represents ownership information for a Drive file
+ */
+export interface DriveOwner {
+  displayName: string;
+  emailAddress: string;
+  permissionId: string;
+}
+
+/**
+ * Represents metadata for a single file in Google Drive
+ */
+export interface DriveFile {
+  id: string;
+  name: string;
+  mimeType: string;
+  kind: 'drive#file';
+  createdTime?: string;
+  modifiedTime?: string;
+  size?: string;
+  webViewLink?: string;
+  owners?: DriveOwner[];
+}
+
+/**
+ * Response from Google Drive API /files endpoint (list files)
+ */
+export interface DriveFileListResponse {
+  kind: 'drive#fileList';
+  files: DriveFile[];
+  nextPageToken?: string;
+  incompleteSearch?: boolean;
+}
+
+/**
+ * Request parameters for listing files from Google Drive
+ */
+export interface DriveFileListParams {
+  query?: string;
+  pageSize?: number;
+  pageToken?: string;
+  orderBy?: string;
+  fields?: string;
+}
+
+/**
+ * Plain text content representation of a Google Doc
+ */
+export interface DocumentContent {
+  fileId: string;
+  fileName: string;
+  content: string;
+  exportFormat: string;
+}

@@ -1,5 +1,8 @@
 import type { McpServer } from '../../../mcp-core/mcp-types.js';
 import { registerDriveAboutUserTool } from './drive-about-user.js';
+import { registerDriveListFilesTool } from './drive-list-files.js';
+import { registerDriveGetDocumentTool } from './drive-get-document.js';
+import { registerDriveFindAndGetDocumentTool } from './drive-find-and-get-document.js';
 
 /**
  * Register all Google Drive-specific tools with the MCP server
@@ -12,5 +15,14 @@ export function registerGoogleTools(mcp: McpServer, authContext: any): void {
   // User authentication test tool
   registerDriveAboutUserTool(mcp);
   
-  console.log('  All Google Drive tools registered (1 tool)');
+  // File listing tool
+  registerDriveListFilesTool(mcp);
+  
+  // Document content retrieval tool
+  registerDriveGetDocumentTool(mcp);
+  
+  // Convenience tool: find and get in one step
+  registerDriveFindAndGetDocumentTool(mcp);
+  
+  console.log('  All Google Drive tools registered (4 tools)');
 }

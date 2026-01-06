@@ -220,6 +220,31 @@ npm run dev:client
 - **atlassian-get-attachments** - Fetch issue attachments by ID
 - **atlassian-update-issue-description** - Update issue description with markdown (converts to ADF)
 
+### Google Drive Tools
+- **drive-about-user** - Get authenticated user's Google Drive profile information
+- **drive-list-files** - List files from Google Drive with filtering, pagination, and sorting
+  - Supports query filtering (e.g., Google Docs only, name search, folder filtering)
+  - Parameters: `query`, `pageSize` (1-1000), `pageToken`, `orderBy`
+  - Returns formatted markdown table with file names, types, modified dates, sizes, IDs, and web links
+  - Example: `drive-list-files({ query: "mimeType='application/vnd.google-apps.document'", pageSize: 50 })`
+  
+- **drive-get-document** - Retrieve plain text content from a Google Doc
+  - Exports Google Doc as plain text preserving basic structure
+  - Parameters: `fileId` (required)
+  - Returns document content with metadata header (file ID, content length, line count)
+  - Example: `drive-get-document({ fileId: "1abc...xyz" })`
+
+- **drive-find-and-get-document** - Find and retrieve document content in one step (convenience tool)
+  - Searches for document by name/text and retrieves content automatically
+  - Perfect for queries like "what is ticket 1395 about?"
+  - Parameters: `searchQuery` (required), `mimeType` (optional, defaults to Google Docs)
+  - Returns most recently modified matching document with full content
+  - Example: `drive-find-and-get-document({ searchQuery: "1395" })`
+
+**Google Drive Workflows**: 
+- **Two-step**: Use `drive-list-files` → `drive-get-document` for precise control
+- **One-step**: Use `drive-find-and-get-document` for quick access by search term
+
 ### Combined Provider Tools
 Advanced workflow tools that integrate multiple services:
 
