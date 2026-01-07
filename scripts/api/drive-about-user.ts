@@ -4,22 +4,29 @@
  * Get authenticated user information from Google Drive using service account
  * 
  * Usage:
- *   node --import ./loader.mjs scripts/api/drive-about-user.ts
+ *   node --import ./loader.mjs scripts/api/drive-about-user.ts [--json]
  * 
  * Configuration:
- *   Reads service account credentials from google.json in project root
+ *   Default: Set GOOGLE_SERVICE_ACCOUNT_ENCRYPTED in .env (encrypted)
+ *   With --json flag: Place google.json in project root (plaintext)
  */
 
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { createGoogleClientWithServiceAccount } from '../../server/providers/google/google-api-client.js';
+import dotenv from 'dotenv';
+import { 
+  createGoogleClientWithServiceAccountEncrypted,
+  createGoogleClientWithServiceAccountJSON 
+} from '../../server/providers/google/google-api-client.js';
 import type { GoogleServiceAccountCredentials } from '../../server/providers/google/types.js';
 
-// Load service account from google.json
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const googleJsonPath = resolve(__dirname, '../../google.json');
+
+// Load environment variables
+dotenv.config();
 
 async function main() {
   const args = process.argv.slice(2);
@@ -29,35 +36,71 @@ async function main() {
 Drive About User - Get authenticated user information from Google Drive
 
 Usage:
-  node --import ./loader.mjs scripts/api/drive-about-user.ts
+  node --import ./loader.mjs scripts/api/drive-about-user.ts [--json]
 
 Options:
   --help, -h            Show this help message
+  --json                Use plaintext google.json instead of encrypted credentials
 
 Configuration:
-  Service account credentials: google.json (project root)
+  Default: Set GOOGLE_SERVICE_ACCOUNT_ENCRYPTED in .env (encrypted)
+  With --json: Place google.json in project root (plaintext)
 
 Description:
   Retrieves information about the authenticated user from Google Drive.
-  Uses service account authentication from google.json.
+  Supports both encrypted credentials (default) and plaintext JSON (with --json flag).
 
-Example:
+Examples:
+  # Using encrypted credentials (default)
   node --import ./loader.mjs scripts/api/drive-about-user.ts
+  
+  # Using plaintext JSON
+  node --import ./loader.mjs scripts/api/drive-about-user.ts --json
 `);
     process.exit(0);
   }
 
   try {
-    console.log('📂 Loading service account credentials...');
-    const serviceAccountJson = JSON.parse(
-      readFileSync(googleJsonPath, 'utf-8')
-    ) as GoogleServiceAccountCredentials;
+    const useJson = args.includes('--json');
+    let client;
     
-    console.log(`  Service Account: ${serviceAccountJson.client_email}`);
-    console.log(`  Project ID: ${serviceAccountJson.project_id}`);
+    if (useJson) {
+      // Use plaintext google.json
+      if (!existsSync(googleJsonPath)) {
+        throw new Error(
+          'google.json not found in project root.\n' +
+          'Please place your service account JSON file at: ' + googleJsonPath
+        );
+      }
+      
+      console.log('📂 Loading plaintext credentials from google.json...');
+      const serviceAccountJson = JSON.parse(
+        readFileSync(googleJsonPath, 'utf-8')
+      ) as GoogleServiceAccountCredentials;
+      
+      console.log(`  Service Account: ${serviceAccountJson.client_email}`);
+      console.log(`  Project ID: ${serviceAccountJson.project_id}`);
+      
+      console.log('\n🔐 Creating Google Drive client...');
+      client = await createGoogleClientWithServiceAccountJSON(serviceAccountJson);
+    } else {
+      // Use encrypted credentials from env
+      if (!process.env.GOOGLE_SERVICE_ACCOUNT_ENCRYPTED) {
+        throw new Error(
+          'Missing GOOGLE_SERVICE_ACCOUNT_ENCRYPTED environment variable.\n' +
+          'Please set it in .env file.\n' +
+          'Get encrypted credentials from /google-service-encrypt page.\n' +
+          'Or use --json flag to load from google.json'
+        );
+      }
 
-    console.log('\n🔐 Creating Google Drive client with service account...');
-    const client = await createGoogleClientWithServiceAccount(serviceAccountJson);
+      console.log('🔐 Using encrypted credentials from GOOGLE_SERVICE_ACCOUNT_ENCRYPTED');
+
+      console.log('\n🔐 Creating Google Drive client...');
+      client = await createGoogleClientWithServiceAccountEncrypted(
+        process.env.GOOGLE_SERVICE_ACCOUNT_ENCRYPTED
+      );
+    }
     console.log(`  Auth Type: ${client.authType}`);
 
     console.log('\n👤 Fetching user information from Google Drive API...');
@@ -75,7 +118,7 @@ Example:
     console.log('═══════════════════════════════════════════════════════════════');
     
     console.log('\n💡 Tip: This service account can access files shared with:');
-    console.log(`   ${serviceAccountJson.client_email}`);
+    console.log(`   ${userInfo.user.emailAddress}`);
 
     process.exit(0);
   } catch (error: any) {

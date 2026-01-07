@@ -33,6 +33,7 @@ import { googleProvider } from './providers/google/index.js';
 import { logEnvironmentInfo } from './debug-helpers.js';
 import { registerRestApiRoutes } from './api/index.js';
 import { getProjectRoot } from './utils/file-paths.js';
+import { renderEncryptionPage, handleEncryptionRequest } from './google-service-encrypt.js';
 
 // configurations
 dotenv.config();
@@ -204,6 +205,7 @@ if (hasClientBuild) {
         <li><a href="/.well-known/oauth-authorization-server">OAuth Server Metadata</a></li>
         <li><a href="/.well-known/oauth-protected-resource">Protected Resource Metadata</a></li>
         <li><a href="/get-access-token">Manual Token Retrieval</a></li>
+        <li><a href="/google-service-encrypt">🔐 Encrypt Google Service Account</a></li>
       </ul>
       <h2>REST API Endpoints (PAT Authentication)</h2>
       <ul>
@@ -221,6 +223,10 @@ app.get('/.well-known/oauth-protected-resource', oauthProtectedResourceMetadata)
 
 // Manual token retrieval page
 app.get('/get-access-token', renderManualTokenPage);
+
+// Google service account encryption page
+app.get('/google-service-encrypt', renderEncryptionPage);
+app.post('/google-service-encrypt', express.urlencoded({ extended: true }), handleEncryptionRequest);
 
 app.get('/authorize', authorize);
 app.post('/register', express.json(), clientRegistration);
