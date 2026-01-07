@@ -7,9 +7,11 @@
  * Authentication Methods:
  * - OAuth: Uses Bearer tokens from OAuth 2.0 flow (for user delegation)
  * - Service Account: Uses JWT tokens from Google service account JSON (for server-to-server)
+ * - Encrypted Service Account: Uses RSA-encrypted service account credentials (secure storage)
  */
 
 import type { DriveAboutResponse, GoogleServiceAccountCredentials } from './types.js';
+import { googleKeyManager } from '../../utils/key-manager.js';
 
 /**
  * Google API client interface
@@ -92,36 +94,86 @@ export function createGoogleClient(accessToken: string): GoogleClient {
 }
 
 /**
- * Create a Google API client using Personal Access Token (PAT)
- * For Google, PAT is the same as OAuth access token
- * @param token - Google access token
- * @returns API client with Drive operations
- */
-export function createGoogleClientWithPAT(token: string): GoogleClient {
-  return createGoogleClient(token);
-}
-
-/**
- * Create a Google API client using Service Account credentials
+ * Create a Google API client using Encrypted Service Account credentials
  * 
  * Service accounts use JWT tokens for authentication. This function:
- * 1. Creates a JWT signed with the service account's private key
- * 2. Exchanges the JWT for an access token
- * 3. Returns a client that uses the access token
+ * 1. Accepts RSA-encrypted service account credentials (string with "RSA-ENCRYPTED:" prefix)
+ * 2. Decrypts the credentials using the server's private key
+ * 3. Creates a JWT signed with the service account's private key
+ * 4. Exchanges the JWT for an access token
+ * 5. Returns a client that uses the access token
  * 
  * Note: This requires the googleapis package for JWT creation.
  * 
- * @param serviceAccountJson - Google service account JSON credentials
+ * @param encryptedCredentials - Encrypted service account credentials ("RSA-ENCRYPTED:...")
  * @returns API client with Drive operations using service account auth
  * 
  * @example
  * ```typescript
- * const credentials = JSON.parse(fs.readFileSync('google.json', 'utf-8'));
- * const client = await createGoogleClientWithServiceAccount(credentials);
+ * // From environment variable
+ * const client = await createGoogleClientWithServiceAccountEncrypted(
+ *   process.env.GOOGLE_SERVICE_ACCOUNT_ENCRYPTED
+ * );
+ * 
+ * // From encrypted string
+ * const encryptedString = "RSA-ENCRYPTED:eyJhbGci...";
+ * const client = await createGoogleClientWithServiceAccountEncrypted(encryptedString);
+ * 
  * const userInfo = await client.fetchAboutUser();
  * ```
  */
-export async function createGoogleClientWithServiceAccount(
+export async function createGoogleClientWithServiceAccountEncrypted(
+  encryptedCredentials: string
+): Promise<GoogleClient> {
+  if (!encryptedCredentials || typeof encryptedCredentials !== 'string') {
+    throw new Error(
+      'Missing encrypted credentials. Expected a string with "RSA-ENCRYPTED:" prefix.\n' +
+      'Get encrypted credentials from /google-service-encrypt page.'
+    );
+  }
+
+  if (!encryptedCredentials.startsWith('RSA-ENCRYPTED:')) {
+    throw new Error(
+      'Invalid encrypted credentials format. Expected "RSA-ENCRYPTED:..." prefix.\n' +
+      'Get encrypted credentials from /google-service-encrypt page.'
+    );
+  }
+
+  console.log('🔐 Decrypting service account credentials...');
+  const serviceAccountJson = await googleKeyManager.decrypt(encryptedCredentials);
+  
+  return createGoogleClientWithServiceAccountJSON(serviceAccountJson);
+}
+
+/**
+ * Create a Google API client using plaintext Service Account JSON credentials
+ * 
+ * Service accounts use JWT tokens for authentication. This function:
+ * 1. Accepts plaintext service account JSON credentials
+ * 2. Creates a JWT signed with the service account's private key
+ * 3. Exchanges the JWT for an access token
+ * 4. Returns a client that uses the access token
+ * 
+ * Note: This requires the googleapis package for JWT creation.
+ * 
+ * @param serviceAccountJson - Plaintext service account JSON credentials
+ * @returns API client with Drive operations using service account auth
+ * 
+ * @example
+ * ```typescript
+ * const credentials = {
+ *   type: 'service_account',
+ *   project_id: 'my-project',
+ *   private_key_id: '...',
+ *   private_key: '-----BEGIN PRIVATE KEY-----...',
+ *   client_email: 'my-service@my-project.iam.gserviceaccount.com',
+ *   // ... other fields
+ * };
+ * const client = await createGoogleClientWithServiceAccountJSON(credentials);
+ * const userInfo = await client.fetchAboutUser();
+ * ```
+ */
+export async function createGoogleClientWithServiceAccountJSON(
   serviceAccountJson: GoogleServiceAccountCredentials
 ): Promise<GoogleClient> {
   // Import googleapis dynamically to avoid bundling it unnecessarily
@@ -137,8 +189,8 @@ export async function createGoogleClientWithServiceAccount(
   });
   
   // Get access token from JWT
-  const credentials = await auth.getAccessToken();
-  const accessToken = credentials.token;
+  const tokenResponse = await auth.getAccessToken();
+  const accessToken = tokenResponse.token;
   
   if (!accessToken) {
     throw new Error('Failed to obtain access token from service account');

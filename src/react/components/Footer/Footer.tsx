@@ -55,6 +55,14 @@ export function Footer({ baseUrl }: FooterProps) {
                   Manual Token Retrieval
                 </a>
               </li>
+              <li>
+                <a
+                  href="/google-service-encrypt"
+                  className="text-blue-600 hover:underline"
+                >
+                  Encrypt Google Service Account JSON
+                </a>
+              </li>
             </ul>
           </div>
           <div>

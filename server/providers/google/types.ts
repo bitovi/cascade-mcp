@@ -37,6 +37,20 @@ export interface GoogleServiceAccountCredentials {
 }
 
 /**
+ * Encrypted Google Service Account credentials
+ * 
+ * RSA-encrypted service account JSON that can be safely stored and transmitted.
+ * Server-side decryption required before use.
+ * 
+ * Format: "RSA-ENCRYPTED:<base64-encoded-data>"
+ */
+export interface GoogleEncryptedServiceAccountCredentials {
+  type: 'encrypted_service_account';
+  encrypted_data: string; // Base64-encoded RSA-encrypted JSON
+  encryption_version: '1'; // For future encryption algorithm changes
+}
+
+/**
  * Google Drive user profile information
  * Source: https://www.googleapis.com/drive/v3/about?fields=user
  */
