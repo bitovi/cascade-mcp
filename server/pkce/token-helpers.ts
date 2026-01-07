@@ -54,6 +54,29 @@ export interface ExtendedAtlassianTokenResponse extends AtlassianTokenResponse {
 }
 
 /**
+ * Helper to add provider tokens to multi-provider structure
+ * Mutates the target object by adding provider token data with calculated expiration
+ * 
+ * @param target - The MultiProviderTokens object to mutate
+ * @param providerKey - The provider key ('atlassian' or 'figma')
+ * @param tokens - Provider token response containing access_token, refresh_token, expires_in, scope
+ */
+export function addProviderTokens(
+  target: MultiProviderTokens,
+  providerKey: 'atlassian' | 'figma',
+  tokens: any
+): void {
+  if (tokens) {
+    target[providerKey] = {
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      expires_at: Math.floor(Date.now() / 1000) + tokens.expires_in,
+      scope: tokens.scope,
+    };
+  }
+}
+
+/**
  * Extract expiration from Atlassian JWT refresh token
  */
 function extractAtlassianRefreshTokenExpiration(refreshToken: string): number | null {

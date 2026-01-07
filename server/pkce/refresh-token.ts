@@ -28,6 +28,7 @@ import { sanitizeObjectWithJWTs, jwtVerify, getExpiresInFromJwt } from '../token
 import {
   createMultiProviderAccessToken,
   createMultiProviderRefreshToken,
+  addProviderTokens,
   type MultiProviderTokens,
 } from './token-helpers.ts';
 import { atlassianProvider } from '../providers/atlassian/index.ts';
@@ -160,27 +161,10 @@ export const refreshToken: OAuthHandler = async (req: Request, res: Response): P
       return;
     }
 
-    // Helper to add provider tokens to multi-provider structure
-    const addProviderTokens = (
-      target: MultiProviderTokens,
-      providerKey: 'atlassian' | 'figma',
-      tokens: any,
-      defaultExpiresIn: number
-    ) => {
-      if (tokens) {
-        target[providerKey] = {
-          access_token: tokens.access_token,
-          refresh_token: tokens.refresh_token,
-          expires_at: Math.floor(Date.now() / 1000) + (tokens.expires_in || defaultExpiresIn),
-          scope: tokens.scope,
-        };
-      }
-    };
-
     // Build multi-provider tokens structure for new JWTs
     const multiProviderTokens: MultiProviderTokens = {};
-    addProviderTokens(multiProviderTokens, 'atlassian', newAtlassianTokens, 3600);
-    addProviderTokens(multiProviderTokens, 'figma', newFigmaTokens, 7776000);
+    addProviderTokens(multiProviderTokens, 'atlassian', newAtlassianTokens);
+    addProviderTokens(multiProviderTokens, 'figma', newFigmaTokens);
 
     // Create new access token with refreshed provider tokens
     const newAccessToken = await createMultiProviderAccessToken(

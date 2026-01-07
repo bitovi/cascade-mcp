@@ -100,12 +100,6 @@ async function handleAuthorizationCodeGrant(
       response.refresh_token = result.refreshToken;
     }
 
-    console.log(`  📤 Full response to VS Code:`, JSON.stringify({
-      ...response,
-      access_token: response.access_token.substring(0, 50) + '...',
-      refresh_token: response.refresh_token ? response.refresh_token.substring(0, 50) + '...' : undefined,
-    }, null, 2));
-
     res.json(response);
     return;
   }
