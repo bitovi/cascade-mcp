@@ -125,14 +125,13 @@ npm run dev:client
   Modular OAuth 2.0 authorization server with PKCE support split across specialized modules:
   - **pkce/discovery.ts** - OAuth metadata endpoints and dynamic client registration
   - **pkce/authorize.ts** - Authorization endpoint with PKCE parameter handling
-  - **pkce/callback.ts** - OAuth callback handler for authorization code processing
   - **pkce/access-token.ts** - Token exchange endpoint for authorization and refresh grants
   - **pkce/refresh-token.ts** - Refresh token grant handler with Atlassian token refresh
   - **pkce/token-helpers.ts** - JWT token creation utilities for MCP-compatible tokens
 
-- **atlassian-auth-code-flow.ts** - Atlassian OAuth Integration  
-  HTTP client for Atlassian OAuth API calls and token management.  
-  *Example*: `exchangeCodeForTokens()` - Exchange auth code for access tokens
+- **atlassian-auth-code-flow.ts** - Atlassian OAuth Configuration  
+  Configuration for Atlassian OAuth API endpoints.  
+  *Example*: `getAtlassianConfig()` - Get Atlassian OAuth configuration
 
 - **tokens.ts** - JWT Token Management  
   Creates and validates JWT tokens that wrap Atlassian credentials for bridge authentication.  

@@ -14,10 +14,8 @@ import {
   dynamicClientRegistration as clientRegistration
 } from './pkce/discovery.ts';
 import { authorize } from './pkce/authorize.ts';
-import { callback } from './pkce/callback.ts';
 import { accessToken } from './pkce/access-token.ts';
 import { handleMcpPost, handleSessionRequest } from './mcp-service.ts';
-import { renderManualTokenPage } from './manual-token-flow.ts';
 import cors from 'cors';
 import { logger } from './observability/logger.ts';
 import {
@@ -202,7 +200,6 @@ if (hasClientBuild) {
         <li><a href="/mcp">MCP Endpoint</a> - <code>${baseUrl}/mcp</code></li>
         <li><a href="/.well-known/oauth-authorization-server">OAuth Server Metadata</a></li>
         <li><a href="/.well-known/oauth-protected-resource">Protected Resource Metadata</a></li>
-        <li><a href="/get-access-token">Manual Token Retrieval</a></li>
       </ul>
       <h2>REST API Endpoints (PAT Authentication)</h2>
       <ul>
@@ -218,12 +215,8 @@ app.get('/.well-known/oauth-authorization-server', oauthMetadata);
 // OAuth 2.0 Protected Resource Metadata (RFC9728) for MCP discovery
 app.get('/.well-known/oauth-protected-resource', oauthProtectedResourceMetadata);
 
-// Manual token retrieval page
-app.get('/get-access-token', renderManualTokenPage);
-
 app.get('/authorize', authorize);
 app.post('/register', express.json(), clientRegistration);
-app.get('/callback', callback);
 
 // --- Connection Hub Routes (Phase 1.3) ---
 // Per Q25: Static routes with factory functions

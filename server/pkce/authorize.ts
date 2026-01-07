@@ -27,10 +27,6 @@ import {
   generateCodeVerifier, 
   generateCodeChallenge
 } from '../tokens.ts';
-import { 
-  createAtlassianAuthUrl, 
-  getAtlassianConfig
-} from '../atlassian-auth-code-flow.ts';
 import type { OAuthHandler } from './types.ts';
 import { renderConnectionHub } from '../provider-server-oauth/index.js';
 
