@@ -6,6 +6,7 @@
 import { logger } from '../../../observability/logger.js';
 import { getAuthInfoSafe } from '../../../mcp-core/auth-helpers.js';
 import type { McpServer } from '../../../mcp-core/mcp-types.js';
+import { createGoogleClient } from '../google-api-client.js';
 
 /**
  * Register the drive-about-user tool with the MCP server
@@ -40,52 +41,17 @@ export function registerDriveAboutUserTool(mcp: McpServer): void {
 
         console.log('  Calling Google Drive API /about endpoint...');
 
-        // Call Google Drive API to get user info
-        const apiUrl = 'https://www.googleapis.com/drive/v3/about?fields=user';
-        const response = await fetch(apiUrl, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json',
-          },
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          logger.error('Google Drive API error', {
-            status: response.status,
-            statusText: response.statusText,
-            body: errorText,
-          });
-          
-          if (response.status === 401) {
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: 'Error: Invalid or expired Google Drive access token. Please re-authenticate.',
-                },
-              ],
-            };
-          }
-          
-          return {
-            content: [
-              {
-                type: 'text',
-                text: `Error: Google Drive API request failed: ${response.status} ${response.statusText}\n${errorText}`,
-              },
-            ],
-          };
-        }
-
-        const aboutData = await response.json() as any;
-        const user = aboutData.user;
+        // Create Google client and fetch user info
+        const googleClient = createGoogleClient(token);
+        const userData = await googleClient.fetchAboutUser();
+        const user = userData.user;
         
         console.log(`  Google Drive user info retrieved successfully: ${user.emailAddress}`);
         logger.info('drive-about-user completed', {
           email: user.emailAddress,
           displayName: user.displayName,
           permissionId: user.permissionId,
+          authType: googleClient.authType,
         });
 
         return {
