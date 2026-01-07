@@ -24,7 +24,7 @@
  */
 
 import { Request, Response } from 'express';
-import { sanitizeObjectWithJWTs, jwtVerify, parseJWT } from '../tokens.ts';
+import { sanitizeObjectWithJWTs, jwtVerify, getExpiresInFromJwt } from '../tokens.ts';
 import {
   createMultiProviderAccessToken,
   createMultiProviderRefreshToken,
@@ -46,24 +46,6 @@ function sendErrorResponse(res: Response, error: string, description: string, st
 }
 
 /**
- * Extract expires_in from a JWT token by decoding its exp claim
- * @param token - JWT token string
- * @returns seconds until expiration, or default 3540 if unable to extract
- */
-function getExpiresInFromJwt(token: string): number {
-  try {
-    const payload = parseJWT(token);
-    if (payload.exp && typeof payload.exp === 'number') {
-      const expiresIn = payload.exp - Math.floor(Date.now() / 1000);
-      return Math.max(0, expiresIn); // Don't return negative
-    }
-  } catch (err) {
-    console.log('  Warning: Could not extract exp from JWT, using default');
-  }
-  return 3540; // Default fallback
-}
-
-/**
  * Refresh Token Endpoint
  * Handles OAuth 2.0 refresh token grant for renewing access tokens
  */
@@ -75,16 +57,6 @@ export const refreshToken: OAuthHandler = async (req: Request, res: Response): P
 
   try {
     const { grant_type, refresh_token, client_id, scope } = req.body;
-    
-    console.log('🔄 REFRESH TOKEN FLOW - Starting validation:', {
-      grant_type,
-      has_refresh_token: !!refresh_token,
-      refresh_token_length: refresh_token?.length,
-      refresh_token_prefix: refresh_token ? refresh_token.substring(0, 20) + '...' : 'none',
-      client_id,
-      scope,
-      request_headers: Object.keys(req.headers),
-    });
 
     if (grant_type !== 'refresh_token') {
       console.log('🔄 REFRESH TOKEN FLOW - ERROR: Unsupported grant type:', grant_type);
@@ -103,20 +75,6 @@ export const refreshToken: OAuthHandler = async (req: Request, res: Response): P
     console.log('🔄 REFRESH TOKEN FLOW - Attempting to verify JWT refresh token');
     try {
       refreshPayload = await jwtVerify(refresh_token);
-      console.log('🔄 REFRESH TOKEN FLOW - JWT verification successful:', {
-        type: refreshPayload.type,
-        sub: refreshPayload.sub,
-        exp: refreshPayload.exp,
-        iss: refreshPayload.iss,
-        aud: refreshPayload.aud,
-        scope: refreshPayload.scope,
-        // Check for nested provider structure
-        has_atlassian: !!refreshPayload.atlassian,
-        has_figma: !!refreshPayload.figma,
-        atlassian_has_refresh_token: !!refreshPayload.atlassian?.refresh_token,
-        figma_has_refresh_token: !!refreshPayload.figma?.refresh_token,
-        payload_keys: Object.keys(refreshPayload),
-      });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('🔄 REFRESH TOKEN FLOW - ERROR: JWT verification failed:', {
@@ -127,13 +85,6 @@ export const refreshToken: OAuthHandler = async (req: Request, res: Response): P
       sendErrorResponse(res, 'invalid_grant', 'Invalid or expired refresh token');
       return;
     }
-
-    // Validate it's actually a refresh token
-    console.log('🔄 REFRESH TOKEN FLOW - Validating token type:', {
-      expected_type: 'refresh_token',
-      actual_type: refreshPayload.type,
-      type_match: refreshPayload.type === 'refresh_token',
-    });
     
     if (refreshPayload.type !== 'refresh_token') {
       console.log('🔄 REFRESH TOKEN FLOW - ERROR: Token is not a refresh token:', {
@@ -146,17 +97,8 @@ export const refreshToken: OAuthHandler = async (req: Request, res: Response): P
 
     // Check if refresh token is expired
     const now = Math.floor(Date.now() / 1000);
-    const timeUntilExp = refreshPayload.exp ? refreshPayload.exp - now : null;
-    console.log('🔄 REFRESH TOKEN FLOW - Checking expiration:', {
-      current_timestamp: now,
-      token_exp: refreshPayload.exp,
-      time_until_expiration_seconds: timeUntilExp,
-      time_until_expiration_minutes: timeUntilExp ? Math.round(timeUntilExp / 60) : null,
-      is_expired: refreshPayload.exp && now >= refreshPayload.exp,
-    });
     
     if (refreshPayload.exp && now >= refreshPayload.exp) {
-      console.log('🔄 REFRESH TOKEN FLOW - ERROR: Refresh token has expired');
       sendErrorResponse(res, 'invalid_grant', 'Refresh token has expired');
       return;
     }
@@ -165,11 +107,6 @@ export const refreshToken: OAuthHandler = async (req: Request, res: Response): P
     const atlassianRefreshToken = refreshPayload.atlassian?.refresh_token;
     const figmaRefreshToken = refreshPayload.figma?.refresh_token;
 
-    console.log('🔄 REFRESH TOKEN FLOW - Provider refresh tokens found:', {
-      has_atlassian: !!atlassianRefreshToken,
-      has_figma: !!figmaRefreshToken,
-    });
-
     // Refresh each provider using the provider interface
     let newAtlassianTokens: any = null;
     let newFigmaTokens: any = null;
@@ -177,27 +114,15 @@ export const refreshToken: OAuthHandler = async (req: Request, res: Response): P
     try {
       // Refresh Atlassian if present
       if (atlassianRefreshToken) {
-        console.log('🔄 REFRESH TOKEN FLOW - Refreshing Atlassian tokens');
         newAtlassianTokens = await atlassianProvider.refreshAccessToken!({
           refreshToken: atlassianRefreshToken,
-        });
-        console.log('🔄 REFRESH TOKEN FLOW - Atlassian refresh successful:', {
-          hasAccessToken: !!newAtlassianTokens.access_token,
-          hasRefreshToken: !!newAtlassianTokens.refresh_token,
-          expiresIn: newAtlassianTokens.expires_in,
         });
       }
 
       // Refresh Figma if present
       if (figmaRefreshToken) {
-        console.log('🔄 REFRESH TOKEN FLOW - Refreshing Figma tokens');
         newFigmaTokens = await figmaProvider.refreshAccessToken!({
           refreshToken: figmaRefreshToken,
-        });
-        console.log('🔄 REFRESH TOKEN FLOW - Figma refresh successful:', {
-          hasAccessToken: !!newFigmaTokens.access_token,
-          hasRefreshToken: !!newFigmaTokens.refresh_token,
-          expiresIn: newFigmaTokens.expires_in,
         });
       }
 
@@ -235,37 +160,29 @@ export const refreshToken: OAuthHandler = async (req: Request, res: Response): P
       return;
     }
 
+    // Helper to add provider tokens to multi-provider structure
+    const addProviderTokens = (
+      target: MultiProviderTokens,
+      providerKey: 'atlassian' | 'figma',
+      tokens: any,
+      defaultExpiresIn: number
+    ) => {
+      if (tokens) {
+        target[providerKey] = {
+          access_token: tokens.access_token,
+          refresh_token: tokens.refresh_token,
+          expires_at: Math.floor(Date.now() / 1000) + (tokens.expires_in || defaultExpiresIn),
+          scope: tokens.scope,
+        };
+      }
+    };
+
     // Build multi-provider tokens structure for new JWTs
     const multiProviderTokens: MultiProviderTokens = {};
-
-    if (newAtlassianTokens) {
-      console.log(
-        '🔄 REFRESH TOKEN FLOW - Adding refreshed Atlassian tokens to JWT'
-      );
-      multiProviderTokens.atlassian = {
-        access_token: newAtlassianTokens.access_token,
-        refresh_token: newAtlassianTokens.refresh_token, // Provider handles rotation
-        expires_at:
-          Math.floor(Date.now() / 1000) + (newAtlassianTokens.expires_in || 3600),
-        scope: newAtlassianTokens.scope,
-      };
-    }
-
-    if (newFigmaTokens) {
-      console.log(
-        '🔄 REFRESH TOKEN FLOW - Adding refreshed Figma tokens to JWT'
-      );
-      multiProviderTokens.figma = {
-        access_token: newFigmaTokens.access_token,
-        refresh_token: newFigmaTokens.refresh_token, // Provider handles non-rotation
-        expires_at:
-          Math.floor(Date.now() / 1000) + (newFigmaTokens.expires_in || 7776000),
-        scope: newFigmaTokens.scope,
-      };
-    }
+    addProviderTokens(multiProviderTokens, 'atlassian', newAtlassianTokens, 3600);
+    addProviderTokens(multiProviderTokens, 'figma', newFigmaTokens, 7776000);
 
     // Create new access token with refreshed provider tokens
-    console.log('🔄 REFRESH TOKEN FLOW - Creating new JWT access token');
     const newAccessToken = await createMultiProviderAccessToken(
       multiProviderTokens,
       {
@@ -275,15 +192,8 @@ export const refreshToken: OAuthHandler = async (req: Request, res: Response): P
         iss: refreshPayload.iss,
       }
     );
-    console.log('🔄 REFRESH TOKEN FLOW - New JWT access token created:', {
-      token_length: newAccessToken?.length,
-      token_prefix: newAccessToken
-        ? newAccessToken.substring(0, 20) + '...'
-        : 'none',
-    });
 
     // Create new refresh token (with potentially rotated provider refresh tokens)
-    console.log('🔄 REFRESH TOKEN FLOW - Creating new JWT refresh token');
     const { refreshToken: newRefreshToken } =
       await createMultiProviderRefreshToken(multiProviderTokens, {
         resource: refreshPayload.aud,
@@ -291,17 +201,6 @@ export const refreshToken: OAuthHandler = async (req: Request, res: Response): P
         sub: refreshPayload.sub,
         iss: refreshPayload.iss,
       });
-    console.log('🔄 REFRESH TOKEN FLOW - New JWT refresh token created:', {
-      token_length: newRefreshToken?.length,
-      token_prefix: newRefreshToken
-        ? newRefreshToken.substring(0, 20) + '...'
-        : 'none',
-    });
-
-    console.log(
-      '🔄 REFRESH TOKEN FLOW - SUCCESS: OAuth refresh token exchange successful for client:',
-      client_id
-    );
 
     // Extract expires_in from the JWT's exp claim (respects TEST_SHORT_AUTH_TOKEN_EXP)
     const expiresIn = getExpiresInFromJwt(newAccessToken);
@@ -315,12 +214,14 @@ export const refreshToken: OAuthHandler = async (req: Request, res: Response): P
       scope: refreshPayload.scope,
     };
 
-    console.log('🔄 REFRESH TOKEN FLOW - Final response:', {
-      has_access_token: !!responsePayload.access_token,
-      has_refresh_token: !!responsePayload.refresh_token,
-      expires_in: responsePayload.expires_in,
-      token_type: responsePayload.token_type,
-      scope: responsePayload.scope,
+    // Single summary log for successful refresh
+    console.log('🔄 Token refresh successful', {
+      client_id,
+      providers_refreshed: [
+        newAtlassianTokens && 'atlassian',
+        newFigmaTokens && 'figma',
+      ].filter(Boolean),
+      expires_in: expiresIn,
     });
 
     res.json(responsePayload);

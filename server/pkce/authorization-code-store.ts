@@ -102,11 +102,6 @@ export function storeAuthorizationCode(
     clientId,
     redirectUri,
   });
-
-  console.log(
-    `📝 Stored authorization code (expires in ${CODE_EXPIRATION_MS / 1000}s)`
-  );
-  console.log(`  Has refresh token: ${!!refreshToken}`);
 }
 
 /**
@@ -135,8 +130,6 @@ export function consumeAuthorizationCode(code: string): AuthCodeResult | null {
   // Delete code (single-use per RFC 6749)
   authorizationCodes.delete(code);
   console.log('  ✅ Authorization code consumed');
-  console.log(`  Returning access token: ${!!entry.accessToken}`);
-  console.log(`  Returning refresh token: ${!!entry.refreshToken}`);
 
   return {
     accessToken: entry.accessToken,

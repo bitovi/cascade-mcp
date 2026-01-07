@@ -220,22 +220,15 @@ export async function createMultiProviderAccessToken(
   };
 
   // Add provider tokens to payload
-  if (tokens.atlassian) {
-    payload.atlassian = {
-      access_token: tokens.atlassian.access_token,
-      refresh_token: tokens.atlassian.refresh_token,
-      expires_at: tokens.atlassian.expires_at,
-      scope: tokens.atlassian.scope,
-    };
-  }
-
-  if (tokens.figma) {
-    payload.figma = {
-      access_token: tokens.figma.access_token,
-      refresh_token: tokens.figma.refresh_token,
-      expires_at: tokens.figma.expires_at,
-      scope: tokens.figma.scope,
-    };
+  for (const [providerKey, providerData] of Object.entries(tokens)) {
+    if (providerData) {
+      payload[providerKey] = {
+        access_token: providerData.access_token,
+        refresh_token: providerData.refresh_token,
+        expires_at: providerData.expires_at,
+        scope: providerData.scope,
+      };
+    }
   }
 
   const jwt = await jwtSign(payload);
@@ -271,16 +264,12 @@ export async function createMultiProviderRefreshToken(
   };
 
   // Add provider refresh tokens to payload
-  if (tokens.atlassian) {
-    payload.atlassian = {
-      refresh_token: tokens.atlassian.refresh_token,
-    };
-  }
-
-  if (tokens.figma) {
-    payload.figma = {
-      refresh_token: tokens.figma.refresh_token,
-    };
+  for (const [providerKey, providerData] of Object.entries(tokens)) {
+    if (providerData) {
+      payload[providerKey] = {
+        refresh_token: providerData.refresh_token,
+      };
+    }
   }
 
   const refreshToken = await jwtSign(payload);

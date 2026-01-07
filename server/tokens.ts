@@ -76,6 +76,21 @@ export function parseJWT(token: string): any {
 }
 
 /**
+ * Extract expires_in from a JWT token by decoding its exp claim
+ * @param token - JWT token string
+ * @returns seconds until expiration, or default 3540 if unable to extract
+ */
+export function getExpiresInFromJwt(token: string): number {
+  const payload = parseJWT(token);
+  if (payload.exp && typeof payload.exp === 'number') {
+    const expiresIn = payload.exp - Math.floor(Date.now() / 1000);
+    return Math.max(0, expiresIn); // Don't return negative
+  }
+
+  return 3540; // Default fallback
+}
+
+/**
  * Format a token with truncation and expiration information
  * @param token - The JWT token to format
  * @param maxLength - Maximum length for the truncated token

@@ -70,7 +70,6 @@ export const oauthMetadata: OAuthHandler = (req: Request, res: Response): void =
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   
   const baseUrl = getBaseUrl(req);
-  console.log('  Using baseUrl:', baseUrl);
   
   res.json({
     issuer: baseUrl,
@@ -101,7 +100,6 @@ export const oauthProtectedResourceMetadata: OAuthHandler = (req: Request, res: 
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   
   const baseUrl = getBaseUrl(req);
-  console.log('  Using baseUrl:', baseUrl);
   
   const metadata = {
     resource: baseUrl,

@@ -141,9 +141,6 @@ export class BrowserMcpClient {
       
       if (authorizationCode) {
         console.log('[BrowserMcpClient] 🎟️ Found authorization code in URL:', authorizationCode.substring(0, 10) + '...');
-        // IMMEDIATELY clean up URL to prevent duplicate token exchanges
-        // (React Strict Mode can cause double invocations)
-        console.log('[BrowserMcpClient] 🧹 Immediately cleaning up URL to prevent duplicate exchanges...');
         window.history.replaceState({}, '', window.location.pathname);
       }
       

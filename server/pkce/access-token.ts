@@ -27,7 +27,7 @@
 import { Request, Response } from 'express';
 import { 
   sanitizeObjectWithJWTs,
-  parseJWT,
+  getExpiresInFromJwt,
 } from '../tokens.ts';
 import { 
   createJiraMCPAuthToken,
@@ -57,24 +57,6 @@ function sendErrorResponse(res: Response, error: string, description: string, st
     error_description: description,
   };
   res.status(statusCode).json(errorResponse);
-}
-
-/**
- * Extract expires_in from a JWT token by decoding its exp claim
- * @param token - JWT token string
- * @returns seconds until expiration, or default 3540 if unable to extract
- */
-function getExpiresInFromJwt(token: string): number {
-  try {
-    const payload = parseJWT(token);
-    if (payload.exp && typeof payload.exp === 'number') {
-      const expiresIn = payload.exp - Math.floor(Date.now() / 1000);
-      return Math.max(0, expiresIn); // Don't return negative
-    }
-  } catch (err) {
-    console.log('  Warning: Could not extract exp from JWT, using default');
-  }
-  return 3540; // Default fallback
 }
 
 /**
@@ -112,10 +94,6 @@ async function handleAuthorizationCodeGrant(
       expires_in: expiresIn,
       scope: getAtlassianConfig().scopes,
     };
-
-    console.log(`  Connection hub response expires_in: ${expiresIn}s (${Math.floor(expiresIn / 60)}m ${expiresIn % 60}s)`);
-    console.log(`  JWT exp timestamp: ${parseJWT(result.accessToken).exp}`);
-    console.log(`  Current timestamp: ${Math.floor(Date.now() / 1000)}`);
 
     // Include refresh_token if present
     if (result.refreshToken) {
@@ -169,8 +147,7 @@ async function handleAuthorizationCodeGrant(
 
   // Extract expires_in from the JWT's exp claim (respects TEST_SHORT_AUTH_TOKEN_EXP)
   const jwtExpiresIn = getExpiresInFromJwt(jwt);
-  console.log(`  Response expires_in: ${jwtExpiresIn}s`);
-  
+
   res.json({
     access_token: jwt,
     token_type: 'Bearer',
