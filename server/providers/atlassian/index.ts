@@ -12,10 +12,12 @@ import type {
   AuthUrlParams,
   TokenExchangeParams,
   StandardTokenResponse,
-  CallbackParams
+  CallbackParams,
+  RefreshTokenParams,
 } from '../provider-interface.js';
 import { registerAtlassianTools } from './tools/index.js';
 import { generateCodeChallenge } from '../../tokens.js';
+import { getAtlassianConfig } from '../../atlassian-auth-code-flow.js';
 
 /**
  * Atlassian Provider Object
@@ -281,6 +283,66 @@ export const atlassianProvider: OAuthProvider = {
    */
   getDefaultScopes(): string[] {
     return ['read:jira-work', 'write:jira-work', 'offline_access'];
+  },
+
+  /**
+   * Refresh an access token using a refresh token
+   * Atlassian rotates refresh tokens - returns a NEW refresh token with each refresh
+   * @param params - Refresh parameters including the refresh token
+   * @returns New access token and NEW refresh token (token rotation)
+   */
+  async refreshAccessToken(
+    params: RefreshTokenParams
+  ): Promise<StandardTokenResponse> {
+    const ATLASSIAN_CONFIG = getAtlassianConfig();
+
+    console.log('[ATLASSIAN] Refreshing access token');
+    console.log(
+      '[ATLASSIAN]   - Refresh token length:',
+      params.refreshToken.length
+    );
+    console.log(
+      '[ATLASSIAN]   - Using endpoint:',
+      ATLASSIAN_CONFIG.tokenUrl
+    );
+
+    const response = await fetch(ATLASSIAN_CONFIG.tokenUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        grant_type: 'refresh_token',
+        client_id: ATLASSIAN_CONFIG.clientId,
+        client_secret: ATLASSIAN_CONFIG.clientSecret,
+        refresh_token: params.refreshToken,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[ATLASSIAN] Token refresh failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText,
+      });
+      throw new Error(
+        `Atlassian token refresh failed (${response.status}): ${errorText}`
+      );
+    }
+
+    const tokenData = (await response.json()) as any;
+    console.log('[ATLASSIAN] Token refresh successful:', {
+      hasAccessToken: !!tokenData.access_token,
+      hasRefreshToken: !!tokenData.refresh_token, // Should be true - Atlassian rotates
+      expiresIn: tokenData.expires_in,
+    });
+
+    return {
+      access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token, // Atlassian rotates - return NEW token
+      token_type: tokenData.token_type || 'Bearer',
+      expires_in: tokenData.expires_in || 3600,
+      scope: tokenData.scope,
+    };
   },
 
   /**

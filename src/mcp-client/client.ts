@@ -141,6 +141,7 @@ export class BrowserMcpClient {
       
       if (authorizationCode) {
         console.log('[BrowserMcpClient] 🎟️ Found authorization code in URL:', authorizationCode.substring(0, 10) + '...');
+        window.history.replaceState({}, '', window.location.pathname);
       }
       
       // Attempt OAuth authentication
@@ -160,12 +161,6 @@ export class BrowserMcpClient {
       }
 
       console.log('[BrowserMcpClient] 🎉 AUTHORIZED! Proceeding to connect...');
-
-      // Clean up URL after OAuth callback
-      if (BrowserMcpClient.hasOAuthCallback()) {
-        console.log('[BrowserMcpClient] 🧹 Cleaning up URL...');
-        window.history.replaceState({}, '', window.location.pathname);
-      }
 
       // Create transport with auth headers
       const tokens = await this.oauthProvider.tokens();
@@ -284,5 +279,104 @@ export class BrowserMcpClient {
    */
   clearTokens(): void {
     this.oauthProvider?.clearAll();
+  }
+
+  /**
+   * Refresh OAuth tokens manually
+   * Calls the server's /access-token endpoint with grant_type=refresh_token
+   * @returns Object indicating success and which providers were refreshed
+   */
+  async refreshTokens(): Promise<{ success: boolean; providers: string[]; error?: string }> {
+    console.log('[BrowserMcpClient] 🔄 refreshTokens() called');
+    
+    if (!this.oauthProvider) {
+      return { success: false, providers: [], error: 'No OAuth provider configured' };
+    }
+
+    const currentTokens = this.oauthProvider.tokens();
+    if (!currentTokens?.refresh_token) {
+      return { success: false, providers: [], error: 'No refresh token available' };
+    }
+
+    const serverUrl = this.connectionState.serverUrl;
+    if (!serverUrl) {
+      return { success: false, providers: [], error: 'No server URL configured' };
+    }
+
+    try {
+      console.log('[BrowserMcpClient] 🔄 Calling /access-token with refresh_token grant');
+      
+      // Get client info for the request
+      const clientInfo = this.oauthProvider.clientInformation();
+      
+      const response = await fetch(new URL('/access-token', serverUrl).toString(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          grant_type: 'refresh_token',
+          refresh_token: currentTokens.refresh_token,
+          client_id: clientInfo?.client_id,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMsg = errorData.error_description || errorData.error || `HTTP ${response.status}`;
+        console.error('[BrowserMcpClient] ❌ Token refresh failed:', errorMsg);
+        return { success: false, providers: [], error: errorMsg };
+      }
+
+      const newTokens = await response.json();
+      console.log('[BrowserMcpClient] ✅ Token refresh successful:', {
+        hasAccessToken: !!newTokens.access_token,
+        hasRefreshToken: !!newTokens.refresh_token,
+        expiresIn: newTokens.expires_in,
+      });
+
+      // Save the new tokens
+      this.oauthProvider.saveTokens({
+        access_token: newTokens.access_token,
+        refresh_token: newTokens.refresh_token,
+        token_type: newTokens.token_type,
+        expires_in: newTokens.expires_in,
+        scope: newTokens.scope,
+      });
+
+      // Decode the JWT to see which providers were refreshed
+      const providers: string[] = [];
+      try {
+        const payload = JSON.parse(atob(newTokens.access_token.split('.')[1]));
+        if (payload.atlassian) providers.push('atlassian');
+        if (payload.figma) providers.push('figma');
+      } catch {
+        // If we can't decode, just report success
+      }
+
+      // Update transport with new token if connected
+      if (this.transport && this.client) {
+        console.log('[BrowserMcpClient] 🔄 Reconnecting with new tokens...');
+        // Need to recreate transport with new token
+        await this.transport.close();
+        this.transport = new StreamableHTTPClientTransport(
+          new URL('/mcp', serverUrl),
+          {
+            requestInit: {
+              headers: {
+                'Authorization': `Bearer ${newTokens.access_token}`,
+              },
+            },
+          }
+        );
+        await this.client.connect(this.transport);
+      }
+
+      return { success: true, providers };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[BrowserMcpClient] ❌ Token refresh error:', errorMsg);
+      return { success: false, providers: [], error: errorMsg };
+    }
   }
 }
