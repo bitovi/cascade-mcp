@@ -95,14 +95,19 @@ export async function handleConnectionDone(req: Request, res: Response): Promise
     }
     
     // Add Google tokens if present
-    if (googleTokens) {
+
+    console.log(`GOOGLE TOKENS:`, JSON.stringify(googleTokens));
+
+    if (googleTokens && googleTokens.access_token && googleTokens.refresh_token) {
       console.log('  Adding Google credentials to JWT');
-      jwtPayload.google = {
+      multiProviderTokens.google = {
         access_token: googleTokens.access_token,
         refresh_token: googleTokens.refresh_token,
         expires_at: googleTokens.expires_at,
         scope: googleTokens.scope,
       };
+    } else if (googleTokens) {
+      console.log('  Warning: Google tokens incomplete (missing access or refresh token)');
     }
     
     // Create JWT access token with nested provider structure

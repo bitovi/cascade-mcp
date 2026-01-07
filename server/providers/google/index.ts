@@ -12,7 +12,8 @@ import type {
   AuthUrlParams, 
   TokenExchangeParams, 
   StandardTokenResponse, 
-  CallbackParams 
+  CallbackParams,
+  RefreshTokenParams,
 } from '../provider-interface.js';
 import { registerGoogleTools } from './tools/index.js';
 
@@ -43,6 +44,7 @@ export const googleProvider: OAuthProvider = {
       redirect_uri: redirectUri,
       scope,
       access_type: 'offline', // Request refresh token
+      prompt: 'consent', // Force consent screen to always get refresh token
     };
     
     if (params.state) {
@@ -121,6 +123,68 @@ export const googleProvider: OAuthProvider = {
     return ['https://www.googleapis.com/auth/drive'];
   },
   
+  /**
+   * Refresh an access token using a refresh token
+   * Google uses standard OAuth 2.0 refresh with client_secret
+   * ⚠️ NOTE: Google does NOT rotate refresh tokens - the same one remains valid
+   * @param params - Refresh parameters including the refresh token
+   * @returns New access token and the ORIGINAL refresh token
+   */
+  async refreshAccessToken(
+    params: RefreshTokenParams
+  ): Promise<StandardTokenResponse> {
+    const clientId = process.env.GOOGLE_CLIENT_ID!;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET!;
+
+    console.log('[GOOGLE] Refreshing access token');
+    console.log('[GOOGLE]   - Refresh token length:', params.refreshToken.length);
+    console.log(
+      '[GOOGLE]   - Using endpoint: https://oauth2.googleapis.com/token'
+    );
+
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: params.refreshToken,
+        grant_type: 'refresh_token',
+      }).toString(),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[GOOGLE] Token refresh failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText,
+      });
+      throw new Error(
+        `Google token refresh failed (${response.status}): ${errorText}`
+      );
+    }
+
+    const tokenData = (await response.json()) as any;
+    console.log('[GOOGLE] Token refresh successful:', {
+      hasAccessToken: !!tokenData.access_token,
+      hasRefreshToken: !!tokenData.refresh_token, // Should be false
+      expiresIn: tokenData.expires_in,
+    });
+
+    // Google response: { access_token, token_type, expires_in, scope } - NO refresh_token!
+    return {
+      access_token: tokenData.access_token,
+      // ⚠️ KEY: Google doesn't return a refresh token, so we return the ORIGINAL
+      // input token. This ensures the caller gets a valid refresh_token to embed
+      // in the new JWT, even though Google didn't provide one.
+      refresh_token: params.refreshToken,
+      token_type: tokenData.token_type || 'Bearer',
+      expires_in: tokenData.expires_in || 3600,
+      scope: tokenData.scope,
+    };
+  },
+
   /**
    * Register Google Drive-specific MCP tools
    * Tools will be registered with 'google-' prefix

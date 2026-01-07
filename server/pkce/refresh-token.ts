@@ -33,6 +33,7 @@ import {
 } from './token-helpers.ts';
 import { atlassianProvider } from '../providers/atlassian/index.ts';
 import { figmaProvider } from '../providers/figma/index.ts';
+import { googleProvider } from '../providers/google/index.ts';
 import type { OAuthHandler, OAuthRequest, OAuthErrorResponse } from './types.ts';
 
 /**
@@ -107,10 +108,12 @@ export const refreshToken: OAuthHandler = async (req: Request, res: Response): P
     // Extract provider refresh tokens from nested structure
     const atlassianRefreshToken = refreshPayload.atlassian?.refresh_token;
     const figmaRefreshToken = refreshPayload.figma?.refresh_token;
+    const googleRefreshToken = refreshPayload.google?.refresh_token;
 
     // Refresh each provider using the provider interface
     let newAtlassianTokens: any = null;
     let newFigmaTokens: any = null;
+    let newGoogleTokens: any = null;
 
     try {
       // Refresh Atlassian if present
@@ -127,8 +130,15 @@ export const refreshToken: OAuthHandler = async (req: Request, res: Response): P
         });
       }
 
+      // Refresh Google if present
+      if (googleRefreshToken) {
+        newGoogleTokens = await googleProvider.refreshAccessToken!({
+          refreshToken: googleRefreshToken,
+        });
+      }
+
       // Check if we refreshed any provider
-      if (!newAtlassianTokens && !newFigmaTokens) {
+      if (!newAtlassianTokens && !newFigmaTokens && !newGoogleTokens) {
         console.error(
           '🔄 REFRESH TOKEN FLOW - ERROR: No provider refresh tokens found in JWT'
         );
@@ -165,6 +175,7 @@ export const refreshToken: OAuthHandler = async (req: Request, res: Response): P
     const multiProviderTokens: MultiProviderTokens = {};
     addProviderTokens(multiProviderTokens, 'atlassian', newAtlassianTokens);
     addProviderTokens(multiProviderTokens, 'figma', newFigmaTokens);
+    addProviderTokens(multiProviderTokens, 'google', newGoogleTokens);
 
     // Create new access token with refreshed provider tokens
     const newAccessToken = await createMultiProviderAccessToken(
@@ -204,6 +215,7 @@ export const refreshToken: OAuthHandler = async (req: Request, res: Response): P
       providers_refreshed: [
         newAtlassianTokens && 'atlassian',
         newFigmaTokens && 'figma',
+        newGoogleTokens && 'google',
       ].filter(Boolean),
       expires_in: expiresIn,
     });
