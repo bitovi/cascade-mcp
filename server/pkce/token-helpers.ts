@@ -29,9 +29,51 @@ import { jwtSign } from '../tokens.ts';
 import { getAtlassianConfig } from '../atlassian-auth-code-flow.ts';
 import type { AtlassianTokenResponse } from '../atlassian-auth-code-flow.ts';
 
+/**
+ * Provider token data structure for multi-provider JWTs
+ */
+export interface ProviderTokenData {
+  access_token: string;
+  refresh_token: string;
+  expires_at: number;
+  scope?: string;
+}
+
+/**
+ * Multi-provider token container
+ * Contains nested provider token data for JWT embedding
+ */
+export interface MultiProviderTokens {
+  atlassian?: ProviderTokenData;
+  figma?: ProviderTokenData;
+}
+
 // Extended interface to handle optional refresh token expiration
 export interface ExtendedAtlassianTokenResponse extends AtlassianTokenResponse {
   refresh_expires_in?: number;
+}
+
+/**
+ * Helper to add provider tokens to multi-provider structure
+ * Mutates the target object by adding provider token data with calculated expiration
+ * 
+ * @param target - The MultiProviderTokens object to mutate
+ * @param providerKey - The provider key ('atlassian' or 'figma')
+ * @param tokens - Provider token response containing access_token, refresh_token, expires_in, scope
+ */
+export function addProviderTokens(
+  target: MultiProviderTokens,
+  providerKey: 'atlassian' | 'figma',
+  tokens: any
+): void {
+  if (tokens) {
+    target[providerKey] = {
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      expires_at: Math.floor(Date.now() / 1000) + tokens.expires_in,
+      scope: tokens.scope,
+    };
+  }
 }
 
 /**
@@ -148,4 +190,113 @@ export async function createJiraMCPRefreshToken(
     refreshToken,
     expiresIn: refreshTokenExp - Math.floor(Date.now() / 1000)
   };
+}
+
+/**
+ * Creates a multi-provider access token (JWT) with nested provider credentials
+ * Per Q21, Q22: Uses nested structure { atlassian: {...}, figma: {...} }
+ *
+ * @param tokens - Multi-provider token data to embed in JWT
+ * @param options - Token creation options (resource, scope, sub, iss)
+ * @returns JWT access token string with nested provider credentials
+ */
+export async function createMultiProviderAccessToken(
+  tokens: MultiProviderTokens,
+  options: TokenCreationOptions = {}
+): Promise<string> {
+  // Calculate JWT expiration: minimum of all provider expiration times (minus 60s buffer)
+  let minExpiresAt = Infinity;
+
+  if (tokens.atlassian?.expires_at) {
+    minExpiresAt = Math.min(minExpiresAt, tokens.atlassian.expires_at);
+  }
+  if (tokens.figma?.expires_at) {
+    minExpiresAt = Math.min(minExpiresAt, tokens.figma.expires_at);
+  }
+
+  // Default to 1 hour if no provider expiration found
+  const jwtExpirationTime =
+    minExpiresAt !== Infinity
+      ? Math.floor(minExpiresAt / 1000) - 60
+      : Math.floor(Date.now() / 1000) + 3600;
+
+  // Support test mode short expiration
+  const finalExpiration = process.env.TEST_SHORT_AUTH_TOKEN_EXP
+    ? Math.floor(Date.now() / 1000) +
+      parseInt(process.env.TEST_SHORT_AUTH_TOKEN_EXP)
+    : jwtExpirationTime;
+
+  if (process.env.TEST_SHORT_AUTH_TOKEN_EXP) {
+    const testExp = parseInt(process.env.TEST_SHORT_AUTH_TOKEN_EXP);
+    console.log(
+      `🧪 TEST MODE: Creating multi-provider JWT with ${testExp}s expiration (expires at ${new Date(finalExpiration * 1000).toISOString()})`
+    );
+  }
+
+  // Build JWT payload with nested provider structure
+  const payload: any = {
+    sub: options.sub || 'user-' + randomUUID(),
+    iss: options.iss || process.env.VITE_AUTH_SERVER_URL,
+    aud: options.resource || process.env.VITE_AUTH_SERVER_URL,
+    scope: options.scope || '',
+    exp: finalExpiration,
+  };
+
+  // Add provider tokens to payload
+  for (const [providerKey, providerData] of Object.entries(tokens)) {
+    if (providerData) {
+      payload[providerKey] = {
+        access_token: providerData.access_token,
+        refresh_token: providerData.refresh_token,
+        expires_at: providerData.expires_at,
+        scope: providerData.scope,
+      };
+    }
+  }
+
+  const jwt = await jwtSign(payload);
+  
+  return jwt;
+}
+
+/**
+ * Creates a multi-provider refresh token (JWT) with nested provider refresh tokens
+ * Per Q21: Uses nested structure { atlassian: { refresh_token }, figma: { refresh_token } }
+ *
+ * @param tokens - Multi-provider token data containing refresh tokens
+ * @param options - Token creation options (resource, scope, sub, iss)
+ * @returns Object containing refresh token JWT and expiration time
+ */
+export async function createMultiProviderRefreshToken(
+  tokens: MultiProviderTokens,
+  options: TokenCreationOptions = {}
+): Promise<{ refreshToken: string; expiresIn: number }> {
+  // Calculate refresh token expiration (use longest provider refresh token lifetime)
+  // Default to 90 days for refresh tokens
+  const defaultRefreshExp =
+    Math.floor(Date.now() / 1000) + 90 * 24 * 60 * 60;
+
+  // Build JWT payload with nested provider refresh tokens
+  const payload: any = {
+    type: 'refresh_token',
+    sub: options.sub || 'user-' + randomUUID(),
+    iss: options.iss || process.env.VITE_AUTH_SERVER_URL,
+    aud: options.resource || process.env.VITE_AUTH_SERVER_URL,
+    scope: options.scope || '',
+    exp: defaultRefreshExp,
+  };
+
+  // Add provider refresh tokens to payload
+  for (const [providerKey, providerData] of Object.entries(tokens)) {
+    if (providerData) {
+      payload[providerKey] = {
+        refresh_token: providerData.refresh_token,
+      };
+    }
+  }
+
+  const refreshToken = await jwtSign(payload);
+  const expiresIn = defaultRefreshExp - Math.floor(Date.now() / 1000);
+
+  return { refreshToken, expiresIn };
 }

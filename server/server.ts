@@ -246,6 +246,9 @@ app.post('/domain', async (req: Request, res: Response) => {
 // OAuth token endpoint for MCP clients (POST)
 app.post('/access-token', accessToken);
 
+// OAuth token endpoint alias for MCP SDK compatibility (SDK uses /token by default)
+app.post('/token', accessToken);
+
 // OAuth refresh token endpoint (kept for backwards compatibility)
 app.post('/refresh-token', accessToken);
 

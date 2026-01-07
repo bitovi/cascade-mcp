@@ -35,6 +35,8 @@ export interface UseMcpClientReturn {
   setAnthropicKey: (key: string) => void;
   /** Clear logs */
   clearLogs: () => void;
+  /** Refresh OAuth tokens (for testing refresh flow) */
+  refreshTokens: () => Promise<{ success: boolean; providers: string[]; error?: string }>;
 }
 
 export interface LogEntry {
@@ -279,6 +281,33 @@ export function useMcpClient(options: UseMcpClientOptions = {}): UseMcpClientRet
     setLogs([]);
   }, []);
 
+  const refreshTokens = useCallback(async () => {
+    if (!clientRef.current) {
+      return { success: false, providers: [], error: 'Not connected' };
+    }
+
+    addLog('info', '🔄 Refreshing OAuth tokens...');
+    
+    try {
+      const result = await clientRef.current.refreshTokens();
+      
+      if (result.success) {
+        const providersStr = result.providers.length > 0 
+          ? result.providers.join(', ') 
+          : 'unknown';
+        addLog('info', `✅ Token refresh successful! Providers: ${providersStr}`);
+      } else {
+        addLog('error', `❌ Token refresh failed: ${result.error}`);
+      }
+      
+      return result;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Token refresh failed';
+      addLog('error', `❌ Token refresh error: ${message}`);
+      return { success: false, providers: [], error: message };
+    }
+  }, [addLog]);
+
   // Load stored API key on mount
   useEffect(() => {
     const storedKey = localStorage.getItem('mcp_anthropic_key');
@@ -296,5 +325,6 @@ export function useMcpClient(options: UseMcpClientOptions = {}): UseMcpClientRet
     callTool,
     setAnthropicKey,
     clearLogs,
+    refreshTokens,
   };
 }

@@ -5,6 +5,13 @@ import { defineConfig } from 'vite';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// Shared proxy configuration for all backend endpoints
+const proxyConfig = {
+  target: 'http://localhost:3000',
+  changeOrigin: false,
+  headers: { 'X-Forwarded-Origin': 'http://localhost:5173' },
+};
+
 export default defineConfig({
   plugins: [react()],
   root: '.', // Project root
@@ -21,12 +28,17 @@ export default defineConfig({
     port: 5173,
     proxy: {
       // Proxy MCP and API requests to backend during dev
-      '/mcp': 'http://localhost:3000',
-      '/api': 'http://localhost:3000',
-      '/auth': 'http://localhost:3000',
-      '/.well-known': 'http://localhost:3000',
-      '/register': 'http://localhost:3000',
-      '/get-access-token': 'http://localhost:3000',
+      '/mcp': proxyConfig,
+      '/api': proxyConfig,
+      '/auth': proxyConfig,
+      '/.well-known': proxyConfig,
+      '/register': proxyConfig,
+      '/get-access-token': proxyConfig,
+      // OAuth token endpoints (used by MCP SDK)
+      '/token': proxyConfig,
+      '/access-token': proxyConfig,
+      '/authorize': proxyConfig,
+      '/callback': proxyConfig,
     },
   },
 });
