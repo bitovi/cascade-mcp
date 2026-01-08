@@ -327,8 +327,8 @@ function validateAndExtractJwt(token: string, req: Request, res: Response, sourc
     console.log(`Successfully parsed JWT payload from ${source}:`, JSON.stringify(sanitizeJwtPayload(payload), null, 2));
 
     // Validate that we have at least one provider's credentials (nested structure per Q21)
-    if (!payload.atlassian && !payload.figma) {
-      console.log(`JWT payload missing provider credentials (${source}) - expected 'atlassian' or 'figma' nested structure`);
+    if (!payload.atlassian && !payload.figma && !payload.google) {
+      console.log(`JWT payload missing provider credentials (${source}) - expected 'atlassian', 'figma', or 'google' nested structure`);
       sendMissingAtlassianAccessToken(res, req, source);
       return { authInfo: null, errored: true };
     }
@@ -371,7 +371,7 @@ function send401(res: Response, jsonResponse: { error: string }, includeInvalidT
 }
 
 function sendMissingAtlassianAccessToken(res: Response, req: Request, where: string = 'bearer header'): Response {
-  const message = `Authentication token missing Atlassian access token in ${where}.`;
+  const message = `Authentication token missing provider access token in ${where}.`;
   console.log(`❌🔑 ${message}`);
   return res
       .status(401)

@@ -63,8 +63,11 @@ export function isTokenExpired(authInfo: AuthContext | null): boolean {
   const hasValidFigmaToken = authInfo.figma && 
     authInfo.figma.expires_at > now;
   
+  const hasValidGoogleToken = authInfo.google && 
+    authInfo.google.expires_at > now;
+  
   // If at least one provider has a valid token, not expired
-  const hasAnyValidToken = hasValidAtlassianToken || hasValidFigmaToken;
+  const hasAnyValidToken = hasValidAtlassianToken || hasValidFigmaToken || hasValidGoogleToken;
   
   return !hasAnyValidToken;
 }

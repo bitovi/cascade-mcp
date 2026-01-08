@@ -61,8 +61,9 @@ export async function handleConnectionDone(req: Request, res: Response): Promise
     // Build multi-provider tokens structure for JWT creation
     const atlassianTokens = providerTokens['atlassian'];
     const figmaTokens = providerTokens['figma'];
+    const googleTokens = providerTokens['google'];
     
-    if (!atlassianTokens && !figmaTokens) {
+    if (!atlassianTokens && !figmaTokens && !googleTokens) {
       throw new Error('No provider tokens found - please connect at least one service');
     }
     
@@ -91,6 +92,18 @@ export async function handleConnectionDone(req: Request, res: Response): Promise
       };
     } else if (figmaTokens) {
       console.log('  Warning: Figma tokens incomplete (missing access or refresh token)');
+    }
+    
+    if (googleTokens && googleTokens.access_token && googleTokens.refresh_token) {
+      console.log('  Adding Google credentials to JWT');
+      multiProviderTokens.google = {
+        access_token: googleTokens.access_token,
+        refresh_token: googleTokens.refresh_token,
+        expires_at: googleTokens.expires_at,
+        scope: googleTokens.scope,
+      };
+    } else if (googleTokens) {
+      console.log('  Warning: Google tokens incomplete (missing access or refresh token)');
     }
     
     // Create JWT access token with nested provider structure
