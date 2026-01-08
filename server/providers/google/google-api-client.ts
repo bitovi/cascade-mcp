@@ -26,12 +26,6 @@ export interface GoogleClient {
   fetch: (url: string, options?: RequestInit) => Promise<Response>;
   
   /**
-   * Get user information from Google Drive API
-   * @returns Promise resolving to Drive user information
-   */
-  fetchAboutUser(): Promise<DriveAboutResponse>;
-  
-  /**
    * Authentication type used by this client
    */
   authType: 'oauth';
@@ -68,24 +62,5 @@ export function createGoogleClient(accessToken: string): GoogleClient {
         },
       });
     },
-    
-    async fetchAboutUser(): Promise<DriveAboutResponse> {
-      const response = await fetch(
-        'https://www.googleapis.com/drive/v3/about?fields=user',
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Accept': 'application/json',
-          },
-        }
-      );
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Drive API error (${response.status}): ${errorText}`);
-      }
-      
-      return response.json() as Promise<DriveAboutResponse>;
-    }
   };
 }
