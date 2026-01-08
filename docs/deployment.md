@@ -38,6 +38,22 @@ Before deploying, you need to create OAuth applications for the services you wan
    - **Scopes**: `file_content:read file_comments:read current_user:read`
 4. Note your `Client ID` and `Client Secret`
 
+#### Google Drive OAuth App
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select an existing one
+3. Enable the Google Drive API:
+   - Navigate to **APIs & Services** > **Library**
+   - Search for "Google Drive API"
+   - Click **Enable**
+4. Create OAuth 2.0 credentials:
+   - Navigate to **APIs & Services** > **Credentials**
+   - Click **Create Credentials** > **OAuth client ID**
+   - Select **Application type**: **Web application**
+   - **Name**: Choose a descriptive name (e.g., "Cascade MCP Server")
+   - **Authorized redirect URIs**: Add `https://your-domain.com/auth/callback/google`
+   - Click **Create**
+5. Note your `Client ID` and `Client Secret` from the confirmation dialog
+
 ---
 
 ## Environment Configuration
@@ -69,6 +85,11 @@ VITE_JIRA_API_URL=https://api.atlassian.com/ex/jira
 FIGMA_CLIENT_ID=your-figma-client-id
 FIGMA_CLIENT_SECRET=your-figma-client-secret
 FIGMA_OAUTH_SCOPES="file_content:read file_comments:read current_user:read"
+
+# Google Drive OAuth
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+GOOGLE_OAUTH_SCOPES="https://www.googleapis.com/auth/drive"
 
 # Optional: AWS (for CloudWatch logging)
 AWS_ACCESS_KEY_ID=your-aws-access-key
