@@ -46,6 +46,7 @@ export interface ProviderTokenData {
 export interface MultiProviderTokens {
   atlassian?: ProviderTokenData;
   figma?: ProviderTokenData;
+  google?: ProviderTokenData;
 }
 
 // Extended interface to handle optional refresh token expiration
@@ -58,12 +59,12 @@ export interface ExtendedAtlassianTokenResponse extends AtlassianTokenResponse {
  * Mutates the target object by adding provider token data with calculated expiration
  * 
  * @param target - The MultiProviderTokens object to mutate
- * @param providerKey - The provider key ('atlassian' or 'figma')
+ * @param providerKey - The provider key ('atlassian', 'figma', or 'google')
  * @param tokens - Provider token response containing access_token, refresh_token, expires_in, scope
  */
 export function addProviderTokens(
   target: MultiProviderTokens,
-  providerKey: 'atlassian' | 'figma',
+  providerKey: 'atlassian' | 'figma' | 'google',
   tokens: any
 ): void {
   if (tokens) {
