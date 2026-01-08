@@ -204,7 +204,39 @@ You must register a new OAuth app in Figma to obtain credentials for MCP integra
    - `current_user:read`
 6. Save the app and copy the **Client ID** and **Client Secret**.
 
-### 3. Configure Environment Variables
+### 3. Create a Google OAuth App (Optional)
+
+If you want to use Google Drive integration, you'll need to create OAuth credentials in Google Cloud Console.
+
+**Steps:**
+1. Go to [Google Cloud Console](https://console.cloud.google.com/).
+2. Create a new project or select an existing one:
+   - Click the project dropdown in the top navigation bar
+   - Click **New Project**
+   - Enter a project name (e.g., `Cascade MCP Local`)
+   - Click **Create**
+3. Enable the Google Drive API:
+   - In the left sidebar, navigate to **APIs & Services** > **Library**
+   - Search for "Google Drive API"
+   - Click on **Google Drive API** in the results
+   - Click **Enable**
+4. Create OAuth 2.0 credentials:
+   - Navigate to **APIs & Services** > **Credentials**
+   - Click **Create Credentials** > **OAuth client ID**
+   - If prompted to configure OAuth consent screen:
+     - Select **External** user type
+     - Fill in required fields (App name, User support email, Developer contact)
+     - Add test users if needed for local development
+     - Save and continue through all steps
+   - Back on **Create OAuth client ID** screen:
+     - Select **Application type**: **Web application**
+     - **Name**: `Cascade MCP - Google Drive Local`
+     - Under **Authorized redirect URIs**, click **Add URI** and enter:
+       - `http://localhost:3000/auth/callback/google`
+     - Click **Create**
+5. Note your `Client ID` and `Client Secret` from the confirmation dialog
+
+### 4. Configure Environment Variables
 
 1. Copy the example environment file:
    ```bash
@@ -224,6 +256,11 @@ You must register a new OAuth app in Figma to obtain credentials for MCP integra
    - `FIGMA_CLIENT_SECRET` - Your Figma OAuth Client Secret
    - `FIGMA_OAUTH_SCOPES` - Should be `"file_content:read file_metadata:read file_comments:read current_user:read"`
 
+   **Google Drive OAuth** (from Step 3, optional):
+   - `GOOGLE_CLIENT_ID` - Your Google OAuth Client ID
+   - `GOOGLE_CLIENT_SECRET` - Your Google OAuth Client Secret
+   - `GOOGLE_OAUTH_SCOPES` - Should be `"https://www.googleapis.com/auth/drive"`
+
    **Note:** The `ANTHROPIC_API_KEY`, `SESSION_SECRET`, and `JWT_SECRET` variables were already set during API setup.
 
 3. **Understanding Callback URLs**: The application uses provider-specific callback URLs following the pattern:
@@ -232,6 +269,7 @@ You must register a new OAuth app in Figma to obtain credentials for MCP integra
    ```
    - Atlassian: `http://localhost:3000/auth/callback/atlassian`
    - Figma: `http://localhost:3000/auth/callback/figma`
+   - Google: `http://localhost:3000/auth/callback/google`
    
    These URLs **must match exactly** in your OAuth app configurations.
 
