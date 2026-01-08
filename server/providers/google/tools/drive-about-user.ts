@@ -7,6 +7,7 @@ import { logger } from '../../../observability/logger.js';
 import { getAuthInfoSafe } from '../../../mcp-core/auth-helpers.js';
 import type { McpServer } from '../../../mcp-core/mcp-types.js';
 import { createGoogleClient } from '../google-api-client.js';
+import { getGoogleDriveUser } from '../google-helpers.js';
 
 /**
  * Register the drive-about-user tool with the MCP server
@@ -22,7 +23,7 @@ export function registerDriveAboutUserTool(mcp: McpServer): void {
     },
     async (_, context) => {
       console.log('drive-about-user called');
-      
+
       try {
         // Get auth info with proper error handling - uses nested access pattern
         const authInfo = getAuthInfoSafe(context, 'drive-about-user');
@@ -41,20 +42,11 @@ export function registerDriveAboutUserTool(mcp: McpServer): void {
 
         console.log('  Calling Google Drive API /about endpoint...');
 
-        // Create Google client and fetch user info
+        // Create Google client and fetch user info using helper
         const googleClient = createGoogleClient(token);
-        const response = await googleClient.fetch(
-          'https://www.googleapis.com/drive/v3/about?fields=user'
-        );
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Drive API error (${response.status}): ${errorText}`);
-        }
-        
-        const userData = await response.json();
+        const userData = await getGoogleDriveUser(googleClient);
         const user = userData.user;
-        
+
         console.log(`  Google Drive user info retrieved successfully: ${user.emailAddress}`);
         logger.info('drive-about-user completed', {
           email: user.emailAddress,
@@ -67,14 +59,18 @@ export function registerDriveAboutUserTool(mcp: McpServer): void {
           content: [
             {
               type: 'text',
-              text: JSON.stringify({
-                kind: user.kind,
-                displayName: user.displayName,
-                emailAddress: user.emailAddress,
-                permissionId: user.permissionId,
-                photoLink: user.photoLink,
-                me: user.me,
-              }, null, 2),
+              text: JSON.stringify(
+                {
+                  kind: user.kind,
+                  displayName: user.displayName,
+                  emailAddress: user.emailAddress,
+                  permissionId: user.permissionId,
+                  photoLink: user.photoLink,
+                  me: user.me,
+                },
+                null,
+                2,
+              ),
             },
           ],
         };
@@ -90,6 +86,6 @@ export function registerDriveAboutUserTool(mcp: McpServer): void {
           ],
         };
       }
-    }
+    },
   );
 }
