@@ -515,7 +515,11 @@ function renderSuccessPage(encrypted: string, clientEmail: string, projectId: st
 
 const encryptedCredentials = "RSA-ENCRYPTED:...";
 const client = await createGoogleClientWithServiceAccount(encryptedCredentials);
-const userInfo = await client.fetchAboutUser();</code></pre>
+const response = await client.fetch(
+  'https://www.googleapis.com/drive/v3/about?fields=user',
+  { method: 'GET' }
+);
+const userInfo = await response.json();</code></pre>
           
           <div class="usage-subtitle">Option 2: Store in environment variable</div>
           <pre><code># .env file

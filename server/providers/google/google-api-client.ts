@@ -13,9 +13,9 @@
 import type { 
   DriveAboutResponse, 
   DriveFileListResponse, 
-  DriveFileListParams 
+  DriveFileListParams,
+  GoogleServiceAccountCredentials
 } from './types.js';
-import type { DriveAboutResponse, GoogleServiceAccountCredentials } from './types.js';
 import { googleKeyManager } from '../../utils/key-manager.js';
 
 /**
@@ -72,25 +72,6 @@ export function createGoogleClient(accessToken: string): GoogleClient {
           'Accept': 'application/json',
         },
       });
-    },
-    
-    async fetchAboutUser(): Promise<DriveAboutResponse> {
-      const response = await fetch(
-        'https://www.googleapis.com/drive/v3/about?fields=user',
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Accept': 'application/json',
-          },
-        }
-      );
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Drive API error (${response.status}): ${errorText}`);
-      }
-      
-      return response.json() as Promise<DriveAboutResponse>;
     },
     
     async listFiles(params?: DriveFileListParams): Promise<DriveFileListResponse> {
@@ -280,9 +261,30 @@ export async function createGoogleClientWithServiceAccountJSON(
       });
     },
     
-    async fetchAboutUser(): Promise<DriveAboutResponse> {
+    async listFiles(params?: DriveFileListParams): Promise<DriveFileListResponse> {
+      // Build query parameters
+      const queryParams = new URLSearchParams();
+      
+      // Default fields to return (can be overridden)
+      const defaultFields = 'kind,files(id,name,mimeType,kind,createdTime,modifiedTime,size,webViewLink,owners),nextPageToken,incompleteSearch';
+      queryParams.append('fields', params?.fields || defaultFields);
+      
+      // Add optional parameters
+      if (params?.query) {
+        queryParams.append('q', params.query);
+      }
+      if (params?.pageSize) {
+        queryParams.append('pageSize', params.pageSize.toString());
+      }
+      if (params?.pageToken) {
+        queryParams.append('pageToken', params.pageToken);
+      }
+      if (params?.orderBy) {
+        queryParams.append('orderBy', params.orderBy);
+      }
+      
       const response = await fetch(
-        'https://www.googleapis.com/drive/v3/about?fields=user',
+        `https://www.googleapis.com/drive/v3/files?${queryParams.toString()}`,
         {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -293,10 +295,29 @@ export async function createGoogleClientWithServiceAccountJSON(
       
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Drive API error (${response.status}): ${errorText}`);
+        throw new Error(`Drive API list files error (${response.status}): ${errorText}`);
       }
       
-      return response.json() as Promise<DriveAboutResponse>;
+      return response.json() as Promise<DriveFileListResponse>;
+    },
+    
+    async getDocumentContent(fileId: string): Promise<string> {
+      // Export Google Doc as plain text
+      const response = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=text/plain`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+        }
+      );
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Drive API get document error (${response.status}): ${errorText}`);
+      }
+      
+      return response.text();
     }
   };
 }

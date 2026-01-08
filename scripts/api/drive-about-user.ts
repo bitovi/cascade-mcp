@@ -104,7 +104,17 @@ Examples:
     console.log(`  Auth Type: ${client.authType}`);
 
     console.log('\n👤 Fetching user information from Google Drive API...');
-    const userInfo = await client.fetchAboutUser();
+    const response = await client.fetch(
+      'https://www.googleapis.com/drive/v3/about?fields=user',
+      { method: 'GET' }
+    );
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Drive API error (${response.status}): ${errorText}`);
+    }
+    
+    const userInfo = await response.json() as any;
 
     console.log('\n✅ User Information Retrieved!\n');
     console.log('═══════════════════════════════════════════════════════════════');

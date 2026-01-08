@@ -59,7 +59,17 @@ async function main() {
 
     // Step 4: Test API call
     console.log('🌐 Step 4: Testing Google Drive API...');
-    const userInfo = await client.fetchAboutUser();
+    const response = await client.fetch(
+      'https://www.googleapis.com/drive/v3/about?fields=user',
+      { method: 'GET' }
+    );
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Drive API error (${response.status}): ${errorText}`);
+    }
+    
+    const userInfo = await response.json() as any;
     
     console.log(`  ✓ API call successful!`);
     console.log(`  ✓ User: ${userInfo.user.displayName}`);

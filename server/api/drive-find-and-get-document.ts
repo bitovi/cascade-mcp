@@ -7,7 +7,7 @@
 
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import { createGoogleClientWithPAT } from '../providers/google/google-api-client.js';
+import { createGoogleClient } from '../providers/google/google-api-client.js';
 import { logger } from '../observability/logger.js';
 
 /**
@@ -78,7 +78,7 @@ export async function handleDriveFindAndGetDocument(req: Request, res: Response)
     console.log(`  Search query: ${searchQuery}`);
     
     // Create Google API client with PAT
-    const googleClient = createGoogleClientWithPAT(googleToken);
+    const googleClient = createGoogleClient(googleToken);
     
     // Build search query
     const defaultMimeType = 'application/vnd.google-apps.document';

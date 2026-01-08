@@ -7,7 +7,7 @@
 
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import { createGoogleClientWithPAT } from '../providers/google/google-api-client.js';
+import { createGoogleClient } from '../providers/google/google-api-client.js';
 import { logger } from '../observability/logger.js';
 
 /**
@@ -97,7 +97,7 @@ export async function handleDriveListFiles(req: Request, res: Response): Promise
     });
     
     // Create Google API client with PAT
-    const googleClient = createGoogleClientWithPAT(googleToken);
+    const googleClient = createGoogleClient(googleToken);
     
     // List files from Google Drive API
     console.log('  Fetching files from Google Drive API...');

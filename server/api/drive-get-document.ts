@@ -7,7 +7,7 @@
 
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import { createGoogleClientWithPAT } from '../providers/google/google-api-client.js';
+import { createGoogleClient } from '../providers/google/google-api-client.js';
 import { logger } from '../observability/logger.js';
 
 /**
@@ -72,7 +72,7 @@ export async function handleDriveGetDocument(req: Request, res: Response): Promi
     console.log(`  File ID: ${fileId}`);
     
     // Create Google API client with PAT
-    const googleClient = createGoogleClientWithPAT(googleToken);
+    const googleClient = createGoogleClient(googleToken);
     
     // Get document content from Google Drive API
     console.log('  Fetching document content from Google Drive API...');

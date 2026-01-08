@@ -43,7 +43,17 @@ export function registerDriveAboutUserTool(mcp: McpServer): void {
 
         // Create Google client and fetch user info
         const googleClient = createGoogleClient(token);
-        const userData = await googleClient.fetchAboutUser();
+        const response = await googleClient.fetch(
+          'https://www.googleapis.com/drive/v3/about?fields=user',
+          { method: 'GET' }
+        );
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Drive API error (${response.status}): ${errorText}`);
+        }
+        
+        const userData = await response.json() as any;
         const user = userData.user;
         
         console.log(`  Google Drive user info retrieved successfully: ${user.emailAddress}`);
@@ -51,7 +61,6 @@ export function registerDriveAboutUserTool(mcp: McpServer): void {
           email: user.emailAddress,
           displayName: user.displayName,
           permissionId: user.permissionId,
-          authType: googleClient.authType,
         });
 
         return {

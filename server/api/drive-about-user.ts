@@ -104,7 +104,17 @@ export async function handleDriveAboutUser(req: Request, res: Response): Promise
     
     // Fetch user info from Google Drive API
     console.log('  Fetching user info from Google Drive API...');
-    const userData = await googleClient!.fetchAboutUser();
+    const response = await googleClient!.fetch(
+      'https://www.googleapis.com/drive/v3/about?fields=user',
+      { method: 'GET' }
+    );
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Drive API error (${response.status}): ${errorText}`);
+    }
+    
+    const userData = await response.json() as any;
     
     console.log(`  Retrieved user: ${userData.user.emailAddress}`);
     logger.info('drive-about-user API completed', {
