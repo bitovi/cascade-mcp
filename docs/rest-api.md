@@ -49,6 +49,19 @@ X-Anthropic-Token: sk-ant-api03-...
    - File content - Read only
    - File comments - Read only
 
+**Google Service Account** (for drive-about-user endpoint):
+
+See the [Google Service Account Setup Guide](./google-service-account.md) for detailed instructions with screenshots.
+
+⚠️ **CRITICAL SECURITY WARNING**: Service account keys do NOT expire and provide full access to shared resources. The X-Google-Json header should ONLY be used in secure, server-to-server environments. Never expose this endpoint to client-side applications.
+
+Quick setup:
+1. Create service account in [Google Cloud Console](https://console.cloud.google.com/)
+2. Enable Google Drive API
+3. Create and download JSON key
+4. Share Google Drive files with the service account email
+5. Use the JSON content in the `X-Google-Json` header
+
 **Anthropic API Key:**
 1. Go to https://console.anthropic.com/settings/keys
 2. Create an API key
@@ -286,6 +299,106 @@ while (true) {
 
 console.log(`Total stories written: ${storiesWritten}`);
 ```
+
+---
+
+### Drive About User (Google Service Account)
+
+Get authenticated user information from Google Drive using service account credentials.
+
+⚠️ **SECURITY WARNING**: This endpoint accepts unencrypted service account credentials via HTTP headers. Service account keys do NOT expire and provide full access to resources. Only use in secure, server-to-server environments. See [Google Service Account Setup Guide](./google-service-account.md) for security best practices.
+
+**Endpoint:** `POST /api/drive-about-user`
+
+**Headers:**
+- `Content-Type: application/json`
+- `X-Google-Json` (required) - Service account JSON as string
+
+**Request Body:**
+```json
+{}
+```
+
+**Parameters:**
+- None (empty request body)
+
+**Success Response (200 OK):**
+```json
+{
+  "user": {
+    "kind": "drive#user",
+    "displayName": "cascade-mcp-drive",
+    "emailAddress": "cascade-mcp-drive@project.iam.gserviceaccount.com",
+    "permissionId": "12345678901234567890",
+    "photoLink": "https://lh3.googleusercontent.com/...",
+    "me": true
+  }
+}
+```
+
+**Error Response (401 Unauthorized):**
+```json
+{
+  "error": "Missing credentials header",
+  "details": "Please provide credentials via X-Google-Json header (plaintext service account JSON)"
+}
+```
+
+**Example using curl:**
+```bash
+# Load service account JSON from file
+# Note: The JSON must be passed as a single-line string in the header
+curl -X POST http://localhost:3000/api/drive-about-user \
+  -H "Content-Type: application/json" \
+  -H "X-Google-Json: $(cat google.json | tr -d '\n')" \
+  -d '{}'
+
+# Alternative: Use a variable to avoid shell escaping issues
+GOOGLE_JSON=$(cat google.json | tr -d '\n')
+curl -X POST http://localhost:3000/api/drive-about-user \
+  -H "Content-Type: application/json" \
+  -H "X-Google-Json: $GOOGLE_JSON" \
+  -d '{}'
+```
+
+**Example using Node.js:**
+```javascript
+const fs = require('fs');
+
+// Load service account JSON
+const serviceAccountJson = fs.readFileSync('./google.json', 'utf-8');
+
+const response = await fetch('http://localhost:3000/api/drive-about-user', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-Google-Json': serviceAccountJson,
+  },
+  body: JSON.stringify({}),
+});
+
+const data = await response.json();
+console.log(`User: ${data.user.displayName}`);
+console.log(`Email: ${data.user.emailAddress}`);
+console.log(`Permission ID: ${data.user.permissionId}`);
+```
+
+**Security Considerations:**
+
+DO NOT use this endpoint if:
+- Your application is client-side (browser, mobile app)
+- You're on an untrusted network
+- You're transmitting over unencrypted connections in production
+
+ONLY use this endpoint if:
+- You're in a secure server-to-server environment
+- You have proper access controls in place
+- You're on an internal network with security measures
+- You understand the risks of using long-lived credentials
+
+For more information, see the [Google Service Account Setup Guide](./google-service-account.md).
+
+---
 
 ## Error Handling
 
