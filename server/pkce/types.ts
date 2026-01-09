@@ -33,6 +33,7 @@ declare module 'express-session' {
     mcpScope?: string;
     mcpResource?: string;
     usingMcpPkce?: boolean;
+    isMcpPassthrough?: boolean;  // True when MCP client PKCE params are passed through to provider
     manualFlow?: { codeVerifier: string; state: string; isManualFlow: boolean; };
     
     // Multi-provider session fields (Phase 1.3)

@@ -236,6 +236,35 @@ export function createMockAtlassianServer(port = 3001) {
     }
   });
   
+  // Mock accessible-resources endpoint (returns test Jira cloud)
+  app.get('/oauth/token/accessible-resources', (req, res) => {
+    console.log('  🌐 Mock accessible-resources endpoint called');
+    
+    // Check for Authorization header
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('  ❌ Missing or invalid authorization header');
+      return res.status(401).json({
+        code: 401,
+        message: 'Unauthorized'
+      });
+    }
+    
+    // Return mock accessible resources
+    const mockResources = [
+      {
+        id: 'test-cloud-id-12345',
+        name: 'bitovi',
+        url: 'https://bitovi.atlassian.net',
+        scopes: ['read:jira-work', 'write:jira-work'],
+        avatarUrl: 'https://site-admin-avatar-cdn.prod.public.atl-paas.net/avatars/240/flag.png'
+      }
+    ];
+    
+    console.log('  ✅ Returning mock accessible resources:', mockResources);
+    res.json(mockResources);
+  });
+  
   // Health check endpoint
   app.get('/health', (req, res) => {
     res.json({ 
@@ -252,9 +281,10 @@ export function createMockAtlassianServer(port = 3001) {
     res.json({
       service: 'Mock Atlassian OAuth Server',
       endpoints: {
-        authorize: `${config.baseUrl}/authorize`,
-        token: `${config.baseUrl}/token`,
+        authorize: config.authUrl,
+        token: config.tokenUrl,
         refresh: `${config.baseUrl}/refresh`,
+        accessible_resources: `${config.baseUrl}/oauth/token/accessible-resources`,
         health: `${config.baseUrl}/health`
       },
       test_client: {
