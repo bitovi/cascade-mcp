@@ -66,11 +66,7 @@ const client = createApiClient({
 ### API Endpoints
 
 ```typescript
-import { 
-  analyzeFeatureScope,
-  writeShellStories, 
-  writeNextStory 
-} from './helpers/api-endpoints.js';
+import { analyzeFeatureScope, writeShellStories, writeNextStory } from './helpers/api-endpoints.js';
 
 // Analyze feature scope
 const result = await analyzeFeatureScope(client, {
@@ -97,10 +93,8 @@ const result = await writeNextStory(client, {
 import { parseJiraUrl } from './helpers/jira-url-parser.js';
 
 // Parse full Jira URL
-const { epicKey, siteName } = parseJiraUrl(
-  'https://bitovi.atlassian.net/browse/PLAY-123'
-);
-// Returns: { epicKey: 'PLAY-123', siteName: 'bitovi' }
+const { ticketKey, siteName } = parseJiraUrl('https://bitovi.atlassian.net/browse/PLAY-123');
+// Returns: { ticketKey: 'PLAY-123', siteName: 'bitovi' }
 ```
 
 ## CLI Scripts
