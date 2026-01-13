@@ -11,8 +11,10 @@ import {
   getAuthContext as getAuthContextStore,
   getAuthInfo as getAuthInfoFromStore,
   type AuthContext,
+  type ProviderAuthInfo,
 } from './auth-context-store.ts';
 import { handleJiraAuthError as handleJiraAuthErrorHelper } from '../providers/atlassian/atlassian-helpers.ts';
+import { PROVIDER_KEYS } from '../pkce/token-helpers.js';
 
 /**
  * Helper function to safely log token information without exposing sensitive data
@@ -38,6 +40,16 @@ let testForcingAuthError = false;
 let testForcingTokenExpired = false;
 
 /**
+ * Check if a provider token is valid (not expired)
+ * @param provider - Provider authentication info
+ * @param now - Current timestamp in seconds
+ * @returns True if provider token is valid and not expired
+ */
+function hasValidProviderToken(provider: ProviderAuthInfo | undefined, now: number): boolean {
+  return provider?.expires_at != null && provider.expires_at > now;
+}
+
+/**
  * Check if a JWT token is expired
  * For multi-provider auth, checks if all provider tokens are expired
  * @param authInfo - Authentication info object containing provider tokens
@@ -57,14 +69,9 @@ export function isTokenExpired(authInfo: AuthContext | null): boolean {
   const now = Math.floor(Date.now() / 1000);
 
   // Check if at least one provider has a valid (non-expired) token
-  const hasValidAtlassianToken = authInfo.atlassian && authInfo.atlassian.expires_at > now;
-
-  const hasValidFigmaToken = authInfo.figma && authInfo.figma.expires_at > now;
-
-  const hasValidGoogleToken = authInfo.google && authInfo.google.expires_at > now;
-
-  // If at least one provider has a valid token, not expired
-  const hasAnyValidToken = hasValidAtlassianToken || hasValidFigmaToken || hasValidGoogleToken;
+  const hasAnyValidToken = PROVIDER_KEYS.some(
+    provider => hasValidProviderToken(authInfo[provider], now)
+  );
 
   return !hasAnyValidToken;
 }

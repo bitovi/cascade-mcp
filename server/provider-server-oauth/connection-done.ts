@@ -25,6 +25,7 @@ import type { Request, Response } from 'express';
 import {
   createMultiProviderAccessToken,
   createMultiProviderRefreshToken,
+  addProviderTokensIfValid,
   type MultiProviderTokens,
 } from '../pkce/token-helpers.js';
 import {
@@ -70,41 +71,9 @@ export async function handleConnectionDone(req: Request, res: Response): Promise
     // Build MultiProviderTokens structure
     const multiProviderTokens: MultiProviderTokens = {};
     
-    if (atlassianTokens && atlassianTokens.access_token && atlassianTokens.refresh_token) {
-      console.log('  Adding Atlassian credentials to JWT');
-      multiProviderTokens.atlassian = {
-        access_token: atlassianTokens.access_token,
-        refresh_token: atlassianTokens.refresh_token,
-        expires_at: atlassianTokens.expires_at,
-        scope: atlassianTokens.scope,
-      };
-    } else if (atlassianTokens) {
-      console.log('  Warning: Atlassian tokens incomplete (missing access or refresh token)');
-    }
-    
-    if (figmaTokens && figmaTokens.access_token && figmaTokens.refresh_token) {
-      console.log('  Adding Figma credentials to JWT');
-      multiProviderTokens.figma = {
-        access_token: figmaTokens.access_token,
-        refresh_token: figmaTokens.refresh_token,
-        expires_at: figmaTokens.expires_at,
-        scope: figmaTokens.scope,
-      };
-    } else if (figmaTokens) {
-      console.log('  Warning: Figma tokens incomplete (missing access or refresh token)');
-    }
-    
-    if (googleTokens && googleTokens.access_token && googleTokens.refresh_token) {
-      console.log('  Adding Google credentials to JWT');
-      multiProviderTokens.google = {
-        access_token: googleTokens.access_token,
-        refresh_token: googleTokens.refresh_token,
-        expires_at: googleTokens.expires_at,
-        scope: googleTokens.scope,
-      };
-    } else if (googleTokens) {
-      console.log('  Warning: Google tokens incomplete (missing access or refresh token)');
-    }
+    addProviderTokensIfValid(multiProviderTokens, 'atlassian', atlassianTokens);
+    addProviderTokensIfValid(multiProviderTokens, 'figma', figmaTokens);
+    addProviderTokensIfValid(multiProviderTokens, 'google', googleTokens);
     
     // Create JWT access token with nested provider structure
     const tokenOptions = {
