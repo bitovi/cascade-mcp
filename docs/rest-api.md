@@ -306,7 +306,7 @@ console.log(`Total stories written: ${storiesWritten}`);
 
 Get authenticated user information from Google Drive using service account credentials.
 
-⚠️ **SECURITY WARNING**: This endpoint accepts unencrypted service account credentials via HTTP headers. Service account keys do NOT expire and provide full access to resources. Only use in secure, server-to-server environments. See [Google Service Account Setup Guide](./google-service-account.md) for security best practices.
+🚨 **TEMPORARY PROOF OF CONCEPT** - The `X-Google-Json` header currently accepts unencrypted service account credentials and will be replaced with an encrypted key mechanism soon. Only use for internal testing and local development. See [Google Service Account Setup Guide](./google-service-account.md) for details.
 
 **Endpoint:** `POST /api/drive-about-user`
 
@@ -382,19 +382,6 @@ console.log(`User: ${data.user.displayName}`);
 console.log(`Email: ${data.user.emailAddress}`);
 console.log(`Permission ID: ${data.user.permissionId}`);
 ```
-
-**Security Considerations:**
-
-DO NOT use this endpoint if:
-- Your application is client-side (browser, mobile app)
-- You're on an untrusted network
-- You're transmitting over unencrypted connections in production
-
-ONLY use this endpoint if:
-- You're in a secure server-to-server environment
-- You have proper access controls in place
-- You're on an internal network with security measures
-- You understand the risks of using long-lived credentials
 
 For more information, see the [Google Service Account Setup Guide](./google-service-account.md).
 

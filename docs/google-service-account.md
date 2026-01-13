@@ -4,6 +4,10 @@
 
 Google service accounts allow server-to-server authentication without user interaction. Service account credentials are JSON key files that contain a private key for signing requests to Google APIs.
 
+**🚨 TEMPORARY PROOF OF CONCEPT**
+
+The `X-Google-Json` header currently accepts **unencrypted** service account JSON keys. This will be replaced with an encrypted key mechanism soon. Until then, only use for internal testing and local development.
+
 **⚠️ CRITICAL SECURITY WARNING**
 
 Service account keys are **EXTREMELY DANGEROUS**:
@@ -18,12 +22,11 @@ Service account keys are **EXTREMELY DANGEROUS**:
 - ❌ Store keys in client-side applications or public-facing code
 - ❌ Use the X-Google-Json API header outside of secure server-to-server environments
 - ❌ Share keys with untrusted parties
+- ❌ Use this in any production environment
 
 **ONLY USE FOR:**
-- ✅ Secure, trusted server-to-server integrations
-- ✅ Backend services with proper access controls
-- ✅ Internal automation scripts on secure infrastructure
-- ✅ Testing in local development environments (with extreme caution)
+- ✅ Internal testing and local development
+- ✅ Demonstration purposes in secure environments
 
 ## Creating a Service Account
 
@@ -40,21 +43,15 @@ Service account keys are **EXTREMELY DANGEROUS**:
 3. Click **Enable**
 4. Wait for enablement (~30 seconds)
 
-![Enable Google Drive API](./images/google-enable-drive-api.png)
-
 ### Step 3: Create Service Account
 
 1. Navigate to **IAM & Admin** → **Service Accounts**
 2. Click **Create Service Account**
 
-![Create Service Account](./images/google-create-service-account.png)
-
 3. Fill in details:
    - **Service account name**: `cascade-mcp-drive` (or your preferred name)
    - **Service account ID**: Auto-generated (e.g., `cascade-mcp-drive@project-id.iam.gserviceaccount.com`)
    - **Description**: "Service account for CascadeMCP Google Drive integration"
-
-![Service Account Details](./images/google-service-account-details.png)
 
 4. Click **Create and Continue**
 
@@ -74,19 +71,10 @@ Service account keys are **EXTREMELY DANGEROUS**:
 
 1. Find your newly created service account in the list
 2. Click on the service account email
-
-![Service Account List](./images/google-service-account-list.png)
-
 3. Go to **Keys** tab
 4. Click **Add Key** → **Create new key**
-
-![Create Key](./images/google-create-key.png)
-
 5. Select **JSON** format
 6. Click **Create**
-
-![Select JSON](./images/google-key-json.png)
-
 7. **IMPORTANT**: The JSON file downloads automatically:
    - Save it securely immediately
    - Rename it to `google.json` (or your preferred name)
@@ -94,8 +82,6 @@ Service account keys are **EXTREMELY DANGEROUS**:
    - If lost, you must create a new key
 
 ### Step 5: Secure the Key File
-
-**For Development (Recommended):**
 
 Place the key in your project root and ensure it's ignored by git:
 
@@ -160,8 +146,6 @@ Service accounts can only access Google Drive files that are explicitly shared w
 6. Uncheck "Notify people" (service accounts can't receive emails)
 7. Click **Share**
 
-![Share with Service Account](./images/google-share-with-service-account.png)
-
 **Important Notes:**
 - Service accounts appear as regular users in sharing dialogs
 - They cannot access files in "My Drive" unless explicitly shared
@@ -175,56 +159,12 @@ Service accounts can only access Google Drive files that are explicitly shared w
 Test the service account credentials directly:
 
 ```bash
-# Place google.json in project root
-cp ~/secure/google.json ./google.json
-
-# Run the test script
 node --import ./loader.mjs scripts/api/drive-about-user.ts
 ```
 
-**Expected Output:**
-```
-📂 Loading credentials from google.json...
-  Service Account: cascade-mcp-drive@your-project.iam.gserviceaccount.com
-  Project ID: your-project-id
-
-🔐 Creating Google Drive client...
-  Auth Type: service-account
-
-👤 Fetching user information from Google Drive API...
-
-✅ User Information Retrieved!
-
-═══════════════════════════════════════════════════════════════
-📧 Email:        cascade-mcp-drive@your-project.iam.gserviceaccount.com
-👤 Display Name: cascade-mcp-drive
-🆔 Permission ID: 12345678901234567890
-🔗 Kind:         drive#user
-═══════════════════════════════════════════════════════════════
-
-💡 Tip: This service account can access files shared with:
-   cascade-mcp-drive@your-project.iam.gserviceaccount.com
-```
+This will display the service account's email and permission ID.
 
 ### API Endpoint Test
-
-🚨 **PROOF OF CONCEPT ONLY - INTERNAL USE ONLY** 🚨
-
-**This endpoint is a temporary proof of concept and will be replaced with an encrypted key mechanism shortly.**
-
-This endpoint currently accepts **unencrypted** service account keys via HTTP headers. The server will soon encrypt these keys before transmission. Until then, this is **HIGHLY INSECURE** and should **NEVER** be used outside of:
-- Internal testing only
-- Isolated local development environments
-- Demonstration purposes
-
-**DO NOT:**
-- ❌ Use this in any production environment
-- ❌ Use this in client-facing applications
-- ❌ Share this endpoint with external parties
-- ❌ Rely on this endpoint for any long-term implementation
-- ❌ Deploy this to any public or shared networks
-
-**An encrypted key mechanism is coming soon to replace this temporary approach.**
 
 **Test with curl:**
 ```bash
@@ -268,8 +208,6 @@ If a key is compromised or no longer needed:
 4. Find the key (by Key ID)
 5. Click ⋮ (three dots) → **Delete**
 6. Confirm deletion
-
-![Delete Key](./images/google-delete-key.png)
 
 **Effect:** Key becomes invalid immediately and cannot be restored
 

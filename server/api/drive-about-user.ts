@@ -16,8 +16,8 @@
 import type { Request, Response } from 'express';
 import { createGoogleClientWithServiceAccountJSON } from '../providers/google/google-api-client.js';
 import { getGoogleDriveUser } from '../providers/google/google-helpers.js';
-import type { GoogleServiceAccountCredentials } from '../providers/google/types.js';
 import { logger } from '../observability/logger.js';
+import { validateGoogleJsonApiHeaders } from './api-error-helpers.js';
 
 /**
  * POST /api/drive-about-user
@@ -49,40 +49,9 @@ export async function handleDriveAboutUser(req: Request, res: Response): Promise
   try {
     console.log('API call: drive-about-user');
     
-    // Check for credentials in headers
-    const jsonCredentials = req.headers['x-google-json'] as string;
-    
-    if (!jsonCredentials) {
-      logger.warn('drive-about-user API: Missing credentials header');
-      res.status(401).json({
-        error: 'Missing credentials header',
-        details: 'Please provide credentials via X-Google-Json header (plaintext service account JSON)',
-      });
-      return;
-    }
-    
-    // Parse and validate plaintext JSON credentials
-    let serviceAccountJson: GoogleServiceAccountCredentials;
-    
-    try {
-      serviceAccountJson = JSON.parse(jsonCredentials);
-    } catch {
-      logger.warn('drive-about-user API: Invalid JSON format');
-      res.status(401).json({
-        error: 'Invalid JSON format',
-        details: 'X-Google-Json header must contain valid JSON',
-      });
-      return;
-    }
-    
-    if (serviceAccountJson.type !== 'service_account') {
-      logger.warn('drive-about-user API: Not a service account');
-      res.status(401).json({
-        error: 'Invalid credentials',
-        details: 'Expected service account JSON with type="service_account"',
-      });
-      return;
-    }
+    // Validate and parse service account credentials from header
+    const serviceAccountJson = validateGoogleJsonApiHeaders(req.headers, res);
+    if (!serviceAccountJson) return; // Response already sent
     
     console.log('  Creating Google Drive client with plaintext service account JSON...');
     const googleClient = await createGoogleClientWithServiceAccountJSON(serviceAccountJson);
