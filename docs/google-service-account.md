@@ -282,43 +282,6 @@ If a key is compromised or no longer needed:
 
 **Effect:** All keys for this service account become invalid, and access to all shared files is revoked
 
-## Security Best Practices
-
-### Storage
-
-- ✅ Store keys in secure secret managers (AWS Secrets Manager, GCP Secret Manager, HashiCorp Vault)
-- ✅ Use environment variables in production (never hardcode)
-- ✅ Encrypt keys at rest if storing in files
-- ✅ Use restrictive file permissions (600 on Unix systems)
-
-### Access Control
-
-- ✅ Grant minimal necessary permissions to service accounts
-- ✅ Use separate service accounts for different environments (dev, staging, prod)
-- ✅ Audit service account access regularly
-- ✅ Rotate keys periodically (e.g., every 90 days)
-
-### Monitoring
-
-- ✅ Enable audit logging for service account usage
-- ✅ Monitor for suspicious API activity
-- ✅ Set up alerts for unauthorized access attempts
-- ✅ Review shared file access regularly
-
-### In Code
-
-- ✅ Never log the full private key
-- ✅ Sanitize error messages (don't expose key details)
-- ✅ Use try-catch to handle authentication errors gracefully
-- ✅ Validate service account JSON before use
-
-### Development
-
-- ✅ Use separate service accounts for local development
-- ✅ Never commit keys to version control (use .gitignore)
-- ✅ Clear keys from terminal history after use
-- ✅ Revoke keys immediately if accidentally exposed
-
 ## Related Documentation
 
 - [REST API Documentation](./rest-api.md) - Using service accounts with REST APIs
