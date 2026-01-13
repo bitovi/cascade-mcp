@@ -95,24 +95,23 @@ Service account keys are **EXTREMELY DANGEROUS**:
 
 ### Step 5: Secure the Key File
 
+**For Development (Recommended):**
+
+Place the key in your project root and ensure it's ignored by git:
+
 ```bash
-# Move to a secure location (NOT in your project directory if it's in git)
-mv ~/Downloads/project-id-*.json ~/secure/google.json
+# Move to project root
+mv ~/Downloads/project-id-*.json ./google.json
 
-# Set restrictive permissions (macOS/Linux)
-chmod 600 ~/secure/google.json
-
-# Verify it's not in version control
-git check-ignore ~/secure/google.json  # Should show the path if ignored
+# Verify .gitignore is working
+git status  # google.json should NOT appear in untracked files
 ```
 
-**Add to `.gitignore`:**
+**Add to `.gitignore`** (if not already present):
+
 ```gitignore
 # Google Service Account Keys
 google.json
-*.json
-!package.json
-!tsconfig.json
 ```
 
 ## Service Account JSON Structure
@@ -209,17 +208,23 @@ node --import ./loader.mjs scripts/api/drive-about-user.ts
 
 ### API Endpoint Test
 
-⚠️ **WARNING**: This endpoint accepts unencrypted service account keys via HTTP headers.
+🚨 **PROOF OF CONCEPT ONLY - INTERNAL USE ONLY** 🚨
 
-**ONLY USE IN:**
-- Secure, server-to-server environments
-- Internal networks with proper access controls
-- Local development/testing
+**This endpoint is a temporary proof of concept and will be replaced with an encrypted key mechanism shortly.**
 
-**NEVER USE IN:**
-- Client-side applications
-- Public APIs
-- Untrusted networks
+This endpoint currently accepts **unencrypted** service account keys via HTTP headers. The server will soon encrypt these keys before transmission. Until then, this is **HIGHLY INSECURE** and should **NEVER** be used outside of:
+- Internal testing only
+- Isolated local development environments
+- Demonstration purposes
+
+**DO NOT:**
+- ❌ Use this in any production environment
+- ❌ Use this in client-facing applications
+- ❌ Share this endpoint with external parties
+- ❌ Rely on this endpoint for any long-term implementation
+- ❌ Deploy this to any public or shared networks
+
+**An encrypted key mechanism is coming soon to replace this temporary approach.**
 
 **Test with curl:**
 ```bash
@@ -313,60 +318,6 @@ If a key is compromised or no longer needed:
 - ✅ Never commit keys to version control (use .gitignore)
 - ✅ Clear keys from terminal history after use
 - ✅ Revoke keys immediately if accidentally exposed
-
-## Alternatives to Service Accounts
-
-For less sensitive use cases, consider:
-
-1. **OAuth 2.0** - User-based authentication with refresh tokens
-   - Tokens can be revoked by users
-   - Requires user consent flow
-   - More appropriate for user-facing applications
-
-2. **API Keys** - For public APIs only
-   - Not suitable for Google Drive (requires OAuth or service accounts)
-
-3. **Workload Identity Federation** - For cloud-based services
-   - More secure than service account keys
-   - No long-lived credentials
-   - Recommended for production GCP workloads
-
-## Troubleshooting
-
-### "Invalid service account JSON"
-
-**Problem:** JSON file is malformed or missing required fields
-
-**Solution:**
-- Verify `type` field is `"service_account"`
-- Check that `private_key` and `client_email` are present
-- Re-download the key from Google Cloud Console
-
-### "Permission denied" (403)
-
-**Problem:** Service account doesn't have access to the file
-
-**Solution:**
-- Share the file with the service account email
-- Verify the correct permission level (Viewer/Editor)
-- Check that the file wasn't unshared
-
-### "Invalid JWT signature" (401)
-
-**Problem:** Private key is incorrect or corrupted
-
-**Solution:**
-- Re-download the service account JSON
-- Verify file wasn't modified or truncated
-- Check for encoding issues (should be UTF-8)
-
-### "Invalid grant: account not found" (400)
-
-**Problem:** Service account was deleted
-
-**Solution:**
-- Create a new service account
-- Re-share files with the new service account email
 
 ## Related Documentation
 
