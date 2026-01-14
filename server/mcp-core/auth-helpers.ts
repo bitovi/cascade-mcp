@@ -5,12 +5,12 @@
 
 import { InvalidTokenError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 import { logger } from '../observability/logger.ts';
-import { 
-  setAuthContext as setAuthContextStore, 
-  clearAuthContext as clearAuthContextStore, 
-  getAuthContext as getAuthContextStore, 
+import {
+  setAuthContext as setAuthContextStore,
+  clearAuthContext as clearAuthContextStore,
+  getAuthContext as getAuthContextStore,
   getAuthInfo as getAuthInfoFromStore,
-  type AuthContext 
+  type AuthContext,
 } from './auth-context-store.ts';
 import { handleJiraAuthError as handleJiraAuthErrorHelper } from '../providers/atlassian/atlassian-helpers.ts';
 
@@ -24,7 +24,7 @@ export function getTokenLogInfo(token?: string, prefix: string = 'Token'): Recor
   if (!token) {
     return { [`${prefix.toLowerCase()}Available`]: false };
   }
-  
+
   return {
     [`${prefix.toLowerCase()}Available`]: true,
     [`${prefix.toLowerCase()}Prefix`]: token.substring(0, 20) + '...',
@@ -49,26 +49,23 @@ export function isTokenExpired(authInfo: AuthContext | null): boolean {
     logger.info('Test mechanism: forcing token expired');
     return true;
   }
-  
+
   if (!authInfo) {
     return true;
   }
-  
+
   const now = Math.floor(Date.now() / 1000);
-  
+
   // Check if at least one provider has a valid (non-expired) token
-  const hasValidAtlassianToken = authInfo.atlassian && 
-    authInfo.atlassian.expires_at > now;
-  
-  const hasValidFigmaToken = authInfo.figma && 
-    authInfo.figma.expires_at > now;
-  
-  const hasValidGoogleToken = authInfo.google && 
-    authInfo.google.expires_at > now;
-  
+  const hasValidAtlassianToken = authInfo.atlassian && authInfo.atlassian.expires_at > now;
+
+  const hasValidFigmaToken = authInfo.figma && authInfo.figma.expires_at > now;
+
+  const hasValidGoogleToken = authInfo.google && authInfo.google.expires_at > now;
+
   // If at least one provider has a valid token, not expired
   const hasAnyValidToken = hasValidAtlassianToken || hasValidFigmaToken || hasValidGoogleToken;
-  
+
   return !hasAnyValidToken;
 }
 
@@ -85,9 +82,11 @@ export function handleJiraAuthError(response: Response, operation: string = 'Jir
     logger.error(`401 Authentication error for ${operation}`, {
       status: response.status,
       statusText: response.statusText,
-      operation
+      operation,
     });
-    throw new InvalidTokenError(`Authentication required: ${operation} returned 401. The access token expired and re-authentication is needed.`);
+    throw new InvalidTokenError(
+      `Authentication required: ${operation} returned 401. The access token expired and re-authentication is needed.`,
+    );
   }
   if (!response.ok) {
     throw new Error(`${operation} failed: ${response.status} ${response.statusText}`);
@@ -101,11 +100,11 @@ export function handleJiraAuthError(response: Response, operation: string = 'Jir
  */
 export function getAuthInfo(context: any): AuthContext | null {
   const authInfo = getAuthInfoFromStore(context);
-  
+
   if (authInfo && isTokenExpired(authInfo)) {
     throw new InvalidTokenError('The access token expired and re-authentication is needed.');
   }
-  
+
   return authInfo;
 }
 
