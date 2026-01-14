@@ -80,14 +80,6 @@ export const figmaProvider: OAuthProvider = {
       params
     );
   },
-  
-  /**
-   * Get default OAuth scopes for Figma
-   * @returns Array of scope strings
-   */
-  getDefaultScopes(): string[] {
-    return ['file_content:read', 'file_comments:read'];
-  },
 
   /**
    * Refresh an access token using a refresh token

@@ -5,7 +5,7 @@
  * across provider implementations. Supports both PKCE and traditional OAuth flows.
  */
 
-import type { AuthUrlParams } from './provider-interface.js';
+import type { AuthUrlParams } from '../provider-interface.js';
 
 /**
  * Configuration for building OAuth authorization URLs
