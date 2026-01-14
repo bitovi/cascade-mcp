@@ -117,7 +117,7 @@ export const atlassianProvider: OAuthProvider = {
     return performTokenRefresh(
       {
         tokenUrl: ATLASSIAN_CONFIG.tokenUrl,
-        clientIdEnvVar: 'JIRA_CLIENT_ID',
+        clientIdEnvVar: 'VITE_JIRA_CLIENT_ID',
         clientSecretEnvVar: 'JIRA_CLIENT_SECRET',
         contentType: 'json',
         rotatesRefreshToken: true,
