@@ -18,8 +18,8 @@ import type {
 import { registerAtlassianTools } from './tools/index.js';
 import { generateCodeChallenge } from '../../tokens.js';
 import { getAtlassianConfig } from '../../atlassian-auth-code-flow.js';
-import { buildOAuthUrl } from '../oauth-url-builder.js';
-import { performTokenExchange, performTokenRefresh } from '../token-exchange-helper.js';
+import { buildOAuthUrl } from '../utils/oauth-url-builder.js';
+import { performTokenExchange, performTokenRefresh } from '../utils/token-exchange-helper.js';
 
 /**
  * Atlassian Provider Object
