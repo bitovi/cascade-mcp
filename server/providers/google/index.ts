@@ -84,15 +84,7 @@ export const googleProvider: OAuthProvider = {
       params
     );
   },
-  
-  /**
-   * Get default OAuth scopes for Google Drive
-   * @returns Array of scope strings
-   */
-  getDefaultScopes(): string[] {
-    return ['https://www.googleapis.com/auth/drive'];
-  },
-  
+
   /**
    * Refresh an access token using a refresh token
    * Google uses standard OAuth 2.0 refresh with client_secret

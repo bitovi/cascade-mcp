@@ -105,14 +105,6 @@ export const atlassianProvider: OAuthProvider = {
   },
 
   /**
-   * Get default OAuth scopes for Atlassian
-   * @returns Array of scope strings
-   */
-  getDefaultScopes(): string[] {
-    return ['read:jira-work', 'write:jira-work', 'offline_access'];
-  },
-
-  /**
    * Refresh an access token using a refresh token
    * Atlassian rotates refresh tokens - returns a NEW refresh token with each refresh
    * @param params - Refresh parameters including the refresh token
