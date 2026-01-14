@@ -34,23 +34,6 @@ export const atlassianProvider: OAuthProvider = {
    * @returns Full Atlassian authorization URL
    */
   createAuthUrl(params: AuthUrlParams): string {
-    console.log(`[ATLASSIAN] Creating auth URL with params:`, {
-      redirectUri: params.redirectUri,
-      codeChallenge: params.codeChallenge?.substring(0, 10) + '...',
-      codeChallengeMethod: params.codeChallengeMethod,
-      state: params.state?.substring(0, 10) + '...',
-      responseType: params.responseType,
-      scope: params.scope,
-    });
-
-    const clientId = process.env.VITE_JIRA_CLIENT_ID;
-    const baseUrl = process.env.VITE_AUTH_SERVER_URL!;
-
-    console.log(`[ATLASSIAN] Using environment variables:`);
-    console.log(`[ATLASSIAN]   - VITE_JIRA_CLIENT_ID: ${clientId?.substring(0, 10)}...`);
-    console.log(`[ATLASSIAN]   - VITE_AUTH_SERVER_URL: ${baseUrl}`);
-    console.log(`[ATLASSIAN]   - VITE_JIRA_SCOPE: ${process.env.VITE_JIRA_SCOPE}`);
-
     const fullUrl = buildOAuthUrl(
       {
         baseUrl: 'https://auth.atlassian.com/authorize',
@@ -62,9 +45,7 @@ export const atlassianProvider: OAuthProvider = {
       '/auth/callback/atlassian'
     );
 
-    console.log(`[ATLASSIAN] Generated full auth URL (first 100 chars): ${fullUrl.substring(0, 100)}...`);
-    console.log(`[ATLASSIAN] 🔑 CRITICAL - Code challenge being sent to Atlassian: ${params.codeChallenge}`);
-    console.log(`[ATLASSIAN] 🔑 Full authorization URL:\n${fullUrl}`);
+    console.log(`[ATLASSIAN] 🔑 Auth URL created with code challenge: ${params.codeChallenge}`);
 
     return fullUrl;
   },
@@ -76,47 +57,25 @@ export const atlassianProvider: OAuthProvider = {
    * @returns Extracted and normalized callback parameters
    */
   extractCallbackParams(req: any): CallbackParams {
-    console.log(`[ATLASSIAN] Extracting callback parameters from query string`);
-    console.log(`[ATLASSIAN] Full query object:`, req.query);
+    console.log(`[ATLASSIAN] Processing OAuth callback`);
 
     const { code, state } = req.query;
 
-    console.log(`[ATLASSIAN] Raw extracted values:`);
-    console.log(`[ATLASSIAN]   - code: ${code ? code.substring(0, 30) + '... (length: ' + code.length + ')' : 'MISSING'}`);
-    console.log(`[ATLASSIAN]   - state: ${state ? state.substring(0, 20) + '... (length: ' + state.length + ')' : 'MISSING'}`);
-
-    // Try to decode the authorization code JWT to see what Atlassian stored
+    // Try to decode the authorization code JWT to verify client_id match
     if (code) {
       try {
         const parts = code.split('.');
         if (parts.length === 3) {
           const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
-          console.log(`[ATLASSIAN] Decoded authorization code JWT payload:`, {
-            jti: payload.jti,
-            sub: payload.sub?.substring(0, 20) + '...',
-            iss: payload.iss,
-            aud: payload.aud?.substring(0, 10) + '...',
-            audFull: payload.aud,
-            exp: payload.exp ? new Date(payload.exp * 1000).toISOString() : 'none',
-            hasPkce: !!payload['https://id.atlassian.com/pkce'],
-            pkcePreview: payload['https://id.atlassian.com/pkce']?.substring(0, 30),
-          });
-          console.log(`[ATLASSIAN] This shows what code_challenge Atlassian stored during authorization`);
           console.log(`[ATLASSIAN] 🚨 VERIFY: Auth code issued for client_id: ${payload.aud}`);
         }
-      } catch (err) {
-        console.log(`[ATLASSIAN] Could not decode authorization code as JWT (this is normal)`);
+      } catch {
+        // Not a JWT or decode failed - this is normal
       }
     }
 
     // Handle Atlassian-specific URL encoding: + gets decoded as space
     const normalizedState = state ? state.replace(/ /g, '+') : state;
-
-    if (state !== normalizedState) {
-      console.log(`[ATLASSIAN] State was normalized (spaces replaced with +)`);
-      console.log(`[ATLASSIAN]   - Original: ${state?.substring(0, 20)}...`);
-      console.log(`[ATLASSIAN]   - Normalized: ${normalizedState?.substring(0, 20)}...`);
-    }
 
     return {
       code: code || '',
