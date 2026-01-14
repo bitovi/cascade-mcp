@@ -11,7 +11,7 @@
 
 import { performTokenExchange, performTokenRefresh } from './token-exchange-helper.js';
 import type { TokenExchangeConfig, TokenRefreshConfig } from './token-exchange-helper.js';
-import type { TokenExchangeParams, RefreshTokenParams, StandardTokenResponse } from './provider-interface.js';
+import type { TokenExchangeParams, RefreshTokenParams, StandardTokenResponse } from '../provider-interface.js';
 
 // Mock fetch globally
 global.fetch = jest.fn();
