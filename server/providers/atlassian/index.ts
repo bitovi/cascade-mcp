@@ -70,7 +70,7 @@ export const atlassianProvider: OAuthProvider = {
           console.log(`[ATLASSIAN] 🚨 VERIFY: Auth code issued for client_id: ${payload.aud}`);
         }
       } catch {
-        // Not a JWT or decode failed - this is normal
+        console.log(`[ATLASSIAN] Auth code is not a JWT or decode failed (this is expected)`);
       }
     }
 
