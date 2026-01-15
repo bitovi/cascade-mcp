@@ -6,7 +6,7 @@
  * with JSON and URL-encoded content types.
  */
 
-import type { TokenExchangeParams, StandardTokenResponse, RefreshTokenParams } from '../provider-interface.js';
+import type { TokenExchangeParams, StandardTokenResponse, RefreshTokenParams } from '../providers/provider-interface.js';
 
 /**
  * Configuration for token exchange request

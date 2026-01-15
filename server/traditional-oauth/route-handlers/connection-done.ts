@@ -27,11 +27,11 @@ import {
   createMultiProviderRefreshToken,
   addProviderTokensIfValid,
   type MultiProviderTokens,
-} from '../pkce/token-helpers.js';
+} from '../../pkce/token-helpers.js';
 import {
   generateAuthorizationCode,
   storeAuthorizationCode,
-} from '../pkce/authorization-code-store.js';
+} from '../../pkce/authorization-code-store.js';
 
 /**
  * Handles the "Done" button click

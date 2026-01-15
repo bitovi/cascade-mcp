@@ -234,7 +234,9 @@ try {
 
 ### File Structure Significance
 - `server/jira-mcp/tool-*.ts` - Individual MCP tool implementations (register with `mcp.addTool()`)
-- `server/atlassian-auth-code-flow.ts` - Atlassian-specific OAuth utilities
+- `server/traditional-oauth/` - Traditional OAuth utilities for Server-Side OAuth (bridge ↔ providers)
+- `server/pkce/` - MCP PKCE OAuth utilities (MCP client ↔ bridge)
+- `server/providers/atlassian/config.ts` - Atlassian OAuth configuration with test support
 - `server/tokens.ts` - JWT utilities with token sanitization for logging
 - `specs/atlassian-mcp-analysis/` - Integration tests against **official Atlassian MCP service** (`https://mcp.atlassian.com/v1/sse`) for token lifecycle validation
 - `specs/atlassian-mcp-analysis/analysis.md` - Comprehensive analysis of Atlassian's MCP implementation including refresh tokens, CORS requirements, and compliance details
