@@ -15,8 +15,8 @@
  */
 
 import type { Request, Response } from 'express';
-import type { OAuthProvider } from '../providers/provider-interface.js';
-import { generateCodeVerifier, generateCodeChallenge } from '../tokens.js';
+import type { OAuthProvider } from '../../providers/provider-interface.js';
+import { generateCodeVerifier, generateCodeChallenge } from '../../tokens.js';
 
 /**
  * Creates an authorize endpoint for a specific provider (Server-Side OAuth)

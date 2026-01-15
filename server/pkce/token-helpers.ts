@@ -26,8 +26,8 @@
 
 import { randomUUID } from 'crypto';
 import { jwtSign } from '../tokens.ts';
-import { getAtlassianConfig } from '../atlassian-auth-code-flow.ts';
-import type { AtlassianTokenResponse } from '../atlassian-auth-code-flow.ts';
+import { getAtlassianConfig } from '../providers/atlassian/config.js';
+import type { AtlassianTokenResponse } from '../providers/atlassian/config.js';
 
 /**
  * Array of all supported provider keys

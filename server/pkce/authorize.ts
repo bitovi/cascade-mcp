@@ -28,7 +28,7 @@ import {
   generateCodeChallenge
 } from '../tokens.ts';
 import type { OAuthHandler } from './types.ts';
-import { renderConnectionHub } from '../provider-server-oauth/index.js';
+import { renderConnectionHub } from '../traditional-oauth/route-handlers/index.js';
 
 /**
  * Type guard to ensure query parameter is a string

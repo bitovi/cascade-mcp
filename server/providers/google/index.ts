@@ -16,8 +16,8 @@ import type {
   RefreshTokenParams,
 } from '../provider-interface.js';
 import { registerGoogleTools } from './tools/index.js';
-import { buildOAuthUrl } from '../utils/oauth-url-builder.js';
-import { performTokenExchange, performTokenRefresh } from '../utils/token-exchange-helper.js';
+import { buildOAuthUrl } from '../../traditional-oauth/url-builder.js';
+import { performTokenExchange, performTokenRefresh } from '../../traditional-oauth/token-exchange.js';
 
 /**
  * Google Drive Provider Object

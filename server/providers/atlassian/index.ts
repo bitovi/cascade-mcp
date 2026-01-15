@@ -16,9 +16,8 @@ import type {
   RefreshTokenParams,
 } from '../provider-interface.js';
 import { registerAtlassianTools } from './tools/index.js';
-import { getAtlassianConfig } from '../../atlassian-auth-code-flow.js';
-import { buildOAuthUrl } from '../utils/oauth-url-builder.js';
-import { performTokenExchange, performTokenRefresh } from '../utils/token-exchange-helper.js';
+import { buildOAuthUrl } from '../../traditional-oauth/url-builder.js';
+import { performTokenExchange, performTokenRefresh } from '../../traditional-oauth/token-exchange.js';
 
 /**
  * Atlassian Provider Object
@@ -108,10 +107,9 @@ export const atlassianProvider: OAuthProvider = {
   async refreshAccessToken(
     params: RefreshTokenParams
   ): Promise<StandardTokenResponse> {
-    const ATLASSIAN_CONFIG = getAtlassianConfig();
     return performTokenRefresh(
       {
-        tokenUrl: ATLASSIAN_CONFIG.tokenUrl,
+        tokenUrl: 'https://auth.atlassian.com/oauth/token',
         clientIdEnvVar: 'VITE_JIRA_CLIENT_ID',
         clientSecretEnvVar: 'JIRA_CLIENT_SECRET',
         contentType: 'json',
