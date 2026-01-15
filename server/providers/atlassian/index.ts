@@ -16,7 +16,6 @@ import type {
   RefreshTokenParams,
 } from '../provider-interface.js';
 import { registerAtlassianTools } from './tools/index.js';
-import { generateCodeChallenge } from '../../tokens.js';
 import { getAtlassianConfig } from '../../atlassian-auth-code-flow.js';
 import { buildOAuthUrl } from '../utils/oauth-url-builder.js';
 import { performTokenExchange, performTokenRefresh } from '../utils/token-exchange-helper.js';
@@ -45,8 +44,6 @@ export const atlassianProvider: OAuthProvider = {
       '/auth/callback/atlassian'
     );
 
-    console.log(`[ATLASSIAN] 🔑 Auth URL created with code challenge: ${params.codeChallenge}`);
-
     return fullUrl;
   },
 
@@ -57,8 +54,6 @@ export const atlassianProvider: OAuthProvider = {
    * @returns Extracted and normalized callback parameters
    */
   extractCallbackParams(req: any): CallbackParams {
-    console.log(`[ATLASSIAN] Processing OAuth callback`);
-
     const { code, state } = req.query;
 
     // Try to decode the authorization code JWT to verify client_id match
