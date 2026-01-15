@@ -43,14 +43,7 @@ export const utilityProvider: OAuthProvider = {
   async exchangeCodeForTokens(params: TokenExchangeParams): Promise<StandardTokenResponse> {
     throw new Error('Utility provider does not support OAuth');
   },
-  
-  /**
-   * Not applicable - utility tools don't use OAuth scopes
-   */
-  getDefaultScopes(): string[] {
-    return [];
-  },
-  
+
   /**
    * Register utility tools with the MCP server
    * @param mcp - MCP server instance

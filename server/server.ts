@@ -24,7 +24,7 @@ import {
   hubCallbackHandler,
   renderConnectionHub,
   handleConnectionDone
-} from './provider-server-oauth/index.js';
+} from './traditional-oauth/route-handlers/index.js';
 import { atlassianProvider } from './providers/atlassian/index.js';
 import { figmaProvider } from './providers/figma/index.js';
 import { googleProvider } from './providers/google/index.js';

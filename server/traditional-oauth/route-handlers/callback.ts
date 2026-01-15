@@ -18,7 +18,7 @@
  */
 
 import type { Request, Response } from 'express';
-import type { OAuthProvider, StandardTokenResponse } from '../providers/provider-interface.js';
+import type { OAuthProvider, StandardTokenResponse } from '../../providers/provider-interface.js';
 
 /**
  * Creates a callback endpoint for a specific provider

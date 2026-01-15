@@ -29,12 +29,15 @@ import {
   createMultiProviderAccessToken,
   createMultiProviderRefreshToken,
   addProviderTokens,
+  PROVIDER_KEYS,
   type MultiProviderTokens,
+  type ProviderKey,
 } from './token-helpers.ts';
 import { atlassianProvider } from '../providers/atlassian/index.ts';
 import { figmaProvider } from '../providers/figma/index.ts';
 import { googleProvider } from '../providers/google/index.ts';
-import type { OAuthHandler, OAuthRequest, OAuthErrorResponse } from './types.ts';
+import type { OAuthProvider, StandardTokenResponse } from '../providers/provider-interface.ts';
+import type { OAuthHandler, OAuthErrorResponse } from './types.ts';
 
 /**
  * Send error response with proper typing
@@ -105,40 +108,36 @@ export const refreshToken: OAuthHandler = async (req: Request, res: Response): P
       return;
     }
 
-    // Extract provider refresh tokens from nested structure
-    const atlassianRefreshToken = refreshPayload.atlassian?.refresh_token;
-    const figmaRefreshToken = refreshPayload.figma?.refresh_token;
-    const googleRefreshToken = refreshPayload.google?.refresh_token;
+    // Provider registry for dynamic refresh
+    const providerRegistry: Record<ProviderKey, OAuthProvider> = {
+      atlassian: atlassianProvider,
+      figma: figmaProvider,
+      google: googleProvider,
+    };
 
-    // Refresh each provider using the provider interface
-    let newAtlassianTokens: any = null;
-    let newFigmaTokens: any = null;
-    let newGoogleTokens: any = null;
+    // Refresh all providers dynamically
+    const refreshedTokens: Record<ProviderKey, StandardTokenResponse | null> = {
+      atlassian: null,
+      figma: null,
+      google: null,
+    };
 
     try {
-      // Refresh Atlassian if present
-      if (atlassianRefreshToken) {
-        newAtlassianTokens = await atlassianProvider.refreshAccessToken!({
-          refreshToken: atlassianRefreshToken,
-        });
-      }
-
-      // Refresh Figma if present
-      if (figmaRefreshToken) {
-        newFigmaTokens = await figmaProvider.refreshAccessToken!({
-          refreshToken: figmaRefreshToken,
-        });
-      }
-
-      // Refresh Google if present
-      if (googleRefreshToken) {
-        newGoogleTokens = await googleProvider.refreshAccessToken!({
-          refreshToken: googleRefreshToken,
-        });
+      for (const providerKey of PROVIDER_KEYS) {
+        const refreshToken = refreshPayload[providerKey]?.refresh_token;
+        if (refreshToken) {
+          const provider = providerRegistry[providerKey];
+          if (provider.refreshAccessToken) {
+            refreshedTokens[providerKey] = await provider.refreshAccessToken({
+              refreshToken,
+            });
+          }
+        }
       }
 
       // Check if we refreshed any provider
-      if (!newAtlassianTokens && !newFigmaTokens && !newGoogleTokens) {
+      const hasAnyRefreshedTokens = PROVIDER_KEYS.some(key => refreshedTokens[key]);
+      if (!hasAnyRefreshedTokens) {
         console.error(
           '🔄 REFRESH TOKEN FLOW - ERROR: No provider refresh tokens found in JWT'
         );
@@ -173,9 +172,9 @@ export const refreshToken: OAuthHandler = async (req: Request, res: Response): P
 
     // Build multi-provider tokens structure for new JWTs
     const multiProviderTokens: MultiProviderTokens = {};
-    addProviderTokens(multiProviderTokens, 'atlassian', newAtlassianTokens);
-    addProviderTokens(multiProviderTokens, 'figma', newFigmaTokens);
-    addProviderTokens(multiProviderTokens, 'google', newGoogleTokens);
+    for (const providerKey of PROVIDER_KEYS) {
+      addProviderTokens(multiProviderTokens, providerKey, refreshedTokens[providerKey]);
+    }
 
     // Create new access token with refreshed provider tokens
     const newAccessToken = await createMultiProviderAccessToken(
@@ -212,11 +211,7 @@ export const refreshToken: OAuthHandler = async (req: Request, res: Response): P
     // Single summary log for successful refresh
     console.log('🔄 Token refresh successful', {
       client_id,
-      providers_refreshed: [
-        newAtlassianTokens && 'atlassian',
-        newFigmaTokens && 'figma',
-        newGoogleTokens && 'google',
-      ].filter(Boolean),
+      providers_refreshed: PROVIDER_KEYS.filter(key => refreshedTokens[key]),
       expires_in: expiresIn,
     });
 

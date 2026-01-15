@@ -348,9 +348,16 @@ export class BrowserMcpClient {
       const providers: string[] = [];
       try {
         const payload = JSON.parse(atob(newTokens.access_token.split('.')[1]));
-        if (payload.atlassian) providers.push('atlassian');
-        if (payload.figma) providers.push('figma');
-      } catch {
+        console.log('[BrowserMcpClient] JWT payload:', payload);
+        providers.push(...Object.keys(payload).filter(key => {
+          const value = payload[key];
+          const isProvider = value && typeof value === 'object' && 'access_token' in value;
+          console.log(`[BrowserMcpClient] Checking key "${key}":`, { value, isProvider });
+          return isProvider;
+        }));
+        console.log('[BrowserMcpClient] Final providers:', providers);
+      } catch (error) {
+        console.error('[BrowserMcpClient] JWT decode error:', error);
         // If we can't decode, just report success
       }
 

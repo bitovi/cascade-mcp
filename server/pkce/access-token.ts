@@ -25,7 +25,7 @@ import {
   getExpiresInFromJwt,
 } from '../tokens.ts';
 import { refreshToken } from './refresh-token.ts';
-import { getAtlassianConfig } from '../atlassian-auth-code-flow.ts';
+import { getAtlassianConfig } from '../providers/atlassian/config.js';
 import { consumeAuthorizationCode } from './authorization-code-store.ts';
 import type { 
   OAuthHandler, 
