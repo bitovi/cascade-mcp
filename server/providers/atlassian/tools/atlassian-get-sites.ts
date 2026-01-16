@@ -36,7 +36,11 @@ export function registerAtlassianGetSitesTool(mcp: McpServer): void {
       }
 
       try {
-        const response = await fetch('https://api.atlassian.com/oauth/token/accessible-resources', {
+        const accessibleResourcesUrl = process.env.TEST_USE_MOCK_ATLASSIAN === 'true'
+          ? 'http://localhost:3001/oauth/token/accessible-resources'
+          : 'https://api.atlassian.com/oauth/token/accessible-resources';
+          
+        const response = await fetch(accessibleResourcesUrl, {
           headers: {
             Authorization: `Bearer ${token}`,
             Accept: 'application/json',

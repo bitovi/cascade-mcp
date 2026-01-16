@@ -79,7 +79,26 @@ export function makeCallback(
         statePreview: req.session.state?.substring(0, 10),
         hasCodeChallenge: !!req.session.codeChallenge,
         codeChallengePreview: req.session.codeChallenge?.substring(0, 10),
+        isMcpPassthrough: req.session.isMcpPassthrough,
       });
+      
+      // Check if this is MCP passthrough mode
+      if (req.session.isMcpPassthrough && req.session.mcpRedirectUri) {
+        console.log(`[CALLBACK] MCP passthrough mode detected - redirecting to MCP client`);
+        console.log(`[CALLBACK] MCP redirect URI: ${req.session.mcpRedirectUri}`);
+        
+        // Redirect back to MCP client with the authorization code
+        const redirectUrl = new URL(req.session.mcpRedirectUri);
+        redirectUrl.searchParams.set('code', callbackParams.code);
+        if (callbackParams.state || callbackParams.normalizedState) {
+          redirectUrl.searchParams.set('state', callbackParams.state || callbackParams.normalizedState || '');
+        }
+        
+        console.log(`[CALLBACK] Redirecting to MCP client: ${redirectUrl.toString()}`);
+        console.log(`========== CALLBACK END: ${provider.name} MCP PASSTHROUGH ==========\n`);
+        res.redirect(redirectUrl.toString());
+        return;
+      }
       
       // Log the FULL code_challenge we sent during authorization
       if (req.session.codeChallenge) {
@@ -89,9 +108,12 @@ export function makeCallback(
 
       // Get the code_verifier we generated when initiating this provider's OAuth flow
       // (This is OUR code_verifier for Server-Side OAuth, NOT the MCP client's code_verifier)
+      // Note: In MCP passthrough mode, codeVerifier is empty string since client has it
       const codeVerifier = req.session.codeVerifier;
 
-      if (!codeVerifier) {
+      // Only check for code verifier if NOT in MCP passthrough mode
+      // In passthrough mode, the MCP client has the verifier (empty string stored here)
+      if (!codeVerifier && !req.session.isMcpPassthrough) {
         console.error(`[CALLBACK] ERROR: No code verifier found in session`);
         console.error(`[CALLBACK] Session ID: ${req.sessionID}`);
         console.error(`[CALLBACK] This could mean:`);
@@ -101,7 +123,8 @@ export function makeCallback(
         throw new Error('No code verifier found in session - OAuth flow not properly initiated');
       }
 
-      console.log(`[CALLBACK] Found code_verifier in session: ${codeVerifier.substring(0, 10)}... (length: ${codeVerifier.length})`);
+      // At this point, codeVerifier is guaranteed to be a string (validated above or empty in passthrough)
+      console.log(`[CALLBACK] Found code_verifier in session: ${codeVerifier!.substring(0, 10)}... (length: ${codeVerifier!.length})`);
 
       const baseUrl = process.env.VITE_AUTH_SERVER_URL!;
       const redirectUri = `${baseUrl}/auth/callback/${provider.name}`;
@@ -110,14 +133,14 @@ export function makeCallback(
       console.log(`[CALLBACK]   - Base URL: ${baseUrl}`);
       console.log(`[CALLBACK]   - Redirect URI: ${redirectUri}`);
       console.log(`[CALLBACK]   - Code (first 20 chars): ${callbackParams.code.substring(0, 20)}...`);
-      console.log(`[CALLBACK]   - Code verifier (first 10 chars): ${codeVerifier.substring(0, 10)}...`);
+      console.log(`[CALLBACK]   - Code verifier (first 10 chars): ${codeVerifier!.substring(0, 10)}...`);
       console.log(`[CALLBACK] Exchanging ${provider.name} authorization code for tokens...`);
 
       // ALWAYS exchange the provider's authorization code for access/refresh tokens
       // This uses Server-Side OAuth with client_secret (NOT MCP PKCE)
       const tokens = await provider.exchangeCodeForTokens({
         code: callbackParams.code,
-        codeVerifier: codeVerifier,
+        codeVerifier: codeVerifier!,
         redirectUri: redirectUri,
       });
 
