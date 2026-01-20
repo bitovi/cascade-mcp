@@ -8,6 +8,7 @@ import type { Response } from 'express';
 import type { AtlassianClient } from '../providers/atlassian/atlassian-api-client.js';
 import { addIssueComment } from '../providers/atlassian/atlassian-helpers.js';
 import { logger } from '../observability/logger.js';
+import type { GoogleServiceAccountCredentials } from '../providers/google/types.js';
 
 /**
  * Context needed for posting error comments to Jira
@@ -141,4 +142,52 @@ export function validateEpicKey(
   }
   
   return epicKey;
+}
+
+/**
+ * Validate Google service account credentials from X-Google-Json header
+ * 
+ * @param headers - Request headers object
+ * @param res - Express response object
+ * @returns Parsed service account credentials, or null if validation failed (response already sent)
+ */
+export function validateGoogleJsonApiHeaders(
+  headers: Record<string, string | string[] | undefined>,
+  res: Response
+): GoogleServiceAccountCredentials | null {
+  const jsonCredentials = headers['x-google-json'] as string;
+  
+  if (!jsonCredentials) {
+    res.status(401).json({ 
+      success: false, 
+      error: 'Missing required header: X-Google-Json',
+      details: 'Please provide credentials via X-Google-Json header (plaintext service account JSON)'
+    });
+    return null;
+  }
+  
+  // Parse JSON credentials
+  let serviceAccountJson: GoogleServiceAccountCredentials;
+  try {
+    serviceAccountJson = JSON.parse(jsonCredentials);
+  } catch {
+    res.status(401).json({ 
+      success: false, 
+      error: 'Invalid JSON format',
+      details: 'X-Google-Json header must contain valid JSON'
+    });
+    return null;
+  }
+  
+  // Validate it's a service account
+  if (serviceAccountJson.type !== 'service_account') {
+    res.status(401).json({ 
+      success: false, 
+      error: 'Invalid credentials',
+      details: 'Expected service account JSON with type="service_account"'
+    });
+    return null;
+  }
+  
+  return serviceAccountJson;
 }
