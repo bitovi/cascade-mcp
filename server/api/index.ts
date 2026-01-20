@@ -1,6 +1,6 @@
 /**
  * REST API Route Registration
- * 
+ *
  * Registers all REST API endpoints for PAT-authenticated access.
  * These endpoints provide an alternative to MCP OAuth for server-to-server integrations.
  */
@@ -11,10 +11,11 @@ import { handleWriteNextStory } from './write-next-story.js';
 import { handleIdentifyFeatures } from './identify-features.js';
 import { handleAnalyzeFeatureScope } from './analyze-feature-scope.js';
 import { handleReviewWorkItem } from './review-work-item.js';
+import { handleCheckStoryChanges } from './check-story-changes.js';
 
 /**
  * Register all REST API routes with the Express app
- * 
+ *
  * @param app - Express application instance
  */
 export function registerRestApiRoutes(app: Express): void {
@@ -32,17 +33,17 @@ export function registerRestApiRoutes(app: Express): void {
   // Wrap handler to match Express signature (req, res) => void
   app.post('/api/write-shell-stories', (req, res) => handleWriteShellStories(req, res));
   console.log('  ✓ POST /api/write-shell-stories');
-  
+
   // Write the next Jira story from shell stories in an epic
   // Wrap handler to match Express signature (req, res) => void
   app.post('/api/write-next-story', (req, res) => handleWriteNextStory(req, res));
   console.log('  ✓ POST /api/write-next-story');
-  
+
   // Analyze feature scope from Figma designs (new endpoint)
   // Wrap handler to match Express signature (req, res) => void
   app.post('/api/analyze-feature-scope', (req, res) => handleAnalyzeFeatureScope(req, res));
   console.log('  ✓ POST /api/analyze-feature-scope');
-  
+
   // Legacy endpoint for backward compatibility (redirects to analyze-feature-scope)
   // Wrap handler to match Express signature (req, res) => void
   app.post('/api/identify-features', (req, res) => handleAnalyzeFeatureScope(req, res));
@@ -51,6 +52,10 @@ export function registerRestApiRoutes(app: Express): void {
   // Review work item completeness and post questions as comments
   app.post('/api/review-work-item', (req, res) => handleReviewWorkItem(req, res));
   console.log('  ✓ POST /api/review-work-item');
-  
+
+  // Check story changes against parent epic
+  app.post('/api/check-story-changes', (req, res) => handleCheckStoryChanges(req, res));
+  console.log('  ✓ POST /api/check-story-changes');
+
   console.log('REST API routes registered successfully');
 }

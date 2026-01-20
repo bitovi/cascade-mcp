@@ -246,6 +246,14 @@ Advanced workflow tools that integrate multiple services:
   - **Confluence Context**: Includes relevant technical documentation and links to referenced docs
   - Parameters: `epicKey`, optional `cloudId` or `siteName`
 
+- **check-story-changes** - Analyze divergences between a child story and its parent epic
+  - Identifies conflicts, additions, missing content, and interpretation differences
+  - Compares the child story description against the parent epic's shell story
+  - Generates comprehensive analysis highlighting what changed and potential issues
+  - Useful for validating story scope and ensuring alignment with epic requirements
+  - Parameters: `storyKey` (child story), optional `cloudId` or `siteName`
+  - Example: `check-story-changes({ storyKey: "PLAY-456" })`
+
 - **review-work-item** - Review a Jira work item and identify gaps/questions
   - Gathers context from parent hierarchy, linked Confluence docs, and project description
   - **Figma Analysis**: Downloads and analyzes linked Figma screens with AI vision

@@ -43,6 +43,12 @@ export interface ProgressCommentManager {
   appendError(errorMarkdown: string): Promise<void>;
   
   /**
+   * Replace progress comment with final content (removes progress tracking)
+   * Updates the existing comment to contain only the final content
+   */
+  replaceWithFinalContent(markdown: string): Promise<void>;
+  
+  /**
    * Get the notify function to pass to core logic
    */
   getNotifyFunction(): (message: string) => Promise<void>;
@@ -75,7 +81,7 @@ export function createProgressCommentManager(
       markdown += `${index + 1}. ${msg}\n`;
     });
     
-    // If there's an error, append it after the list
+    // If there's an error, append it at the very end
     if (errorDetails) {
       markdown += '\n---\n\n';
       markdown += errorDetails;
@@ -176,7 +182,13 @@ export function createProgressCommentManager(
     
     // Build and post/update comment
     const markdown = buildCommentMarkdown();
-    await tryUpdateComment(markdown);
+    const success = await tryUpdateComment(markdown);
+    
+    // If update failed and we haven't disabled commenting yet, throw error
+    // This ensures failures surface to the caller for proper error handling
+    if (!success && !isCommentingDisabled) {
+      throw new Error(`Failed to update progress comment on ${context.epicKey}`);
+    }
   }
 
   /**
@@ -203,6 +215,42 @@ export function createProgressCommentManager(
   }
 
   /**
+   * Implementation of replaceWithFinalContent() - replace progress with clean final content
+   */
+  async function replaceWithFinalContent(markdown: string): Promise<void> {
+    // Always log to console as backup
+    console.log(`[Progress] Replacing with final content`);
+    
+    // If commenting is disabled or no comment was created, just return
+    if (isCommentingDisabled || commentId === null) {
+      return;
+    }
+    
+    try {
+      // Update the existing comment with just the final content (no progress list)
+      await updateIssueComment(
+        context.client,
+        context.cloudId,
+        context.epicKey,
+        commentId,
+        markdown
+      );
+      
+      logger.info('Progress comment replaced with final content', {
+        epicKey: context.epicKey,
+        commentId
+      });
+    } catch (error: any) {
+      logger.error('Failed to replace progress with final content', { 
+        epicKey: context.epicKey,
+        commentId,
+        error: error.message
+      });
+      // Don't throw - operation already succeeded, commenting is best-effort
+    }
+  }
+
+  /**
    * Get the notify function to pass to core logic
    */
   function getNotifyFunction(): (message: string) => Promise<void> {
@@ -213,6 +261,7 @@ export function createProgressCommentManager(
   return {
     notify,
     appendError,
+    replaceWithFinalContent,
     getNotifyFunction
   };
 }

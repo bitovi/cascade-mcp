@@ -1,6 +1,6 @@
 /**
  * Type-safe API endpoint helpers for E2E testing
- * 
+ *
  * Each helper wraps one REST API endpoint with proper type checking
  * and error handling.
  */
@@ -28,12 +28,12 @@ export interface AnalyzeFeatureScopeResult {
 
 /**
  * Analyze Figma screens to generate comprehensive scope analysis
- * 
+ *
  * POST /api/analyze-feature-scope
  */
 export async function analyzeFeatureScope(
   client: ApiClient,
-  params: AnalyzeFeatureScopeParams
+  params: AnalyzeFeatureScopeParams,
 ): Promise<AnalyzeFeatureScopeResult> {
   console.log(`Calling analyzeFeatureScope for epic: ${params.epicKey}`);
 
@@ -41,9 +41,7 @@ export async function analyzeFeatureScope(
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(
-      `API call failed with status ${response.status}: ${errorText}`
-    );
+    throw new Error(`API call failed with status ${response.status}: ${errorText}`);
   }
 
   const result: any = await response.json();
@@ -76,12 +74,12 @@ export interface WriteShellStoriesResult {
 
 /**
  * Generate shell stories from Figma designs in a Jira epic
- * 
+ *
  * POST /api/write-shell-stories
  */
 export async function writeShellStories(
   client: ApiClient,
-  params: WriteShellStoriesParams
+  params: WriteShellStoriesParams,
 ): Promise<WriteShellStoriesResult> {
   console.log(`Calling writeShellStories for epic: ${params.epicKey}`);
 
@@ -89,9 +87,7 @@ export async function writeShellStories(
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(
-      `API call failed with status ${response.status}: ${errorText}`
-    );
+    throw new Error(`API call failed with status ${response.status}: ${errorText}`);
   }
 
   const result: any = await response.json();
@@ -133,22 +129,17 @@ export type WriteNextStoryResult = WriteNextStoryResultSuccess | WriteNextStoryR
 
 /**
  * Write the next Jira story from shell stories in an epic
- * 
+ *
  * POST /api/write-next-story
  */
-export async function writeNextStory(
-  client: ApiClient,
-  params: WriteNextStoryParams
-): Promise<WriteNextStoryResult> {
+export async function writeNextStory(client: ApiClient, params: WriteNextStoryParams): Promise<WriteNextStoryResult> {
   console.log(`Calling writeNextStory for epic: ${params.epicKey}`);
 
   const response = await client.post('/api/write-next-story', params);
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(
-      `API call failed with status ${response.status}: ${errorText}`
-    );
+    throw new Error(`API call failed with status ${response.status}: ${errorText}`);
   }
 
   const result: any = await response.json();
@@ -169,7 +160,7 @@ export async function writeNextStory(
 // ===== Review Work Item =====
 
 export interface ReviewWorkItemParams {
-  issueKey: string;
+  ticketKey: string;
   cloudId?: string;
   siteName?: string;
   maxDepth?: number;
@@ -177,7 +168,7 @@ export interface ReviewWorkItemParams {
 
 export interface ReviewWorkItemResult {
   success: true;
-  issueKey: string;
+  ticketKey: string;
   reviewContent: string;
   questionCount: number;
   wellDefined: boolean;
@@ -193,7 +184,7 @@ export async function reviewWorkItem(
   client: ApiClient,
   params: ReviewWorkItemParams
 ): Promise<ReviewWorkItemResult> {
-  console.log(`Calling reviewWorkItem for issue: ${params.issueKey}`);
+  console.log(`Calling reviewWorkItem for issue: ${params.ticketKey}`);
 
   const response = await client.post('/api/review-work-item', params);
 
@@ -214,4 +205,50 @@ export async function reviewWorkItem(
   console.log(`  ${statusEmoji} Review complete: ${result.questionCount} questions identified`);
 
   return result as ReviewWorkItemResult;
+}
+
+// ===== Check Story Changes =====
+
+export interface CheckStoryChangesParams {
+  storyKey: string;
+  cloudId?: string;
+  siteName?: string;
+  sessionId?: string;
+}
+
+export interface CheckStoryChangesResult {
+  success: true;
+  analysis: string;
+  metadata: {
+    parentKey: string;
+    childKey: string;
+    tokensUsed?: number;
+  };
+}
+
+/**
+ * POST /api/check-story-changes
+ */
+export async function checkStoryChanges(
+  client: ApiClient,
+  params: CheckStoryChangesParams,
+): Promise<CheckStoryChangesResult> {
+  console.log(`Calling checkStoryChanges for story: ${params.storyKey}`);
+
+  const response = await client.post('/api/check-story-changes', params);
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`API call failed with status ${response.status}: ${errorText}`);
+  }
+
+  const result: any = await response.json();
+
+  if (!result.success) {
+    throw new Error(`API returned error: ${result.error || 'Unknown error'}`);
+  }
+
+  console.log(`  ✓ Check complete: ${result.analysis.summary}`);
+
+  return result as CheckStoryChangesResult;
 }
