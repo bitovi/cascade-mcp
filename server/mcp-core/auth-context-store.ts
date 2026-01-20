@@ -14,8 +14,8 @@ export interface ProviderAuthInfo {
   expires_at: number;
   scope?: string;
   // Provider-specific optional fields
-  cloudId?: string; // Atlassian
-  user_id?: string; // Figma
+  cloudId?: string;  // Atlassian
+  user_id?: string;  // Figma
 }
 
 /**
@@ -52,7 +52,7 @@ function getTokenLogInfo(token?: string, prefix: string = 'Token'): Record<strin
   if (!token) {
     return { [`${prefix.toLowerCase()}Available`]: false };
   }
-
+  
   return {
     [`${prefix.toLowerCase()}Available`]: true,
     [`${prefix.toLowerCase()}Prefix`]: token.substring(0, 20) + '...',
@@ -71,44 +71,40 @@ export function setAuthContext(transportId: string, authInfo: AuthContext): void
   const figmaToken = authInfo?.figma?.access_token;
   const googleToken = authInfo?.google?.access_token;
   const now = Math.floor(Date.now() / 1000);
-
+  
   // Calculate expiry for Atlassian tokens
-  const atlassianExpiresIn = authInfo?.atlassian?.expires_at ? authInfo.atlassian.expires_at - now : null;
-
+  const atlassianExpiresIn = authInfo?.atlassian?.expires_at 
+    ? authInfo.atlassian.expires_at - now 
+    : null;
+  
   logger.info('Storing auth context for transport', {
     transportId,
     providers: {
-      atlassian: authInfo?.atlassian
-        ? {
-            ...getTokenLogInfo(atlassianToken, 'atlassianToken'),
-            hasRefreshToken: !!authInfo.atlassian.refresh_token,
-            scope: authInfo.atlassian.scope,
-            expiresIn: atlassianExpiresIn,
-            expiresAt: authInfo.atlassian.expires_at
-              ? new Date(authInfo.atlassian.expires_at * 1000).toISOString()
-              : null,
-          }
-        : null,
-      figma: authInfo?.figma
-        ? {
-            ...getTokenLogInfo(figmaToken, 'figmaToken'),
-            hasRefreshToken: !!authInfo.figma.refresh_token,
-            scope: authInfo.figma.scope,
-          }
-        : null,
-      google: authInfo?.google
-        ? {
-            ...getTokenLogInfo(googleToken, 'googleToken'),
-            hasRefreshToken: !!authInfo.google.refresh_token,
-            scope: authInfo.google.scope,
-          }
-        : null,
+      atlassian: authInfo?.atlassian ? {
+        ...getTokenLogInfo(atlassianToken, 'atlassianToken'),
+        hasRefreshToken: !!authInfo.atlassian.refresh_token,
+        scope: authInfo.atlassian.scope,
+        expiresIn: atlassianExpiresIn,
+        expiresAt: authInfo.atlassian.expires_at 
+          ? new Date(authInfo.atlassian.expires_at * 1000).toISOString() 
+          : null,
+      } : null,
+      figma: authInfo?.figma ? {
+        ...getTokenLogInfo(figmaToken, 'figmaToken'),
+        hasRefreshToken: !!authInfo.figma.refresh_token,
+        scope: authInfo.figma.scope,
+      } : null,
+      google: authInfo?.google ? {
+        ...getTokenLogInfo(googleToken, 'googleToken'),
+        hasRefreshToken: !!authInfo.google.refresh_token,
+        scope: authInfo.google.scope,
+      } : null,
     },
     issuer: authInfo?.iss,
     audience: authInfo?.aud,
     authInfoKeys: Object.keys(authInfo || {}),
   });
-
+  
   // Warn if Atlassian token is already expired or expires soon
   if (atlassianExpiresIn !== null && authInfo?.atlassian) {
     if (atlassianExpiresIn <= 0) {
@@ -116,15 +112,14 @@ export function setAuthContext(transportId: string, authInfo: AuthContext): void
         transportId,
         expiredBy: Math.abs(atlassianExpiresIn),
       });
-    } else if (atlassianExpiresIn < 300) {
-      // Less than 5 minutes
+    } else if (atlassianExpiresIn < 300) { // Less than 5 minutes
       logger.warn('Storing Atlassian token that expires soon', {
         transportId,
         expiresInMinutes: Math.floor(atlassianExpiresIn / 60),
       });
     }
   }
-
+  
   authContextStore.set(transportId, authInfo);
 }
 
@@ -164,10 +159,10 @@ export function getAuthInfo(context: any): AuthContext | null {
 
   // Try to get session ID from context to safely retrieve auth info
   const sessionId = context?.sessionId || context?.transport?.sessionId;
-
+  
   if (sessionId) {
     const authInfo = authContextStore.get(sessionId);
-
+    
     if (authInfo && (authInfo.atlassian || authInfo.figma || authInfo.google)) {
       return authInfo;
     }

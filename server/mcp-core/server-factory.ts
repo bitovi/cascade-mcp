@@ -57,7 +57,7 @@ export function createMcpServer(authContext: AuthContext): McpServer {
         fetch: true,   // Enable fetch tool for retrieving Jira issues
         search: true,  // Enable search tool for JQL queries
         actions: true, // Purpose unclear, but included per ChatGPT PR requirements
-      } as any,
+      },
     },
   );
 
