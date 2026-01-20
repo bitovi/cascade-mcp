@@ -73,11 +73,9 @@ export function registerUtilityTestSamplingTool(mcp: McpServer): void {
         );
 
         // Extract response content
-        const responseText = samplingResponse.content.type === 'text' 
-          ? samplingResponse.content.text 
-          : undefined;
+        const responseText = samplingResponse.content?.text as string;
         if (!responseText) {
-          throw new Error('No text content received from agent');
+          throw new Error('No content received from agent');
         }
 
         console.log('  ✅ Sampling successful');
