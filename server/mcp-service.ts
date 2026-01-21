@@ -56,7 +56,6 @@ export async function handleMcpPost(req: Request, res: Response): Promise<void> 
   console.log('======= POST /mcp =======');
   console.log('Headers:', JSON.stringify(sanitizeHeaders(req.headers)));
   console.log('Body:', JSON.stringify(req.body));
-  console.log('mcp-session-id:', req.headers['mcp-session-id']);
   console.log('--------------------------------');
 
   // Check for existing session ID
