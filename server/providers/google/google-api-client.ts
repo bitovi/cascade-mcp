@@ -2,13 +2,14 @@
  * Google Drive API Client Factory
  * 
  * Provides API client instances for OAuth and Service Account authentication.
- * Uses native fetch (no additional dependencies).
+ * Uses native fetch (no additional dependencies for OAuth).
  * 
  * Authentication Methods:
  * - OAuth: Uses Bearer tokens from OAuth 2.0 flow (for user delegation)
  * - Service Account: Uses JWT tokens from Google service account JSON (for server-to-server)
  */
 
+import { google } from 'googleapis';
 import type { GoogleServiceAccountCredentials } from './types.js';
 
 import type { DriveAboutResponse } from './types.js';
@@ -99,9 +100,6 @@ export function createGoogleClient(accessToken: string): GoogleClient {
 export async function createGoogleClientWithServiceAccountJSON(
   serviceAccountJson: GoogleServiceAccountCredentials
 ): Promise<GoogleClient> {
-  // Import googleapis dynamically to avoid bundling it unnecessarily
-  const { google } = await import('googleapis');
-  
   const SCOPES = ['https://www.googleapis.com/auth/drive.readonly'];
   
   // Create JWT auth client
