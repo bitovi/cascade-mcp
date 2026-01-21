@@ -6,7 +6,6 @@
 
 👉 Bitovi can help you integrate this into your own SDLC workflow: [AI for Software Teams](https://www.bitovi.com/ai-for-software-teams)
 
-
 <br clear="all" />
 
 Supported tools at the `https://cascade.bitovi.com/mcp` endpoint:
@@ -51,7 +50,7 @@ See the **[LLM Provider Guide](./server/llm-client/README.md)** for complete doc
 
 There are two main ways to use CascadeMCP:
 
-- With the mini MCP client hosted at [https://cascade.bitovi.com/](https://cascade-staging.bitovi.com/)
+- With the mini MCP client hosted at [https://cascade.bitovi.com/](https://cascade.bitovi.com/)
 - With an MCP client that has sampling capabilities (like VSCode Copilot), shown below.
 - With a Jira automation, shown [here](https://bitovi.atlassian.net/wiki/spaces/AIEnabledDevelopment/pages/1734148141/Jira+Automation+Setup).
 
