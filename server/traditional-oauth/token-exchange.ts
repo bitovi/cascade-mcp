@@ -44,18 +44,16 @@ export async function performTokenExchange(
   const providerName = config.tokenUrl.includes('atlassian') ? 'ATLASSIAN' : 
                        config.tokenUrl.includes('figma') ? 'FIGMA' : 'GOOGLE';
 
-  console.log(`\n========== ${providerName} TOKEN EXCHANGE START ==========`);
-  console.log(`[${providerName}] Preparing token exchange request...`);
+  console.log(`[${providerName}] Token exchange started`, {
+    endpoint: config.tokenUrl,
+    usePKCE: config.usePKCE,
+    contentType: config.contentType,
+  });
 
   const clientId = process.env[config.clientIdEnvVar];
   const clientSecret = process.env[config.clientSecretEnvVar];
   const baseUrl = process.env.VITE_AUTH_SERVER_URL!;
   const redirectUri = params.redirectUri || `${baseUrl}${config.redirectPath}`;
-
-  console.log(`[${providerName}] Environment variables:`);
-  console.log(`[${providerName}]   - Client ID: ${clientId?.substring(0, 10)}...`);
-  console.log(`[${providerName}]   - Client Secret: ${clientSecret ? 'present (length: ' + clientSecret.length + ')' : 'MISSING'}`);
-  console.log(`[${providerName}]   - Redirect URI: ${redirectUri}`);
 
   // Build request body
   const body: Record<string, string> = {
@@ -69,16 +67,7 @@ export async function performTokenExchange(
   // Add PKCE code_verifier if required
   if (config.usePKCE) {
     body.code_verifier = params.codeVerifier;
-    console.log(`[${providerName}] PKCE enabled - code_verifier length: ${params.codeVerifier.length}`);
   }
-
-  console.log(`[${providerName}] Token request (redacted):`, {
-    grant_type: body.grant_type,
-    client_id: body.client_id.substring(0, 10) + '...',
-    code: body.code.substring(0, 20) + '...',
-    redirect_uri: body.redirect_uri,
-    code_verifier: config.usePKCE ? body.code_verifier.substring(0, 10) + '...' : 'N/A',
-  });
 
   // Determine headers and body encoding
   const headers: Record<string, string> = {};
@@ -92,9 +81,6 @@ export async function performTokenExchange(
     requestBody = new URLSearchParams(body).toString();
   }
 
-  console.log(`[${providerName}] Making POST request to: ${config.tokenUrl}`);
-  console.log(`[${providerName}] Content-Type: ${headers['Content-Type']}`);
-
   // Make token exchange request
   let tokenRes: Response;
   try {
@@ -104,37 +90,33 @@ export async function performTokenExchange(
       body: requestBody,
     });
   } catch (err: any) {
-    console.error(`[${providerName}] FATAL: Network error:`, err.message);
+    console.error(`[${providerName}] Token exchange network error:`, err.message);
     throw new Error(`Network error contacting ${providerName}: ${err.message}`);
   }
 
-  console.log(`[${providerName}] Response status: ${tokenRes.status} ${tokenRes.statusText}`);
-
   if (!tokenRes.ok) {
     const errorText = await tokenRes.text();
-    console.error(`[${providerName}] Token exchange failed (${tokenRes.status}): ${errorText}`);
+    console.error(`[${providerName}] Token exchange failed:`, {
+      status: tokenRes.status,
+      statusText: tokenRes.statusText,
+      error: errorText,
+    });
     throw new Error(`Token exchange failed (${tokenRes.status}): ${errorText}`);
   }
 
   const tokenData = (await tokenRes.json()) as any;
 
-  console.log(`[${providerName}] Response:`, {
-    hasAccessToken: !!tokenData.access_token,
-    hasRefreshToken: !!tokenData.refresh_token,
-    tokenType: tokenData.token_type,
-    expiresIn: tokenData.expires_in,
-    scope: tokenData.scope,
-  });
-
   // Validate response has access token
   if (!tokenData.access_token) {
-    console.error(`[${providerName}] ERROR: No access_token in response`);
+    console.error(`[${providerName}] Token exchange failed: no access_token in response`);
     throw new Error(`Token exchange failed: ${JSON.stringify(tokenData)}`);
   }
 
-  console.log(`[${providerName}] Token exchange successful!`);
-  console.log(`[${providerName}] Access token (first 20 chars): ${tokenData.access_token.substring(0, 20)}...`);
-  console.log(`========== ${providerName} TOKEN EXCHANGE END ==========\n`);
+  console.log(`[${providerName}] Token exchange completed`, {
+    hasAccessToken: true,
+    hasRefreshToken: !!tokenData.refresh_token,
+    expiresIn: tokenData.expires_in,
+  });
 
   // Return standardized response
   return {
@@ -183,9 +165,11 @@ export async function performTokenRefresh(
   const providerName = config.tokenUrl.includes('atlassian') ? 'ATLASSIAN' : 
                        config.tokenUrl.includes('figma') ? 'FIGMA' : 'GOOGLE';
 
-  console.log(`[${providerName}] Refreshing access token`);
-  console.log(`[${providerName}]   - Refresh token length: ${params.refreshToken.length}`);
-  console.log(`[${providerName}]   - Using endpoint: ${config.tokenUrl}`);
+  console.log(`[${providerName}] Token refresh started`, {
+    endpoint: config.tokenUrl,
+    useBasicAuth: config.useBasicAuth,
+    rotatesRefreshToken: config.rotatesRefreshToken,
+  });
 
   const clientId = process.env[config.clientIdEnvVar]!;
   const clientSecret = process.env[config.clientSecretEnvVar]!;
@@ -233,7 +217,7 @@ export async function performTokenRefresh(
       body: requestBody,
     });
   } catch (err: any) {
-    console.error(`[${providerName}] FATAL: Network error:`, err.message);
+    console.error(`[${providerName}] Token refresh network error:`, err.message);
     throw new Error(`Network error refreshing ${providerName} token: ${err.message}`);
   }
 
@@ -248,7 +232,7 @@ export async function performTokenRefresh(
   }
 
   const tokenData = (await response.json()) as any;
-  console.log(`[${providerName}] Token refresh successful:`, {
+  console.log(`[${providerName}] Token refresh completed`, {
     hasAccessToken: !!tokenData.access_token,
     hasRefreshToken: !!tokenData.refresh_token,
     expiresIn: tokenData.expires_in,

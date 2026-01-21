@@ -38,25 +38,18 @@ import {
  * Creates a multi-provider JWT with all connected provider tokens
  */
 export async function handleConnectionDone(req: Request, res: Response): Promise<void> {
-  console.log('Processing connection hub "Done" action');
-  console.log('  Session state:', {
-    mcpRedirectUri: req.session.mcpRedirectUri,
-    usingMcpPkce: req.session.usingMcpPkce,
-    mcpState: req.session.mcpState,
-    mcpClientId: req.session.mcpClientId,
-    connectedProviders: req.session.connectedProviders,
+  console.log('Connection hub "Done" action', {
+    providers: req.session.connectedProviders,
+    hasMcpRedirect: !!req.session.mcpRedirectUri,
   });
   
   const connectedProviders = req.session.connectedProviders || [];
   const providerTokens = req.session.providerTokens || {};
   
   if (connectedProviders.length === 0) {
-    console.log('  Error: No providers connected');
     res.status(400).send('No providers connected. Please connect at least one service.');
     return;
   }
-  
-  console.log(`  Creating JWT for providers: ${connectedProviders.join(', ')}`);
   
   try {
     // Build multi-provider tokens structure for JWT creation
@@ -85,19 +78,16 @@ export async function handleConnectionDone(req: Request, res: Response): Promise
       multiProviderTokens,
       tokenOptions
     );
-    console.log('  JWT access token created successfully');
     
     // Create JWT refresh token with nested provider refresh tokens
     const { refreshToken } = await createMultiProviderRefreshToken(
       multiProviderTokens,
       tokenOptions
     );
-    console.log('  JWT refresh token created successfully');
     
-    console.log(
-      '  Tokens created with providers:',
-      Object.keys(multiProviderTokens)
-    );
+    console.log('Multi-provider JWT created', {
+      providers: Object.keys(multiProviderTokens),
+    });
     
     // Clear session provider data (tokens now embedded in JWT)
     delete req.session.providerTokens;
