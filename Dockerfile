@@ -1,10 +1,10 @@
 FROM node:20-alpine
 ENV PORT=3000
 
-WORKDIR app
+WORKDIR /app
 COPY package.json package-lock.json ./
-# Use npm install to resolve platform-specific optional dependencies (rollup native binaries)
-RUN npm install --frozen-lockfile || npm install
+# npm ci with explicit rollup native binary for Alpine Linux (musl)
+RUN npm ci && npm install @rollup/rollup-linux-x64-musl --save-optional
 COPY . .
 RUN npm run build
 
