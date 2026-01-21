@@ -1,0 +1,348 @@
+openapi: 3.0.3
+info:
+  title: Google Drive Document to Markdown API
+  description: |
+    REST API endpoint for converting Google Drive documents to markdown format.
+    
+    Fetches documents via Google Drive API, exports as HTML, and converts to
+    GitHub-flavored Markdown using Turndown library.
+    
+    **Authentication**: Requires Google Drive OAuth access token or service account credentials.
+    
+    **Dual Interface Pattern**: Identical functionality to MCP tool `drive-doc-to-markdown`.
+  version: 1.0.0
+  contact:
+    name: Cascade MCP Support
+    url: https://github.com/your-org/cascade-mcp
+
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+  - url: https://api.your-domain.com
+    description: Production server
+
+tags:
+  - name: Google Drive
+    description: Google Drive document conversion operations
+
+paths:
+  /api/drive-doc-to-markdown:
+    post:
+      summary: Convert Google Drive document to markdown
+      description: |
+        Converts a Google Docs document to markdown format. The API:
+        1. Parses the provided Google Drive URL to extract the document ID
+        2. Fetches document metadata from Google Drive API
+        3. Validates document type (Google Docs only) and size (<10MB)
+        4. Exports document as HTML from Google Drive API
+        5. Converts HTML to markdown using Turndown library
+        6. Returns markdown content with metadata
+        
+        **Performance**:
+        - Conversion: < 5 seconds (documents < 1MB)
+        - Supports 100 concurrent requests
+      operationId: convertDriveDocToMarkdown
+      tags:
+        - Google Drive
+      security:
+        - GoogleOAuth: []
+        - GoogleServiceAccount: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversionRequest'
+            examples:
+              basicRequest:
+                summary: Basic conversion request
+                value:
+                  url: "https://docs.google.com/document/d/1a2b3c4d5e6f7g8h9i0j/edit"
+              forceRefresh:
+                summary: Force cache refresh
+                value:
+                  url: "1a2b3c4d5e6f7g8h9i0j"
+                  forceRefresh: true
+      responses:
+        '200':
+          description: Conversion successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversionResult'
+              examples:
+                cacheHit:
+                  summary: Cache hit (fast response)
+                  value:
+                    markdown: "# Product Requirements\n\nThis is a PRD..."
+                    metadata:
+                      documentId: "1a2b3c4d5e6f7g8h9i0j"
+                      title: "Product Requirements Document"
+                      url: "https://docs.google.com/document/d/1a2b3c4d5e6f7g8h9i0j/edit"
+                      modifiedTime: "2026-01-15T14:30:00.000Z"
+                      size: 45678
+                    cacheHit: true
+                    warnings: []
+                    processingTimeMs: 15
+                freshConversion:
+                  summary: Fresh conversion with warnings
+                  value:
+                    markdown: "# Technical Spec\n\n..."
+                    metadata:
+                      documentId: "2b3c4d5e6f7g8h9i0j1k"
+                      title: "Technical Specification"
+                      url: "https://docs.google.com/document/d/2b3c4d5e6f7g8h9i0j1k/edit"
+                      modifiedTime: "2026-01-15T16:00:00.000Z"
+                      size: 67890
+                    cacheHit: false
+                    warnings:
+                      - "Unsupported style: CustomHeading (using default heading format)"
+                      - "Image reference preserved as link: image1.png"
+                    processingTimeMs: 1456
+        '400':
+          description: Bad request (invalid URL, unsupported document type, or document too large)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidUrl:
+                  summary: Invalid URL format
+                  value:
+                    error: "INVALID_URL"
+                    message: "Invalid Google Drive URL format. Expected formats: (1) https://docs.google.com/document/d/{id}/edit, (2) https://docs.google.com/document/u/0/d/{id}/mobilebasic, (3) {documentId} (bare ID)"
+                    details:
+                      providedUrl: "https://invalid-url.com"
+                unsupportedType:
+                  summary: Unsupported document type
+                  value:
+                    error: "UNSUPPORTED_DOCUMENT_TYPE"
+                    message: "Unsupported document type: application/vnd.google-apps.spreadsheet. Only Google Docs documents are supported (not Sheets, Slides, or PDFs)."
+                tooLarge:
+                  summary: Document exceeds size limit
+                  value:
+                    error: "DOCUMENT_TOO_LARGE"
+                    message: "Document size (12.5MB) exceeds limit (10MB). Export smaller documents only."
+        '401':
+          description: Authentication failed (invalid or expired token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                authFailed:
+                  summary: Authentication failure
+                  value:
+                    error: "AUTHENTICATION_FAILED"
+                    message: "Authentication failed: Your Google Drive access token is invalid or expired. Re-authenticate and try again."
+        '403':
+          description: Permission denied (user doesn't have access to document)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                permissionDenied:
+                  summary: No access to document
+                  value:
+                    error: "PERMISSION_DENIED"
+                    message: "Permission denied: You don't have access to this document. Request access from the document owner or ensure the document is shared with 'anyone with the link'."
+                    details:
+                      documentUrl: "https://docs.google.com/document/d/1a2b3c4d5e6f7g8h9i0j/edit"
+        '404':
+          description: Document not found (deleted or invalid URL)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notFound:
+                  summary: Document doesn't exist
+                  value:
+                    error: "DOCUMENT_NOT_FOUND"
+                    message: "Document not found: The document may have been deleted or the URL is invalid. Check the URL and try again."
+                    details:
+                      documentUrl: "https://docs.google.com/document/d/invalid-id/edit"
+        '429':
+          description: Rate limit exceeded
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Number of seconds to wait before retrying
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                rateLimitExceeded:
+                  summary: Too many requests
+                  value:
+                    error: "RATE_LIMIT_EXCEEDED"
+                    message: "Rate limit exceeded: You've made too many requests. Try again in 60 seconds."
+                    details:
+                      retryAfter: 60
+        '500':
+          description: Internal server error (conversion failed or service unavailable)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                conversionFailed:
+                  summary: Conversion error
+                  value:
+                    error: "CONVERSION_FAILED"
+                    message: "Document conversion failed: DOCX parsing error. If the problem persists, contact support."
+                serviceError:
+                  summary: Google Drive service error
+                  value:
+                    error: "SERVICE_ERROR"
+                    message: "Google Drive service error: The service is temporarily unavailable. Try again later."
+
+components:
+  securitySchemes:
+    GoogleOAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        OAuth 2.0 Bearer token. Provide Google Drive access token in `X-Google-Token` header.
+        
+        Example:
+        ```
+        X-Google-Token: ya29.a0AfH6SMBx...
+        ```
+        
+        Required scope: `https://www.googleapis.com/auth/drive.readonly`
+    
+    GoogleServiceAccount:
+      type: apiKey
+      in: header
+      name: X-Google-Service-Account-JSON
+      description: |
+        Google service account credentials as JSON string. Provide the entire service account JSON in this header.
+        
+        Example:
+        ```
+        X-Google-Service-Account-JSON: {"type":"service_account","project_id":"...","private_key":"..."}
+        ```
+
+  schemas:
+    ConversionRequest:
+      type: object
+      required:
+        - url
+      properties:
+        url:
+          type: string
+          description: |
+            Google Drive document URL or document ID.
+            
+            Supported formats:
+            1. Standard sharing URL: `https://docs.google.com/document/d/{id}/edit`
+            2. Mobile/app URL: `https://docs.google.com/document/u/0/d/{id}/mobilebasic`
+            3. Bare document ID: `{documentId}` (25-44 alphanumeric characters with underscores/hyphens)
+            
+            The document must be a Google Docs document (not Sheets, Slides, or other types).
+          examples:
+            - "https://docs.google.com/document/d/1a2b3c4d5e6f7g8h9i0j/edit"
+            - "https://docs.google.com/document/u/0/d/1a2b3c4d5e6f7g8h9i0j/mobilebasic"
+            - "1a2b3c4d5e6f7g8h9i0j"
+    
+    ConversionResult:
+      type: object
+      required:
+        - markdown
+        - metadata
+        - warnings
+      properties:
+        markdown:
+          type: string
+          description: |
+            Converted markdown content. Preserves document structure including:
+            - Headings (h1-h6)
+            - Paragraphs
+            - Lists (ordered and unordered)
+            - Bold, italic, code formatting
+            - Links
+            - Tables
+            
+            Images are converted to markdown image syntax with references (not embedded).
+          example: "# Product Requirements\n\n## Overview\n\nThis document outlines...\n\n## Features\n\n- Feature 1\n- Feature 2"
+        metadata:
+          $ref: '#/components/schemas/DocumentMetadata'
+        warnings:
+          type: array
+          items:
+            type: string
+          description: Conversion warnings (e.g., unsupported elements). Empty array if no warnings.
+          example:
+            - "Unsupported style: CustomHeading (using default heading format)"
+            - "Image reference preserved as link: image1.png"
+        processingTimeMs:
+          type: number
+          description: Processing time in milliseconds (for debugging and performance monitoring).
+          example: 1234
+    
+    DocumentMetadata:
+      type: object
+      required:
+        - documentId
+        - title
+        - url
+        - modifiedTime
+        - size
+      properties:
+        documentId:
+          type: string
+          description: Google Drive document ID (extracted from URL).
+          example: "1a2b3c4d5e6f7g8h9i0j"
+        title:
+          type: string
+          description: Document title from Google Drive.
+          example: "Product Requirements Document"
+        url:
+          type: string
+          description: Normalized Google Drive URL.
+          example: "https://docs.google.com/document/d/1a2b3c4d5e6f7g8h9i0j/edit"
+        modifiedTime:
+          type: string
+          format: date-time
+          description: Last modified timestamp (ISO 8601 format).
+          example: "2026-01-15T14:30:00.000Z"
+        size:
+          type: number
+          description: Document size in bytes.
+          example: 45678
+    
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error code (machine-readable).
+          enum:
+            - INVALID_URL
+            - UNSUPPORTED_DOCUMENT_TYPE
+            - DOCUMENT_TOO_LARGE
+            - PERMISSION_DENIED
+            - DOCUMENT_NOT_FOUND
+            - RATE_LIMIT_EXCEEDED
+            - AUTHENTICATION_FAILED
+            - CONVERSION_FAILED
+            - SERVICE_ERROR
+          example: "PERMISSION_DENIED"
+        message:
+          type: string
+          description: Human-readable error message with actionable guidance.
+          example: "Permission denied: You don't have access to this document. Request access from the document owner or ensure the document is shared with 'anyone with the link'."
+        details:
+          type: object
+          description: Additional error context (optional).
+          additionalProperties: true
+          example:
+            documentUrl: "https://docs.google.com/document/d/1a2b3c4d5e6f7g8h9i0j/edit"

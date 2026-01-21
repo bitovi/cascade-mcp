@@ -16,7 +16,7 @@ Thank you for your interest in contributing! To contribute to this project, you'
 - [Contributing Code](#contributing-code)
 
 ## Prerequisites
-- Node.js (v18 or higher recommended)
+- Node.js (v20 or higher required)
 - npm (v9 or higher recommended)
 - An Atlassian account with access to Jira ([atlassian.com](https://www.atlassian.com/))
 - A Figma account ([figma.com](https://www.figma.com/))
@@ -309,9 +309,26 @@ You can configure optional environment variables in your `.env` file to help wit
 ---
 
 ## Contributing Code
-- Please follow the code style and documentation patterns in the repo.
-- Update `server/readme.md` with any API or file changes.
-- Open a pull request with a clear description of your changes.
+
+All code contributions must comply with the [Project Constitution](./.specify/memory/constitution.md), which defines our core principles:
+
+1. **Code Quality First**: Follow modular architecture patterns, TypeScript strict mode, comprehensive documentation
+2. **Test-Driven Development**: Write tests first, achieve test approval, implement features (Red-Green-Refactor cycle)
+3. **User Experience Consistency**: Maintain dual interface pattern (MCP + REST API), consistent authentication paths
+4. **Performance & Reliability**: Implement proper token lifecycle management, session reuse, resource cleanup
+
+**Quality Gates for Pull Requests:**
+- [ ] Constitution principles verified and documented in PR description
+- [ ] `npm run typecheck` passes with zero errors
+- [ ] All tests pass; TDD evidence in commit history for new features
+- [ ] `server/readme.md` updated if public APIs changed
+- [ ] Tool READMEs updated if MCP tools modified
+- [ ] OAuth and PAT paths tested if authentication code changed
+- [ ] Clear PR description with rationale for any principle violations
+
+For detailed guidance, see:
+- [Project Constitution](./.specify/memory/constitution.md) - Governance and core principles
+- [Development Guidelines](./.github/copilot-instructions.md) - Runtime development patterns
 
 ---
 For more details, see the main `README.md` and `server/readme.md`.

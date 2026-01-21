@@ -1,5 +1,6 @@
 import type { McpServer } from '../../../mcp-core/mcp-types.js';
 import { registerDriveAboutUserTool } from './drive-about-user.js';
+import { registerDriveDocToMarkdownTool } from './drive-doc-to-markdown/index.js';
 
 /**
  * Register all Google Drive-specific tools with the MCP server
@@ -12,5 +13,8 @@ export function registerGoogleTools(mcp: McpServer, authContext: any): void {
   // User authentication test tool
   registerDriveAboutUserTool(mcp);
 
-  console.log('  All Google Drive tools registered (1 tool)');
+  // Google Docs to Markdown conversion tool
+  registerDriveDocToMarkdownTool(mcp);
+
+  console.log('  All Google Drive tools registered (2 tools)');
 }
