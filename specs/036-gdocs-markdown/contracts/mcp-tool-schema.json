@@ -1,0 +1,181 @@
+{
+  "name": "drive-doc-to-markdown",
+  "description": "Convert a Google Drive document to markdown format. Fetches the document via Google Drive API, exports as HTML, and converts to GitHub-flavored Markdown using Turndown. Returns markdown content with metadata. Supports headings, formatting, lists, tables, images, hyperlinks, code blocks, and special character normalization.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string",
+        "description": "Google Drive document URL or document ID. Supported formats: (1) https://docs.google.com/document/d/{id}/edit, (2) https://docs.google.com/document/u/0/d/{id}/mobilebasic, (3) {documentId} (bare ID). The document must be a Google Docs document (not Sheets, Slides, or other types).",
+        "examples": [
+          "https://docs.google.com/document/d/1a2b3c4d5e6f7g8h9i0j/edit",
+          "https://docs.google.com/document/u/0/d/1a2b3c4d5e6f7g8h9i0j/mobilebasic",
+          "1a2b3c4d5e6f7g8h9i0j"
+        ]
+      }
+    },
+    "required": ["url"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "markdown": {
+        "type": "string",
+        "description": "Converted markdown content. Preserves document structure including headings (h1-h6), paragraphs, lists (ordered/unordered), bold, italic, code, links, and tables. Images are converted to markdown image syntax with references."
+      },
+      "metadata": {
+        "type": "object",
+        "description": "Document metadata from Google Drive API",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "description": "Google Drive document ID (extracted from URL)"
+          },
+          "title": {
+            "type": "string",
+            "description": "Document title from Google Drive"
+          },
+          "url": {
+            "type": "string",
+            "description": "Normalized Google Drive URL"
+          },
+          "modifiedTime": {
+            "type": "string",
+            "description": "Last modified timestamp (ISO 8601 format)"
+          },
+          "size": {
+            "type": "number",
+            "description": "Document size in bytes"
+          }
+        },
+        "required": ["documentId", "title", "url", "modifiedTime", "size"]
+      },
+      "warnings": {
+        "type": "array",
+        "description": "Conversion warnings (e.g., unsupported elements). Empty array if no warnings.",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": ["markdown", "metadata", "warnings"]
+  },
+  "authentication": {
+    "type": "oauth",
+    "provider": "google",
+    "scopes": [
+      "https://www.googleapis.com/auth/drive.readonly"
+    ],
+    "notes": "Requires OAuth 2.0 authentication with Google Drive. The access token is extracted from the MCP session context. Ensure the user has read access to the document."
+  },
+  "errors": [
+    {
+      "code": "INVALID_URL",
+      "status": 400,
+      "message": "Invalid Google Drive URL format. Expected formats: (1) https://docs.google.com/document/d/{id}/edit, (2) https://docs.google.com/document/u/0/d/{id}/mobilebasic, (3) {documentId} (bare ID)"
+    },
+    {
+      "code": "UNSUPPORTED_DOCUMENT_TYPE",
+      "status": 400,
+      "message": "Unsupported document type: {mimeType}. Only Google Docs documents are supported (not Sheets, Slides, or PDFs)."
+    },
+    {
+      "code": "DOCUMENT_TOO_LARGE",
+      "status": 400,
+      "message": "Document size ({size}MB) exceeds limit (10MB). Export smaller documents only."
+    },
+    {
+      "code": "PERMISSION_DENIED",
+      "status": 403,
+      "message": "Permission denied: You don't have access to this document. Request access from the document owner or ensure the document is shared with 'anyone with the link'."
+    },
+    {
+      "code": "DOCUMENT_NOT_FOUND",
+      "status": 404,
+      "message": "Document not found: The document may have been deleted or the URL is invalid. Check the URL and try again."
+    },
+    {
+      "code": "RATE_LIMIT_EXCEEDED",
+      "status": 429,
+      "message": "Rate limit exceeded: You've made too many requests. Try again in {retry-after} seconds."
+    },
+    {
+      "code": "AUTHENTICATION_FAILED",
+      "status": 401,
+      "message": "Authentication failed: Your Google Drive access token is invalid or expired. Re-authenticate and try again."
+    },
+    {
+      "code": "CONVERSION_FAILED",
+      "status": 500,
+      "message": "Document conversion failed: {error}. If the problem persists, contact support."
+    }
+  ],
+  "examples": [
+    {
+      "name": "Convert public document",
+      "description": "Convert a publicly accessible Google Docs document to markdown",
+      "input": {
+        "url": "https://docs.google.com/document/d/1a2b3c4d5e6f7g8h9i0j/edit"
+      },
+      "output": {
+        "markdown": "# Product Requirements Document\n\n## Overview\n\nThis document outlines...\n\n## Features\n\n- Feature 1\n- Feature 2\n\n## Acceptance Criteria\n\n1. Criterion 1\n2. Criterion 2",
+        "metadata": {
+          "documentId": "1a2b3c4d5e6f7g8h9i0j",
+          "title": "Product Requirements Document",
+          "url": "https://docs.google.com/document/d/1a2b3c4d5e6f7g8h9i0j/edit",
+          "modifiedTime": "2026-01-15T14:30:00.000Z",
+          "size": 45678
+        },
+        "warnings": []
+      }
+    },
+    {
+      "name": "Convert with document ID only",
+      "description": "Convert a document using just the document ID",
+      "input": {
+        "url": "1a2b3c4d5e6f7g8h9i0j"
+      },
+      "output": {
+        "markdown": "# Technical Specification\n\n...",
+        "metadata": {
+          "documentId": "1a2b3c4d5e6f7g8h9i0j",
+          "title": "Technical Specification",
+          "url": "https://docs.google.com/document/d/1a2b3c4d5e6f7g8h9i0j/edit",
+          "modifiedTime": "2026-01-14T10:00:00.000Z",
+          "size": 23456
+        },
+        "warnings": []
+      }
+    },
+    {
+      "name": "Conversion with warnings",
+      "description": "Convert a document that has unsupported formatting",
+      "input": {
+        "url": "https://docs.google.com/document/d/1a2b3c4d5e6f7g8h9i0j/edit"
+      },
+      "output": {
+        "markdown": "# Updated Document\n\n...",
+        "metadata": {
+          "documentId": "1a2b3c4d5e6f7g8h9i0j",
+          "title": "Updated Document",
+          "url": "https://docs.google.com/document/d/1a2b3c4d5e6f7g8h9i0j/edit",
+          "modifiedTime": "2026-01-15T16:00:00.000Z",
+          "size": 34567
+        },
+        "warnings": [
+          "Unsupported style: CustomHeading (using default heading format)"
+        ]
+      }
+    }
+  ],
+  "performance": {
+    "targetLatency": "< 5 seconds for documents under 1MB",
+    "concurrency": "Supports 100 concurrent requests"
+  },
+  "notes": [
+    "This tool converts Google Docs to HTML via Drive API export, then converts HTML to markdown using Turndown",
+    "Image conversion: Images are converted to markdown image syntax with references (not embedded)",
+    "Formatting: Preserves headings, bold, italic, lists, tables, links. Custom fonts and inline styles are lost",
+    "No caching: Documents are converted fresh on every request to ensure up-to-date content"
+  ]
+}

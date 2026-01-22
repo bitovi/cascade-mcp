@@ -16,7 +16,7 @@ Thank you for your interest in contributing! To contribute to this project, you'
 - [Contributing Code](#contributing-code)
 
 ## Prerequisites
-- Node.js (v18 or higher recommended)
+- Node.js (v20 or higher required)
 - npm (v9 or higher recommended)
 - An Atlassian account with access to Jira ([atlassian.com](https://www.atlassian.com/))
 - A Figma account ([figma.com](https://www.figma.com/))

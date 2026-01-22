@@ -219,6 +219,20 @@ npm run dev:client
 - **atlassian-get-attachments** - Fetch issue attachments by ID
 - **atlassian-update-issue-description** - Update issue description with markdown (converts to ADF)
 
+### Google Drive Tools
+
+- **google-drive-doc-to-markdown** - Convert Google Drive documents to markdown format
+  - Fetches Google Docs via Drive API, exports as HTML, converts to GitHub-flavored Markdown using Turndown
+  - Preserves formatting: headings, bold, italic, strikethrough, lists, tables, links, images, code blocks
+  - Special character normalization (smart quotes → straight quotes, em-dashes, etc.)
+  - Comprehensive error handling: permission denied, document not found, unsupported types, file size limits
+  - Supports both OAuth (user-delegated) and Service Account authentication
+  - Returns: markdown content, document metadata, conversion warnings, processing time
+  - Parameters: `url` (Google Doc URL or document ID)
+  - Example: `google-drive-doc-to-markdown({ url: "https://docs.google.com/document/d/abc123/edit" })`
+  - Dual interface: Available as MCP tool and REST API endpoint `/api/drive-doc-to-markdown`
+  - Limitations: Google Docs only (not Sheets/Slides/PDFs), max 10MB document size
+
 ### Combined Provider Tools
 Advanced workflow tools that integrate multiple services:
 

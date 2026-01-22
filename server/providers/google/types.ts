@@ -55,3 +55,35 @@ export interface DriveUser {
 export interface DriveAboutResponse {
   user: DriveUser;
 }
+
+/**
+ * Google Drive document metadata from Drive API
+ * Used for document-to-markdown conversion feature
+ */
+export interface GoogleDocMetadata {
+  /**
+   * Document ID (from Drive API)
+   */
+  id: string;
+  
+  /**
+   * Document title
+   */
+  name: string;
+  
+  /**
+   * MIME type - should be 'application/vnd.google-apps.document' for Google Docs
+   */
+  mimeType: string;
+  
+  /**
+   * Last modified timestamp (ISO 8601)
+   * Used for cache invalidation
+   */
+  modifiedTime: string;
+  
+  /**
+   * Document size in bytes
+   */
+  size?: number;
+}
