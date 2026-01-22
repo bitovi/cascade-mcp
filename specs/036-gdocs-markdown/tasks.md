@@ -65,7 +65,7 @@
 - [X] T017 [US1] Register tool in server/providers/google/tools/drive-doc-to-markdown/index.ts with export registerDriveDocToMarkdownTool
 - [X] T018 [US1] Update server/providers/google/index.ts to call registerDriveDocToMarkdownTool
 - [X] T019 [US1] Create REST API endpoint at server/api/drive-doc-to-markdown.ts wrapping core-logic.ts with PAT authentication
-- [X] T020 [US1] Add structured logging for conversion operations in drive-doc-to-markdown.ts with fields: documentId (string), cacheStatus ('hit'|'miss'|'stale'), processingTimeMs (number), userId (string, from auth context), errorType (string|null), logLevel (info|warn|error)
+- [X] T020 [US1] Add structured logging for conversion operations in drive-doc-to-markdown.ts with fields: documentId (string), cacheStatus ('hit'|'miss'|'stale'), userId (string, from auth context), errorType (string|null), logLevel (info|warn|error)
 
 **Checkpoint**: At this point, User Story 1 should be fully functional - users can convert Google Docs with basic formatting to Markdown via both MCP and REST API interfaces
 

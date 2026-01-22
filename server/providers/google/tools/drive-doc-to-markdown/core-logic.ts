@@ -48,8 +48,6 @@ export async function executeDriveDocToMarkdown(
 ): Promise<ConversionResult> {
   console.log('Starting Drive document to Markdown conversion');
   
-  const startTime = Date.now();
-  
   // Step 1: Parse URL and extract document ID
   console.log('Step 1: Parsing URL');
   const { documentId } = parseGoogleDriveUrl(request.url);
@@ -88,7 +86,6 @@ export async function executeDriveDocToMarkdown(
   const { markdown, warnings } = htmlToMarkdown(html);
   
   // Step 5: Return result
-  const processingTimeMs = Date.now() - startTime;
   const documentMetadata: GoogleDocMetadata = {
     id: metadata.id,
     name: metadata.name,
@@ -97,13 +94,12 @@ export async function executeDriveDocToMarkdown(
     size: metadata.size || 0
   };
   
-  console.log('Conversion complete in', processingTimeMs, 'ms');
+  console.log('Conversion complete');
   
   return {
     markdown,
     metadata: documentMetadata,
-    warnings,
-    processingTimeMs
+    warnings
   };
 }
 

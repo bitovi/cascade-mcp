@@ -47,8 +47,7 @@ curl -X POST http://localhost:3000/api/drive-doc-to-markdown \
 {
   "markdown": "# Document Title\n\n...",
   "metadata": { "documentId": "...", "title": "...", "modifiedTime": "..." },
-  "warnings": [],
-  "processingTimeMs": 1250
+  "warnings": []
 }
 ```
 
@@ -116,8 +115,7 @@ Convert this Google Doc to markdown: https://docs.google.com/document/d/1a2b3c4d
     "modifiedTime": "2026-01-15T14:30:00.000Z",
     "size": 45678
   },
-  "warnings": [],
-  "processingTimeMs": 1234
+  "warnings": []
 }
 ```
 
@@ -146,8 +144,7 @@ curl -X POST http://localhost:3000/api/drive-doc-to-markdown \
     "modifiedTime": "2026-01-15T14:30:00.000Z",
     "size": 45678
   },
-  "warnings": [],
-  "processingTimeMs": 1234
+  "warnings": []
 }
 ```
 

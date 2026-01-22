@@ -80,7 +80,6 @@ export function registerDriveDocToMarkdownTool(mcp: McpServer): void {
         metadataText += `**Document**: ${result.metadata.name}\n`;
         metadataText += `**Document ID**: ${result.metadata.id}\n`;
         metadataText += `**Modified**: ${result.metadata.modifiedTime}\n`;
-        metadataText += `**Processing Time**: ${result.processingTimeMs}ms\n`;
         
         if (result.warnings && result.warnings.length > 0) {
           metadataText += `\n## Warnings\n\n`;

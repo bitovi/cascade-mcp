@@ -56,10 +56,6 @@
         "items": {
           "type": "string"
         }
-      },
-      "processingTimeMs": {
-        "type": "number",
-        "description": "Processing time in milliseconds (for debugging and performance monitoring)"
       }
     },
     "required": ["markdown", "metadata", "warnings"]
@@ -130,8 +126,7 @@
           "modifiedTime": "2026-01-15T14:30:00.000Z",
           "size": 45678
         },
-        "warnings": [],
-        "processingTimeMs": 1234
+        "warnings": []
       }
     },
     {
@@ -149,8 +144,7 @@
           "modifiedTime": "2026-01-14T10:00:00.000Z",
           "size": 23456
         },
-        "warnings": [],
-        "processingTimeMs": 1289
+        "warnings": []
       }
     },
     {
@@ -170,8 +164,7 @@
         },
         "warnings": [
           "Unsupported style: CustomHeading (using default heading format)"
-        ],
-        "processingTimeMs": 1456
+        ]
       }
     }
   ],

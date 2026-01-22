@@ -81,7 +81,6 @@ paths:
                       modifiedTime: "2026-01-15T14:30:00.000Z"
                       size: 45678
                     warnings: []
-                    processingTimeMs: 1234
                 conversionWithWarnings:
                   summary: Conversion with warnings
                   value:
@@ -95,7 +94,7 @@ paths:
                     warnings:
                       - "Unsupported style: CustomHeading (using default heading format)"
                       - "Image reference preserved as link: image1.png"
-                    processingTimeMs: 1456
+
         '400':
           description: Bad request (invalid URL, unsupported document type, or document too large)
           content:
@@ -277,10 +276,6 @@ components:
           example:
             - "Unsupported style: CustomHeading (using default heading format)"
             - "Image reference preserved as link: image1.png"
-        processingTimeMs:
-          type: number
-          description: Processing time in milliseconds (for debugging and performance monitoring).
-          example: 1234
     
     DocumentMetadata:
       type: object

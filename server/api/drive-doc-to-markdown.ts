@@ -47,8 +47,7 @@ import { validateGoogleJsonApiHeaders } from './api-error-helpers.js';
  *     "modifiedTime": "2025-01-15T10:30:00.000Z",
  *     "size": 1234
  *   },
- *   "warnings": [],
- *   "processingTimeMs": 1250
+ *   "warnings": []
  * }
  */
 export async function handleDriveDocToMarkdown(req: Request, res: Response): Promise<void> {
@@ -91,7 +90,6 @@ export async function handleDriveDocToMarkdown(req: Request, res: Response): Pro
       documentId: result.metadata.id,
       title: result.metadata.name,
       markdownLength: result.markdown.length,
-      processingTimeMs: result.processingTimeMs,
       authType: googleClient.authType,
     });
     

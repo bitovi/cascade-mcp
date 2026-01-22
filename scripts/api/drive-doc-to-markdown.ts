@@ -156,7 +156,6 @@ Examples:
     console.log(`📅 Modified:      ${result.metadata.modifiedTime}`);
     console.log(`📏 Size:          ${result.metadata.size || 0} bytes`);
     console.log(`📝 Markdown:      ${result.markdown.length} characters`);
-    console.log(`⏱️  Processing:    ${result.processingTimeMs}ms`);
     
     if (result.warnings && result.warnings.length > 0) {
       console.log(`⚠️  Warnings:      ${result.warnings.length}`);

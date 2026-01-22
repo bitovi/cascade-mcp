@@ -100,9 +100,4 @@ export interface ConversionResult {
    * Conversion warnings (if any)
    */
   warnings: string[];
-  
-  /**
-   * Processing time in milliseconds (for debugging)
-   */
-  processingTimeMs?: number;
 }
