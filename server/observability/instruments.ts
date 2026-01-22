@@ -1,6 +1,5 @@
 import * as Sentry from '@sentry/node';
-// Temporarily disabled profiling due to native module dependency issue
-// import { nodeProfilingIntegration } from '@sentry/profiling-node';
+import { nodeProfilingIntegration } from '@sentry/profiling-node';
 
 interface SentryConfig {
   dsn: string | undefined;
@@ -12,7 +11,7 @@ interface SentryConfig {
 
 const sentryConfig: SentryConfig = {
   dsn: process.env.BACKEND_SENTRY_DSN,
-  integrations: [], // nodeProfilingIntegration() disabled
+  integrations: [nodeProfilingIntegration()],
   tracesSampleRate: 1.0,
   enabled: !!process.env.BACKEND_SENTRY_DSN,
   environment: process.env.VITE_STATUS_REPORTS_ENV,
@@ -20,4 +19,4 @@ const sentryConfig: SentryConfig = {
 
 Sentry.init(sentryConfig);
 
-// Sentry.profiler.startProfiler(); // disabled
+Sentry.profiler.startProfiler();
