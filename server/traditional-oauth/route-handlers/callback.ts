@@ -125,7 +125,7 @@ export async function hubCallbackHandler(
     req.session.providerTokens = {};
   }
 
-  const expiresAt = Date.now() + (tokens.expires_in * 1000);
+  const expiresAt = Math.floor(Date.now() / 1000) + tokens.expires_in;
 
   req.session.providerTokens[providerName] = {
     access_token: tokens.access_token,
