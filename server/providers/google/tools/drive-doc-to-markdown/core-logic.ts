@@ -18,6 +18,7 @@ import type { ConversionRequest, ConversionResult } from './types.js';
 import type { GoogleDocMetadata } from '../../types.js';
 import { parseGoogleDriveUrl } from './url-parser.js';
 import { getDocumentMetadata, exportDocumentAsHTML } from '../../google-helpers.js';
+import { htmlToMarkdown } from './conversion-helpers.js';
 
 /**
  * Execute the complete document-to-markdown conversion workflow
@@ -84,7 +85,6 @@ export async function executeDriveDocToMarkdown(
   
   // Step 4: Convert HTML to Markdown
   console.log('Step 4: Converting HTML to Markdown');
-  const { htmlToMarkdown } = await import('./conversion-helpers.js');
   const { markdown, warnings } = htmlToMarkdown(html);
   
   // Step 5: Return result
