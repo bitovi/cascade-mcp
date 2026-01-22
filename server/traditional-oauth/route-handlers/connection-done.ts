@@ -25,37 +25,31 @@ import type { Request, Response } from 'express';
 import {
   createMultiProviderAccessToken,
   createMultiProviderRefreshToken,
+  addProviderTokensIfValid,
   type MultiProviderTokens,
-} from '../pkce/token-helpers.js';
+} from '../../pkce/token-helpers.js';
 import {
   generateAuthorizationCode,
   storeAuthorizationCode,
-} from '../pkce/authorization-code-store.js';
+} from '../../pkce/authorization-code-store.js';
 
 /**
  * Handles the "Done" button click
  * Creates a multi-provider JWT with all connected provider tokens
  */
 export async function handleConnectionDone(req: Request, res: Response): Promise<void> {
-  console.log('Processing connection hub "Done" action');
-  console.log('  Session state:', {
-    mcpRedirectUri: req.session.mcpRedirectUri,
-    usingMcpPkce: req.session.usingMcpPkce,
-    mcpState: req.session.mcpState,
-    mcpClientId: req.session.mcpClientId,
-    connectedProviders: req.session.connectedProviders,
+  console.log('Connection hub "Done" action', {
+    providers: req.session.connectedProviders,
+    hasMcpRedirect: !!req.session.mcpRedirectUri,
   });
   
   const connectedProviders = req.session.connectedProviders || [];
   const providerTokens = req.session.providerTokens || {};
   
   if (connectedProviders.length === 0) {
-    console.log('  Error: No providers connected');
     res.status(400).send('No providers connected. Please connect at least one service.');
     return;
   }
-  
-  console.log(`  Creating JWT for providers: ${connectedProviders.join(', ')}`);
   
   try {
     // Build multi-provider tokens structure for JWT creation
@@ -70,41 +64,9 @@ export async function handleConnectionDone(req: Request, res: Response): Promise
     // Build MultiProviderTokens structure
     const multiProviderTokens: MultiProviderTokens = {};
     
-    if (atlassianTokens && atlassianTokens.access_token && atlassianTokens.refresh_token) {
-      console.log('  Adding Atlassian credentials to JWT');
-      multiProviderTokens.atlassian = {
-        access_token: atlassianTokens.access_token,
-        refresh_token: atlassianTokens.refresh_token,
-        expires_at: atlassianTokens.expires_at,
-        scope: atlassianTokens.scope,
-      };
-    } else if (atlassianTokens) {
-      console.log('  Warning: Atlassian tokens incomplete (missing access or refresh token)');
-    }
-    
-    if (figmaTokens && figmaTokens.access_token && figmaTokens.refresh_token) {
-      console.log('  Adding Figma credentials to JWT');
-      multiProviderTokens.figma = {
-        access_token: figmaTokens.access_token,
-        refresh_token: figmaTokens.refresh_token,
-        expires_at: figmaTokens.expires_at,
-        scope: figmaTokens.scope,
-      };
-    } else if (figmaTokens) {
-      console.log('  Warning: Figma tokens incomplete (missing access or refresh token)');
-    }
-    
-    if (googleTokens && googleTokens.access_token && googleTokens.refresh_token) {
-      console.log('  Adding Google credentials to JWT');
-      multiProviderTokens.google = {
-        access_token: googleTokens.access_token,
-        refresh_token: googleTokens.refresh_token,
-        expires_at: googleTokens.expires_at,
-        scope: googleTokens.scope,
-      };
-    } else if (googleTokens) {
-      console.log('  Warning: Google tokens incomplete (missing access or refresh token)');
-    }
+    addProviderTokensIfValid(multiProviderTokens, 'atlassian', atlassianTokens);
+    addProviderTokensIfValid(multiProviderTokens, 'figma', figmaTokens);
+    addProviderTokensIfValid(multiProviderTokens, 'google', googleTokens);
     
     // Create JWT access token with nested provider structure
     const tokenOptions = {
@@ -116,19 +78,16 @@ export async function handleConnectionDone(req: Request, res: Response): Promise
       multiProviderTokens,
       tokenOptions
     );
-    console.log('  JWT access token created successfully');
     
     // Create JWT refresh token with nested provider refresh tokens
     const { refreshToken } = await createMultiProviderRefreshToken(
       multiProviderTokens,
       tokenOptions
     );
-    console.log('  JWT refresh token created successfully');
     
-    console.log(
-      '  Tokens created with providers:',
-      Object.keys(multiProviderTokens)
-    );
+    console.log('Multi-provider JWT created', {
+      providers: Object.keys(multiProviderTokens),
+    });
     
     // Clear session provider data (tokens now embedded in JWT)
     delete req.session.providerTokens;

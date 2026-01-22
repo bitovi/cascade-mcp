@@ -26,8 +26,19 @@
 
 import { randomUUID } from 'crypto';
 import { jwtSign } from '../tokens.ts';
-import { getAtlassianConfig } from '../atlassian-auth-code-flow.ts';
-import type { AtlassianTokenResponse } from '../atlassian-auth-code-flow.ts';
+import { getAtlassianConfig } from '../providers/atlassian/config.js';
+import type { AtlassianTokenResponse } from '../providers/atlassian/config.js';
+
+/**
+ * Array of all supported provider keys
+ * Use this constant to iterate over all providers consistently
+ */
+export const PROVIDER_KEYS = ['atlassian', 'figma', 'google'] as const;
+
+/**
+ * Supported OAuth provider keys (derived from PROVIDER_KEYS array)
+ */
+export type ProviderKey = typeof PROVIDER_KEYS[number];
 
 /**
  * Provider token data structure for multi-provider JWTs
@@ -64,7 +75,7 @@ export interface ExtendedAtlassianTokenResponse extends AtlassianTokenResponse {
  */
 export function addProviderTokens(
   target: MultiProviderTokens,
-  providerKey: 'atlassian' | 'figma' | 'google',
+  providerKey: ProviderKey,
   tokens: any
 ): void {
   if (tokens) {
@@ -74,6 +85,35 @@ export function addProviderTokens(
       expires_at: Math.floor(Date.now() / 1000) + tokens.expires_in,
       scope: tokens.scope,
     };
+  }
+}
+
+/**
+ * Helper to validate and add provider tokens to multi-provider structure
+ * Validates that both access_token and refresh_token are present before adding
+ * Logs warnings for incomplete token sets
+ * 
+ * @param target - The MultiProviderTokens object to mutate
+ * @param providerKey - The provider key ('atlassian', 'figma', or 'google')
+ * @param tokens - Provider token response that should contain access_token, refresh_token, expires_at, scope
+ */
+export function addProviderTokensIfValid(
+  target: MultiProviderTokens,
+  providerKey: ProviderKey,
+  tokens: any
+): void {
+  if (!tokens) return;
+  
+  if (tokens.access_token && tokens.refresh_token) {
+    console.log(`  Adding ${providerKey} credentials to JWT`);
+    target[providerKey] = {
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      expires_at: tokens.expires_at,
+      scope: tokens.scope,
+    };
+  } else {
+    console.log(`  Warning: ${providerKey} tokens incomplete (missing access or refresh token)`);
   }
 }
 

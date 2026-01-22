@@ -16,6 +16,8 @@ import type {
   RefreshTokenParams,
 } from '../provider-interface.js';
 import { registerGoogleTools } from './tools/index.js';
+import { buildOAuthUrl } from '../../traditional-oauth/url-builder.js';
+import { performTokenExchange, performTokenRefresh } from '../../traditional-oauth/token-exchange.js';
 
 /**
  * Google Drive Provider Object
@@ -31,27 +33,20 @@ export const googleProvider: OAuthProvider = {
    * @returns Full Google authorization URL
    */
   createAuthUrl(params: AuthUrlParams): string {
-    const clientId = process.env.GOOGLE_CLIENT_ID;
-    const baseUrl = process.env.VITE_AUTH_SERVER_URL!;
-    const redirectUri = params.redirectUri || `${baseUrl}/auth/callback/google`;
-    const scope = params.scope || process.env.GOOGLE_OAUTH_SCOPES!;
-    
-    // Google uses traditional OAuth 2.0 - DO NOT include PKCE parameters
-    // Request offline access to receive refresh token
-    const urlParams: Record<string, string> = {
-      client_id: clientId!,
-      response_type: params.responseType || 'code',
-      redirect_uri: redirectUri,
-      scope,
-      access_type: 'offline', // Request refresh token
-      prompt: 'consent', // Force consent screen to always get refresh token
-    };
-    
-    if (params.state) {
-      urlParams.state = params.state;
-    }
-    
-    return `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams(urlParams).toString()}`;
+    return buildOAuthUrl(
+      {
+        baseUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+        clientIdEnvVar: 'GOOGLE_CLIENT_ID',
+        scopeEnvVar: 'GOOGLE_OAUTH_SCOPES',
+        additionalParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
+        usePKCE: false,
+      },
+      params,
+      '/auth/callback/google'
+    );
   },
   
   /**
@@ -76,53 +71,20 @@ export const googleProvider: OAuthProvider = {
    * @returns Standardized token response
    */
   async exchangeCodeForTokens(params: TokenExchangeParams): Promise<StandardTokenResponse> {
-    const clientId = process.env.GOOGLE_CLIENT_ID;
-    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    const baseUrl = process.env.VITE_AUTH_SERVER_URL!;
-    const redirectUri = params.redirectUri || `${baseUrl}/auth/callback/google`;
-    
-    // Google uses traditional OAuth 2.0 - DO NOT include code_verifier
-    // Authentication is via client_id + client_secret only
-    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: clientId!,
-        client_secret: clientSecret!,
-        code: params.code,
-        redirect_uri: redirectUri,
-        grant_type: 'authorization_code',
-      }).toString(),
-    });
-    
-    if (!tokenRes.ok) {
-      const errorText = await tokenRes.text();
-      throw new Error(`Google token exchange failed (${tokenRes.status}): ${errorText}`);
-    }
-    
-    const tokenData = await tokenRes.json() as any;
-    
-    if (!tokenData.access_token) {
-      throw new Error(`Google token exchange failed: ${JSON.stringify(tokenData)}`);
-    }
-    
-    return {
-      access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token,
-      token_type: tokenData.token_type || 'Bearer',
-      expires_in: tokenData.expires_in || 3600, // Google default: 1 hour
-      scope: tokenData.scope,
-    };
+    return performTokenExchange(
+      {
+        tokenUrl: 'https://oauth2.googleapis.com/token',
+        clientIdEnvVar: 'GOOGLE_CLIENT_ID',
+        clientSecretEnvVar: 'GOOGLE_CLIENT_SECRET',
+        usePKCE: false,
+        contentType: 'form',
+        defaultExpiresIn: 3600, // Google default: 1 hour
+        redirectPath: '/auth/callback/google',
+      },
+      params
+    );
   },
-  
-  /**
-   * Get default OAuth scopes for Google Drive
-   * @returns Array of scope strings
-   */
-  getDefaultScopes(): string[] {
-    return ['https://www.googleapis.com/auth/drive'];
-  },
-  
+
   /**
    * Refresh an access token using a refresh token
    * Google uses standard OAuth 2.0 refresh with client_secret
@@ -133,56 +95,17 @@ export const googleProvider: OAuthProvider = {
   async refreshAccessToken(
     params: RefreshTokenParams
   ): Promise<StandardTokenResponse> {
-    const clientId = process.env.GOOGLE_CLIENT_ID!;
-    const clientSecret = process.env.GOOGLE_CLIENT_SECRET!;
-
-    console.log('[GOOGLE] Refreshing access token');
-    console.log('[GOOGLE]   - Refresh token length:', params.refreshToken.length);
-    console.log(
-      '[GOOGLE]   - Using endpoint: https://oauth2.googleapis.com/token'
+    return performTokenRefresh(
+      {
+        tokenUrl: 'https://oauth2.googleapis.com/token',
+        clientIdEnvVar: 'GOOGLE_CLIENT_ID',
+        clientSecretEnvVar: 'GOOGLE_CLIENT_SECRET',
+        contentType: 'form',
+        rotatesRefreshToken: false,
+        defaultExpiresIn: 3600,
+      },
+      params
     );
-
-    const response = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: clientId,
-        client_secret: clientSecret,
-        refresh_token: params.refreshToken,
-        grant_type: 'refresh_token',
-      }).toString(),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[GOOGLE] Token refresh failed:', {
-        status: response.status,
-        statusText: response.statusText,
-        error: errorText,
-      });
-      throw new Error(
-        `Google token refresh failed (${response.status}): ${errorText}`
-      );
-    }
-
-    const tokenData = (await response.json()) as any;
-    console.log('[GOOGLE] Token refresh successful:', {
-      hasAccessToken: !!tokenData.access_token,
-      hasRefreshToken: !!tokenData.refresh_token, // Should be false
-      expiresIn: tokenData.expires_in,
-    });
-
-    // Google response: { access_token, token_type, expires_in, scope } - NO refresh_token!
-    return {
-      access_token: tokenData.access_token,
-      // ⚠️ KEY: Google doesn't return a refresh token, so we return the ORIGINAL
-      // input token. This ensures the caller gets a valid refresh_token to embed
-      // in the new JWT, even though Google didn't provide one.
-      refresh_token: params.refreshToken,
-      token_type: tokenData.token_type || 'Bearer',
-      expires_in: tokenData.expires_in || 3600,
-      scope: tokenData.scope,
-    };
   },
 
   /**

@@ -15,8 +15,8 @@
  */
 
 import type { Request, Response } from 'express';
-import type { OAuthProvider } from '../providers/provider-interface.js';
-import { generateCodeVerifier, generateCodeChallenge } from '../tokens.js';
+import type { OAuthProvider } from '../../providers/provider-interface.js';
+import { generateCodeVerifier, generateCodeChallenge } from '../../tokens.js';
 
 /**
  * Creates an authorize endpoint for a specific provider (Server-Side OAuth)
@@ -30,16 +30,9 @@ import { generateCodeVerifier, generateCodeChallenge } from '../tokens.js';
  */
 export function makeAuthorize(provider: OAuthProvider) {
   return async (req: Request, res: Response) => {
-    console.log(`\n========== AUTHORIZE START: ${provider.name} ==========`);
-    console.log(`[AUTHORIZE] Starting Server-Side OAuth flow for provider: ${provider.name}`);
-    console.log(`[AUTHORIZE] Session ID: ${req.sessionID}`);
-    console.log(`[AUTHORIZE] Request headers:`, {
-      host: req.headers.host,
-      'x-forwarded-proto': req.headers['x-forwarded-proto'],
-      'x-forwarded-for': req.headers['x-forwarded-for'],
-      origin: req.headers.origin,
-      referer: req.headers.referer,
-      cookie: req.headers.cookie ? 'present' : 'missing'
+    console.log(`[AUTHORIZE] ${provider.name} OAuth flow started`, {
+      sessionId: req.sessionID,
+      hasCookie: !!req.headers.cookie,
     });
 
     // Generate OUR code_verifier for Server-Side OAuth with this provider
@@ -51,12 +44,6 @@ export function makeAuthorize(provider: OAuthProvider) {
     // Generate state for this provider's OAuth flow
     const state = generateCodeVerifier(); // Random state value
 
-    console.log(`[AUTHORIZE] Generated OAuth parameters:`);
-    console.log(`[AUTHORIZE]   - code_verifier: ${codeVerifier.substring(0, 10)}... (length: ${codeVerifier.length})`);
-    console.log(`[AUTHORIZE]   - code_challenge: ${codeChallenge.substring(0, 10)}... (length: ${codeChallenge.length})`);
-    console.log(`[AUTHORIZE]   - state: ${state.substring(0, 10)}... (length: ${state.length})`);
-    console.log(`[AUTHORIZE]   - codeChallengeMethod: ${codeChallengeMethod}`);
-
     // Store Server-Side OAuth parameters for callback validation
     req.session.provider = provider.name;
     req.session.codeVerifier = codeVerifier; // OUR code_verifier for provider OAuth
@@ -64,16 +51,8 @@ export function makeAuthorize(provider: OAuthProvider) {
     req.session.codeChallengeMethod = codeChallengeMethod;
     req.session.state = state;
 
-    console.log(`[AUTHORIZE] Stored in session (ID: ${req.sessionID}):`);
-    console.log(`[AUTHORIZE]   - provider: ${req.session.provider}`);
-    console.log(`[AUTHORIZE]   - codeVerifier: ${req.session.codeVerifier?.substring(0, 10)}...`);
-    console.log(`[AUTHORIZE]   - state: ${req.session.state?.substring(0, 10)}...`);
-
     const baseUrl = process.env.VITE_AUTH_SERVER_URL!;
-    console.log(`[AUTHORIZE] Base URL from env: ${baseUrl}`);
-
     const redirectUri = `${baseUrl}/auth/callback/${provider.name}`;
-    console.log(`[AUTHORIZE] Redirect URI: ${redirectUri}`);
 
     const authUrl = provider.createAuthUrl({
       redirectUri: redirectUri, // Per Q26: Provider-specific callback
@@ -83,9 +62,10 @@ export function makeAuthorize(provider: OAuthProvider) {
       responseType: 'code',
     });
 
-    console.log(`[AUTHORIZE] Full auth URL: ${authUrl.substring(0, 150)}...`);
-    console.log(`[AUTHORIZE] Redirecting to ${provider.name} OAuth URL`);
-    console.log(`========== AUTHORIZE END: ${provider.name} ==========\n`);
+    console.log(`[AUTHORIZE] ${provider.name} redirecting to authorization URL`, {
+      redirectUri,
+      usePKCE: true,
+    });
 
     res.redirect(authUrl);
   };

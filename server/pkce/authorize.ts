@@ -28,7 +28,7 @@ import {
   generateCodeChallenge
 } from '../tokens.ts';
 import type { OAuthHandler } from './types.ts';
-import { renderConnectionHub } from '../provider-server-oauth/index.js';
+import { renderConnectionHub } from '../traditional-oauth/route-handlers/index.js';
 
 /**
  * Type guard to ensure query parameter is a string
@@ -52,16 +52,10 @@ export const authorize: OAuthHandler = (req: Request, res: Response): void => {
   const mcpCodeChallengeMethod = getStringParam(req.query.code_challenge_method);
   const mcpResource = getStringParam(req.query.resource);
 
-  console.log('↔️ GET /authorize request from MCP client:', {
-    mcpClientId,
-    mcpRedirectUri,
-    mcpScope,
-    responseType,
-    mcpState,
-    mcpCodeChallenge,
-    mcpCodeChallengeMethod,
-    mcpResource,
-    queryParams: req.query,
+  console.log('↔️ MCP authorize request', {
+    clientId: mcpClientId,
+    hasPKCE: !!(mcpCodeChallenge && mcpCodeChallengeMethod),
+    resource: mcpResource,
   });
 
   // Use MCP client's PKCE parameters if provided, otherwise generate our own (fallback)
@@ -73,13 +67,11 @@ export const authorize: OAuthHandler = (req: Request, res: Response): void => {
     // Use the MCP client's PKCE parameters
     codeChallenge = mcpCodeChallenge;
     codeChallengeMethod = mcpCodeChallengeMethod;
-    console.log('  Using MCP client PKCE parameters');
   } else {
     // Generate our own PKCE parameters (fallback for non-MCP clients)
     codeVerifier = generateCodeVerifier();
     codeChallenge = generateCodeChallenge(codeVerifier);
     codeChallengeMethod = 'S256';
-    console.log('  Generated our own PKCE parameters');
   }
 
   // Store MCP client info in session for later use in callback
@@ -91,17 +83,7 @@ export const authorize: OAuthHandler = (req: Request, res: Response): void => {
   req.session.mcpResource = mcpResource; // Store the resource parameter
   req.session.usingMcpPkce = !codeVerifier; // Flag to indicate if we're using MCP's PKCE
 
-  console.log('  Saved in session:', {
-    state: mcpState,
-    codeVerifier: codeVerifier ? 'present' : 'null (using MCP PKCE)',
-    mcpClientId,
-    mcpRedirectUri,
-    mcpResource: mcpResource || 'undefined',
-    usingMcpPkce: !codeVerifier,
-  });
-
   // Per Authentication Flows section: Show connection hub for multi-provider flow
   // The hub will display provider connection buttons and handle the multi-provider OAuth
-  console.log('  Rendering connection hub for multi-provider selection');
   renderConnectionHub(req, res);
 };

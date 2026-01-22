@@ -1,11 +1,10 @@
 /**
  * Atlassian OAuth Configuration
  * 
- * This module provides configuration for Atlassian OAuth services.
- * Used by token refresh flows and JWT creation.
+ * Provides configuration for Atlassian OAuth services including
+ * support for test mock endpoints.
  */
 
-// Atlassian OAuth configuration interface
 export interface AtlassianConfig {
   authUrl: string;
   tokenUrl: string;
@@ -15,7 +14,6 @@ export interface AtlassianConfig {
   scopes: string | undefined;
 }
 
-// Atlassian token response interface
 export interface AtlassianTokenResponse {
   access_token: string;
   refresh_token: string;
@@ -26,10 +24,10 @@ export interface AtlassianTokenResponse {
 
 /**
  * Get Atlassian OAuth configuration
+ * Supports environment-configurable OAuth endpoints for testing
  * @returns Atlassian OAuth configuration
  */
 export function getAtlassianConfig(): AtlassianConfig {
-  // Support environment-configurable OAuth endpoints for testing
   const baseUrl = process.env.VITE_AUTH_SERVER_URL || 'http://localhost:3000';
   const useMockEndpoints = process.env.TEST_USE_MOCK_ATLASSIAN === 'true';
   
@@ -54,4 +52,3 @@ export function getAtlassianConfig(): AtlassianConfig {
     scopes: process.env.VITE_JIRA_SCOPE,
   };
 }
-

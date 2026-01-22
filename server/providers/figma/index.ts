@@ -16,6 +16,8 @@ import type {
   RefreshTokenParams,
 } from '../provider-interface.js';
 import { registerFigmaTools } from './tools/index.js';
+import { buildOAuthUrl } from '../../traditional-oauth/url-builder.js';
+import { performTokenExchange, performTokenRefresh } from '../../traditional-oauth/token-exchange.js';
 
 /**
  * Figma Provider Object
@@ -31,24 +33,16 @@ export const figmaProvider: OAuthProvider = {
    * @returns Full Figma authorization URL
    */
   createAuthUrl(params: AuthUrlParams): string {
-    const clientId = process.env.FIGMA_CLIENT_ID;
-    const baseUrl = process.env.VITE_AUTH_SERVER_URL!;
-    const redirectUri = params.redirectUri || `${baseUrl}/auth/callback/figma`;
-    const scope = params.scope || process.env.FIGMA_OAUTH_SCOPES!;
-    
-    // Figma uses traditional OAuth 2.0 - DO NOT include PKCE parameters
-    const urlParams: Record<string, string> = {
-      client_id: clientId!,
-      response_type: params.responseType || 'code',
-      redirect_uri: redirectUri,
-      scope,
-    };
-    
-    if (params.state) {
-      urlParams.state = params.state;
-    }
-    
-    return `https://www.figma.com/oauth?${new URLSearchParams(urlParams).toString()}`;
+    return buildOAuthUrl(
+      {
+        baseUrl: 'https://www.figma.com/oauth',
+        clientIdEnvVar: 'FIGMA_CLIENT_ID',
+        scopeEnvVar: 'FIGMA_OAUTH_SCOPES',
+        usePKCE: false,
+      },
+      params,
+      '/auth/callback/figma'
+    );
   },
   
   /**
@@ -73,52 +67,18 @@ export const figmaProvider: OAuthProvider = {
    * @returns Standardized token response
    */
   async exchangeCodeForTokens(params: TokenExchangeParams): Promise<StandardTokenResponse> {
-    const clientId = process.env.FIGMA_CLIENT_ID;
-    const clientSecret = process.env.FIGMA_CLIENT_SECRET;
-    const baseUrl = process.env.VITE_AUTH_SERVER_URL!;
-    const redirectUri = params.redirectUri || `${baseUrl}/auth/callback/figma`;
-    
-    // Figma uses traditional OAuth 2.0 - DO NOT include code_verifier
-    // Authentication is via client_id + client_secret only
-    const tokenRes = await fetch('https://api.figma.com/v1/oauth/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: clientId!,
-        client_secret: clientSecret!,
-        code: params.code,
-        redirect_uri: redirectUri,
-        grant_type: 'authorization_code',
-      }).toString(),
-    });
-    
-    if (!tokenRes.ok) {
-      const errorText = await tokenRes.text();
-      throw new Error(`Figma token exchange failed (${tokenRes.status}): ${errorText}`);
-    }
-    
-    const tokenData = await tokenRes.json() as any;
-    
-    if (!tokenData.access_token) {
-      throw new Error(`Figma token exchange failed: ${JSON.stringify(tokenData)}`);
-    }
-    
-    return {
-      access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token,
-      token_type: tokenData.token_type || 'Bearer',
-      expires_in: tokenData.expires_in || 7776000, // Figma default: 90 days
-      scope: tokenData.scope,
-      user_id: tokenData.user_id,
-    };
-  },
-  
-  /**
-   * Get default OAuth scopes for Figma
-   * @returns Array of scope strings
-   */
-  getDefaultScopes(): string[] {
-    return ['file_content:read', 'file_comments:read'];
+    return performTokenExchange(
+      {
+        tokenUrl: 'https://api.figma.com/v1/oauth/token',
+        clientIdEnvVar: 'FIGMA_CLIENT_ID',
+        clientSecretEnvVar: 'FIGMA_CLIENT_SECRET',
+        usePKCE: false,
+        contentType: 'form',
+        defaultExpiresIn: 7776000, // Figma default: 90 days
+        redirectPath: '/auth/callback/figma',
+      },
+      params
+    );
   },
 
   /**
@@ -131,60 +91,18 @@ export const figmaProvider: OAuthProvider = {
   async refreshAccessToken(
     params: RefreshTokenParams
   ): Promise<StandardTokenResponse> {
-    const clientId = process.env.FIGMA_CLIENT_ID!;
-    const clientSecret = process.env.FIGMA_CLIENT_SECRET!;
-
-    console.log('[FIGMA] Refreshing access token');
-    console.log('[FIGMA]   - Refresh token length:', params.refreshToken.length);
-    console.log(
-      '[FIGMA]   - Using endpoint: https://api.figma.com/v1/oauth/refresh'
-    );
-
-    // Figma uses HTTP Basic Auth for refresh (different from token exchange!)
-    const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString(
-      'base64'
-    );
-
-    const response = await fetch('https://api.figma.com/v1/oauth/refresh', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Authorization: `Basic ${basicAuth}`,
+    return performTokenRefresh(
+      {
+        tokenUrl: 'https://api.figma.com/v1/oauth/refresh',
+        clientIdEnvVar: 'FIGMA_CLIENT_ID',
+        clientSecretEnvVar: 'FIGMA_CLIENT_SECRET',
+        contentType: 'form',
+        useBasicAuth: true,
+        rotatesRefreshToken: false,
+        defaultExpiresIn: 7776000,
       },
-      body: new URLSearchParams({
-        refresh_token: params.refreshToken,
-      }).toString(),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[FIGMA] Token refresh failed:', {
-        status: response.status,
-        statusText: response.statusText,
-        error: errorText,
-      });
-      throw new Error(
-        `Figma token refresh failed (${response.status}): ${errorText}`
-      );
-    }
-
-    const tokenData = (await response.json()) as any;
-    console.log('[FIGMA] Token refresh successful:', {
-      hasAccessToken: !!tokenData.access_token,
-      hasRefreshToken: !!tokenData.refresh_token, // Should be false
-      expiresIn: tokenData.expires_in,
-    });
-
-    // Figma response: { access_token, token_type, expires_in } - NO refresh_token!
-    return {
-      access_token: tokenData.access_token,
-      // ⚠️ KEY: Figma doesn't return a refresh token, so we return the ORIGINAL
-      // input token. This ensures the caller gets a valid refresh_token to embed
-      // in the new JWT, even though Figma didn't provide one.
-      refresh_token: params.refreshToken,
-      token_type: tokenData.token_type || 'Bearer',
-      expires_in: tokenData.expires_in || 7776000,
-    };
+      params
+    );
   },
 
   /**
