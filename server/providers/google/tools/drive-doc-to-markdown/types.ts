@@ -41,51 +41,14 @@ export interface ConversionRequest {
 }
 
 /**
- * Document metadata (simplified for external API responses)
- */
-export interface DocumentMetadata {
-  documentId: string;
-  title: string;
-  url: string;
-  modifiedTime: string;
-  size: number;
-}
-
-/**
  * Google Drive document with metadata and content
  * Intermediate entity during conversion workflow
  */
-export interface DriveDocument {
-  /**
-   * Document ID (extracted from URL)
-   */
-  documentId: string;
-  
-  /**
-   * Document title from Drive API
-   */
-  title: string;
-  
+export interface DriveDocument extends GoogleDocMetadata {
   /**
    * Original Drive URL (normalized)
    */
   url: string;
-  
-  /**
-   * MIME type from Drive API
-   * Expected: "application/vnd.google-apps.document"
-   */
-  mimeType: string;
-  
-  /**
-   * Last modified timestamp (ISO 8601)
-   */
-  modifiedTime: string;
-  
-  /**
-   * Document size in bytes
-   */
-  size: number;
   
   /**
    * HTML content (exported from Drive API)
@@ -105,7 +68,7 @@ export interface MarkdownContent {
   /**
    * Document metadata
    */
-  metadata: DocumentMetadata;
+  metadata: GoogleDocMetadata;
   
   /**
    * Conversion timestamp (Unix timestamp in milliseconds)
@@ -131,7 +94,7 @@ export interface ConversionResult {
   /**
    * Document metadata
    */
-  metadata: DocumentMetadata;
+  metadata: GoogleDocMetadata;
   
   /**
    * Conversion warnings (if any)

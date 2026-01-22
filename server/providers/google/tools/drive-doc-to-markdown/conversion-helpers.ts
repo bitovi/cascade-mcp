@@ -6,10 +6,24 @@
 import TurndownService from 'turndown';
 
 /**
+ * Detect images in HTML and generate warnings
+ */
+function detectImages(html: string): string[] {
+  const warnings: string[] = [];
+  const imgMatches = html.match(/<img[^>]*>/gi);
+  if (imgMatches) {
+    warnings.push(`Document contains ${imgMatches.length} image(s) which are not supported`);
+  }
+  return warnings;
+}
+
+/**
  * Convert HTML content to Markdown using Turndown library
  */
-export function htmlToMarkdown(html: string): string {
+export function htmlToMarkdown(html: string): { markdown: string; warnings: string[] } {
   console.log('Converting HTML to Markdown');
+  
+  const warnings = detectImages(html);
   
   try {
     // Initialize Turndown with GitHub-flavored markdown options
@@ -121,6 +135,14 @@ export function htmlToMarkdown(html: string): string {
     }
   });
   
+  // Remove images (not supported - converts to huge base64 data URIs)
+  turndownService.addRule('removeImages', {
+    filter: 'img',
+    replacement: function () {
+      return '[Image removed - not supported]';
+    }
+  });
+  
   // Convert HTML to Markdown
   const markdown = turndownService.turndown(html);
   
@@ -131,7 +153,10 @@ export function htmlToMarkdown(html: string): string {
   const cleaned = normalized.replace(/\n{3,}/g, '\n\n').trim();
   
   console.log(`  Conversion complete: ${cleaned.length} characters`);
-  return cleaned;
+  if (warnings.length > 0) {
+    console.log(`  Warnings: ${warnings.join(', ')}`);
+  }
+  return { markdown: cleaned, warnings };
   } catch (error: any) {
     console.error('  HTML to Markdown conversion failed:', error.message);
     throw new Error(

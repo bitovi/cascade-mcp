@@ -88,8 +88,8 @@ export async function handleDriveDocToMarkdown(req: Request, res: Response): Pro
     
     console.log(`  ✅ Conversion successful: ${result.markdown.length} characters`);
     logger.info('drive-doc-to-markdown API completed', {
-      documentId: result.metadata.documentId,
-      title: result.metadata.title,
+      documentId: result.metadata.id,
+      title: result.metadata.name,
       markdownLength: result.markdown.length,
       processingTimeMs: result.processingTimeMs,
       authType: googleClient.authType,

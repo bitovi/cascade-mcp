@@ -14,7 +14,8 @@
  */
 
 import type { GoogleClient } from '../../google-api-client.js';
-import type { ConversionRequest, ConversionResult, DocumentMetadata } from './types.js';
+import type { ConversionRequest, ConversionResult } from './types.js';
+import type { GoogleDocMetadata } from '../../types.js';
 import { parseGoogleDriveUrl } from './url-parser.js';
 import { getDocumentMetadata, exportDocumentAsHTML } from '../../google-helpers.js';
 
@@ -84,15 +85,14 @@ export async function executeDriveDocToMarkdown(
   // Step 4: Convert HTML to Markdown
   console.log('Step 4: Converting HTML to Markdown');
   const { htmlToMarkdown } = await import('./conversion-helpers.js');
-  const markdown = htmlToMarkdown(html);
-  const warnings: string[] = [];
+  const { markdown, warnings } = htmlToMarkdown(html);
   
   // Step 5: Return result
   const processingTimeMs = Date.now() - startTime;
-  const documentMetadata: DocumentMetadata = {
-    documentId: metadata.id,
-    title: metadata.name,
-    url: normalizeDocumentUrl(documentId),
+  const documentMetadata: GoogleDocMetadata = {
+    id: metadata.id,
+    name: metadata.name,
+    mimeType: metadata.mimeType,
     modifiedTime: metadata.modifiedTime,
     size: metadata.size || 0
   };
