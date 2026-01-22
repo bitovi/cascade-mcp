@@ -25,7 +25,7 @@ import { getDocumentMetadata, exportDocumentAsHTML } from '../../google-helpers.
  * - MCP tool (with OAuth client)
  * - REST API endpoint (with PAT client)
  * 
- * @param request - Conversion request (URL + optional forceRefresh)
+ * @param request - Conversion request with document URL
  * @param client - Authenticated Google API client
  * @returns Promise resolving to conversion result
  * @throws Error for invalid URLs, API errors, or conversion failures

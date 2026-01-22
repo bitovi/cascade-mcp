@@ -116,26 +116,8 @@ Convert this Google Doc to markdown: https://docs.google.com/document/d/1a2b3c4d
     "modifiedTime": "2026-01-15T14:30:00.000Z",
     "size": 45678
   },
-  "cacheHit": false,
   "warnings": [],
   "processingTimeMs": 1234
-}
-```
-
-**Example 2: Force cache refresh**
-```typescript
-// In VS Code Copilot chat
-Refresh this document and convert to markdown: https://docs.google.com/document/d/1a2b3c4d5e6f7g8h9i0j/edit
-```
-
-**Tool invocation**:
-```json
-{
-  "tool": "drive-doc-to-markdown",
-  "parameters": {
-    "url": "1a2b3c4d5e6f7g8h9i0j",
-    "forceRefresh": true
-  }
 }
 ```
 
@@ -164,9 +146,8 @@ curl -X POST http://localhost:3000/api/drive-doc-to-markdown \
     "modifiedTime": "2026-01-15T14:30:00.000Z",
     "size": 45678
   },
-  "cacheHit": true,
   "warnings": [],
-  "processingTimeMs": 15
+  "processingTimeMs": 1234
 }
 ```
 
@@ -178,9 +159,8 @@ curl -X POST http://localhost:3000/api/drive-doc-to-markdown \
   -H "Content-Type: application/json" \
   -H "X-Google-Service-Account-JSON: $SERVICE_ACCOUNT" \
   -d '{
-    "url": "1a2b3c4d5e6f7g8h9i0j",
-    "forceRefresh": true
-  }'
+    "url": "1a2b3c4d5e6f7g8h9i0j"
+  }'`
 ```
 
 **Example 3: Error handling**
@@ -218,12 +198,11 @@ async function fetchDocumentContext(documentUrl: string, accessToken: string): P
   const client = createGoogleClient(accessToken);
   
   const result = await executeDriveDocToMarkdown(
-    { url: documentUrl, forceRefresh: false },
+    { url: documentUrl },
     client
   );
   
   console.log(`Document: ${result.metadata.title}`);
-  console.log(`Cache hit: ${result.cacheHit}`);
   console.log(`Warnings: ${result.warnings.length}`);
   
   return result.markdown;
@@ -242,35 +221,7 @@ const prompt = `Context from Google Doc:\n\n${context}\n\nGenerate shell stories
 
 ## Common Patterns
 
-### Pattern 1: Caching Strategy
-
-**Problem**: Frequent conversions of the same document waste API quota and time
-
-**Solution**: Use cache-first approach with version-based invalidation
-
-```typescript
-// The tool ALWAYS checks cache first
-const cached = await getCachedDocument(documentId);
-if (cached && !isCacheStale(cached.metadata)) {
-  return { ...cached, cacheHit: true };
-}
-
-// Only fetch if cache miss or stale
-const fresh = await fetchAndConvertDocument(documentId, client);
-```
-
-**When to use `forceRefresh: true`**:
-- User explicitly requests latest version
-- Cache suspected to be corrupt
-- Testing conversion changes
-
-**Cache location**: `cache/google-docs/{documentId}/`
-- `metadata.json` - Document metadata + cache info
-- `content.md` - Converted markdown content
-
----
-
-### Pattern 2: Error Handling
+### Pattern 1: Error Handling
 
 **Problem**: Drive API errors are cryptic (403, 404, 429)
 
@@ -306,7 +257,7 @@ try {
 
 ---
 
-### Pattern 3: Integration with Story-Writing Tools
+### Pattern 2: Integration with Story-Writing Tools
 
 **Problem**: Story-writing tools need document context for scope analysis
 
@@ -324,7 +275,7 @@ async function fetchDocumentContext(
   
   for (const url of documentUrls) {
     const result = await executeDriveDocToMarkdown(
-      { url, forceRefresh: false },
+      { url },
       googleClient
     );
     
@@ -360,7 +311,7 @@ Analyze scope and generate feature list...
 
 ---
 
-### Pattern 4: URL Parsing Flexibility
+### Pattern 3: URL Parsing Flexibility
 
 **Problem**: Users share Drive URLs in different formats
 
@@ -398,7 +349,6 @@ await executeDriveDocToMarkdown({ url: "1a2b3c4d5e6f7g8h9i0j" }, client);
 
 | Scenario | Target Latency | Actual (typical) |
 |----------|----------------|------------------|
-| **Cache hit** | < 2 seconds | 15-50 ms |
 | **Fresh conversion (< 1MB)** | < 5 seconds | 1-2 seconds |
 | **Large document (5-10MB)** | < 10 seconds | 5-8 seconds |
 
@@ -406,17 +356,6 @@ await executeDriveDocToMarkdown({ url: "1a2b3c4d5e6f7g8h9i0j" }, client);
 
 - **Supported**: 100 concurrent requests
 - **Rate limiting**: Google Drive API enforces 1,000 requests/100 seconds per user
-- **Mitigation**: Cache-first approach reduces API calls
-
-### Cache Efficiency
-
-**Cache hit rate** (expected): 80-90% in typical usage
-- Unchanged documents served from cache
-- Only fetch when `modifiedTime` changes
-
-**Cache cleanup**:
-- Automatic: Daily cleanup of documents not accessed in 30 days
-- Manual: `DELETE /api/cache/google-docs/{documentId}` (future enhancement)
 
 ---
 
@@ -434,24 +373,7 @@ curl -X POST http://localhost:3000/api/drive-doc-to-markdown \
   }' | jq .
 ```
 
-**Test 2: Cache validation**
-```bash
-# First request (cache miss)
-time curl -X POST http://localhost:3000/api/drive-doc-to-markdown \
-  -H "Content-Type: application/json" \
-  -H "X-Google-Token: $GOOGLE_TOKEN" \
-  -d '{"url": "YOUR_DOC_ID"}' | jq '.cacheHit'
-# Output: false, ~2 seconds
-
-# Second request (cache hit)
-time curl -X POST http://localhost:3000/api/drive-doc-to-markdown \
-  -H "Content-Type: application/json" \
-  -H "X-Google-Token: $GOOGLE_TOKEN" \
-  -d '{"url": "YOUR_DOC_ID"}' | jq '.cacheHit'
-# Output: true, ~0.05 seconds
-```
-
-**Test 3: Error scenarios**
+**Test 2: Error scenarios**
 ```bash
 # Invalid URL
 curl -X POST http://localhost:3000/api/drive-doc-to-markdown \
@@ -472,12 +394,11 @@ curl -X POST http://localhost:3000/api/drive-doc-to-markdown \
 
 **Unit tests** (`tests/unit/`):
 - URL parsing (3 formats)
-- DOCX conversion (formatting preservation)
+- HTML to Markdown conversion (formatting preservation)
 - Error mapping (Drive API errors → user messages)
 
 **Integration tests** (`tests/integration/`):
 - Google Drive API interaction (using test document)
-- Cache read/write/invalidation
 - OAuth token lifecycle
 
 **Contract tests** (`tests/contract/`):
@@ -504,23 +425,7 @@ curl -X POST http://localhost:3000/api/drive-doc-to-markdown \
 
 ---
 
-### Issue 2: Stale cache
-
-**Symptoms**: Converted content doesn't reflect recent document changes
-
-**Causes**:
-1. Document `modifiedTime` not updated by Google (rare)
-2. Cache metadata corrupted
-3. System clock skew
-
-**Solutions**:
-1. Use `forceRefresh: true` to bypass cache
-2. Delete cache folder: `rm -rf cache/google-docs/{documentId}`
-3. Check system time sync
-
----
-
-### Issue 3: Conversion warnings
+### Issue 2: Conversion warnings
 
 **Symptoms**: `warnings` array contains unsupported style messages
 
@@ -543,12 +448,10 @@ curl -X POST http://localhost:3000/api/drive-doc-to-markdown \
 ⏭️ **Implementation Phase**:
 1. Create TypeScript types (`types.ts`)
 2. Implement URL parser (`url-parser.ts`)
-3. Implement document fetcher (`document-fetcher.ts`)
-4. Implement DOCX converter (`docx-converter.ts`)
-5. Implement cache manager (`cache-manager.ts`)
-6. Implement core business logic (`core-logic.ts`)
-7. Implement MCP tool wrapper (`drive-doc-to-markdown.ts`)
-8. Implement REST API endpoint (`server/api/drive-doc-to-markdown.ts`)
+3. Implement HTML to Markdown converter (`conversion-helpers.ts`)
+4. Implement core business logic (`core-logic.ts`)
+5. Implement MCP tool wrapper (`drive-doc-to-markdown.ts`)
+6. Implement REST API endpoint (`server/api/drive-doc-to-markdown.ts`)
 
 **Commands**: Run `/speckit.tasks` to generate detailed task breakdown with acceptance criteria.
 

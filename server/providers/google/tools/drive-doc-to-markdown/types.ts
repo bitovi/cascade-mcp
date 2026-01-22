@@ -79,7 +79,6 @@ export interface DriveDocument {
   
   /**
    * Last modified timestamp (ISO 8601)
-   * Used for cache invalidation
    */
   modifiedTime: string;
   

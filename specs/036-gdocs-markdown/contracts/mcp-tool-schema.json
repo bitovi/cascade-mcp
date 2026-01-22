@@ -130,14 +130,13 @@
           "modifiedTime": "2026-01-15T14:30:00.000Z",
           "size": 45678
         },
-        "cacheHit": false,
         "warnings": [],
         "processingTimeMs": 1234
       }
     },
     {
-      "name": "Cached conversion",
-      "description": "Convert a document that's already cached (fast response)",
+      "name": "Convert with document ID only",
+      "description": "Convert a document using just the document ID",
       "input": {
         "url": "1a2b3c4d5e6f7g8h9i0j"
       },
@@ -150,17 +149,15 @@
           "modifiedTime": "2026-01-14T10:00:00.000Z",
           "size": 23456
         },
-        "cacheHit": true,
         "warnings": [],
-        "processingTimeMs": 15
+        "processingTimeMs": 1289
       }
     },
     {
-      "name": "Force refresh",
-      "description": "Bypass cache and fetch the latest version of a document",
+      "name": "Conversion with warnings",
+      "description": "Convert a document that has unsupported formatting",
       "input": {
-        "url": "https://docs.google.com/document/d/1a2b3c4d5e6f7g8h9i0j/edit",
-        "forceRefresh": true
+        "url": "https://docs.google.com/document/d/1a2b3c4d5e6f7g8h9i0j/edit"
       },
       "output": {
         "markdown": "# Updated Document\n\n...",
@@ -171,7 +168,6 @@
           "modifiedTime": "2026-01-15T16:00:00.000Z",
           "size": 34567
         },
-        "cacheHit": false,
         "warnings": [
           "Unsupported style: CustomHeading (using default heading format)"
         ],
@@ -180,19 +176,13 @@
     }
   ],
   "performance": {
-    "targetLatency": "< 5 seconds for documents under 1MB (fresh conversion)",
-    "cacheLatency": "< 2 seconds (cache hit)",
+    "targetLatency": "< 5 seconds for documents under 1MB",
     "concurrency": "Supports 100 concurrent requests"
   },
-  "caching": {
-    "strategy": "Version-based invalidation using modifiedTime from Google Drive API",
-    "location": "File-based cache at cache/google-docs/{documentId}/",
-    "invalidation": "Automatic when document modifiedTime changes or forceRefresh is true"
-  },
   "notes": [
-    "This tool uses mammoth.js to convert DOCX to HTML, then turndown to convert HTML to markdown",
+    "This tool converts Google Docs to HTML via Drive API export, then converts HTML to markdown using Turndown",
     "Image conversion: Images are converted to markdown image syntax with references (not embedded)",
     "Formatting: Preserves headings, bold, italic, lists, tables, links. Custom fonts and inline styles are lost",
-    "Cache: Documents are cached indefinitely until modified. Stale cache cleanup runs daily (30-day threshold)"
+    "No caching: Documents are converted fresh on every request to ensure up-to-date content"
   ]
 }

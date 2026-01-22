@@ -58,11 +58,10 @@ paths:
                 summary: Basic conversion request
                 value:
                   url: "https://docs.google.com/document/d/1a2b3c4d5e6f7g8h9i0j/edit"
-              forceRefresh:
-                summary: Force cache refresh
+              documentIdOnly:
+                summary: Using document ID only
                 value:
                   url: "1a2b3c4d5e6f7g8h9i0j"
-                  forceRefresh: true
       responses:
         '200':
           description: Conversion successful
@@ -71,8 +70,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/ConversionResult'
               examples:
-                cacheHit:
-                  summary: Cache hit (fast response)
+                successfulConversion:
+                  summary: Successful conversion
                   value:
                     markdown: "# Product Requirements\n\nThis is a PRD..."
                     metadata:
@@ -81,11 +80,10 @@ paths:
                       url: "https://docs.google.com/document/d/1a2b3c4d5e6f7g8h9i0j/edit"
                       modifiedTime: "2026-01-15T14:30:00.000Z"
                       size: 45678
-                    cacheHit: true
                     warnings: []
-                    processingTimeMs: 15
-                freshConversion:
-                  summary: Fresh conversion with warnings
+                    processingTimeMs: 1234
+                conversionWithWarnings:
+                  summary: Conversion with warnings
                   value:
                     markdown: "# Technical Spec\n\n..."
                     metadata:
@@ -94,7 +92,6 @@ paths:
                       url: "https://docs.google.com/document/d/2b3c4d5e6f7g8h9i0j1k/edit"
                       modifiedTime: "2026-01-15T16:00:00.000Z"
                       size: 67890
-                    cacheHit: false
                     warnings:
                       - "Unsupported style: CustomHeading (using default heading format)"
                       - "Image reference preserved as link: image1.png"
