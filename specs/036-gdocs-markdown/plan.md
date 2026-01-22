@@ -42,11 +42,10 @@ Convert Google Drive documents to Markdown format by exporting docs to HTML via 
 ```text
 specs/036-gdocs-markdown/
 ├── plan.md              # This file
-├── research.md          # Phase 0: Google Drive export formats, HTML-to-Markdown approach
-├── data-model.md        # Phase 1: Document metadata, cache structure, conversion request/response
-├── quickstart.md        # Phase 1: Usage examples, URL format guide
-├── contracts/           # Phase 1: MCP tool schema, REST API OpenAPI spec
-└── tasks.md             # Phase 2: Task breakdown by user story (NOT created by /speckit.plan)
+├── quickstart.md        # Usage examples, URL format guide
+├── contracts/           # MCP tool schema, REST API OpenAPI spec
+├── spec.md              # Feature specification
+└── tasks.md             # Task breakdown by user story
 ```
 
 ### Source Code (repository root)
