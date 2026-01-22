@@ -27,12 +27,40 @@ function detectUnsupportedElements(html: string): string[] {
 }
 
 /**
+ * Preprocess HTML to remove non-content elements (styles, scripts, metadata)
+ */
+function preprocessHtml(html: string): string {
+  // Remove style tags and their contents
+  let cleaned = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+  
+  // Remove script tags and their contents
+  cleaned = cleaned.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+  
+  // Remove @import statements and other CSS that might leak through
+  cleaned = cleaned.replace(/@import[^;]+;/gi, '');
+  
+  // Remove head tag and its contents if present
+  cleaned = cleaned.replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '');
+  
+  // Remove meta tags
+  cleaned = cleaned.replace(/<meta[^>]*>/gi, '');
+  
+  // Remove link tags (stylesheets, etc.)
+  cleaned = cleaned.replace(/<link[^>]*>/gi, '');
+  
+  return cleaned;
+}
+
+/**
  * Convert HTML content to Markdown using Turndown library
  */
 export function htmlToMarkdown(html: string): { markdown: string; warnings: string[] } {
   console.log('Converting HTML to Markdown');
   
-  const warnings = detectUnsupportedElements(html);
+  // Preprocess HTML to remove non-content elements
+  const cleanedHtml = preprocessHtml(html);
+  
+  const warnings = detectUnsupportedElements(cleanedHtml);
   
   try {
     // Initialize Turndown with GitHub-flavored markdown options
@@ -160,8 +188,8 @@ export function htmlToMarkdown(html: string): { markdown: string; warnings: stri
     }
   });
   
-  // Convert HTML to Markdown
-  const markdown = turndownService.turndown(html);
+  // Convert HTML to Markdown (use cleaned HTML)
+  const markdown = turndownService.turndown(cleanedHtml);
   
   // Normalize special characters (smart quotes, em-dashes, etc.)
   const normalized = normalizeSpecialCharacters(markdown);

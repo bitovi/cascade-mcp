@@ -79,6 +79,8 @@ export async function executeDriveDocToMarkdown(
   // Step 3: Export document as HTML
   console.log('Step 3: Exporting document as HTML');
   const html = await exportDocumentAsHTML(client, documentId);
+
+  console.log({html});
   
   // Step 4: Convert HTML to Markdown
   console.log('Step 4: Converting HTML to Markdown');
