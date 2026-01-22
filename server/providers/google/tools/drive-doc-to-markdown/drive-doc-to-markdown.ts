@@ -66,33 +66,38 @@ export function registerDriveDocToMarkdownTool(mcp: McpServer): void {
         // Execute conversion
         const result = await executeDriveDocToMarkdown(request, googleClient);
         
-        // Format response
-        let responseText = `# Conversion Result\n\n`;
-        responseText += `**Document**: ${result.metadata.name}\n`;
-        responseText += `**Document ID**: ${result.metadata.id}\n`;
-        responseText += `**Modified**: ${result.metadata.modifiedTime}\n`;
-        responseText += `**Processing Time**: ${result.processingTimeMs}ms\n\n`;
+        // Build content array with markdown first, then metadata/warnings
+        const content: Array<{ type: 'text'; text: string }> = [];
+        
+        // First content item: The actual markdown
+        content.push({
+          type: 'text',
+          text: result.markdown,
+        });
+        
+        // Second content item: Metadata and warnings
+        let metadataText = `# Document Metadata\n\n`;
+        metadataText += `**Document**: ${result.metadata.name}\n`;
+        metadataText += `**Document ID**: ${result.metadata.id}\n`;
+        metadataText += `**Modified**: ${result.metadata.modifiedTime}\n`;
+        metadataText += `**Processing Time**: ${result.processingTimeMs}ms\n`;
         
         if (result.warnings && result.warnings.length > 0) {
-          responseText += `## Warnings\n\n`;
+          metadataText += `\n## Warnings\n\n`;
           for (const warning of result.warnings) {
-            responseText += `- ⚠️ ${warning}\n`;
+            metadataText += `- ⚠️ ${warning}\n`;
           }
-          responseText += `\n`;
         }
         
-        responseText += `## Markdown Content\n\n`;
-        responseText += '```markdown\n';
-        responseText += result.markdown;
-        responseText += '\n```\n';
+        content.push({
+          type: 'text',
+          text: metadataText,
+        });
         
         console.log(`  ✅ Conversion successful (${result.markdown.length} characters)`);
         
         return {
-          content: [{
-            type: 'text',
-            text: responseText,
-          }],
+          content,
         };
         
       } catch (error) {
