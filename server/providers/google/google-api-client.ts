@@ -9,7 +9,7 @@
  * - Service Account: Uses JWT tokens from Google service account JSON (for server-to-server)
  */
 
-import { google } from 'googleapis';
+import { JWT } from 'google-auth-library';
 import type { GoogleServiceAccountCredentials } from './types.js';
 
 import type { DriveAboutResponse } from './types.js';
@@ -103,7 +103,7 @@ export async function createGoogleClientWithServiceAccountJSON(
   const SCOPES = ['https://www.googleapis.com/auth/drive.readonly'];
   
   // Create JWT auth client
-  const auth = new google.auth.JWT({
+  const auth = new JWT({
     email: serviceAccountJson.client_email,
     key: serviceAccountJson.private_key,
     scopes: SCOPES,
