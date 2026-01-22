@@ -6,14 +6,23 @@
 import TurndownService from 'turndown';
 
 /**
- * Detect images in HTML and generate warnings
+ * Detect unsupported elements (images and tables) in HTML and generate warnings
  */
-function detectImages(html: string): string[] {
+function detectUnsupportedElements(html: string): string[] {
   const warnings: string[] = [];
+  
+  // Check for images
   const imgMatches = html.match(/<img[^>]*>/gi);
   if (imgMatches) {
     warnings.push(`Document contains ${imgMatches.length} image(s) which are not supported`);
   }
+  
+  // Check for tables
+  const tableMatches = html.match(/<table[^>]*>/gi);
+  if (tableMatches) {
+    warnings.push(`Document contains ${tableMatches.length} table(s) which are not supported`);
+  }
+  
   return warnings;
 }
 
@@ -23,7 +32,7 @@ function detectImages(html: string): string[] {
 export function htmlToMarkdown(html: string): { markdown: string; warnings: string[] } {
   console.log('Converting HTML to Markdown');
   
-  const warnings = detectImages(html);
+  const warnings = detectUnsupportedElements(html);
   
   try {
     // Initialize Turndown with GitHub-flavored markdown options
@@ -132,6 +141,14 @@ export function htmlToMarkdown(html: string): { markdown: string; warnings: stri
     },
     replacement: function (content: string) {
       return `~~${content}~~`;
+    }
+  });
+  
+  // Remove tables (not supported)
+  turndownService.addRule('removeTables', {
+    filter: 'table',
+    replacement: function () {
+      return '\n[Table removed - not supported]\n';
     }
   });
   

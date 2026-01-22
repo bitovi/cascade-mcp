@@ -77,7 +77,7 @@ export interface MarkdownContent {
   
   /**
    * Conversion warnings
-   * Examples: "Unsupported style: ...", "Image not found: ..."
+   * Examples: "Unsupported style: ...", "Unsupported element: ..."
    */
   warnings: string[];
 }

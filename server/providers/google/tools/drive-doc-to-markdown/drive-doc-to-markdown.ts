@@ -26,7 +26,7 @@ export function registerDriveDocToMarkdownTool(mcp: McpServer): void {
       description:
         'Convert a Google Docs document to Markdown format. ' +
         'Supports headings, formatting (bold, italic), lists (ordered/unordered with nesting), ' +
-        'tables, and hyperlinks. Images are not supported.',
+        'and hyperlinks.',
       inputSchema: {
         url: z.string().describe(
           'Google Docs URL or document ID. ' +
