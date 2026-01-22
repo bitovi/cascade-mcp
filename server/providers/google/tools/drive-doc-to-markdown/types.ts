@@ -3,12 +3,8 @@
  * 
  * Entities and interfaces for the conversion workflow:
  * - ConversionRequest: Input from user
- * - DriveDocument: Document metadata from Drive API
- * - MarkdownContent: Converted output entity
  * - ConversionResult: Response to user
  */
-
-import type { GoogleDocMetadata } from '../../types.js';
 
 /**
  * Authentication context for Google Drive API access
@@ -41,48 +37,6 @@ export interface ConversionRequest {
 }
 
 /**
- * Google Drive document with metadata and content
- * Intermediate entity during conversion workflow
- */
-export interface DriveDocument extends GoogleDocMetadata {
-  /**
-   * Original Drive URL (normalized)
-   */
-  url: string;
-  
-  /**
-   * HTML content (exported from Drive API)
-   */
-  html: string;
-}
-
-/**
- * Converted markdown content with metadata
- */
-export interface MarkdownContent {
-  /**
-   * Markdown text content
-   */
-  content: string;
-  
-  /**
-   * Document metadata
-   */
-  metadata: GoogleDocMetadata;
-  
-  /**
-   * Conversion timestamp (Unix timestamp in milliseconds)
-   */
-  conversionTimestamp: number;
-  
-  /**
-   * Conversion warnings
-   * Examples: "Unsupported style: ...", "Unsupported element: ..."
-   */
-  warnings: string[];
-}
-
-/**
  * Final conversion result returned to user
  */
 export interface ConversionResult {
@@ -90,11 +44,6 @@ export interface ConversionResult {
    * Converted markdown content
    */
   markdown: string;
-  
-  /**
-   * Document metadata
-   */
-  metadata: GoogleDocMetadata;
   
   /**
    * Conversion warnings (if any)

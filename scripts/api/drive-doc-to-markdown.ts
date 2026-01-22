@@ -151,11 +151,7 @@ Examples:
 
     console.log('\n✅ Conversion Successful!\n');
     console.log('═══════════════════════════════════════════════════════════════');
-    console.log(`📋 Title:         ${result.metadata.name}`);
-    console.log(`🆔 Document ID:   ${result.metadata.id}`);
-    console.log(`📅 Modified:      ${result.metadata.modifiedTime}`);
-    console.log(`📏 Size:          ${result.metadata.size || 0} bytes`);
-    console.log(`📝 Markdown:      ${result.markdown.length} characters`);
+    console.log(` Markdown:      ${result.markdown.length} characters`);
     
     if (result.warnings && result.warnings.length > 0) {
       console.log(`⚠️  Warnings:      ${result.warnings.length}`);

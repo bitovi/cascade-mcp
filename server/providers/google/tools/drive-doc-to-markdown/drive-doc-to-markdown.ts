@@ -66,37 +66,13 @@ export function registerDriveDocToMarkdownTool(mcp: McpServer): void {
         // Execute conversion
         const result = await executeDriveDocToMarkdown(request, googleClient);
         
-        // Build content array with markdown first, then metadata/warnings
-        const content: Array<{ type: 'text'; text: string }> = [];
-        
-        // First content item: The actual markdown
-        content.push({
-          type: 'text',
-          text: result.markdown,
-        });
-        
-        // Second content item: Metadata and warnings
-        let metadataText = `# Document Metadata\n\n`;
-        metadataText += `**Document**: ${result.metadata.name}\n`;
-        metadataText += `**Document ID**: ${result.metadata.id}\n`;
-        metadataText += `**Modified**: ${result.metadata.modifiedTime}\n`;
-        
-        if (result.warnings && result.warnings.length > 0) {
-          metadataText += `\n## Warnings\n\n`;
-          for (const warning of result.warnings) {
-            metadataText += `- ⚠️ ${warning}\n`;
-          }
-        }
-        
-        content.push({
-          type: 'text',
-          text: metadataText,
-        });
-        
         console.log(`  ✅ Conversion successful (${result.markdown.length} characters)`);
         
         return {
-          content,
+          content: [{
+            type: 'text',
+            text: result.markdown,
+          }],
         };
         
       } catch (error) {

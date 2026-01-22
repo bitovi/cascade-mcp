@@ -40,13 +40,6 @@ import { validateGoogleJsonApiHeaders } from './api-error-helpers.js';
  * Response:
  * {
  *   "markdown": "# Document Title\n\n...",
- *   "metadata": {
- *     "documentId": "abc123",
- *     "title": "Document Title",
- *     "url": "https://docs.google.com/document/d/abc123/edit",
- *     "modifiedTime": "2025-01-15T10:30:00.000Z",
- *     "size": 1234
- *   },
  *   "warnings": []
  * }
  */
@@ -87,8 +80,6 @@ export async function handleDriveDocToMarkdown(req: Request, res: Response): Pro
     
     console.log(`  ✅ Conversion successful: ${result.markdown.length} characters`);
     logger.info('drive-doc-to-markdown API completed', {
-      documentId: result.metadata.id,
-      title: result.metadata.name,
       markdownLength: result.markdown.length,
       authType: googleClient.authType,
     });
