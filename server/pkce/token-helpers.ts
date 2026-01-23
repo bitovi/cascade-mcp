@@ -248,17 +248,18 @@ export async function createMultiProviderAccessToken(
   // Calculate JWT expiration: minimum of all provider expiration times (minus 60s buffer)
   let minExpiresAt = Infinity;
 
-  if (tokens.atlassian?.expires_at) {
-    minExpiresAt = Math.min(minExpiresAt, tokens.atlassian.expires_at);
-  }
-  if (tokens.figma?.expires_at) {
-    minExpiresAt = Math.min(minExpiresAt, tokens.figma.expires_at);
+  for (const providerKey of PROVIDER_KEYS) {
+    const providerData = tokens[providerKey];
+    if (providerData?.expires_at) {
+      minExpiresAt = Math.min(minExpiresAt, providerData.expires_at);
+    }
   }
 
   // Default to 1 hour if no provider expiration found
+  // Note: expires_at is already in seconds (Unix timestamp), not milliseconds
   const jwtExpirationTime =
     minExpiresAt !== Infinity
-      ? Math.floor(minExpiresAt / 1000) - 60
+      ? minExpiresAt - 60
       : Math.floor(Date.now() / 1000) + 3600;
 
   // Support test mode short expiration

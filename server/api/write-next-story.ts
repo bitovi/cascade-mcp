@@ -17,6 +17,7 @@
 import type { Request, Response } from 'express';
 import { createAtlassianClientWithPAT, type AtlassianClient } from '../providers/atlassian/atlassian-api-client.js';
 import { createFigmaClient } from '../providers/figma/figma-api-client.js';
+import { createGoogleClientWithServiceAccountJSON } from '../providers/google/google-api-client.js';
 import { createProviderFromHeaders } from '../llm-client/index.js';
 import { executeWriteNextStory as defaultExecuteWriteNextStory, type ExecuteWriteNextStoryParams } from '../providers/combined/tools/write-next-story/core-logic.js';
 import type { ToolDependencies } from '../providers/combined/tools/types.js';
@@ -26,6 +27,7 @@ import {
   handleApiError, 
   validateApiHeaders, 
   validateEpicKey,
+  parseOptionalGoogleJson,
   type ErrorCommentContext 
 } from './api-error-helpers.js';
 import { 
@@ -47,11 +49,14 @@ export interface WriteNextStoryHandlerDeps {
  * 
  * Write the next Jira story from shell stories in an epic
  * 
- * Headers:
+ * Required Headers:
  *   X-Atlassian-Token: ATATT...  (Atlassian PAT)
  *   X-Atlassian-Email: user@example.com  (Email for Basic Auth)
  *   X-Figma-Token: figd_...      (Figma PAT)
- *   X-Anthropic-Token: sk-...    (Anthropic API key)
+ * 
+ * Optional Headers:
+ *   X-Google-Json: {...}  (Google service account JSON - enables Google Docs context)
+ *   X-Anthropic-Token: sk-...    (Anthropic API key, or use X-LLM-Provider)
  * 
  * Request body:
  * {
@@ -112,6 +117,12 @@ export async function handleWriteNextStory(req: Request, res: Response, deps: Wr
     const figmaClient = createFigmaClientFn(figmaToken);
     const generateText = createProviderFromHeaders(req.headers as Record<string, string>);
     
+    // Create Google client if service account credentials provided (optional)
+    const googleServiceAccount = parseOptionalGoogleJson(req.headers);
+    const googleClient = googleServiceAccount 
+      ? await createGoogleClientWithServiceAccountJSON(googleServiceAccount) 
+      : undefined;
+    
     // Resolve cloudId BEFORE calling execute (needed for commenting)
     console.log('  Resolving cloud ID...');
     const { cloudId: resolvedCloudId } = await resolveCloudId(atlassianClient, cloudId, siteName);
@@ -128,9 +139,10 @@ export async function handleWriteNextStory(req: Request, res: Response, deps: Wr
     });
     
     // Prepare dependencies with progress comment notifier
-    const toolDeps = {
+    const toolDeps: ToolDependencies = {
       atlassianClient,
       figmaClient,
+      googleClient,
       generateText,
       notify: progressManager.getNotifyFunction()
     };

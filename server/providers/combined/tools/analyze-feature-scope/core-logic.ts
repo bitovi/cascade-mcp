@@ -14,11 +14,11 @@ import { getBaseCacheDir } from '../writing-shell-stories/temp-directory-manager
 import { getFigmaFileCachePath } from '../../../figma/figma-cache.js';
 import { executeScreenAnalysisPipeline } from '../shared/screen-analysis-pipeline.js';
 import { setupConfluenceContext, type ConfluenceDocument } from '../shared/confluence-setup.js';
+import { setupGoogleDocsContext, type GoogleDocDocument, type DocumentContext } from '../shared/google-docs-setup.js';
 import {
   generateFeatureIdentificationPrompt,
   FEATURE_IDENTIFICATION_SYSTEM_PROMPT,
   FEATURE_IDENTIFICATION_MAX_TOKENS,
-  type ConfluenceDocumentContext
 } from './strategies/prompt-scope-analysis-2.js';
 import {
   convertMarkdownToAdf,
@@ -97,7 +97,7 @@ export async function executeAnalyzeFeatureScope(
   // ==========================================
   // PHASE 4.5: Setup Confluence context (if any linked docs)
   // ==========================================
-  let confluenceDocs: ConfluenceDocumentContext[] = [];
+  let confluenceDocsContext: DocumentContext[] = [];
   
   if (epicDescriptionAdf) {
     try {
@@ -110,21 +110,64 @@ export async function executeAnalyzeFeatureScope(
       });
       
       // Filter to docs relevant for scope analysis
-      confluenceDocs = confluenceContext.byRelevance.analyzeScope.map((doc: ConfluenceDocument) => ({
+      confluenceDocsContext = confluenceContext.byRelevance.analyzeScope.map((doc: ConfluenceDocument) => ({
         title: doc.title,
         url: doc.url,
         markdown: doc.markdown,
         documentType: doc.metadata.relevance?.documentType,
         relevanceScore: doc.metadata.relevance?.toolScores.find(t => t.toolId === 'analyze-feature-scope')?.overallScore,
         summary: doc.metadata.summary?.text,
+        source: 'confluence' as const,
       }));
       
-      console.log(`   📚 Confluence docs for scope analysis: ${confluenceDocs.length}`);
+      console.log(`   📚 Confluence docs for scope analysis: ${confluenceDocsContext.length}`);
     } catch (error: any) {
       console.log(`   ⚠️ Confluence context setup failed: ${error.message}`);
       // Continue without Confluence context - it's optional
     }
   }
+
+  // ==========================================
+  // PHASE 4.6: Setup Google Docs context (if any linked docs)
+  // ==========================================
+  let googleDocsContext: DocumentContext[] = [];
+  
+  if (epicDescriptionAdf) {
+    if (!deps.googleClient) {
+      console.log('🔗 Skipping Google Docs context (no Google authentication)');
+    } else {
+      try {
+        const googleDocsResult = await setupGoogleDocsContext({
+          epicAdf: epicDescriptionAdf,
+          googleClient: deps.googleClient,
+          generateText,
+          notify,
+        });
+        
+        // Filter to docs relevant for scope analysis
+        googleDocsContext = googleDocsResult.byRelevance.analyzeScope.map((doc: GoogleDocDocument) => ({
+          title: doc.title,
+          url: doc.url,
+          markdown: doc.markdown,
+          documentType: doc.metadata.relevance?.documentType,
+          relevanceScore: doc.metadata.relevance?.toolScores.find(t => t.toolId === 'analyze-feature-scope')?.overallScore,
+          summary: doc.metadata.summary?.text,
+          source: 'google-docs' as const,
+        }));
+        
+        console.log(`   📄 Google Docs for scope analysis: ${googleDocsContext.length}`);
+      } catch (error: any) {
+        console.log(`   ⚠️ Google Docs context setup failed: ${error.message}`);
+        // Continue without Google Docs context - it's optional
+      }
+    }
+  }
+
+  // ==========================================
+  // PHASE 4.7: Merge documentation contexts
+  // ==========================================
+  const referenceDocs = [...confluenceDocsContext, ...googleDocsContext];
+  console.log(`   📚 Total documentation context: ${referenceDocs.length} docs (${confluenceDocsContext.length} Confluence + ${googleDocsContext.length} Google Docs)`);
 
   // ==========================================
   // PHASE 5: Generate scope analysis
@@ -137,7 +180,7 @@ export async function executeAnalyzeFeatureScope(
     yamlContent,
     notify,
     epicContext,
-    confluenceDocs
+    referenceDocs
   });
 
   // ==========================================
@@ -177,14 +220,14 @@ async function generateScopeAnalysis(params: {
   yamlContent: string;
   notify: ToolDependencies['notify'];
   epicContext?: string;
-  confluenceDocs?: ConfluenceDocumentContext[];
+  referenceDocs?: DocumentContext[];
 }): Promise<{
   scopeAnalysisContent: string;
   featureAreasCount: number;
   questionsCount: number;
   scopeAnalysisPath: string;
 }> {
-  const { generateText, screens, debugDir, figmaFileKey, yamlContent, notify, epicContext, confluenceDocs } = params;
+  const { generateText, screens, debugDir, figmaFileKey, yamlContent, notify, epicContext, referenceDocs } = params;
   
   await notify('📝 Feature Identification: Analyzing features and scope...');
   
@@ -215,7 +258,7 @@ async function generateScopeAnalysis(params: {
     yamlContent,
     analysisFiles,
     epicContext,
-    confluenceDocs
+    referenceDocs
   );
   
   // Save prompt to debug directory for debugging (if enabled)

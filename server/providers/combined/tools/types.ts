@@ -7,6 +7,7 @@
 
 import type { AtlassianClient } from '../../atlassian/atlassian-api-client.js';
 import type { FigmaClient } from '../../figma/figma-api-client.js';
+import type { GoogleClient } from '../../google/google-api-client.js';
 import type { GenerateTextFn } from '../../../llm-client/types.js';
 
 /**
@@ -32,6 +33,14 @@ export interface ToolDependencies {
    * Token captured in closure
    */
   figmaClient: FigmaClient;
+  
+  /**
+   * Pre-configured Google API client (optional)
+   * Token captured in closure
+   * 
+   * If not provided, Google Docs context features are skipped with a warning.
+   */
+  googleClient?: GoogleClient;
   
   /**
    * LLM text generation function

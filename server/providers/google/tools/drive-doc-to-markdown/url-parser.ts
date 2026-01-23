@@ -3,7 +3,28 @@
  * 
  * Parses Google Drive document URLs in various formats and extracts document IDs.
  * Supports standard sharing URLs, mobile URLs, and bare document IDs.
+ * 
+ * This module is the single source of truth for all Google Docs URL patterns.
  */
+
+// ============================================================================
+// URL Pattern Constants
+// ============================================================================
+
+/**
+ * URL pattern for matching Google Docs URLs (used for substring matching)
+ * Matches: docs.google.com/document/...
+ * Does NOT match: docs.google.com/spreadsheets/... or docs.google.com/presentation/...
+ */
+export const GOOGLE_DOCS_URL_PATTERN = 'docs.google.com/document';
+
+/**
+ * Regex for extracting Google Docs URLs from plain text
+ * Used by extractGoogleDocsUrlsFromADF to find URLs in ADF content.
+ * 
+ * Character class excludes common URL terminators: whitespace, ), >, ], ", '
+ */
+export const GOOGLE_DOCS_PLAIN_TEXT_REGEX = /https?:\/\/docs\.google\.com\/document\/[^\s)>\]"']+/g;
 
 /**
  * Parse a Google Drive document URL or ID and extract the document ID

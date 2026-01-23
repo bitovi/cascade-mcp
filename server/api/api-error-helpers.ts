@@ -191,3 +191,41 @@ export function validateGoogleJsonApiHeaders(
   
   return serviceAccountJson;
 }
+
+/**
+ * Parse optional Google service account credentials from X-Google-Json header
+ * 
+ * Unlike validateGoogleJsonApiHeaders, this function does NOT send error responses.
+ * It returns null silently if header is missing or invalid, allowing the caller
+ * to continue without Google integration.
+ * 
+ * @param headers - Request headers object
+ * @returns Parsed service account credentials, or null if not provided or invalid
+ */
+export function parseOptionalGoogleJson(
+  headers: Record<string, string | string[] | undefined>
+): GoogleServiceAccountCredentials | null {
+  const jsonCredentials = headers['x-google-json'] as string;
+  
+  if (!jsonCredentials) {
+    return null; // Header not provided - this is fine for optional Google integration
+  }
+  
+  // Parse JSON credentials
+  let serviceAccountJson: GoogleServiceAccountCredentials;
+  try {
+    serviceAccountJson = JSON.parse(jsonCredentials);
+  } catch {
+    console.log('  ⚠️ X-Google-Json header contains invalid JSON - skipping Google integration');
+    return null;
+  }
+  
+  // Validate it's a service account
+  if (serviceAccountJson.type !== 'service_account') {
+    console.log('  ⚠️ X-Google-Json is not a service account - skipping Google integration');
+    return null;
+  }
+  
+  console.log(`  ✅ Google service account provided: ${serviceAccountJson.client_email}`);
+  return serviceAccountJson;
+}

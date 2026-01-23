@@ -21,6 +21,7 @@ import { getDebugDir, getBaseCacheDir } from './temp-directory-manager.js';
 import { getFigmaFileCachePath } from '../../../figma/figma-cache.js';
 import { setupFigmaScreens } from './figma-screen-setup.js';
 import { setupConfluenceContext, type ConfluenceDocument } from '../shared/confluence-setup.js';
+import { setupGoogleDocsContext, type GoogleDocDocument } from '../shared/google-docs-setup.js';
 import { regenerateScreenAnalyses } from '../shared/screen-analysis-regenerator.js';
 import {
   generateShellStoryPrompt,
@@ -159,6 +160,7 @@ export async function executeWriteShellStories(
         documentType: doc.metadata.relevance?.documentType,
         relevanceScore: doc.metadata.relevance?.toolScores.find(t => t.toolId === 'write-shell-stories')?.overallScore,
         summary: doc.metadata.summary?.text,
+        source: 'confluence' as const,
       }));
       
       console.log(`   📚 Confluence docs for shell stories: ${confluenceDocs.length}`);
@@ -167,6 +169,48 @@ export async function executeWriteShellStories(
       // Continue without Confluence context - it's optional
     }
   }
+
+  // ==========================================
+  // PHASE 3.6: Setup Google Docs context (if any linked docs)
+  // ==========================================
+  let googleDocs: ConfluenceDocumentContext[] = [];
+  
+  if (epicDescriptionAdf) {
+    if (!deps.googleClient) {
+      console.log('🔗 Skipping Google Docs context (no Google authentication)');
+    } else {
+      try {
+        const googleDocsContext = await setupGoogleDocsContext({
+          epicAdf: epicDescriptionAdf,
+          googleClient: deps.googleClient,
+          generateText,
+          notify,
+        });
+        
+        // Filter to docs relevant for shell story writing
+        googleDocs = googleDocsContext.byRelevance.writeStories.map((doc: GoogleDocDocument) => ({
+          title: doc.title,
+          url: doc.url,
+          markdown: doc.markdown,
+          documentType: doc.metadata.relevance?.documentType,
+          relevanceScore: doc.metadata.relevance?.toolScores.find(t => t.toolId === 'write-shell-stories')?.overallScore,
+          summary: doc.metadata.summary?.text,
+          source: 'google-docs' as const,
+        }));
+        
+        console.log(`   📄 Google Docs for shell stories: ${googleDocs.length}`);
+      } catch (error: any) {
+        console.log(`   ⚠️ Google Docs context setup failed: ${error.message}`);
+        // Continue without Google Docs context - it's optional
+      }
+    }
+  }
+
+  // ==========================================
+  // PHASE 3.7: Merge documentation contexts
+  // ==========================================
+  const allDocs = [...confluenceDocs, ...googleDocs];
+  console.log(`   📚 Total documentation context: ${allDocs.length} docs (${confluenceDocs.length} Confluence + ${googleDocs.length} Google Docs)`);
 
   // ==========================================
   // PHASE 4: Download images and analyze screens
@@ -204,7 +248,7 @@ export async function executeWriteShellStories(
     yamlContent,
     notify,
     epicContext: epicWithoutShellStoriesMarkdown,
-    confluenceDocs
+    confluenceDocs: allDocs
   });
 
   // ==========================================

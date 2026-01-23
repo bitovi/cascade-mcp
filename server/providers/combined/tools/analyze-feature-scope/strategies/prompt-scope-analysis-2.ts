@@ -6,6 +6,8 @@
  * low priority (⏬), out-of-scope (❌), or questions (❓).
  */
 
+import type { DocumentContext } from '../../shared/google-docs-setup.js';
+
 /**
  * System prompt for feature identification
  * Sets the role and fundamental constraints for the AI
@@ -70,16 +72,10 @@ OUTPUT REQUIREMENT:
 export const FEATURE_IDENTIFICATION_MAX_TOKENS = 8000;
 
 /**
- * Confluence document for prompt context
+ * Document context for prompt (supports both Confluence and Google Docs)
+ * @deprecated Use DocumentContext from google-docs-setup.ts directly
  */
-export interface ConfluenceDocumentContext {
-  title: string;
-  url: string;
-  markdown: string;
-  documentType?: 'requirements' | 'technical' | 'context' | 'dod' | 'unknown';
-  relevanceScore?: number;
-  summary?: string;
-}
+export type ConfluenceDocumentContext = DocumentContext;
 
 /**
  * Generate feature identification prompt
@@ -87,14 +83,14 @@ export interface ConfluenceDocumentContext {
  * @param screensYaml - Content of screens.yaml file (screen ordering)
  * @param analysisFiles - Array of { screenName, content, url } for each analysis file
  * @param epicContext - Optional epic description content (excluding Scope Analysis section)
- * @param confluenceDocs - Optional array of relevant Confluence documents
+ * @param referenceDocs - Optional array of relevant documents (Confluence or Google Docs)
  * @returns Complete prompt for feature identification
  */
 export function generateFeatureIdentificationPrompt(
   screensYaml: string,
   analysisFiles: Array<{ screenName: string; content: string; url: string }>,
   epicContext?: string,
-  confluenceDocs?: ConfluenceDocumentContext[]
+  referenceDocs?: DocumentContext[]
 ): string {
   // Build epic context section if provided
   const epicContextSection = epicContext?.trim()
@@ -135,24 +131,26 @@ ${epicContext}
 `
     : '';
 
-  // Build Confluence documentation section if provided
-  const confluenceSection = confluenceDocs && confluenceDocs.length > 0
-    ? `**REFERENCED DOCUMENTATION (from Confluence):**
+  // Build documentation section if provided (supports Confluence and Google Docs)
+  const docsSection = referenceDocs && referenceDocs.length > 0
+    ? `**REFERENCED DOCUMENTATION:**
 
 The following linked documents provide additional context for scope decisions:
 
-${confluenceDocs.map(doc => {
+${referenceDocs.map(doc => {
   const typeLabel = doc.documentType && doc.documentType !== 'unknown' 
     ? ` (${doc.documentType})` 
     : '';
-  return `<confluence_doc title="${doc.title}"${typeLabel}>
+  const sourceLabel = doc.source === 'google-docs' ? '[Google Docs]' : '[Confluence]';
+  const tagName = doc.source === 'google-docs' ? 'google_doc' : 'confluence_doc';
+  return `<${tagName} title="${doc.title}"${typeLabel}>
 
-**Document**: [${doc.title}](${doc.url})
+**Document**: ${sourceLabel} [${doc.title}](${doc.url})
 **Type**: ${doc.documentType || 'unknown'}
 
 ${doc.summary || doc.markdown}
 
-</confluence_doc>`;
+</${tagName}>`;
 }).join('\n\n')}
 
 **Use referenced documentation for:**
@@ -191,7 +189,7 @@ Produce a scope analysis document that:
 
 ## INPUTS
 
-${epicContextSection}${confluenceSection}**SCREEN ORDERING (from screens.yaml):**
+${epicContextSection}${docsSection}**SCREEN ORDERING (from screens.yaml):**
 \`\`\`yaml
 ${screensYaml}
 \`\`\`
