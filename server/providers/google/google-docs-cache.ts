@@ -10,8 +10,25 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { getBaseCacheDir } from '../combined/tools/writing-shell-stories/temp-directory-manager.js';
-import type { GoogleDocCacheMetadata } from '../combined/tools/shared/google-docs-setup.js';
 
+export interface GoogleDocCacheMetadata {
+  /**
+   * Google Drive document ID associated with this cache entry.
+   * Optional because some callers may only persist modifiedTime.
+   */
+  documentId?: string;
+
+  /**
+   * ISO 8601 modifiedTime string from the Google Drive API.
+   * Used for cache validation; presence is checked before use.
+   */
+  modifiedTime?: string;
+
+  /**
+   * Optional human-readable title of the document.
+   */
+  title?: string;
+}
 // ============================================================================
 // Path Helpers
 // ============================================================================
