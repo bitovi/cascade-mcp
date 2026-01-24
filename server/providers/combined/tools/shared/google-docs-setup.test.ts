@@ -122,7 +122,7 @@ describe('setupGoogleDocsContext', () => {
 
     // This test will validate deduplication logic
     // The actual API calls are mocked, so we test the orchestration
-    const result = await setupGoogleDocsContext({
+    await setupGoogleDocsContext({
       epicAdf: adf,
       googleClient: mockGoogleClient,
       generateText: mockGenerateText,
