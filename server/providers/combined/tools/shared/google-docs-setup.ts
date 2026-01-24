@@ -12,7 +12,6 @@ import type { GoogleClient } from '../../../google/google-api-client.js';
 import type { GenerateTextFn } from '../../../../llm-client/types.js';
 import type { ADFDocument } from '../../../atlassian/markdown-converter.js';
 import type { DocumentRelevance, ToolRelevanceScore, DocumentSummaryMetadata } from '../../../atlassian/confluence-cache.js';
-import type { GoogleDocMetadata } from '../../../google/types.js';
 
 import {
   extractGoogleDocsUrlsFromADF,
