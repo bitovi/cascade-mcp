@@ -132,17 +132,4 @@ describe('setupGoogleDocsContext', () => {
     // Note: This will fail initially until implementation is complete
     // which is expected in TDD - tests are written first
   });
-
-  test('filters documents by relevance threshold', async () => {
-    const { setupGoogleDocsContext } = await import('./google-docs-setup.js');
-
-    // This test validates that low-relevance docs are filtered out
-    // The mock generateText returns scores, and we expect filtering
-  });
-
-  test('sorts documents by relevance score descending', async () => {
-    const { setupGoogleDocsContext } = await import('./google-docs-setup.js');
-
-    // This test validates that byRelevance arrays are sorted
-  });
 });
