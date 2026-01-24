@@ -9,4 +9,6 @@ node_modules/
 /blob-report/
 /dist/
 /cache/
+/temp/
+.github/agents/
 google.json

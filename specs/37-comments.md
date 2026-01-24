@@ -105,7 +105,7 @@ Integrate Figma comments into the cascade-mcp workflow in two parts:
 - Implement `formatCommentsForPrompt(comments: CommentThread[]): string` - formats for AI context
 
 **How to verify**:
-- Unit test with sample comment JSON from `temp/figma-api-responses/comments.json`
+- Unit test with sample comment data embedded in the test file
 - Verify comments with node_id are directly associated
 - Verify comments with Vector position use proximity
 - Verify threaded comments are grouped correctly
