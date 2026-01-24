@@ -4,7 +4,7 @@
  * Tests for caching Google Docs content with modifiedTime-based invalidation.
  */
 
-import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import {
