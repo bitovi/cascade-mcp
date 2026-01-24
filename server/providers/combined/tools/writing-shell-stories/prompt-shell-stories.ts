@@ -70,12 +70,10 @@ export function generateShellStoryPrompt(
 The following linked documents provide additional context for story planning:
 
 ${confluenceDocs.map(doc => {
-  const typeLabel = doc.documentType && doc.documentType !== 'unknown' 
-    ? ` (${doc.documentType})` 
-    : '';
+  const docType = doc.documentType || 'unknown';
   const sourceLabel = doc.source === 'google-docs' ? '[Google Docs]' : '[Confluence]';
   const tagName = doc.source === 'google-docs' ? 'google_doc' : 'confluence_doc';
-  return `<${tagName} title="${doc.title}"${typeLabel}>
+  return `<${tagName} title="${doc.title}" documentType="${docType}">
 
 **Document**: ${sourceLabel} [${doc.title}](${doc.url})
 **Type**: ${doc.documentType || 'unknown'}
