@@ -8,18 +8,13 @@
 import { readFile } from 'fs/promises';
 import { resolveServerPath } from '../../../../utils/file-paths.js';
 import type { ParsedShellStoryADF } from './shell-story-parser.js';
+import type { DocumentContext } from '../shared/google-docs-setup.js';
 
 /**
- * Confluence document for prompt context
+ * Document context for prompt (supports both Confluence and Google Docs)
+ * @deprecated Use DocumentContext from google-docs-setup.ts directly
  */
-export interface ConfluenceDocumentContext {
-  title: string;
-  url: string;
-  markdown: string;
-  documentType?: 'requirements' | 'technical' | 'context' | 'dod' | 'unknown';
-  relevanceScore?: number;
-  summary?: string;
-}
+export type ConfluenceDocumentContext = DocumentContext;
 
 /**
  * System prompt for story generation
@@ -89,9 +84,9 @@ ${epicContext}
 `
     : '';
   
-  // Build Confluence documentation section if provided
+  // Build documentation section if provided (supports Confluence and Google Docs)
   const confluenceSection = confluenceDocs && confluenceDocs.length > 0
-    ? `## Referenced Documentation (Confluence)
+    ? `## Referenced Documentation
 
 The following linked documents provide additional context for this story. For documents spanning multiple stories, focus only on sections relevant to THIS story's shell story scope.
 
@@ -99,7 +94,8 @@ ${confluenceDocs.map(doc => {
   const typeLabel = doc.documentType && doc.documentType !== 'unknown' 
     ? ` (${doc.documentType})` 
     : '';
-  return `### ${doc.title}${typeLabel}
+  const sourceLabel = doc.source === 'google-docs' ? '[Google Docs]' : '[Confluence]';
+  return `### ${sourceLabel} ${doc.title}${typeLabel}
 
 **Document Link**: [${doc.title}](${doc.url})
 

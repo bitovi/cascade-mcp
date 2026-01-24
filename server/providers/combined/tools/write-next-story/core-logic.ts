@@ -24,6 +24,7 @@ import { getDebugDir, getBaseCacheDir } from '../writing-shell-stories/temp-dire
 import { getFigmaFileCachePath } from '../../../figma/figma-cache.js';
 import { setupFigmaScreens, type FigmaScreenSetupResult } from '../writing-shell-stories/figma-screen-setup.js';
 import { setupConfluenceContext, type ConfluenceDocument } from '../shared/confluence-setup.js';
+import { setupGoogleDocsContext, type GoogleDocDocument } from '../shared/google-docs-setup.js';
 import { regenerateScreenAnalyses } from '../shared/screen-analysis-regenerator.js';
 import { parseShellStoriesFromAdf, addCompletionMarkerToShellStory, type ParsedShellStoryADF } from './shell-story-parser.js';
 import { 
@@ -117,6 +118,7 @@ export async function executeWriteNextStory(
         documentType: doc.metadata.relevance?.documentType,
         relevanceScore: doc.metadata.relevance?.toolScores.find(t => t.toolId === 'write-next-story')?.overallScore,
         summary: doc.metadata.summary?.text,
+        source: 'confluence' as const,
       }));
       
       console.log(`   📚 Confluence docs for story writing: ${confluenceDocs.length}`);
@@ -125,6 +127,44 @@ export async function executeWriteNextStory(
       // Continue without Confluence context - it's optional
     }
   }
+  
+  // Step 1.6: Setup Google Docs context (if any linked docs)
+  let googleDocs: ConfluenceDocumentContext[] = [];
+  
+  if (setupResult.epicDescriptionAdf) {
+    if (!deps.googleClient) {
+      console.log('🔗 Skipping Google Docs context (no Google authentication)');
+    } else {
+      try {
+        const googleDocsContext = await setupGoogleDocsContext({
+          epicAdf: setupResult.epicDescriptionAdf,
+          googleClient: deps.googleClient,
+          generateText,
+          notify,
+        });
+        
+        // Filter to docs relevant for story writing
+        googleDocs = googleDocsContext.byRelevance.writeNextStory.map((doc: GoogleDocDocument) => ({
+          title: doc.title,
+          url: doc.url,
+          markdown: doc.markdown,
+          documentType: doc.metadata.relevance?.documentType,
+          relevanceScore: doc.metadata.relevance?.toolScores.find(t => t.toolId === 'write-next-story')?.overallScore,
+          summary: doc.metadata.summary?.text,
+          source: 'google-docs' as const,
+        }));
+        
+        console.log(`   📄 Google Docs for story writing: ${googleDocs.length}`);
+      } catch (error: any) {
+        console.log(`   ⚠️ Google Docs context setup failed: ${error.message}`);
+        // Continue without Google Docs context - it's optional
+      }
+    }
+  }
+  
+  // Step 1.7: Merge documentation contexts
+  const allDocs = [...confluenceDocs, ...googleDocs];
+  console.log(`   📚 Total documentation context: ${allDocs.length} docs (${confluenceDocs.length} Confluence + ${googleDocs.length} Google Docs)`);
   
   // Step 2-3: Extract shell stories from epic
   const shellStories = await extractShellStoriesFromSetup(setupResult, notify);
@@ -208,7 +248,7 @@ Each story must follow this format:
     nextStory,
     shellStories,
     notify,
-    confluenceDocs
+    allDocs
   );
   console.log(`  Story content generated (${storyContent.length} characters)`);
   

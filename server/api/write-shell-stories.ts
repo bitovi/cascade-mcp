@@ -8,6 +8,7 @@
 import type { Request, Response } from 'express';
 import { createAtlassianClientWithPAT, type AtlassianClient } from '../providers/atlassian/atlassian-api-client.js';
 import { createFigmaClient } from '../providers/figma/figma-api-client.js';
+import { createGoogleClientWithServiceAccountJSON } from '../providers/google/google-api-client.js';
 import { createProviderFromHeaders } from '../llm-client/index.js';
 import { executeWriteShellStories as defaultExecuteWriteShellStories, type ExecuteWriteShellStoriesParams } from '../providers/combined/tools/writing-shell-stories/core-logic.js';
 import type { ToolDependencies } from '../providers/combined/tools/types.js';
@@ -17,6 +18,7 @@ import {
   handleApiError, 
   validateApiHeaders, 
   validateEpicKey,
+  parseOptionalGoogleJson,
   type ErrorCommentContext 
 } from './api-error-helpers.js';
 import { 
@@ -38,10 +40,13 @@ export interface WriteShellStoriesHandlerDeps {
  * 
  * Generate shell stories from Figma designs in a Jira epic
  * 
- * Headers:
+ * Required Headers:
  *   X-Atlassian-Token: <base64(email:token)>  (Atlassian PAT - see link below)
  *   X-Figma-Token: figd_...      (Figma PAT)
- *   X-Anthropic-Token: sk-...    (Anthropic API key)
+ * 
+ * Optional Headers:
+ *   X-Google-Json: {...}  (Google service account JSON - enables Google Docs context)
+ *   X-Anthropic-Token: sk-...    (Anthropic API key, or use X-LLM-Provider)
  * 
  * To create the Atlassian token, see:
  * https://bitovi.atlassian.net/wiki/spaces/agiletraining/pages/1302462817/How+to+create+a+Jira+Request+token
@@ -98,6 +103,12 @@ export async function handleWriteShellStories(req: Request, res: Response, deps:
     const figmaClient = createFigmaClientFn(figmaToken);
     const generateText = createProviderFromHeaders(req.headers as Record<string, string>);
     
+    // Create Google client if service account credentials provided (optional)
+    const googleServiceAccount = parseOptionalGoogleJson(req.headers);
+    const googleClient = googleServiceAccount 
+      ? await createGoogleClientWithServiceAccountJSON(googleServiceAccount) 
+      : undefined;
+    
     // Resolve cloudId BEFORE calling execute (needed for commenting)
     console.log('  Resolving cloud ID...');
     const { cloudId: resolvedCloudId } = await resolveCloudId(atlassianClient, cloudId, siteName);
@@ -114,9 +125,10 @@ export async function handleWriteShellStories(req: Request, res: Response, deps:
     });
     
     // Prepare dependencies with progress comment notifier
-    const toolDeps = {
+    const toolDeps: ToolDependencies = {
       atlassianClient,
       figmaClient,
+      googleClient,
       generateText,
       notify: progressManager.getNotifyFunction()
     };

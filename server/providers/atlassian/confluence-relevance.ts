@@ -254,9 +254,29 @@ export async function scoreDocumentRelevance(
 /**
  * Get relevance threshold from environment variable
  * 
+ * Supports both shared and legacy environment variables:
+ * - DOCS_RELEVANCE_THRESHOLD (shared, preferred)
+ * - CONFLUENCE_RELEVANCE_THRESHOLD (legacy, for backward compatibility)
+ * 
  * @returns Minimum score for a document to be considered relevant
  */
 export function getRelevanceThreshold(): number {
-  const threshold = parseFloat(process.env.CONFLUENCE_RELEVANCE_THRESHOLD ?? '3.0');
+  // Check shared threshold first, then legacy Confluence-specific
+  const thresholdStr = process.env.DOCS_RELEVANCE_THRESHOLD 
+    ?? process.env.CONFLUENCE_RELEVANCE_THRESHOLD 
+    ?? '3.0';
+  const threshold = parseFloat(thresholdStr);
   return isNaN(threshold) ? 3.0 : threshold;
+}
+
+/**
+ * Get relevance threshold from environment variable (shared alias)
+ * 
+ * This is the preferred function for new code. Uses DOCS_RELEVANCE_THRESHOLD
+ * with fallback to CONFLUENCE_RELEVANCE_THRESHOLD for backward compatibility.
+ * 
+ * @returns Minimum score for a document to be considered relevant (default 3.0)
+ */
+export function getDocsRelevanceThreshold(): number {
+  return getRelevanceThreshold();
 }

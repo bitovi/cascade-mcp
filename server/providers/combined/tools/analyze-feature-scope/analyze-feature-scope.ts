@@ -10,6 +10,7 @@ import type { McpServer } from '../../../../mcp-core/mcp-types.js';
 import { getAuthInfoSafe } from '../../../../mcp-core/auth-helpers.js';
 import { createAtlassianClient } from '../../../atlassian/atlassian-api-client.js';
 import { createFigmaClient } from '../../../figma/figma-api-client.js';
+import { createGoogleClient } from '../../../google/google-api-client.js';
 import { createMcpLLMClient } from '../../../../llm-client/mcp-sampling-client.js';
 import { createQueuedGenerateText } from '../../../../llm-client/queued-generate-text.js';
 import { createProgressNotifier } from '../writing-shell-stories/progress-notifier.js';
@@ -52,10 +53,12 @@ export function registerAnalyzeFeatureScopeTool(mcp: McpServer): void {
       // Extract tokens
       const atlassianToken = authInfo?.atlassian?.access_token;
       const figmaToken = authInfo?.figma?.access_token;
+      const googleToken = authInfo?.google?.access_token;
       
       console.log('  Extracted tokens:', {
         hasAtlassianToken: !!atlassianToken,
         hasFigmaToken: !!figmaToken,
+        hasGoogleToken: !!googleToken,
       });
       
       // Debug Figma token details
@@ -97,6 +100,7 @@ export function registerAnalyzeFeatureScopeTool(mcp: McpServer): void {
         // Create API clients with tokens
         const atlassianClient = createAtlassianClient(atlassianToken);
         const figmaClient = createFigmaClient(figmaToken);
+        const googleClient = googleToken ? createGoogleClient(googleToken) : undefined;
         const generateText = createQueuedGenerateText(createMcpLLMClient(context));
         const notify = createProgressNotifier(context, 6); // 6 phases total
         
@@ -110,6 +114,7 @@ export function registerAnalyzeFeatureScopeTool(mcp: McpServer): void {
           {
             atlassianClient,
             figmaClient,
+            googleClient,
             generateText,
             notify
           }

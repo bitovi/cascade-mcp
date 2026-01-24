@@ -8,6 +8,7 @@
 import type { Request, Response } from 'express';
 import { createAtlassianClientWithPAT } from '../providers/atlassian/atlassian-api-client.js';
 import { createFigmaClient } from '../providers/figma/figma-api-client.js';
+import { createGoogleClientWithServiceAccountJSON } from '../providers/google/google-api-client.js';
 import { createProviderFromHeaders } from '../llm-client/index.js';
 import { executeAnalyzeFeatureScope, type ExecuteAnalyzeFeatureScopeParams } from '../providers/combined/tools/analyze-feature-scope/core-logic.js';
 import type { ToolDependencies } from '../providers/combined/tools/types.js';
@@ -17,6 +18,7 @@ import {
   handleApiError,
   validateApiHeaders,
   validateEpicKey,
+  parseOptionalGoogleJson,
   type ErrorCommentContext
 } from './api-error-helpers.js';
 import {
@@ -32,6 +34,9 @@ import {
  * Required Headers:
  *   X-Atlassian-Token: <base64(email:token)>  (Atlassian PAT)
  *   X-Figma-Token: figd_...                    (Figma PAT)
+ * 
+ * Optional Headers:
+ *   X-Google-Json: {...}  (Google service account JSON - enables Google Docs context)
  * 
  * Optional LLM Provider Headers (falls back to env vars):
  *   X-LLM-Provider: anthropic|openai|google|bedrock|mistral|deepseek|groq|xai
@@ -81,6 +86,12 @@ export async function handleAnalyzeFeatureScope(req: Request, res: Response) {
     const figmaClient = createFigmaClient(figmaToken);
     const generateText = createProviderFromHeaders(req.headers as Record<string, string>);
     
+    // Create Google client if service account credentials provided (optional)
+    const googleServiceAccount = parseOptionalGoogleJson(req.headers);
+    const googleClient = googleServiceAccount 
+      ? await createGoogleClientWithServiceAccountJSON(googleServiceAccount) 
+      : undefined;
+    
     // Resolve cloudId BEFORE calling execute (needed for commenting)
     const { cloudId: resolvedCloudId } = await resolveCloudId(atlassianClient, cloudId, siteName);
     console.log(`  Resolved: ${siteName || 'auto-detected'} (${resolvedCloudId})`);
@@ -98,6 +109,7 @@ export async function handleAnalyzeFeatureScope(req: Request, res: Response) {
     const toolDeps: ToolDependencies = {
       atlassianClient,
       figmaClient,
+      googleClient,
       generateText,
       notify: progressManager.getNotifyFunction()
     };

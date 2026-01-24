@@ -175,6 +175,14 @@ npm run dev:client
   - `extractFigmaUrlsFromADF(adf)` / `extractConfluenceUrlsFromADF(adf)` - Convenience functions
   - `findNodesByType(adf, nodeType)` / `collectTextFromADF(adf)` - Query helpers
 
+- **providers/google/google-docs-helpers.ts** - Google Docs URL Utilities  
+  Utilities for extracting and parsing Google Docs URLs from Jira ADF content.
+  - `extractGoogleDocsUrlsFromADF(adf)` - Extract Google Docs URLs from ADF (uses patterns from url-parser.ts)
+  - `parseGoogleDocUrl(url)` - Parse URL and extract document ID (returns null on error)
+  - `isGoogleDoc(mimeType)` - Validate MIME type is a Google Doc (not Sheets/Slides)
+  - `deduplicateByDocumentId(urls)` - Remove duplicate URLs pointing to same document
+  - *Example*: `extractGoogleDocsUrlsFromADF(epicAdf)` returns array of Google Docs URLs
+
 - **providers/atlassian/confluence-*.ts** - Confluence Integration  
   Extracts and processes Confluence page content from epic descriptions for additional context.
   - **confluence-helpers.ts** - URL extraction and API client (parse page URLs, fetch page content, resolve short links)
@@ -188,6 +196,23 @@ npm run dev:client
   - Returns documents sorted by relevance for each tool (analyzeScope, writeStories, writeNextStory)
   - Caches results with Confluence version-based invalidation
   - *Example*: `setupConfluenceContext({ epicAdf, atlassianClient, generateText, siteName })`
+
+- **providers/combined/tools/shared/google-docs-setup.ts** - Google Docs Context Orchestration  
+  Main setup function for extracting and processing Google Docs context from epics.
+  - Extracts URLs, fetches documents via Drive API, converts to markdown, scores relevance
+  - Returns documents sorted by relevance for each tool (analyzeScope, writeStories, writeNextStory)
+  - Caches results with modifiedTime-based invalidation in `cache/google-docs/{documentId}/`
+  - Exports shared `DocumentContext` type for unified prompt context
+  - Handles errors gracefully: skips inaccessible docs with warnings, continues processing
+  - *Example*: `setupGoogleDocsContext({ epicAdf, googleClient, generateText })`
+
+- **providers/google/google-docs-cache.ts** - Google Docs Caching  
+  Cache management for Google Docs content with version-based invalidation.
+  - `getGoogleDocCachePath(documentId)` - Returns cache directory path
+  - `loadGoogleDocMetadata(documentId)` / `saveGoogleDocMetadata(...)` - Metadata operations
+  - `loadGoogleDocMarkdown(documentId)` / `saveGoogleDocMarkdown(...)` - Content operations
+  - `ensureValidCacheForGoogleDoc(documentId, modifiedTime)` - Validate/clear stale cache
+  - Cache includes relevance scores to avoid re-scoring unchanged documents
 
 - **llm-client/** - LLM Client Integration (Vercel AI SDK)  
   Abstracts LLM access for API routes (Anthropic via AI SDK). MCP tools use MCP sampling separately.
@@ -240,7 +265,7 @@ Advanced workflow tools that integrate multiple services:
   - Analyzes screens against epic requirements to identify in-scope/out-of-scope features
   - Categorizes features as: ✅ confirmed, ❌ out-of-scope, ❓ needs-clarification, ⏬ low-priority
   - Updates epic description with structured scope analysis grouped by feature areas
-  - **Confluence Context**: Automatically extracts and uses linked Confluence pages for additional requirements context
+  - **Documentation Context**: Automatically extracts and uses linked Confluence pages and Google Docs for additional requirements context
   - Parameters: `epicKey`, `figmaUrl`, optional `cloudId`
   - Example: `analyze-feature-scope({ epicKey: "PLAY-123", figmaUrl: "https://..." })`
   - **Run this first** before write-shell-stories to establish scope
@@ -249,7 +274,7 @@ Advanced workflow tools that integrate multiple services:
   - **PREREQUISITE**: Epic must have a "## Scope Analysis" section (run analyze-feature-scope first)
   - Creates prioritized shell stories based on scope analysis categorizations
   - Organizes features into incremental delivery plan (stories)
-  - **Confluence Context**: References linked PRDs and technical docs for story planning
+  - **Documentation Context**: References linked Confluence pages and Google Docs for story planning
   - Updates epic description with shell stories section
   - Parameters: `epicKey`, optional `cloudId` or `siteName`
 
@@ -257,7 +282,7 @@ Advanced workflow tools that integrate multiple services:
   - **PREREQUISITE**: Epic must have shell stories (run write-shell-stories first)
   - Generates detailed Jira story with acceptance criteria from shell story
   - Validates dependencies before writing each story
-  - **Confluence Context**: Includes relevant technical documentation and links to referenced docs
+  - **Documentation Context**: Includes relevant Confluence and Google Docs technical documentation
   - Parameters: `epicKey`, optional `cloudId` or `siteName`
 
 - **review-work-item** - Review a Jira work item and identify gaps/questions
@@ -269,13 +294,15 @@ Advanced workflow tools that integrate multiple services:
   - Parameters: `issueKey`, optional `cloudId`, `siteName`, `maxDepth`
   - Example: `review-work-item({ issueKey: "PLAY-456" })`
 
-**Confluence Context Feature**: 
-All combined tools automatically extract and process Confluence page links from the epic description:
+**Documentation Context Feature**: 
+All combined tools automatically extract and process Confluence page and Google Docs links from the epic description:
 - PRDs (Product Requirement Documents) - Used for feature identification and acceptance criteria
 - Technical architecture docs - Used for implementation constraints and API references
 - Definition of Done - Linked (not duplicated) in generated stories
-- Cached with timestamp-based validation (7-day retention)
-- Scored for relevance to each tool's specific needs
+- **Confluence**: Cached with timestamp-based validation (7-day retention)
+- **Google Docs**: Cached with modifiedTime-based validation (invalidates when doc changes)
+- Scored for relevance to each tool's specific needs using shared `DOCS_RELEVANCE_THRESHOLD`
+- Prompts include `[Confluence]` or `[Google Docs]` source tags for AI disambiguation
 
 ### ChatGPT-Compatible Tools
 These tools follow OpenAI's MCP specification patterns for optimal ChatGPT integration:

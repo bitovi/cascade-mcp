@@ -32,7 +32,7 @@ OUTPUT REQUIREMENT:
 export const SHELL_STORY_MAX_TOKENS = 16000;
 
 /**
- * Confluence document for prompt context
+ * Document context for prompt (supports both Confluence and Google Docs)
  */
 export interface ConfluenceDocumentContext {
   title: string;
@@ -41,6 +41,8 @@ export interface ConfluenceDocumentContext {
   documentType?: 'requirements' | 'technical' | 'context' | 'dod' | 'unknown';
   relevanceScore?: number;
   summary?: string;
+  /** Document source: 'confluence' or 'google-docs'. Defaults to 'confluence' for backward compatibility */
+  source?: 'confluence' | 'google-docs';
 }
 
 /**
@@ -61,24 +63,24 @@ export function generateShellStoryPrompt(
   confluenceDocs?: ConfluenceDocumentContext[]
 ): string {
 
-  // Build Confluence documentation section if provided
+  // Build documentation section if provided (supports Confluence and Google Docs)
   const confluenceSection = confluenceDocs && confluenceDocs.length > 0
-    ? `**REFERENCED DOCUMENTATION (from Confluence):**
+    ? `**REFERENCED DOCUMENTATION:**
 
 The following linked documents provide additional context for story planning:
 
 ${confluenceDocs.map(doc => {
-  const typeLabel = doc.documentType && doc.documentType !== 'unknown' 
-    ? ` (${doc.documentType})` 
-    : '';
-  return `<confluence_doc title="${doc.title}"${typeLabel}>
+  const docType = doc.documentType || 'unknown';
+  const sourceLabel = doc.source === 'google-docs' ? '[Google Docs]' : '[Confluence]';
+  const tagName = doc.source === 'google-docs' ? 'google_doc' : 'confluence_doc';
+  return `<${tagName} title="${doc.title}" documentType="${docType}">
 
-**Document**: [${doc.title}](${doc.url})
+**Document**: ${sourceLabel} [${doc.title}](${doc.url})
 **Type**: ${doc.documentType || 'unknown'}
 
 ${doc.summary || doc.markdown}
 
-</confluence_doc>`;
+</${tagName}>`;
 }).join('\n\n')}
 
 **Use referenced documentation for:**

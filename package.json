@@ -136,7 +136,7 @@
       ]
     },
     "transformIgnorePatterns": [
-      "node_modules/(?!(@modelcontextprotocol|node-fetch|marklassian|marked|jose)/)"
+      "node_modules/(?!(@modelcontextprotocol|node-fetch|marklassian|marked|jose|turndown)/)"
     ],
     "moduleNameMapper": {
       "^(\\.{1,2}/.*)\\.js$": "$1"
