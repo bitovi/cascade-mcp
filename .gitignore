@@ -10,5 +10,4 @@ node_modules/
 /dist/
 /cache/
 /temp/
-.github/agents/
 google.json
