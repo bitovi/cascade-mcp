@@ -18,8 +18,8 @@ import {
   saveGoogleDocMetadata,
   saveGoogleDocMarkdown,
   ensureValidCacheForGoogleDoc,
+  type GoogleDocCacheMetadata,
 } from './google-docs-cache.js';
-import type { GoogleDocCacheMetadata } from '../combined/tools/shared/google-docs-setup.js';
 
 // ============================================================================
 // Test Fixtures

@@ -1,0 +1,268 @@
+{
+  "document": {
+    "id": "0:0",
+    "name": "Document",
+    "type": "DOCUMENT",
+    "scrollBehavior": "SCROLLS",
+    "children": [
+      {
+        "id": "0:1",
+        "name": "Reference",
+        "type": "CANVAS",
+        "scrollBehavior": "SCROLLS",
+        "children": [],
+        "backgroundColor": {
+          "r": 0.11764705926179886,
+          "g": 0.11764705926179886,
+          "b": 0.11764705926179886,
+          "a": 1
+        },
+        "prototypeStartNodeID": null,
+        "flowStartingPoints": [],
+        "prototypeDevice": {
+          "type": "NONE",
+          "rotation": "NONE"
+        }
+      },
+      {
+        "id": "14:3005",
+        "name": "——————————————————",
+        "type": "CANVAS",
+        "scrollBehavior": "SCROLLS",
+        "children": [],
+        "backgroundColor": {
+          "r": 0.11764705926179886,
+          "g": 0.11764705926179886,
+          "b": 0.11764705926179886,
+          "a": 1
+        },
+        "prototypeStartNodeID": null,
+        "flowStartingPoints": [],
+        "prototypeDevice": {
+          "type": "NONE",
+          "rotation": "NONE"
+        }
+      },
+      {
+        "id": "1:24",
+        "name": "Design",
+        "type": "CANVAS",
+        "scrollBehavior": "SCROLLS",
+        "children": [],
+        "backgroundColor": {
+          "r": 0.11764705926179886,
+          "g": 0.11764705926179886,
+          "b": 0.11764705926179886,
+          "a": 1
+        },
+        "prototypeStartNodeID": null,
+        "flowStartingPoints": [],
+        "prototypeDevice": {
+          "type": "NONE",
+          "rotation": "NONE"
+        }
+      },
+      {
+        "id": "1099:7820",
+        "name": "Filters",
+        "type": "CANVAS",
+        "scrollBehavior": "SCROLLS",
+        "children": [],
+        "backgroundColor": {
+          "r": 0.11764705926179886,
+          "g": 0.11764705926179886,
+          "b": 0.11764705926179886,
+          "a": 1
+        },
+        "prototypeStartNodeID": null,
+        "flowStartingPoints": [],
+        "prototypeDevice": {
+          "type": "NONE",
+          "rotation": "NONE"
+        }
+      },
+      {
+        "id": "1099:7992",
+        "name": "Related Cases",
+        "type": "CANVAS",
+        "scrollBehavior": "SCROLLS",
+        "children": [],
+        "backgroundColor": {
+          "r": 0.11764705926179886,
+          "g": 0.11764705926179886,
+          "b": 0.11764705926179886,
+          "a": 1
+        },
+        "prototypeStartNodeID": null,
+        "flowStartingPoints": [],
+        "prototypeDevice": {
+          "type": "NONE",
+          "rotation": "NONE"
+        }
+      },
+      {
+        "id": "1099:7993",
+        "name": "Like & Dislike Buttons",
+        "type": "CANVAS",
+        "scrollBehavior": "SCROLLS",
+        "children": [],
+        "backgroundColor": {
+          "r": 0.11764705926179886,
+          "g": 0.11764705926179886,
+          "b": 0.11764705926179886,
+          "a": 1
+        },
+        "prototypeStartNodeID": null,
+        "flowStartingPoints": [],
+        "prototypeDevice": {
+          "type": "NONE",
+          "rotation": "NONE"
+        }
+      },
+      {
+        "id": "1106:8145",
+        "name": "Alert",
+        "type": "CANVAS",
+        "scrollBehavior": "SCROLLS",
+        "children": [],
+        "backgroundColor": {
+          "r": 0.11764705926179886,
+          "g": 0.11764705926179886,
+          "b": 0.11764705926179886,
+          "a": 1
+        },
+        "prototypeStartNodeID": null,
+        "flowStartingPoints": [],
+        "prototypeDevice": {
+          "type": "NONE",
+          "rotation": "NONE"
+        }
+      },
+      {
+        "id": "1109:12837",
+        "name": "Tasks",
+        "type": "CANVAS",
+        "scrollBehavior": "SCROLLS",
+        "children": [],
+        "backgroundColor": {
+          "r": 0.11764705926179886,
+          "g": 0.11764705926179886,
+          "b": 0.11764705926179886,
+          "a": 1
+        },
+        "prototypeStartNodeID": null,
+        "flowStartingPoints": [],
+        "prototypeDevice": {
+          "type": "NONE",
+          "rotation": "NONE"
+        }
+      },
+      {
+        "id": "14:3006",
+        "name": "—————————————————————",
+        "type": "CANVAS",
+        "scrollBehavior": "SCROLLS",
+        "children": [],
+        "backgroundColor": {
+          "r": 0.11764705926179886,
+          "g": 0.11764705926179886,
+          "b": 0.11764705926179886,
+          "a": 1
+        },
+        "prototypeStartNodeID": null,
+        "flowStartingPoints": [],
+        "prototypeDevice": {
+          "type": "NONE",
+          "rotation": "NONE"
+        }
+      },
+      {
+        "id": "4:67463",
+        "name": "Local Components",
+        "type": "CANVAS",
+        "scrollBehavior": "SCROLLS",
+        "children": [],
+        "backgroundColor": {
+          "r": 0.11764705926179886,
+          "g": 0.11764705926179886,
+          "b": 0.11764705926179886,
+          "a": 1
+        },
+        "prototypeStartNodeID": null,
+        "flowStartingPoints": [],
+        "prototypeDevice": {
+          "type": "NONE",
+          "rotation": "NONE"
+        }
+      },
+      {
+        "id": "14:3007",
+        "name": "—————————————————————",
+        "type": "CANVAS",
+        "scrollBehavior": "SCROLLS",
+        "children": [],
+        "backgroundColor": {
+          "r": 0.11764705926179886,
+          "g": 0.11764705926179886,
+          "b": 0.11764705926179886,
+          "a": 1
+        },
+        "prototypeStartNodeID": null,
+        "flowStartingPoints": [],
+        "prototypeDevice": {
+          "type": "NONE",
+          "rotation": "NONE"
+        }
+      },
+      {
+        "id": "14:3003",
+        "name": "Future State",
+        "type": "CANVAS",
+        "scrollBehavior": "SCROLLS",
+        "children": [],
+        "backgroundColor": {
+          "r": 0.11764705926179886,
+          "g": 0.11764705926179886,
+          "b": 0.11764705926179886,
+          "a": 1
+        },
+        "prototypeStartNodeID": null,
+        "flowStartingPoints": [],
+        "prototypeDevice": {
+          "type": "NONE",
+          "rotation": "NONE"
+        }
+      },
+      {
+        "id": "14:3004",
+        "name": "Archive",
+        "type": "CANVAS",
+        "scrollBehavior": "SCROLLS",
+        "children": [],
+        "backgroundColor": {
+          "r": 0.11764705926179886,
+          "g": 0.11764705926179886,
+          "b": 0.11764705926179886,
+          "a": 1
+        },
+        "prototypeStartNodeID": null,
+        "flowStartingPoints": [],
+        "prototypeDevice": {
+          "type": "NONE",
+          "rotation": "NONE"
+        }
+      }
+    ]
+  },
+  "components": {},
+  "componentSets": {},
+  "schemaVersion": 0,
+  "styles": {},
+  "name": "Carton Case Management",
+  "lastModified": "2026-01-09T20:59:52Z",
+  "thumbnailUrl": "https://s3-alpha.figma.com/thumbnails/54811232-40fe-47aa-b045-84ced0fc7747?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAQ4GOSFWCXK3XBUGC%2F20260108%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20260108T000000Z&X-Amz-Expires=604800&X-Amz-SignedHeaders=host&X-Amz-Signature=1d014a130ba8532e4a6d2a74232fe4347a1ae6d15bbc34e505365ce710fefb95",
+  "version": "2307171426550034284",
+  "role": "owner",
+  "editorType": "figma",
+  "linkAccess": "org_view"
+}

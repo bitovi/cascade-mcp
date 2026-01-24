@@ -10,24 +10,30 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { getBaseCacheDir } from '../combined/tools/writing-shell-stories/temp-directory-manager.js';
+import type { DocumentRelevance, DocumentSummaryMetadata } from '../atlassian/confluence-cache.js';
 
+/**
+ * Cached metadata for a Google Doc
+ */
 export interface GoogleDocCacheMetadata {
-  /**
-   * Google Drive document ID associated with this cache entry.
-   * Optional because some callers may only persist modifiedTime.
-   */
-  documentId?: string;
-
-  /**
-   * ISO 8601 modifiedTime string from the Google Drive API.
-   * Used for cache validation; presence is checked before use.
-   */
-  modifiedTime?: string;
-
-  /**
-   * Optional human-readable title of the document.
-   */
-  title?: string;
+  /** Google Drive document ID */
+  documentId: string;
+  /** Document title */
+  title: string;
+  /** Original URL from the epic */
+  url: string;
+  /** MIME type from Drive API */
+  mimeType: string;
+  /** Last modified timestamp (ISO 8601) from Drive API */
+  modifiedTime: string;
+  /** When we cached this content (ISO 8601) */
+  cachedAt: string;
+  /** Length of markdown content in characters */
+  markdownLength: number;
+  /** Relevance scoring data (populated after LLM analysis) */
+  relevance?: DocumentRelevance;
+  /** Summary (only present if document was summarized) */
+  summary?: DocumentSummaryMetadata;
 }
 // ============================================================================
 // Path Helpers

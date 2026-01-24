@@ -26,35 +26,11 @@ import {
   ensureValidCacheForGoogleDoc,
   saveGoogleDocMetadata,
   saveGoogleDocMarkdown,
+  type GoogleDocCacheMetadata,
 } from '../../../google/google-docs-cache.js';
 
-// ============================================================================
-// Types
-// ============================================================================
-
-/**
- * Cached metadata for a Google Doc
- */
-export interface GoogleDocCacheMetadata {
-  /** Google Drive document ID */
-  documentId: string;
-  /** Document title */
-  title: string;
-  /** Original URL from the epic */
-  url: string;
-  /** MIME type from Drive API */
-  mimeType: string;
-  /** Last modified timestamp (ISO 8601) from Drive API */
-  modifiedTime: string;
-  /** When we cached this content (ISO 8601) */
-  cachedAt: string;
-  /** Length of markdown content in characters */
-  markdownLength: number;
-  /** Relevance scoring data (populated after LLM analysis) */
-  relevance?: DocumentRelevance;
-  /** Summary (only present if document was summarized) */
-  summary?: DocumentSummaryMetadata;
-}
+// Re-export for consumers that import from this module
+export type { GoogleDocCacheMetadata };
 
 /**
  * A processed Google Doc with content and metadata
