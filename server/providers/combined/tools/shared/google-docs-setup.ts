@@ -348,32 +348,38 @@ export async function setupGoogleDocsContext(
   }
   
   // ==========================================
-  // Step 3: Deduplicate URLs by document ID
+  // Step 3: Parse URLs to extract document IDs
   // ==========================================
-  const uniqueUrls = deduplicateByDocumentId(rawUrls);
-  console.log(`  Deduplicated to ${uniqueUrls.length} unique documents`);
-  
-  // ==========================================
-  // Step 4: Parse URLs to extract document IDs
-  // ==========================================
-  const urlsWithIds: Array<{ url: string; documentId: string }> = [];
+  const parsedUrlsWithIds: Array<{ url: string; documentId: string }> = [];
   const warnings: string[] = [];
-  
-  for (const url of uniqueUrls) {
+
+  for (const url of rawUrls) {
     const parsed = parseGoogleDocUrl(url);
     if (parsed) {
-      urlsWithIds.push({ url, documentId: parsed.documentId });
+      parsedUrlsWithIds.push({ url, documentId: parsed.documentId });
     } else {
       const warning = `Skipped malformed Google Docs URL: ${url}`;
       console.log(`    ⚠️  ${warning}`);
       warnings.push(warning);
     }
   }
-  
-  if (urlsWithIds.length === 0) {
+
+  if (parsedUrlsWithIds.length === 0) {
     console.log('  No valid Google Docs URLs found - returning empty context');
     return createEmptyResult(warnings.length > 0 ? warnings : undefined);
   }
+
+  // ==========================================
+  // Step 4: Deduplicate URLs by document ID
+  // ==========================================
+  const uniqueByDocumentId = new Map<string, { url: string; documentId: string }>();
+  for (const entry of parsedUrlsWithIds) {
+    if (!uniqueByDocumentId.has(entry.documentId)) {
+      uniqueByDocumentId.set(entry.documentId, entry);
+    }
+  }
+  const urlsWithIds: Array<{ url: string; documentId: string }> = Array.from(uniqueByDocumentId.values());
+  console.log(`  Deduplicated to ${urlsWithIds.length} unique documents`);
   
   // ==========================================
   // Step 5: Process each document
