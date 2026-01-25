@@ -35,6 +35,12 @@ The API supports multiple LLM providers for AI-powered operations. Users can cho
 - Default: OS temp directory when not set
 - Example: `export DEV_CACHE_DIR=./cache`
 
+**`SAVE_FIGMA_COMMENTS_TO_CACHE`** (Optional - Development Only)
+- When set to `true` or `1`, saves fetched Figma comments to cache files for debugging
+- Creates `comments.md` files in the Figma file cache directory
+- Includes full thread details, user summaries, and position data
+- Example: `export SAVE_FIGMA_COMMENTS_TO_CACHE=true`
+
 ### Quick Start
 
 #### REST API Usage (Multi-tenant)
@@ -154,6 +160,7 @@ npm run dev:client
   - **api/write-shell-stories.ts** - Generate shell stories from Figma designs in a Jira epic
   - **api/write-next-story.ts** - Write the next Jira story from shell stories
   - **api/analyze-feature-scope.ts** - Analyze feature scope from Figma designs (generates scope analysis)
+  - **api/analyze-figma-scope.ts** - Standalone Figma analysis with comment integration (no Jira required)
   - **api/identify-features.ts** - Identify in-scope and out-of-scope features from Figma
   - **api/progress-comment-manager.ts** - Progress tracking via Jira comments
   - **api/api-error-helpers.ts** - Shared error handling and validation
@@ -269,6 +276,17 @@ Advanced workflow tools that integrate multiple services:
   - Parameters: `epicKey`, `figmaUrl`, optional `cloudId`
   - Example: `analyze-feature-scope({ epicKey: "PLAY-123", figmaUrl: "https://..." })`
   - **Run this first** before write-shell-stories to establish scope
+
+- **analyze-figma-scope** - Standalone Figma design analysis without Jira integration
+  - Analyzes Figma screens independently of Jira epics
+  - **Figma Comments Integration**: Reads existing comments as context, posts AI-generated questions back
+  - Categorizes features as: ✅ confirmed, ❌ out-of-scope, ❓ needs-clarification, ⏬ low-priority
+  - Returns scope analysis as markdown (does not write to Jira)
+  - **Rate Limit Handling**: Respects Figma's 25 req/min limit with consolidation fallback
+  - Parameters: `figmaUrls` (array), optional `contextDescription`
+  - Example: `analyze-figma-scope({ figmaUrls: ["https://..."], contextDescription: "Mobile app onboarding" })`
+  - Dual interface: Available as MCP tool and REST API endpoint `/api/analyze-figma-scope`
+  - **Authentication**: Requires Figma auth only (no Atlassian needed)
 
 - **write-shell-stories** - Generate shell user stories from Figma designs
   - **PREREQUISITE**: Epic must have a "## Scope Analysis" section (run analyze-feature-scope first)

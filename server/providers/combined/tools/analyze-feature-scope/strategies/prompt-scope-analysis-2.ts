@@ -7,6 +7,7 @@
  */
 
 import type { DocumentContext } from '../../shared/google-docs-setup.js';
+import type { ScreenAnnotation } from '../../shared/screen-annotation.js';
 
 /**
  * System prompt for feature identification
@@ -84,13 +85,15 @@ export type ConfluenceDocumentContext = DocumentContext;
  * @param analysisFiles - Array of { screenName, content, url } for each analysis file
  * @param epicContext - Optional epic description content (excluding Scope Analysis section)
  * @param referenceDocs - Optional array of relevant documents (Confluence or Google Docs)
+ * @param commentContexts - Optional array of Figma comment contexts per screen
  * @returns Complete prompt for feature identification
  */
 export function generateFeatureIdentificationPrompt(
   screensYaml: string,
   analysisFiles: Array<{ screenName: string; content: string; url: string }>,
   epicContext?: string,
-  referenceDocs?: DocumentContext[]
+  referenceDocs?: DocumentContext[],
+  commentContexts?: ScreenAnnotation[]
 ): string {
   // Build epic context section if provided
   const epicContextSection = epicContext?.trim()
@@ -164,6 +167,28 @@ ${doc.summary || doc.markdown}
 `
     : '';
 
+  // Build Figma comments section if provided
+  // TODO: These are not necessarily from stakeholders. Could be designers, devs, etc.
+  const commentsSection = commentContexts && commentContexts.length > 0
+    ? `**FIGMA COMMENTS FROM STAKEHOLDERS:**
+
+The following comments have been left on the Figma designs by designers and stakeholders.
+Use these as additional context for understanding requirements and concerns.
+
+${commentContexts.map(ctx => {
+  return `**${ctx.screenName}:**
+${ctx.markdown}`;
+}).join('\n\n')}
+
+**How to use Figma comments:**
+- Comments may clarify design intent or business requirements
+- Questions in comments may need to be surfaced as ❓ items
+- Resolved comments (✅ RESOLVED) indicate decisions already made
+- Open comments (💬 OPEN) may require attention
+
+`
+    : '';
+
   // Build analysis section with URLs
   const analysisSection = analysisFiles
     .map(({ screenName, content, url }) => {
@@ -187,7 +212,7 @@ Produce a scope analysis document that:
 
 ## INPUTS
 
-${epicContextSection}${docsSection}**SCREEN ORDERING (from screens.yaml):**
+${epicContextSection}${docsSection}${commentsSection}**SCREEN ORDERING (from screens.yaml):**
 \`\`\`yaml
 ${screensYaml}
 \`\`\`

@@ -60,11 +60,12 @@ import { generateScreensYaml } from './yaml-generator.js';
  * @param figmaClient - Figma API client with auth
  * @returns Object containing accumulated metadata and the file key
  */
-async function fetchFigmaMetadataFromUrls(
+export async function fetchFigmaMetadataFromUrls(
   figmaUrls: string[],
   figmaClient: FigmaClient
-): Promise<{ allFramesAndNotes: Array<{ url: string; metadata: FigmaNodeMetadata[] }>; figmaFileKey: string }> {
+): Promise<{ allFramesAndNotes: Array<{ url: string; metadata: FigmaNodeMetadata[] }>; figmaFileKey: string; nodesDataMap: Map<string, any> }> {
   const allFramesAndNotes: Array<{ url: string; metadata: FigmaNodeMetadata[] }> = [];
+  const nodesDataMap = new Map<string, any>(); // Store full node data for each frame
   let figmaFileKey = '';
   
   // Phase 1: Group URLs by fileKey and validate
@@ -122,6 +123,33 @@ async function fetchFigmaMetadataFromUrls(
         // - Notes at any level within the node
         const framesAndNotes = getFramesAndNotesForNode({ document: nodeData }, nodeId);
         
+        // Store full node data for each extracted frame
+        framesAndNotes.forEach(item => {
+          if (item.type === 'FRAME') {
+            // For frames, we need to find the actual frame node data
+            // If nodeData itself is a FRAME, use it; otherwise find in children
+            if (nodeData.type === 'FRAME' && nodeData.id === item.id) {
+              nodesDataMap.set(item.id, nodeData);
+            } else if (nodeData.children) {
+              // Recursively search for frame in children
+              const findFrame = (node: any): any => {
+                if (node.id === item.id) return node;
+                if (node.children) {
+                  for (const child of node.children) {
+                    const found = findFrame(child);
+                    if (found) return found;
+                  }
+                }
+                return null;
+              };
+              const frameNode = findFrame(nodeData);
+              if (frameNode) {
+                nodesDataMap.set(item.id, frameNode);
+              }
+            }
+          }
+        });
+        
         // Check if the original URL pointed to a SECTION - if so, tag all extracted frames
         if (nodeData.type === 'SECTION') {
           console.log(`    📦 Tagging ${framesAndNotes.length} frames with SECTION context: "${nodeData.name}"`);
@@ -153,7 +181,7 @@ async function fetchFigmaMetadataFromUrls(
     }
   }
   
-  return { allFramesAndNotes, figmaFileKey };
+  return { allFramesAndNotes, figmaFileKey, nodesDataMap };
 }
 
 /**
@@ -172,7 +200,7 @@ async function fetchFigmaMetadataFromUrls(
  * @param allFramesAndNotes - Array of metadata from potentially multiple Figma URLs/nodes
  * @returns Object containing separate arrays of frames and notes
  */
-function separateFramesAndNotes(
+export function separateFramesAndNotes(
   allFramesAndNotes: Array<{ url: string; metadata: FigmaNodeMetadata[] }>
 ): { frames: FigmaNodeMetadata[]; notes: FigmaNodeMetadata[] } {
   const frameMap = new Map<string, FigmaNodeMetadata>();
@@ -209,6 +237,73 @@ function separateFramesAndNotes(
 
 // extractFigmaUrlsFromADF is now imported from adf-utils.ts
 
+/**
+ * Result of processing Figma URLs
+ */
+export interface ProcessFigmaUrlsResult {
+  /** All frames found across URLs */
+  allFrames: FigmaNodeMetadata[];
+  /** All notes found across URLs */
+  allNotes: FigmaNodeMetadata[];
+  /** Screens with spatially associated notes */
+  screens: ScreenWithNotes[];
+  /** Note URLs not spatially associated with any frame */
+  unassociatedNotes: string[];
+  /** File key (for image downloads) */
+  figmaFileKey: string;
+  /** Map of frameId -> full node data for semantic XML */
+  nodesDataMap: Map<string, any>;
+  /** Input Figma URLs */
+  figmaUrls: string[];
+}
+
+/**
+ * Process Figma URLs into frames, notes, and screens with spatial associations
+ * 
+ * Shared logic used by both:
+ * - setupFigmaScreens (processes URLs from Jira epic)
+ * - analyze-figma-scope (processes URLs directly from input)
+ * 
+ * Steps:
+ * 1. Batch fetch Figma metadata from URLs
+ * 2. Separate frames and notes with deduplication
+ * 3. Spatially associate notes with frames
+ * 
+ * @param figmaUrls - Figma URLs to process
+ * @param figmaClient - Authenticated Figma API client
+ * @returns Frames, notes, screens with associations, and file key
+ */
+export async function processFigmaUrls(
+  figmaUrls: string[],
+  figmaClient: FigmaClient
+): Promise<ProcessFigmaUrlsResult> {
+  // Step 1: Batch fetch metadata
+  const { allFramesAndNotes, figmaFileKey, nodesDataMap } = await fetchFigmaMetadataFromUrls(figmaUrls, figmaClient);
+  
+  // Step 2: Separate and deduplicate
+  const { frames: allFrames, notes: allNotes } = separateFramesAndNotes(allFramesAndNotes);
+  
+  console.log(`    Found ${allFrames.length} frames, ${allNotes.length} notes`);
+  
+  // Step 3: Spatially associate notes with frames
+  const baseUrl = figmaUrls[0]?.split('?')[0] || '';
+  const { screens, unassociatedNotes } = associateNotesWithFrames(
+    allFrames,
+    allNotes,
+    baseUrl
+  );
+  
+  return {
+    allFrames,
+    allNotes,
+    screens,
+    unassociatedNotes,
+    figmaFileKey,
+    nodesDataMap,
+    figmaUrls,
+  };
+}
+
 
 /**
  * Screen with associated notes
@@ -244,6 +339,7 @@ export interface FigmaScreenSetupResult {
   allFrames: FigmaNodeMetadata[];
   allNotes: FigmaNodeMetadata[];
   figmaFileKey: string;          // File key for image downloads
+  nodesDataMap: Map<string, any>;  // Map of frameId -> full node data for semantic XML
   yamlContent: string;           // Generated screens.yaml content
   yamlPath?: string;             // Path to screens.yaml (only in DEV mode)
   epicWithoutShellStoriesMarkdown: string;   // Epic content excluding Shell Stories
@@ -338,33 +434,16 @@ export async function setupFigmaScreens(
   console.log(`    Shell stories: ${shellStoriesAdf.length} ADF nodes`);
   
   // ==========================================
-  // Step 3: Fetch Figma metadata for all URLs
+  // Step 3: Process Figma URLs (fetch, separate, associate)
   // ==========================================
-  const { allFramesAndNotes, figmaFileKey } = await fetchFigmaMetadataFromUrls(figmaUrls, figmaClient);
-  
-  // ==========================================
-  // Step 4: Combine and separate frames/notes
-  // ==========================================
-  const { frames: allFrames, notes: allNotes } = separateFramesAndNotes(allFramesAndNotes);
-  
-  console.log(`    Found ${allFrames.length} frames, ${allNotes.length} notes`);
-  
-  // ==========================================
-  // Step 5: Associate notes with frames
-  // ==========================================
-  if (notify) {
-    await notify('Associating notes with screens...');
-  }
-  
-  // Use the first Figma URL as base for generating node URLs
-  const baseUrl = figmaUrls[0]?.split('?')[0] || '';
-  
-  // Associate notes with frames based on spatial proximity
-  const { screens, unassociatedNotes } = associateNotesWithFrames(
+  const {
     allFrames,
     allNotes,
-    baseUrl
-  );
+    screens,
+    unassociatedNotes,
+    figmaFileKey,
+    nodesDataMap,
+  } = await processFigmaUrls(figmaUrls, figmaClient);
   
   // ==========================================
   // Step 4: Generate screens.yaml content
@@ -390,6 +469,7 @@ export async function setupFigmaScreens(
     allFrames,
     allNotes,
     figmaFileKey,
+    nodesDataMap,
     yamlContent,
     yamlPath,
     epicWithoutShellStoriesMarkdown,

@@ -254,7 +254,7 @@ If you want to use Google Drive integration, you'll need to create OAuth credent
    **Figma OAuth** (from Step 2):
    - `FIGMA_CLIENT_ID` - Your Figma OAuth Client ID
    - `FIGMA_CLIENT_SECRET` - Your Figma OAuth Client Secret
-   - `FIGMA_OAUTH_SCOPES` - Should be `"file_content:read file_metadata:read file_comments:read current_user:read"`
+   - `FIGMA_OAUTH_SCOPES` - Should be `"file_content:read file_metadata:read file_comments:read file_comments:write current_user:read"`
 
    **Google Drive OAuth** (from Step 3, optional):
    - `GOOGLE_CLIENT_ID` - Your Google OAuth Client ID

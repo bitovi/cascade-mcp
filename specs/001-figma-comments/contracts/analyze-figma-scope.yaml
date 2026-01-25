@@ -1,0 +1,276 @@
+openapi: 3.0.3
+info:
+  title: Figma Comments Integration API
+  description: |
+    REST API endpoints for Figma Comments Integration feature.
+    These endpoints complement the MCP tools with identical functionality.
+  version: 1.0.0
+
+paths:
+  /api/analyze-figma-scope:
+    post:
+      summary: Analyze Figma designs and post questions
+      description: |
+        Analyzes one or more Figma files/frames, generates scope analysis,
+        and optionally posts clarifying questions as comments on the Figma frames.
+        
+        This is the REST API equivalent of the `analyze-figma-scope` MCP tool.
+      operationId: analyzeFigmaScope
+      tags:
+        - Figma Analysis
+      security:
+        - figmaPersonalAccessToken: []
+        - atlassianPersonalAccessToken: []
+        - anthropicApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalyzeFigmaScopeRequest'
+            examples:
+              singleFile:
+                summary: Analyze a single Figma file
+                value:
+                  figmaUrls:
+                    - "https://www.figma.com/design/ABC123xyz/My-Design?node-id=1-100"
+              multipleFilesWithContext:
+                summary: Analyze multiple files with context
+                value:
+                  figmaUrls:
+                    - "https://www.figma.com/design/ABC123xyz/My-Design?node-id=1-100"
+                    - "https://www.figma.com/design/DEF456abc/Another-Design"
+                  contextDescription: "This is a mobile app for ordering food. Focus on the checkout flow."
+              analysisOnly:
+                summary: Analyze without posting comments
+                value:
+                  figmaUrls:
+                    - "https://www.figma.com/design/ABC123xyz/My-Design"
+                  postQuestionsToFigma: false
+      responses:
+        '200':
+          description: Analysis completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyzeFigmaScopeResponse'
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Missing required Figma scope (file_comments:write)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitResponse'
+
+components:
+  securitySchemes:
+    figmaPersonalAccessToken:
+      type: apiKey
+      in: header
+      name: X-Figma-Token
+      description: Figma Personal Access Token
+    atlassianPersonalAccessToken:
+      type: apiKey
+      in: header
+      name: X-Atlassian-Token
+      description: Atlassian Personal Access Token (optional, for Jira integration)
+    anthropicApiKey:
+      type: apiKey
+      in: header
+      name: X-Anthropic-Token
+      description: Anthropic API key for LLM inference
+
+  schemas:
+    AnalyzeFigmaScopeRequest:
+      type: object
+      required:
+        - figmaUrls
+      properties:
+        figmaUrls:
+          type: array
+          items:
+            type: string
+            format: uri
+          minItems: 1
+          description: |
+            Array of Figma URLs to analyze. Supports:
+            - File URLs: https://www.figma.com/design/{fileKey}/{title}
+            - Node URLs: https://www.figma.com/design/{fileKey}/{title}?node-id={nodeId}
+            - Frame URLs: https://www.figma.com/file/{fileKey}/{title}?node-id={nodeId}
+          example:
+            - "https://www.figma.com/design/ABC123xyz/My-Design?node-id=1-100"
+        contextDescription:
+          type: string
+          maxLength: 10000
+          description: |
+            Optional text providing additional context for the AI analysis.
+            Use this to specify business context, user personas, or specific
+            areas of focus.
+          example: "This is an e-commerce checkout flow for a mobile app. Focus on accessibility and edge cases."
+        postQuestionsToFigma:
+          type: boolean
+          default: true
+          description: |
+            Whether to post generated questions as comments on Figma frames.
+            If false, questions are returned in the response but not posted.
+
+    AnalyzeFigmaScopeResponse:
+      type: object
+      required:
+        - analysis
+        - questions
+      properties:
+        analysis:
+          type: string
+          description: |
+            Markdown-formatted scope analysis of the Figma designs.
+            Includes screen descriptions, identified features, and recommendations.
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/GeneratedQuestion'
+          description: Questions generated during analysis
+        postingResults:
+          type: array
+          items:
+            $ref: '#/components/schemas/PostCommentResult'
+          description: |
+            Results of posting questions to Figma.
+            Only present if postQuestionsToFigma was true.
+        postingSummary:
+          type: string
+          description: |
+            Human-readable summary of posting results.
+            Example: "Posted 5/7 questions successfully"
+        errors:
+          type: array
+          items:
+            type: string
+          description: Any non-fatal errors encountered during processing
+
+    GeneratedQuestion:
+      type: object
+      required:
+        - text
+      properties:
+        text:
+          type: string
+          description: The question text
+        frameNodeId:
+          type: string
+          description: Figma node ID of the related frame (if frame-specific)
+          example: "123:456"
+        frameName:
+          type: string
+          description: Human-readable name of the frame
+          example: "Login Screen"
+        category:
+          type: string
+          enum:
+            - interaction
+            - state
+            - edge-case
+            - accessibility
+            - general
+          description: Category of the question
+
+    PostCommentResult:
+      type: object
+      required:
+        - success
+        - question
+      properties:
+        success:
+          type: boolean
+          description: Whether the comment was posted successfully
+        question:
+          type: string
+          description: The question text that was posted
+        frameNodeId:
+          type: string
+          description: Target frame node ID
+        frameName:
+          type: string
+          description: Target frame name
+        error:
+          type: string
+          description: Error message if posting failed
+        commentId:
+          type: string
+          description: Figma comment ID if successful
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Error message
+        code:
+          type: string
+          description: Error code for programmatic handling
+          enum:
+            - INVALID_URL
+            - MISSING_TOKEN
+            - INVALID_TOKEN
+            - MISSING_SCOPE
+            - FILE_NOT_FOUND
+            - ACCESS_DENIED
+        details:
+          type: string
+          description: Additional error details
+
+    RateLimitResponse:
+      type: object
+      required:
+        - error
+        - questions
+      properties:
+        error:
+          type: string
+          description: Rate limit error message
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/GeneratedQuestion'
+          description: |
+            All generated questions are still returned so users can
+            post them manually or retry later.
+        retryAfter:
+          type: integer
+          description: Seconds until rate limit resets
+
+tags:
+  - name: Figma Analysis
+    description: |
+      Tools for analyzing Figma designs and managing comments.
+      
+      ## Authentication
+      
+      These endpoints require:
+      - `X-Figma-Token`: Figma Personal Access Token with `file_comments:read` and `file_comments:write` scopes
+      - `X-Anthropic-Token`: Anthropic API key for LLM inference (or other supported LLM provider)
+      
+      ## Rate Limits
+      
+      Figma API rate limits apply:
+      - Dev/Full seats: ~25 requests/minute for comment endpoints
+      - If posting would exceed limits, questions are consolidated or returned without posting

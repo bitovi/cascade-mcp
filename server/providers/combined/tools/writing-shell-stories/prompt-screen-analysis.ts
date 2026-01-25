@@ -21,10 +21,12 @@ export function generateScreenAnalysisPrompt(
   screenUrl: string,
   screenPosition: string,
   notesContent?: string,
-  epicContext?: string
+  epicContext?: string,
+  semanticXml?: string
 ): string {
   const hasNotes = !!notesContent;
   const hasEpicContext = !!(epicContext && epicContext.trim());
+  const hasSemanticXml = !!semanticXml;
   
   return `You are a UX analyst tasked with creating detailed documentation of this screen design. Be exhaustive in documenting every visible element.
 
@@ -34,6 +36,7 @@ export function generateScreenAnalysisPrompt(
 - **Screen Order:** ${screenPosition}
 - **Has Notes:** ${hasNotes ? 'Yes' : 'No'}
 - **Has Epic Context:** ${hasEpicContext ? 'Yes' : 'No'}
+- **Has Semantic Structure:** ${hasSemanticXml ? 'Yes' : 'No'}
 
 **IMPORTANT:** If the screen name contains a breakpoint indicator (e.g., *-320px, *-768px, *-1024px, *-1440px), this is one view of a responsive design. Pay special attention to the "Layout Structure Analysis" section to precisely document the layout structure at this specific breakpoint.
 
@@ -68,6 +71,22 @@ ${hasEpicContext ? epicContext : 'No epic context available for this analysis.'}
 - IMPORTANT: Low priority features (⏬) should still be documented fully - they will be implemented later in this epic
 - Keep ✅ and ❌ descriptions brief since they're not part of this epic's work
 
+${hasSemanticXml ? `
+## Figma Semantic Structure
+
+The following XML represents the component hierarchy and semantic structure from Figma's design system. Use this to:
+- **Identify component variants**: Look for \`State\` attributes (e.g., State="Hover", State="Open", State="Selected")
+- **Detect interaction patterns**: Components with \`interactive="true"\` are clickable/hoverable
+- **Understand functionality**: Component names reveal purpose (Hover-Card = tooltip, Text-Listing = list of items, Reaction-Statistics = vote display)
+- **Compare similar components**: Multiple instances of the same component with different states show interaction behavior
+
+**Important**: When you see similar visual elements (like multiple comments or cards), check their semantic structure to detect state differences that indicate interactions (hover states, expanded states, selected states, etc.).
+
+\`\`\`xml
+${semanticXml}
+\`\`\`
+
+` : ''}
 ## Page Structure
 
 Document the overall page layout:
@@ -129,6 +148,10 @@ Document every visible element with exact details:
 - **Actions:** All clickable elements, hover states, interactive components
 
 Include exact text labels, button copy, and all visible UI text.
+
+**When comparing similar UI components:** If you see multiple instances of similar components (comments, cards, list items), compare them carefully. If they differ visually, describe what's different and explain what interaction or state change that difference might represent (e.g., hover state, selected state, active state with revealed information).
+
+**If semantic structure is provided:** Cross-reference the visual differences with the Figma component structure. Look for State attributes or additional child components (like Hover-Card) that confirm what interaction is being shown.
 
 ## Data Display
 
