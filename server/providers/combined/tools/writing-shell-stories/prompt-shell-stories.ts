@@ -8,6 +8,8 @@
  * before creating full tickets.
  */
 
+import type { ScreenAnnotation } from '../shared/screen-annotation.js';
+
 /**
  * System prompt for shell story generation
  * Sets the role and fundamental constraints for the AI
@@ -53,6 +55,7 @@ export interface ConfluenceDocumentContext {
  * @param scopeAnalysis - Extracted scope analysis section from epic
  * @param remainingContext - Epic context without scope analysis section
  * @param confluenceDocs - Optional array of relevant Confluence documents
+ * @param figmaComments - Optional array of Figma comment context per screen
  * @returns Complete prompt for shell story generation
  */
 export function generateShellStoryPrompt(
@@ -60,7 +63,8 @@ export function generateShellStoryPrompt(
   analysisFiles: Array<{ screenName: string; content: string }>,
   scopeAnalysis: string,
   remainingContext: string,
-  confluenceDocs?: ConfluenceDocumentContext[]
+  confluenceDocs?: ConfluenceDocumentContext[],
+  figmaComments?: ScreenAnnotation[]
 ): string {
 
   // Build documentation section if provided (supports Confluence and Google Docs)
@@ -100,6 +104,32 @@ ${doc.summary || doc.markdown}
 **When scope analysis and documentation conflict:**
 - Scope analysis takes precedence for feature inclusion
 - Add ❓ question if the conflict affects story implementation
+
+`
+    : '';
+
+  // Build Figma comments section if provided
+  const figmaCommentsSection = figmaComments && figmaComments.length > 0
+    ? `**FIGMA COMMENTS (from design review):**
+
+The following comments are from designers, stakeholders, or previous AI analysis on Figma screens. Use these to understand design intent, clarifications, and questions that have been raised.
+
+${figmaComments.map(screenComments => `<figma_screen_comments screen="${screenComments.screenName}">
+
+${screenComments.markdown}
+
+</figma_screen_comments>`).join('\n\n')}
+
+**Use Figma comments for:**
+- Design clarifications and intent from designers
+- Stakeholder feedback and requirements
+- Previous questions and answers about the design
+- Context that may not be visible in the design itself
+
+**When comments and scope analysis conflict:**
+- Scope analysis takes precedence for feature inclusion
+- Comments provide additional context for implementation details
+- Add ❓ question if the conflict is significant
 
 `
     : '';
@@ -154,7 +184,7 @@ ${remainingContext}
 
 ## INPUTS (provided below)
 
-${epicContextSection}${confluenceSection}**SCREEN ORDERING (from screens.yaml):**
+${epicContextSection}${confluenceSection}${figmaCommentsSection}**SCREEN ORDERING (from screens.yaml):**
 \`\`\`yaml
 ${screensYaml}
 \`\`\`

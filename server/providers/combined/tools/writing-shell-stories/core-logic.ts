@@ -39,6 +39,14 @@ import {
 } from '../../../atlassian/markdown-converter.js';
 import { handleJiraAuthError, addIssueComment } from '../../../atlassian/atlassian-helpers.js';
 import { calculateAdfSize, wouldExceedLimit } from './size-helpers.js';
+import {
+  fetchCommentsForFile,
+  groupCommentsIntoThreads,
+  formatCommentsForContext,
+  type FrameMetadata,
+} from '../../../figma/tools/analyze-figma-scope/figma-comment-utils.js';
+import type { ScreenAnnotation } from '../shared/screen-annotation.js';
+import { notesToScreenAnnotations } from './note-text-extractor.js';
 
 /**
  * Helper: Extract the "## Scope Analysis" section from epic context
@@ -125,6 +133,7 @@ export async function executeWriteShellStories(
     allFrames,
     allNotes,
     figmaFileKey,
+    nodesDataMap,
     epicWithoutShellStoriesMarkdown,
     epicWithoutShellStoriesAdf,
     epicDescriptionAdf,
@@ -213,6 +222,41 @@ export async function executeWriteShellStories(
   console.log(`   📚 Total documentation context: ${allDocs.length} docs (${confluenceDocs.length} Confluence + ${googleDocs.length} Google Docs)`);
 
   // ==========================================
+  // PHASE 3.8: Fetch Figma comments for context
+  // ==========================================
+  let figmaCommentContexts: ScreenAnnotation[] = [];
+  if (figmaClient && figmaFileKey) {
+    try {
+      console.log('  Phase 3.8: Fetching Figma comments...');
+      const comments = await fetchCommentsForFile(figmaClient, figmaFileKey);
+      if (comments.length > 0) {
+        const threads = groupCommentsIntoThreads(comments);
+        // Build frame metadata from screens
+        const frameMetadata: FrameMetadata[] = screens.map((screen) => ({
+          fileKey: figmaFileKey,
+          nodeId: screen.name,
+          name: screen.frameName || screen.name,
+          url: screen.url,
+        }));
+        figmaCommentContexts = formatCommentsForContext(threads, frameMetadata);
+        console.log(`   💬 Fetched ${comments.length} Figma comments across ${figmaCommentContexts.length} screens`);
+      } else {
+        console.log('   💬 No Figma comments found');
+      }
+    } catch (error: any) {
+      console.log(`   ⚠️ Figma comment fetching failed: ${error.message}`);
+      // Continue without comments - they're optional context
+    }
+  }
+
+  // ==========================================
+  // PHASE 3.9: Add notes as context (using shared notesToScreenAnnotations)
+  // ==========================================
+  const noteAnnotations = notesToScreenAnnotations(screens, allNotes);
+  const allContexts = [...figmaCommentContexts, ...noteAnnotations];
+  console.log(`   📝 Total contexts (comments + notes): ${allContexts.length} (${figmaCommentContexts.length} comments + ${noteAnnotations.length} notes)`);
+
+  // ==========================================
   // PHASE 4: Download images and analyze screens
   // ==========================================
   console.log('  Phase 4: Downloading images and analyzing screens...');
@@ -227,6 +271,7 @@ export async function executeWriteShellStories(
     allFrames,
     allNotes,
     figmaFileKey,
+    nodesDataMap,
     epicContext: epicWithoutShellStoriesMarkdown,
     notify: async (message: string) => {
       // Show progress for each screen (auto-increments)
@@ -248,7 +293,8 @@ export async function executeWriteShellStories(
     yamlContent,
     notify,
     epicContext: epicWithoutShellStoriesMarkdown,
-    confluenceDocs: allDocs
+    confluenceDocs: allDocs,
+    figmaComments: allContexts
   });
 
   // ==========================================
@@ -298,8 +344,9 @@ async function generateShellStoriesFromAnalyses(params: {
   notify: ToolDependencies['notify'];
   epicContext?: string;
   confluenceDocs?: ConfluenceDocumentContext[];
+  figmaComments?: ScreenAnnotation[];
 }): Promise<{ storyCount: number; analysisCount: number; shellStoriesPath: string | null; shellStoriesText: string | null }> {
-  const { generateText, screens, debugDir, figmaFileKey, yamlContent, notify, epicContext, confluenceDocs } = params;
+  const { generateText, screens, debugDir, figmaFileKey, yamlContent, notify, epicContext, confluenceDocs, figmaComments } = params;
   
   console.log('  Phase 5: Generating shell stories from analyses...');
   
@@ -353,7 +400,8 @@ async function generateShellStoriesFromAnalyses(params: {
     analysisFiles,
     scopeAnalysis,
     remainingContext,
-    confluenceDocs
+    confluenceDocs,
+    figmaComments
   );
   
   // Save prompt to debug directory for debugging (if enabled)

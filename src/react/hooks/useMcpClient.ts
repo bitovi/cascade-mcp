@@ -246,6 +246,12 @@ export function useMcpClient(options: UseMcpClientOptions = {}): UseMcpClientRet
     
     await clientRef.current.disconnect();
     setTools([]);
+    
+    // Clear stored OAuth tokens and server URL to prevent auto-reconnect
+    clientRef.current.clearTokens();
+    localStorage.removeItem('mcp_last_server_url');
+    localStorage.removeItem('mcp_pending_server_url');
+    
     addLog('info', 'Disconnected');
   }, [addLog]);
 

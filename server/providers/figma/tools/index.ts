@@ -3,6 +3,7 @@ import { registerFigmaGetUserTool } from './figma-get-user.js';
 import { registerFigmaGetMetadataForLayerTool } from './figma-get-metadata-for-layer.js';
 import { registerFigmaGetImageDownloadTool } from './figma-get-image-download.js';
 import { registerFigmaGetLayersForPageTool } from './figma-get-layers-for-page.js';
+import { registerAnalyzeFigmaScopeTool } from './analyze-figma-scope/index.js';
 
 /**
  * Register all Figma-specific tools with the MCP server
@@ -24,5 +25,8 @@ export function registerFigmaTools(mcp: McpServer, authContext: any): void {
   // Page layers discovery tool (ported from figma-downloadable-image-mcp)
   registerFigmaGetLayersForPageTool(mcp);
   
-  console.log('  All Figma tools registered (4 tools)');
+  // Figma design analysis and question posting tool
+  registerAnalyzeFigmaScopeTool(mcp);
+  
+  console.log('  All Figma tools registered (5 tools)');
 }

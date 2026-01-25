@@ -21,6 +21,7 @@ import {
   SCREEN_ANALYSIS_SYSTEM_PROMPT,
   SCREEN_ANALYSIS_MAX_TOKENS
 } from '../writing-shell-stories/prompt-screen-analysis.js';
+import { generateSemanticXml } from '../../../figma/semantic-xml-generator.js';
 
 /**
  * Screen to analyze
@@ -45,6 +46,7 @@ export interface RegenerateAnalysesParams {
   allFrames: FigmaNodeMetadata[];
   allNotes: FigmaNodeMetadata[];
   figmaFileKey: string;
+  nodesDataMap?: Map<string, any>;  // Map of nodeId -> full node data for semantic XML generation
   epicContext?: string;   // Optional epic description content for context
   notify?: (message: string) => Promise<void>;  // Optional progress callback
 }
@@ -74,7 +76,7 @@ export interface RegenerateAnalysesResult {
 export async function regenerateScreenAnalyses(
   params: RegenerateAnalysesParams
 ): Promise<RegenerateAnalysesResult> {
-  const { generateText, figmaClient, screens, allFrames, allNotes, figmaFileKey, epicContext, notify } = params;
+  const { generateText, figmaClient, screens, allFrames, allNotes, figmaFileKey, nodesDataMap, epicContext, notify } = params;
   
   let downloadedImages = 0;
   let analyzedScreens = 0;
@@ -202,6 +204,7 @@ export async function regenerateScreenAnalyses(
       allNotes,
       imagesMap,
       fileCachePath,
+      nodesDataMap,
       epicContext,
       originalIndex,
       totalScreens: screens.length
@@ -249,12 +252,13 @@ async function analyzeScreen(
     allNotes: FigmaNodeMetadata[];
     imagesMap: Map<string, any>;
     fileCachePath: string;
+    nodesDataMap?: Map<string, any>;
     epicContext?: string;
     originalIndex: number;
     totalScreens: number;
   }
 ): Promise<{ filename: string; analyzed: boolean; notesWritten: number }> {
-  const { generateText, allFrames, allNotes, imagesMap, fileCachePath, epicContext, originalIndex, totalScreens } = params;
+  const { generateText, allFrames, allNotes, imagesMap, fileCachePath, nodesDataMap, epicContext, originalIndex, totalScreens } = params;
   
   // Find the frame for this screen
   const frame = allFrames.find(f => 
@@ -292,6 +296,46 @@ async function analyzeScreen(
   const imageBuffer = Buffer.from(imageResult.base64Data, 'base64');
   await fs.writeFile(imagePath, imageBuffer);
   
+  // Step 2.5: Generate semantic XML if node data available
+  let semanticXml: string | undefined;
+  if (nodesDataMap) {
+    const frameId = frame.id; // Already have this from finding the frame
+    const nodeData = nodesDataMap.get(frameId);
+    
+    if (nodeData) {
+      try {
+        semanticXml = generateSemanticXml(nodeData);
+        const xmlSizeKb = Math.round(semanticXml.length / 1024);
+        
+        // Check 200KB size limit
+        const maxSizeKb = 200;
+        if (xmlSizeKb > maxSizeKb) {
+          const originalSizeKb = xmlSizeKb;
+          const maxBytes = maxSizeKb * 1024;
+          const truncationNote = `\n\n<!-- NOTE: Component structure truncated due to complexity. The above shows the primary components and hierarchy. Some deeply nested or repetitive elements have been omitted. -->`;
+          semanticXml = semanticXml.substring(0, maxBytes - truncationNote.length) + truncationNote;
+          console.log(`    ⚠️  Semantic XML truncated (original: ${originalSizeKb} KB, limit: ${maxSizeKb} KB)`);
+        } else {
+          console.log(`    🔍 Generated semantic XML (${xmlSizeKb} KB) for analysis`);
+        }
+        
+        // Save to debug cache if enabled (optional for debugging)
+        if (process.env.SAVE_FIGMA_SEMANTIC_XML_TO_CACHE === 'true') {
+          const semanticXmlPath = path.join(fileCachePath, `${filename}.semantic.xml`);
+          await fs.writeFile(semanticXmlPath, semanticXml, 'utf-8');
+          console.log(`    📁 Saved semantic XML to debug cache`);
+        }
+      } catch (error: any) {
+        console.log(`    ⚠️  Failed to generate semantic XML: ${error.message}`);
+        // Continue without semantic XML - not critical
+      }
+    } else {
+      console.log(`    ℹ️  No node data found for frame ${frameId}`);
+    }
+  } else {
+    console.log(`    ℹ️  No semantic structure available (node data not provided)`);
+  }
+  
   // Step 3: Run AI analysis on screen
   try {
     // Read notes content if available
@@ -310,7 +354,8 @@ async function analyzeScreen(
       screen.url,
       screenPosition,
       notesContent || undefined,
-      epicContext
+      epicContext,
+      semanticXml
     );
 
     // Generate analysis using injected LLM client (with image)

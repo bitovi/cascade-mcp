@@ -27,6 +27,13 @@ import {
   type ADFDocument
 } from '../../../atlassian/markdown-converter.js';
 import { handleJiraAuthError } from '../../../atlassian/atlassian-helpers.js';
+import {
+  fetchCommentsForFile,
+  groupCommentsIntoThreads,
+  formatCommentsForContext,
+} from '../../../figma/tools/analyze-figma-scope/figma-comment-utils.js';
+import type { ScreenAnnotation } from '../shared/screen-annotation.js';
+import { notesToScreenAnnotations } from '../writing-shell-stories/note-text-extractor.js';
 
 /**
  * Parameters for executing the analyze-feature-scope workflow
@@ -88,7 +95,8 @@ export async function executeAnalyzeFeatureScope(
     epicDescriptionAdf,
     cloudId: resolvedCloudId,
     siteName: resolvedSiteName,
-    analyzedScreens
+    analyzedScreens,
+    allNotes
   } = analysisResult;
 
   console.log(`🔍 analyze-feature-scope: Received ${screens.length} screens from pipeline`);
@@ -130,44 +138,36 @@ export async function executeAnalyzeFeatureScope(
   // ==========================================
   // PHASE 4.6: Setup Google Docs context (if any linked docs)
   // ==========================================
-  let googleDocsContext: DocumentContext[] = [];
-  
-  if (epicDescriptionAdf) {
-    if (!deps.googleClient) {
-      console.log('🔗 Skipping Google Docs context (no Google authentication)');
-    } else {
-      try {
-        const googleDocsResult = await setupGoogleDocsContext({
-          epicAdf: epicDescriptionAdf,
-          googleClient: deps.googleClient,
-          generateText,
-          notify,
-        });
-        
-        // Filter to docs relevant for scope analysis
-        googleDocsContext = googleDocsResult.byRelevance.analyzeScope.map((doc: GoogleDocDocument) => ({
-          title: doc.title,
-          url: doc.url,
-          markdown: doc.markdown,
-          documentType: doc.metadata.relevance?.documentType,
-          relevanceScore: doc.metadata.relevance?.toolScores.find(t => t.toolId === 'analyze-feature-scope')?.overallScore,
-          summary: doc.metadata.summary?.text,
-          source: 'google-docs' as const,
-        }));
-        
-        console.log(`   📄 Google Docs for scope analysis: ${googleDocsContext.length}`);
-      } catch (error: any) {
-        console.log(`   ⚠️ Google Docs context setup failed: ${error.message}`);
-        // Continue without Google Docs context - it's optional
-      }
-    }
-  }
+  const googleDocsContext = await fetchGoogleDocsContext({
+    epicDescriptionAdf,
+    googleClient: deps.googleClient,
+    generateText,
+    notify,
+    toolId: 'analyze-feature-scope',
+  });
 
   // ==========================================
   // PHASE 4.7: Merge documentation contexts
   // ==========================================
   const referenceDocs = [...confluenceDocsContext, ...googleDocsContext];
   console.log(`   📚 Total documentation context: ${referenceDocs.length} docs (${confluenceDocsContext.length} Confluence + ${googleDocsContext.length} Google Docs)`);
+
+  // ==========================================
+  // PHASE 4.8: Fetch Figma comments as context
+  // ==========================================
+  const figmaCommentContexts = await fetchFigmaCommentsContext({
+    figmaClient,
+    figmaFileKey,
+    screens,
+    notify,
+  });
+
+  // ==========================================
+  // PHASE 4.9: Add notes as context (using shared notesToScreenAnnotations)
+  // ==========================================
+  const noteAnnotations = notesToScreenAnnotations(screens, allNotes);
+  const allContexts = [...figmaCommentContexts, ...noteAnnotations];
+  console.log(`   📝 Total contexts (comments + notes): ${allContexts.length} (${figmaCommentContexts.length} comments + ${noteAnnotations.length} notes)`);
 
   // ==========================================
   // PHASE 5: Generate scope analysis
@@ -180,7 +180,8 @@ export async function executeAnalyzeFeatureScope(
     yamlContent,
     notify,
     epicContext,
-    referenceDocs
+    referenceDocs,
+    commentContexts: allContexts,
   });
 
   // ==========================================
@@ -221,13 +222,14 @@ async function generateScopeAnalysis(params: {
   notify: ToolDependencies['notify'];
   epicContext?: string;
   referenceDocs?: DocumentContext[];
+  commentContexts?: ScreenAnnotation[];
 }): Promise<{
   scopeAnalysisContent: string;
   featureAreasCount: number;
   questionsCount: number;
   scopeAnalysisPath: string;
 }> {
-  const { generateText, screens, debugDir, figmaFileKey, yamlContent, notify, epicContext, referenceDocs } = params;
+  const { generateText, screens, debugDir, figmaFileKey, yamlContent, notify, epicContext, referenceDocs, commentContexts } = params;
   
   await notify('📝 Feature Identification: Analyzing features and scope...');
   
@@ -258,7 +260,8 @@ async function generateScopeAnalysis(params: {
     yamlContent,
     analysisFiles,
     epicContext,
-    referenceDocs
+    referenceDocs,
+    commentContexts
   );
   
   // Save prompt to debug directory for debugging (if enabled)
@@ -403,5 +406,108 @@ async function updateEpicWithScopeAnalysis({
   } catch (error: any) {
     console.log(`    ⚠️ Error updating epic: ${error.message}`);
     await notify(`⚠️ Error updating epic: ${error.message}`);
+  }
+}
+
+/**
+ * Phase 4.6: Fetch Google Docs context
+ * 
+ * Fetches and processes Google Docs linked in the epic description.
+ * Returns documents filtered for the specified tool's relevance.
+ * 
+ * @returns Array of DocumentContext objects (empty if no docs or error)
+ */
+async function fetchGoogleDocsContext(params: {
+  epicDescriptionAdf: any;
+  googleClient: ToolDependencies['googleClient'];
+  generateText: ToolDependencies['generateText'];
+  notify: ToolDependencies['notify'];
+  toolId: string;
+}): Promise<DocumentContext[]> {
+  const { epicDescriptionAdf, googleClient, generateText, notify, toolId } = params;
+
+  if (!epicDescriptionAdf) {
+    return [];
+  }
+
+  if (!googleClient) {
+    console.log('🔗 Skipping Google Docs context (no Google authentication)');
+    return [];
+  }
+
+  try {
+    const googleDocsResult = await setupGoogleDocsContext({
+      epicAdf: epicDescriptionAdf,
+      googleClient,
+      generateText,
+      notify,
+    });
+
+    // Filter to docs relevant for the specified tool
+    const docs = googleDocsResult.byRelevance.analyzeScope.map((doc: GoogleDocDocument) => ({
+      title: doc.title,
+      url: doc.url,
+      markdown: doc.markdown,
+      documentType: doc.metadata.relevance?.documentType,
+      relevanceScore: doc.metadata.relevance?.toolScores.find(t => t.toolId === toolId)?.overallScore,
+      summary: doc.metadata.summary?.text,
+      source: 'google-docs' as const,
+    }));
+
+    console.log(`   📄 Google Docs for ${toolId}: ${docs.length}`);
+    return docs;
+  } catch (error: any) {
+    console.log(`   ⚠️ Google Docs context setup failed: ${error.message}`);
+    return [];
+  }
+}
+
+/**
+ * Phase 4.8: Fetch Figma comments context
+ * 
+ * Fetches comments from a Figma file and formats them as ScreenAnnotation
+ * objects for inclusion in AI prompts.
+ * 
+ * @returns Array of ScreenAnnotation objects (empty if no comments or error)
+ */
+async function fetchFigmaCommentsContext(params: {
+  figmaClient: ToolDependencies['figmaClient'];
+  figmaFileKey: string;
+  screens: Screen[];
+  notify: ToolDependencies['notify'];
+}): Promise<ScreenAnnotation[]> {
+  const { figmaClient, figmaFileKey, screens, notify } = params;
+
+  if (!figmaClient || !figmaFileKey) {
+    return [];
+  }
+
+  try {
+    await notify('💬 Fetching Figma comments...');
+
+    const comments = await fetchCommentsForFile(figmaClient, figmaFileKey);
+
+    if (comments.length === 0) {
+      console.log('   💬 No Figma comments found on file');
+      return [];
+    }
+
+    // Group comments into threads and format for context
+    const threads = groupCommentsIntoThreads(comments);
+
+    // Build frame metadata from screens for association
+    const frameMetadata = screens.map((screen) => ({
+      fileKey: figmaFileKey,
+      nodeId: screen.name,
+      name: (screen as Screen).frameName || screen.name,
+      url: screen.url,
+    }));
+
+    const contexts = formatCommentsForContext(threads, frameMetadata);
+    console.log(`   💬 Figma comments: ${comments.length} comments, ${contexts.length} screen contexts`);
+    return contexts;
+  } catch (error: any) {
+    console.log(`   ⚠️ Figma comment fetching failed: ${error.message}`);
+    return [];
   }
 }

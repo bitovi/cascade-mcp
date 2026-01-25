@@ -101,7 +101,8 @@ export async function executeScreenAnalysisPipeline(
     epicDescriptionAdf,
     figmaUrls,
     cloudId: resolvedCloudId,
-    siteName: resolvedSiteName
+    siteName: resolvedSiteName,
+    nodesDataMap
   } = setupResult;
   
   await notify(`✅ Preparation Complete: ${screens.length} screens ready`);
@@ -121,6 +122,7 @@ export async function executeScreenAnalysisPipeline(
     allNotes,
     figmaFileKey,
     epicContext: epicWithoutShellStoriesMarkdown,
+    nodesDataMap,
     notify: async (message: string) => {
       // Show progress for each screen (auto-increments)
       await notify(message);

@@ -9,18 +9,29 @@ import * as fs from 'fs/promises';
 import type { FigmaNodeMetadata } from '../../../figma/figma-helpers.js';
 import { convertNodeIdToApiFormat } from '../../../figma/figma-helpers.js';
 import type { Screen } from './screen-analyzer.js';
+import type { ScreenAnnotation } from '../shared/screen-annotation.js';
 
 /**
  * Extract text content from a Figma node recursively
  * @param node - Figma node (typically a text node with characters)
  * @returns Extracted text content
  */
-function extractText(node: any): string {
+export function extractText(node: any): string {
   if (node.characters) return node.characters;
   if (node.children) {
     return node.children.map(extractText).join('\n');
   }
   return '';
+}
+
+/**
+ * Extract text from a Figma note's children
+ * @param note - Figma note metadata with children nodes
+ * @returns Extracted text content from note
+ */
+export function extractNoteText(note: FigmaNodeMetadata): string {
+  if (!note.children) return '';
+  return note.children.map(extractText).filter(t => t).join('\n');
 }
 
 /**
@@ -47,7 +58,7 @@ export function extractNoteTexts(
     const note = allNotes.find(n => n.id === apiNoteId);
     if (note && note.children) {
       // Extract text from note's children (text nodes)
-      const noteText = note.children.map(extractText).filter(t => t).join('\n');
+      const noteText = extractNoteText(note);
       if (noteText) {
         noteTexts.push(`## Note ${noteTexts.length + 1}\n\n${noteText}`);
       }
@@ -99,5 +110,42 @@ export async function writeNotesForScreen(
     console.log(`    ⚠️ Failed to extract notes for ${screen.name}: ${error.message}`);
     return 0;
   }
+}
+
+/**
+ * Convert notes for multiple screens to ScreenAnnotation format
+ * 
+ * This is the primary function for integrating notes into prompt contexts.
+ * It extracts note content from Figma metadata and formats it as ScreenAnnotation
+ * objects that can be consumed uniformly alongside comments.
+ * 
+ * @param screens - Array of Screen objects with note URLs
+ * @param allNotes - Complete array of note metadata from Figma
+ * @returns Array of ScreenAnnotation objects for screens that have notes
+ */
+export function notesToScreenAnnotations(
+  screens: Screen[],
+  allNotes: FigmaNodeMetadata[]
+): ScreenAnnotation[] {
+  const annotations: ScreenAnnotation[] = [];
+
+  for (const screen of screens) {
+    if (screen.notes.length === 0) continue;
+
+    const noteTexts = extractNoteTexts(screen.notes, allNotes);
+    if (noteTexts.length === 0) continue;
+
+    // Format notes as markdown (without the overall header since we're per-screen)
+    const markdown = noteTexts.join('\n\n---\n\n');
+
+    annotations.push({
+      screenId: screen.name, // name is the node ID
+      screenName: screen.frameName || screen.name,
+      source: 'notes',
+      markdown,
+    });
+  }
+
+  return annotations;
 }
 

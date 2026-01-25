@@ -199,15 +199,27 @@ Integrate Figma comments into the cascade-mcp workflow in two parts:
 
 ## Questions
 
-1. Should resolved Figma comments be excluded from context, or included with a "resolved" indicator? Included.
+1. Should resolved Figma comments be excluded from context, or included with a "resolved" indicator? 
 
-2. For `analyze-figma-scope`, should we require a Jira epic for context, or allow standalone analysis with just a text description? Standalone. This should be figma to figma.
+Answer: Included.
+
+2. For `analyze-figma-scope`, should we require a Jira epic for context, or allow standalone analysis with just a text description? Standalone. 
+
+Answer: This should be figma to figma.
 
 3. When posting questions as comments, should we use a specific format/prefix (e.g., "❓ [AI Question]") to distinguish AI-generated questions from human comments?
 
+Yes, post with `Cascade🤖P: {Question}❓` like `Cascade🤖: Should search be case sensitive❓`
+
 4. Should we support posting comments on replies (adding to existing threads), or only create new top-level comments?
+
+Only create new top-level comments.
+
 
 5. For comments that span multiple frames (general questions), where should they be posted? Options:
    - First frame in the file
    - Page-level (if Figma supports this)
    - A designated "Overview" frame if one exists
+
+
+If it associates stonger for one than the others, post in that frame. Otherwise, page-level. 

@@ -84,7 +84,7 @@ VITE_JIRA_API_URL=https://api.atlassian.com/ex/jira
 # Figma OAuth
 FIGMA_CLIENT_ID=your-figma-client-id
 FIGMA_CLIENT_SECRET=your-figma-client-secret
-FIGMA_OAUTH_SCOPES="file_content:read file_comments:read current_user:read"
+FIGMA_OAUTH_SCOPES="file_content:read file_comments:read file_comments:write current_user:read"
 
 # Google Drive OAuth
 GOOGLE_CLIENT_ID=your-google-client-id

@@ -493,6 +493,7 @@ export async function generateStoryContent(
       allNotes: setupResult.allNotes,
       figmaFileKey: setupResult.figmaFileKey,
       epicContext: setupResult.epicWithoutShellStoriesMarkdown,
+      nodesDataMap: setupResult.nodesDataMap,
       notify: async (msg) => await notify(msg)
     });
     
