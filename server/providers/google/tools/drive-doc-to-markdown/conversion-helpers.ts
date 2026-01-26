@@ -4,51 +4,83 @@
  */
 
 import TurndownService from 'turndown';
+import { parseHTML } from 'linkedom';
 
 /**
- * Detect unsupported elements (images and tables) in HTML and generate warnings
+ * Result of HTML preprocessing
  */
-function detectUnsupportedElements(html: string): string[] {
-  const warnings: string[] = [];
-  
-  // Check for images
-  const imgMatches = html.match(/<img[^>]*>/gi);
-  if (imgMatches) {
-    warnings.push(`Document contains ${imgMatches.length} image(s) which are not supported`);
-  }
-  
-  // Check for tables
-  const tableMatches = html.match(/<table[^>]*>/gi);
-  if (tableMatches) {
-    warnings.push(`Document contains ${tableMatches.length} table(s) which are not supported`);
-  }
-  
-  return warnings;
+interface PreprocessResult {
+  cleanedHtml: string;
+  warnings: string[];
 }
 
 /**
- * Preprocess HTML to remove non-content elements (styles, scripts, metadata)
+ * Preprocess HTML to remove non-content elements and detect unsupported features
+ * Uses linkedom to parse and clean the HTML properly
+ * 
+ * @param html - Raw HTML from Google Docs export
+ * @returns Cleaned HTML and warnings about unsupported elements
  */
-function preprocessHtml(html: string): string {
-  // Remove style tags and their contents
-  let cleaned = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-  
-  // Remove script tags and their contents
-  cleaned = cleaned.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
-  
-  // Remove @import statements and other CSS that might leak through
-  cleaned = cleaned.replace(/@import[^;]+;/gi, '');
-  
-  // Remove head tag and its contents if present
-  cleaned = cleaned.replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '');
-  
-  // Remove meta tags
-  cleaned = cleaned.replace(/<meta[^>]*>/gi, '');
-  
-  // Remove link tags (stylesheets, etc.)
-  cleaned = cleaned.replace(/<link[^>]*>/gi, '');
-  
-  return cleaned;
+function preprocessHtml(html: string): PreprocessResult {
+  try {
+    const { document } = parseHTML(html);
+    
+    // Detect unsupported elements before removal
+    const warnings: string[] = [];
+    const images = document.querySelectorAll('img');
+    if (images.length > 0) {
+      warnings.push(`Document contains ${images.length} image(s) which are not supported`);
+    }
+    
+    const tables = document.querySelectorAll('table');
+    if (tables.length > 0) {
+      warnings.push(`Document contains ${tables.length} table(s) which are not supported`);
+    }
+    
+    // Remove non-content elements
+    const elementsToRemove = [
+      'style',
+      'script',
+      'head',
+      'meta',
+      'link',
+    ];
+    
+    elementsToRemove.forEach(selector => {
+      document.querySelectorAll(selector).forEach(el => el.remove());
+    });
+    
+    // Return the cleaned HTML (use body if present, otherwise full document)
+    const body = document.querySelector('body');
+    const cleanedHtml = body ? body.innerHTML : document.documentElement.innerHTML;
+    
+    return { cleanedHtml, warnings };
+  } catch (error) {
+    // Fallback to regex-based cleaning if linkedom parsing fails
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.warn(`Failed to parse HTML with linkedom, using regex fallback: ${errorMessage}`);
+    
+    // Regex-based fallback
+    let cleaned = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+    cleaned = cleaned.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+    cleaned = cleaned.replace(/@import[^;]+;/gi, '');
+    cleaned = cleaned.replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '');
+    cleaned = cleaned.replace(/<meta[^>]*>/gi, '');
+    cleaned = cleaned.replace(/<link[^>]*>/gi, '');
+    
+    // Detect unsupported elements with regex
+    const warnings: string[] = [];
+    const imgMatches = cleaned.match(/<img[^>]*>/gi);
+    if (imgMatches) {
+      warnings.push(`Document contains ${imgMatches.length} image(s) which are not supported`);
+    }
+    const tableMatches = cleaned.match(/<table[^>]*>/gi);
+    if (tableMatches) {
+      warnings.push(`Document contains ${tableMatches.length} table(s) which are not supported`);
+    }
+    
+    return { cleanedHtml: cleaned, warnings };
+  }
 }
 
 /**
@@ -57,10 +89,8 @@ function preprocessHtml(html: string): string {
 export function htmlToMarkdown(html: string): { markdown: string; warnings: string[] } {
   console.log('Converting HTML to Markdown');
   
-  // Preprocess HTML to remove non-content elements
-  const cleanedHtml = preprocessHtml(html);
-  
-  const warnings = detectUnsupportedElements(cleanedHtml);
+  // Preprocess HTML to remove non-content elements and detect unsupported features
+  const { cleanedHtml, warnings } = preprocessHtml(html);
   
   try {
     // Initialize Turndown with GitHub-flavored markdown options
