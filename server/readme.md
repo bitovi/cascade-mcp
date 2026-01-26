@@ -263,7 +263,7 @@ npm run dev:client
   - Returns: markdown content, document metadata, conversion warnings, processing time
   - Parameters: `url` (Google Doc URL or document ID)
   - Example: `google-drive-doc-to-markdown({ url: "https://docs.google.com/document/d/abc123/edit" })`
-  - Dual interface: Available as MCP tool and REST API endpoint `/api/drive-doc-to-markdown`
+  - Available as MCP tool only
   - Limitations: Google Docs only (not Sheets/Slides/PDFs), max 10MB document size
 
 ### Combined Provider Tools
