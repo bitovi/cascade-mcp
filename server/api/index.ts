@@ -10,7 +10,7 @@ import { handleWriteShellStories } from './write-shell-stories.js';
 import { handleWriteNextStory } from './write-next-story.js';
 import { handleIdentifyFeatures } from './identify-features.js';
 import { handleAnalyzeFeatureScope } from './analyze-feature-scope.js';
-import { handleAnalyzeFigmaScope } from './analyze-figma-scope.js';
+import { handleFigmaReviewDesign } from './figma-review-design.js';
 import { handleReviewWorkItem } from './review-work-item.js';
 import { handleDriveAboutUser } from './drive-about-user.js';
 import { handleDriveDocToMarkdown } from './drive-doc-to-markdown.js';
@@ -47,8 +47,8 @@ export function registerRestApiRoutes(app: Express): void {
   console.log('  ✓ POST /api/analyze-feature-scope');
   
   // Analyze Figma designs directly and post questions as comments
-  app.post('/api/analyze-figma-scope', (req, res) => handleAnalyzeFigmaScope(req, res));
-  console.log('  ✓ POST /api/analyze-figma-scope');
+  app.post('/api/figma-review-design', (req, res) => handleFigmaReviewDesign(req, res));
+  console.log('  ✓ POST /api/figma-review-design');
   
   // Legacy endpoint for backward compatibility (redirects to analyze-feature-scope)
   // Wrap handler to match Express signature (req, res) => void

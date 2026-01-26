@@ -1,5 +1,5 @@
 /**
- * MCP Tool Handler for Analyze Figma Scope
+ * MCP Tool Handler for Figma Review Design
  *
  * Analyzes Figma screen designs directly and posts clarifying questions
  * as comments on the Figma file. This is a standalone tool that doesn't
@@ -20,20 +20,20 @@ import { executeAnalyzeFigmaScope } from './core-logic.js';
 /**
  * Tool parameters interface
  */
-interface AnalyzeFigmaScopeParams {
+interface FigmaReviewDesignParams {
   figmaUrls: string[];
   contextDescription?: string;
 }
 
 /**
- * Register the analyze-figma-scope tool with the MCP server
+ * Register the figma-review-design tool with the MCP server
  * @param mcp - MCP server instance
  */
-export function registerAnalyzeFigmaScopeTool(mcp: McpServer): void {
+export function registerFigmaReviewDesignTool(mcp: McpServer): void {
   mcp.registerTool(
-    'analyze-figma-scope',
+    'figma-review-design',
     {
-      title: 'Analyze Figma Scope',
+      title: 'Figma Review Design',
       description:
         'Analyze Figma screen designs and post clarifying questions as comments. ' +
         'Provide one or more Figma URLs to analyze. Questions will be posted directly ' +
@@ -53,14 +53,14 @@ export function registerAnalyzeFigmaScopeTool(mcp: McpServer): void {
           ),
       },
     },
-    async ({ figmaUrls, contextDescription }: AnalyzeFigmaScopeParams, context) => {
-      console.log('analyze-figma-scope called', {
+    async ({ figmaUrls, contextDescription }: FigmaReviewDesignParams, context) => {
+      console.log('figma-review-design called', {
         figmaUrls,
         hasContextDescription: !!contextDescription,
       });
 
       // Get auth info for Figma
-      const authInfo = getAuthInfoSafe(context, 'analyze-figma-scope');
+      const authInfo = getAuthInfoSafe(context, 'figma-review-design');
 
       // Extract Figma token
       const figmaToken = authInfo?.figma?.access_token;
@@ -117,7 +117,7 @@ export function registerAnalyzeFigmaScopeTool(mcp: McpServer): void {
         );
 
         // Build response content
-        let responseText = `# Figma Scope Analysis Complete ✅
+        let responseText = `# Figma Design Review Complete ✅
 
 **URLs Analyzed**: ${figmaUrls.length}
 **Questions Generated**: ${result.questions.length}`;
@@ -158,12 +158,12 @@ export function registerAnalyzeFigmaScopeTool(mcp: McpServer): void {
           ],
         };
       } catch (error: any) {
-        console.error('analyze-figma-scope failed:', error);
+        console.error('figma-review-design failed:', error);
         return {
           content: [
             {
               type: 'text',
-              text: `# Figma Scope Analysis Failed ❌\n\n**Error**: ${error.message}\n\n**Details**: ${error.stack || 'No stack trace available'}`,
+              text: `# Figma Design Review Failed ❌\n\n**Error**: ${error.message}\n\n**Details**: ${error.stack || 'No stack trace available'}`,
             },
           ],
           isError: true,
