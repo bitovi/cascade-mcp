@@ -50,11 +50,15 @@ function preprocessHtml(html: string): PreprocessResult {
       document.querySelectorAll(selector).forEach(el => el.remove());
     });
     
-    // Return the cleaned HTML (use body if present, otherwise full document)
+    // Return the cleaned HTML
+    // Try body first (for complete HTML documents), then use document.toString() for fragments
     const body = document.querySelector('body');
-    const cleanedHtml = body ? body.innerHTML : document.documentElement.innerHTML;
+    if (body) {
+      return { cleanedHtml: body.innerHTML, warnings };
+    }
     
-    return { cleanedHtml, warnings };
+    // For HTML fragments, use document.toString() which includes all elements
+    return { cleanedHtml: document.toString(), warnings };
   } catch (error) {
     // Fallback to regex-based cleaning if linkedom parsing fails
     const errorMessage = error instanceof Error ? error.message : String(error);
