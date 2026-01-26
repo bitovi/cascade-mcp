@@ -26,18 +26,19 @@ A product manager wants to break down an epic into shell stories. They call `wri
 
 ### User Story 2 - Single Story Creation (Priority: P2)
 
-A developer wants to write a single detailed story for a small feature or bug fix without creating an epic structure. They call `write-story` with an issue key and optional Figma URLs. The tool automatically checks if it has enough information and either writes the story immediately or returns questions for clarification.
+A developer wants to write a single detailed story for a small feature or bug fix without creating an epic structure. They call `write-story` with an issue key and optional Figma URLs. The tool automatically analyzes the scope (just like `analyze-feature-scope` does for epics) and either writes the story immediately (if few questions) or writes a Scope Analysis section to the issue with feature categorization and clarifying questions (if many questions).
 
 **Why this priority**: Enables quick story creation for common small-scope work without the overhead of the epic workflow.
 
-**Independent Test**: Run `write-story` on a Jira issue with linked Figma designs. Verify the tool either writes the story directly or returns questions asking for clarification.
+**Independent Test**: Run `write-story` on a Jira issue with linked Figma designs. Verify the tool either writes the story directly or creates a Scope Analysis section with feature categorization and questions.
 
 **Acceptance Scenarios**:
 
 1. **Given** a Jira issue with clear requirements and linked Figma designs (≤5 questions), **When** I run `write-story`, **Then** a detailed story with acceptance criteria is written to the issue
-2. **Given** a Jira issue with unclear requirements (>5 questions), **When** I run `write-story`, **Then** questions are returned and the tool asks me to provide clarification
+2. **Given** a Jira issue with unclear requirements (>5 questions), **When** I run `write-story`, **Then** a Scope Analysis section is written to the issue containing feature categorization (✅ confirmed, ❌ out-of-scope, ❓ needs-clarification, ⏬ low-priority) and clarifying questions, and the tool asks me to answer and re-run
 3. **Given** a Jira issue where `figma-review-design` was previously run on linked designs, **When** I run `write-story`, **Then** resolved Figma comment threads reduce the question count
 4. **Given** a Jira issue with no Figma designs, **When** I run `write-story` with `contextDescription`, **Then** the tool uses the context to analyze requirements
+5. **Given** a Jira issue with an existing Scope Analysis section with answered questions, **When** I re-run `write-story`, **Then** the tool recognizes answers and writes the detailed story
 
 ---
 
@@ -52,7 +53,7 @@ A user runs a self-healing tool and receives questions. They answer the question
 **Acceptance Scenarios**:
 
 1. **Given** an epic with unanswered questions in Scope Analysis, **When** I answer the questions and re-run `write-shell-stories`, **Then** the tool recognizes answers and creates shell stories
-2. **Given** questions were returned from `write-story`, **When** I update the issue with answers and re-run, **Then** the tool writes the story
+2. **Given** an issue with unanswered questions in Scope Analysis from `write-story`, **When** I answer the questions and re-run `write-story`, **Then** the tool recognizes answers and writes the detailed story
 3. **Given** some but not all questions are answered, **When** I re-run the tool, **Then** remaining questions are surfaced but the tool proceeds if count is below threshold
 
 ---
@@ -102,14 +103,15 @@ A designer runs `figma-review-design` on their designs, answering questions in F
 #### Single Story Tool
 
 - **FR-010**: `write-story` MUST accept an issue key and optional Figma URLs
-- **FR-011**: `write-story` MUST NOT create intermediate artifacts (Scope Analysis) unless questions exceed threshold
-- **FR-012**: `write-story` MUST return questions as a structured response when clarification is needed
+- **FR-011**: `write-story` MUST perform scope analysis (feature categorization) just like `analyze-feature-scope` does for epics
+- **FR-012**: If questions > threshold, `write-story` MUST write a "## Scope Analysis" section to the issue containing feature categorization (✅ confirmed, ❌ out-of-scope, ❓ needs-clarification, ⏬ low-priority) and clarifying questions
+- **FR-013**: If questions ≤ threshold, `write-story` MUST skip the Scope Analysis artifact and write the detailed story directly
 
 #### Deprecation
 
-- **FR-013**: `analyze-feature-scope` MUST remain functional for backward compatibility
-- **FR-014**: `analyze-feature-scope` MUST be marked as deprecated in documentation and tool descriptions
-- **FR-015**: Documentation MUST recommend using `write-shell-stories` directly instead of `analyze-feature-scope`
+- **FR-014**: `analyze-feature-scope` MUST remain functional for backward compatibility
+- **FR-015**: `analyze-feature-scope` MUST be marked as deprecated in documentation and tool descriptions
+- **FR-016**: Documentation MUST recommend using `write-shell-stories` or `write-story` directly instead of `analyze-feature-scope`
 
 ### Key Entities
 
@@ -117,9 +119,11 @@ A designer runs `figma-review-design` on their designs, answering questions in F
   - Source: Figma design analysis, comment threads, or documentation gaps
   - State: Open (needs answer) or Resolved (answered in Figma, Jira, or context)
   
-- **Scope Analysis Section**: A markdown section in a Jira epic containing categorized features and open questions
+- **Scope Analysis Section**: A markdown section in a Jira epic or issue containing categorized features and open questions
+  - Contains feature categorization: ✅ confirmed, ❌ out-of-scope, ❓ needs-clarification, ⏬ low-priority
   - Created only when questions exceed threshold
   - Updated on subsequent tool runs
+  - Used by both `write-shell-stories` (for epics) and `write-story` (for single issues)
   
 - **Shell Story**: A high-level story outline in a Jira epic
   - Created after Scope Analysis questions are sufficiently answered
