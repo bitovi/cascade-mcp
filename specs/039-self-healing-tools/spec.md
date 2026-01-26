@@ -20,7 +20,7 @@ A product manager wants to break down an epic into shell stories. They call `wri
 1. **Given** an epic with well-documented Figma designs (≤5 clarifying questions), **When** I run `write-shell-stories`, **Then** shell stories are created directly without a Scope Analysis section
 2. **Given** an epic with incomplete requirements (>5 clarifying questions), **When** I run `write-shell-stories`, **Then** a Scope Analysis section with questions is created and the tool asks me to re-run after answering
 3. **Given** an epic that already has a Scope Analysis section with answered questions, **When** I run `write-shell-stories`, **Then** shell stories are created based on the answered questions
-4. **Given** an epic where `figma-review-design` was previously run, **When** I run `write-shell-stories`, **Then** resolved Figma comment threads reduce the question count
+4. **Given** an epic where `figma-review-design` was previously run, **When** I run `write-shell-stories`, **Then** Figma comment threads with answers reduce the unanswered question count (inferred by LLM)
 
 ---
 
@@ -36,7 +36,7 @@ A developer wants to write a single detailed story for a small feature or bug fi
 
 1. **Given** a Jira issue with clear requirements and linked Figma designs (≤5 questions), **When** I run `write-story`, **Then** a detailed story with acceptance criteria is written to the issue
 2. **Given** a Jira issue with unclear requirements (>5 questions), **When** I run `write-story`, **Then** a Scope Analysis section is written to the issue containing feature categorization (✅ confirmed, ❌ out-of-scope, ❓ needs-clarification, ⏬ low-priority) and clarifying questions, and the tool asks me to answer and re-run
-3. **Given** a Jira issue where `figma-review-design` was previously run on linked designs, **When** I run `write-story`, **Then** resolved Figma comment threads reduce the question count
+3. **Given** a Jira issue where `figma-review-design` was previously run on linked designs, **When** I run `write-story`, **Then** Figma comment threads with answers reduce the unanswered question count (inferred by LLM)
 4. **Given** a Jira issue with no Figma designs, **When** I run `write-story` with `contextDescription`, **Then** the tool uses the context to analyze requirements
 5. **Given** a Jira issue with an existing Scope Analysis section with answered questions, **When** I re-run `write-story`, **Then** the tool recognizes answers and writes the detailed story
 
@@ -60,16 +60,16 @@ A user runs a self-healing tool and receives questions. They answer the question
 
 ### User Story 4 - Figma Comments Integration (Priority: P2)
 
-A designer runs `figma-review-design` on their designs, answering questions in Figma comments. Later, when a PM runs `write-shell-stories` on the same epic, the tool reads the resolved Figma comment threads and uses them as answered questions, reducing the number of new questions it needs to ask.
+A designer runs `figma-review-design` on their designs, answering questions in Figma comments. Later, when a PM runs `write-shell-stories` on the same epic, the tool reads the Figma comment threads and the LLM recognizes that questions have been answered, reducing the number of new questions it needs to ask.
 
 **Why this priority**: Connects the designer workflow (`figma-review-design`) with the PM workflow (`write-shell-stories`), reducing duplicate questions.
 
-**Independent Test**: Run `figma-review-design`, answer some questions in Figma, then run `write-shell-stories` on an epic linking those designs. Verify fewer questions are generated.
+**Independent Test**: Run `figma-review-design`, answer some questions in Figma comments, then run `write-shell-stories` on an epic linking those designs. Verify fewer questions are generated.
 
 **Acceptance Scenarios**:
 
-1. **Given** Figma designs with resolved comment threads from `figma-review-design`, **When** I run `write-shell-stories` on an epic linking those designs, **Then** resolved threads are treated as answered questions
-2. **Given** Figma designs with unresolved comment threads, **When** I run `write-shell-stories`, **Then** unresolved threads are included as additional context but still count as open questions
+1. **Given** Figma designs with comment threads containing answers from `figma-review-design`, **When** I run `write-shell-stories` on an epic linking those designs, **Then** the LLM recognizes answered questions and the unanswered question count is reduced
+2. **Given** Figma designs with comment threads that don't contain clear answers, **When** I run `write-shell-stories`, **Then** those questions remain in the unanswered count
 
 ---
 
@@ -89,35 +89,36 @@ A designer runs `figma-review-design` on their designs, answering questions in F
 
 - **FR-001**: `write-shell-stories` MUST automatically check for a "## Scope Analysis" section before proceeding
 - **FR-002**: `write-shell-stories` MUST run scope analysis internally if no Scope Analysis section exists
-- **FR-003**: Tools MUST count clarifying questions after analyzing Figma designs, comments, and documentation
+- **FR-003**: Tools MUST use LLM to analyze current context (Figma designs, comments, Jira description, linked docs) and determine how many clarifying questions remain unanswered
 - **FR-004**: Tools MUST use a configurable question threshold (default: 5) to decide whether to proceed or ask for clarification
-- **FR-005**: If questions > threshold, tools MUST create appropriate artifacts (Scope Analysis for epics, or return questions for single stories)
+- **FR-005**: If questions > threshold, tools MUST create appropriate artifacts (Scope Analysis section with questions)
 - **FR-006**: If questions ≤ threshold, tools MUST proceed with their primary function (creating shell stories or writing the story)
+- **FR-007**: On re-run, tools MUST re-analyze all context to determine remaining unanswered questions (LLM infers answers from context, no manual markers required)
 
 #### Figma Integration
 
-- **FR-007**: Tools MUST read existing Figma comments from linked designs
-- **FR-008**: Resolved Figma comment threads MUST be treated as answered questions
-- **FR-009**: Unresolved Figma comment threads MUST be included as context but counted as open questions
+- **FR-008**: Tools MUST read existing Figma comments from linked designs and include them in LLM context
+- **FR-009**: LLM MUST consider Figma comment threads (including replies) when determining if questions have been answered
+- **FR-010**: Figma comments that contain answers to questions MUST reduce the unanswered question count (inferred by LLM, not by resolved status)
 
 #### Single Story Tool
 
-- **FR-010**: `write-story` MUST accept an issue key and optional Figma URLs
-- **FR-011**: `write-story` MUST perform scope analysis (feature categorization) just like `analyze-feature-scope` does for epics
-- **FR-012**: If questions > threshold, `write-story` MUST write a "## Scope Analysis" section to the issue containing feature categorization (✅ confirmed, ❌ out-of-scope, ❓ needs-clarification, ⏬ low-priority) and clarifying questions
-- **FR-013**: If questions ≤ threshold, `write-story` MUST skip the Scope Analysis artifact and write the detailed story directly
+- **FR-011**: `write-story` MUST accept an issue key and optional Figma URLs
+- **FR-012**: `write-story` MUST perform scope analysis (feature categorization) just like `analyze-feature-scope` does for epics
+- **FR-013**: If questions > threshold, `write-story` MUST write a "## Scope Analysis" section to the issue containing feature categorization (✅ confirmed, ❌ out-of-scope, ❓ needs-clarification, ⏬ low-priority) and clarifying questions
+- **FR-014**: If questions ≤ threshold, `write-story` MUST skip the Scope Analysis artifact and write the detailed story directly
 
 #### Deprecation
 
-- **FR-014**: `analyze-feature-scope` MUST remain functional for backward compatibility
-- **FR-015**: `analyze-feature-scope` MUST be marked as deprecated in documentation and tool descriptions
-- **FR-016**: Documentation MUST recommend using `write-shell-stories` or `write-story` directly instead of `analyze-feature-scope`
+- **FR-015**: `analyze-feature-scope` MUST remain functional for backward compatibility
+- **FR-016**: `analyze-feature-scope` MUST be marked as deprecated in documentation and tool descriptions
+- **FR-017**: Documentation MUST recommend using `write-shell-stories` or `write-story` directly instead of `analyze-feature-scope`
 
 ### Key Entities
 
 - **Question**: A clarifying question about unclear requirements, edge cases, or missing information
   - Source: Figma design analysis, comment threads, or documentation gaps
-  - State: Open (needs answer) or Resolved (answered in Figma, Jira, or context)
+  - State: Open or Answered (inferred by LLM from context, not manually marked)
   
 - **Scope Analysis Section**: A markdown section in a Jira epic or issue containing categorized features and open questions
   - Contains feature categorization: ✅ confirmed, ❌ out-of-scope, ❓ needs-clarification, ⏬ low-priority
@@ -142,9 +143,10 @@ A designer runs `figma-review-design` on their designs, answering questions in F
 ## Assumptions
 
 - The question threshold of 5 is appropriate for most use cases (may need tuning based on user feedback)
-- Resolved Figma comment threads reliably indicate answered questions
-- Users will answer questions in the Scope Analysis section or Jira issue description
+- LLM can reliably infer whether a question has been answered from surrounding context (Figma comments, Jira text, linked docs)
+- Users will provide answers in natural language (no special formatting or markers required)
 - The existing Figma comment reading infrastructure supports this workflow
+- LLM-based question counting is acceptable cost/latency trade-off for better UX
 
 ## Out of Scope
 
