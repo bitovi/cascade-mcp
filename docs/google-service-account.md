@@ -154,47 +154,7 @@ Service accounts can only access Google Drive files that are explicitly shared w
 
 ## Testing the Service Account
 
-### Direct Client Test
-
-Test the service account credentials directly:
-
-```bash
-node --import ./loader.mjs scripts/api/drive-about-user.ts
-```
-
-This will display the service account's email and permission ID.
-
-### API Endpoint Test
-
-**Test with curl:**
-```bash
-# Make sure server is running: npm run dev
-
-curl -X POST http://localhost:3000/api/drive-about-user \
-  -H "Content-Type: application/json" \
-  -H "X-Google-Json: $(cat google.json)" \
-  -d '{}'
-```
-
-**Test with Node.js:**
-```javascript
-const fs = require('fs');
-
-const serviceAccountJson = fs.readFileSync('./google.json', 'utf-8');
-
-const response = await fetch('http://localhost:3000/api/drive-about-user', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'X-Google-Json': serviceAccountJson,
-  },
-  body: JSON.stringify({}),
-});
-
-const data = await response.json();
-console.log(`User: ${data.user.displayName}`);
-console.log(`Email: ${data.user.emailAddress}`);
-```
+The service account credentials can be tested using the Google Drive MCP tools through the browser-based MCP client at http://localhost:3000 after starting the server with `npm run start-local`.
 
 ## Revoking Service Account Keys
 
