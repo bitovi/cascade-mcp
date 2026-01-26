@@ -22,69 +22,42 @@ interface PreprocessResult {
  * @returns Cleaned HTML and warnings about unsupported elements
  */
 function preprocessHtml(html: string): PreprocessResult {
-  try {
-    const { document } = parseHTML(html);
-    
-    // Detect unsupported elements before removal
-    const warnings: string[] = [];
-    const images = document.querySelectorAll('img');
-    if (images.length > 0) {
-      warnings.push(`Document contains ${images.length} image(s) which are not supported`);
-    }
-    
-    const tables = document.querySelectorAll('table');
-    if (tables.length > 0) {
-      warnings.push(`Document contains ${tables.length} table(s) which are not supported`);
-    }
-    
-    // Remove non-content elements
-    const elementsToRemove = [
-      'style',
-      'script',
-      'head',
-      'meta',
-      'link',
-    ];
-    
-    elementsToRemove.forEach(selector => {
-      document.querySelectorAll(selector).forEach(el => el.remove());
-    });
-    
-    // Return the cleaned HTML
-    // Try body first (for complete HTML documents), then use document.toString() for fragments
-    const body = document.querySelector('body');
-    if (body) {
-      return { cleanedHtml: body.innerHTML, warnings };
-    }
-    
-    // For HTML fragments, use document.toString() which includes all elements
-    return { cleanedHtml: document.toString(), warnings };
-  } catch (error) {
-    // Fallback to regex-based cleaning if linkedom parsing fails
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.warn(`Failed to parse HTML with linkedom, using regex fallback: ${errorMessage}`);
-    
-    // Regex-based fallback
-    let cleaned = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-    cleaned = cleaned.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
-    cleaned = cleaned.replace(/@import[^;]+;/gi, '');
-    cleaned = cleaned.replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '');
-    cleaned = cleaned.replace(/<meta[^>]*>/gi, '');
-    cleaned = cleaned.replace(/<link[^>]*>/gi, '');
-    
-    // Detect unsupported elements with regex
-    const warnings: string[] = [];
-    const imgMatches = cleaned.match(/<img[^>]*>/gi);
-    if (imgMatches) {
-      warnings.push(`Document contains ${imgMatches.length} image(s) which are not supported`);
-    }
-    const tableMatches = cleaned.match(/<table[^>]*>/gi);
-    if (tableMatches) {
-      warnings.push(`Document contains ${tableMatches.length} table(s) which are not supported`);
-    }
-    
-    return { cleanedHtml: cleaned, warnings };
+  const { document } = parseHTML(html);
+  
+  // Detect unsupported elements before removal
+  const warnings: string[] = [];
+  const images = document.querySelectorAll('img');
+  if (images.length > 0) {
+    warnings.push(`Document contains ${images.length} image(s) which are not supported`);
   }
+  
+  const tables = document.querySelectorAll('table');
+  if (tables.length > 0) {
+    warnings.push(`Document contains ${tables.length} table(s) which are not supported`);
+  }
+  
+  // Remove non-content elements
+  const elementsToRemove = [
+    'style',
+    'script',
+    'head',
+    'meta',
+    'link',
+  ];
+  
+  elementsToRemove.forEach(selector => {
+    document.querySelectorAll(selector).forEach(el => el.remove());
+  });
+  
+  // Return the cleaned HTML
+  // Try body first (for complete HTML documents), then use document.toString() for fragments
+  const body = document.querySelector('body');
+  if (body) {
+    return { cleanedHtml: body.innerHTML, warnings };
+  }
+  
+  // For HTML fragments, use document.toString() which includes all elements
+  return { cleanedHtml: document.toString(), warnings };
 }
 
 /**
