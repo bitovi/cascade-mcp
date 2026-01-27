@@ -27,7 +27,7 @@ import {
   fetchCommentsForFile,
   groupCommentsIntoThreads,
   formatCommentsForContext,
-} from '../../../figma/tools/analyze-figma-scope/figma-comment-utils.js';
+} from '../../../figma/tools/figma-review-design/figma-comment-utils.js';
 import type { ScreenAnnotation } from '../shared/screen-annotation.js';
 import { notesToScreenAnnotations } from '../writing-shell-stories/note-text-extractor.js';
 

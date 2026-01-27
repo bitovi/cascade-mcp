@@ -160,7 +160,7 @@ npm run dev:client
   - **api/write-shell-stories.ts** - Generate shell stories from Figma designs in a Jira epic
   - **api/write-next-story.ts** - Write the next Jira story from shell stories
   - **api/analyze-feature-scope.ts** - Analyze feature scope from Figma designs (generates scope analysis)
-  - **api/analyze-figma-scope.ts** - Standalone Figma analysis with comment integration (no Jira required)
+  - **api/figma-review-design.ts** - Standalone Figma analysis with comment integration (no Jira required)
   - **api/identify-features.ts** - Identify in-scope and out-of-scope features from Figma
   - **api/progress-comment-manager.ts** - Progress tracking via Jira comments
   - **api/api-error-helpers.ts** - Shared error handling and validation
@@ -278,15 +278,15 @@ Advanced workflow tools that integrate multiple services:
   - Example: `analyze-feature-scope({ epicKey: "PLAY-123", figmaUrl: "https://..." })`
   - **Deprecated**: Run `write-shell-stories` directly instead - it handles scope analysis automatically
 
-- **analyze-figma-scope** - Standalone Figma design analysis without Jira integration
+- **figma-review-design** - Standalone Figma design analysis without Jira integration
   - Analyzes Figma screens independently of Jira epics
   - **Figma Comments Integration**: Reads existing comments as context, posts AI-generated questions back
   - Categorizes features as: ✅ confirmed, ❌ out-of-scope, ❓ needs-clarification, ⏬ low-priority
   - Returns scope analysis as markdown (does not write to Jira)
   - **Rate Limit Handling**: Respects Figma's 25 req/min limit with consolidation fallback
   - Parameters: `figmaUrls` (array), optional `contextDescription`
-  - Example: `analyze-figma-scope({ figmaUrls: ["https://..."], contextDescription: "Mobile app onboarding" })`
-  - Dual interface: Available as MCP tool and REST API endpoint `/api/analyze-figma-scope`
+  - Example: `figma-review-design({ figmaUrls: ["https://..."], contextDescription: "Mobile app onboarding" })`
+  - Dual interface: Available as MCP tool and REST API endpoint `/api/figma-review-design`
   - **Authentication**: Requires Figma auth only (no Atlassian needed)
 
 - **write-shell-stories** - Generate shell user stories from Figma designs
