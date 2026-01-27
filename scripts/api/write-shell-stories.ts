@@ -108,22 +108,45 @@ Example:
       cloudId,
     });
 
-    // Display results
-    console.log('\n✅ Shell Stories Created!\n');
-    console.log('═══════════════════════════════════════════════════════════════');
-    console.log(`📝 Stories:  ${result.storyCount}`);
-    console.log(`🖼️  Screens:  ${result.screensAnalyzed}`);
-    console.log('═══════════════════════════════════════════════════════════════');
-    
-    console.log(`\n🔗 View Epic: https://${siteName}.atlassian.net/browse/${epicKey}`);
-    
-    console.log('\n📋 Shell Stories (first 500 chars):\n');
-    console.log(result.shellStoriesContent.substring(0, 500));
-    if (result.shellStoriesContent.length > 500) {
-      console.log(`\n... (${result.shellStoriesContent.length - 500} more characters)`);
-    }
+    // Display results based on action type
+    if (result.action === 'proceed') {
+      console.log('\n✅ Shell Stories Created!\n');
+      console.log('═══════════════════════════════════════════════════════════════');
+      console.log(`📝 Stories:  ${result.storyCount}`);
+      console.log(`🖼️  Screens:  ${result.screensAnalyzed}`);
+      console.log('═══════════════════════════════════════════════════════════════');
+      
+      console.log(`\n🔗 View Epic: https://${siteName}.atlassian.net/browse/${epicKey}`);
+      
+      if (result.shellStoriesContent) {
+        console.log('\n📋 Shell Stories (first 500 chars):\n');
+        console.log(result.shellStoriesContent.substring(0, 500));
+        if (result.shellStoriesContent.length > 500) {
+          console.log(`\n... (${result.shellStoriesContent.length - 500} more characters)`);
+        }
+      }
 
-    console.log('\n💡 Next step: Run write-next-story to create Jira issues from these shell stories');
+      console.log('\n💡 Next step: Run write-next-story to create Jira issues from these shell stories');
+    } else if (result.action === 'clarify' || result.action === 'regenerate') {
+      console.log('\n⚠️  Scope Analysis Generated - Clarification Needed\n');
+      console.log('═══════════════════════════════════════════════════════════════');
+      console.log(`❓ Questions: ${result.questionCount}`);
+      console.log(`🖼️  Screens:   ${result.screensAnalyzed}`);
+      console.log('═══════════════════════════════════════════════════════════════');
+      
+      console.log(`\n🔗 View Epic: https://${siteName}.atlassian.net/browse/${epicKey}`);
+      
+      console.log('\n📝 The epic has been updated with a Scope Analysis section.');
+      console.log('   Please answer the questions marked with ❓, then run this script again.');
+      
+      if (result.scopeAnalysisContent) {
+        console.log('\n📋 Scope Analysis Preview (first 500 chars):\n');
+        console.log(result.scopeAnalysisContent.substring(0, 500));
+        if (result.scopeAnalysisContent.length > 500) {
+          console.log(`\n... (${result.scopeAnalysisContent.length - 500} more characters)`);
+        }
+      }
+    }
 
     process.exit(0);
   } catch (error: any) {
