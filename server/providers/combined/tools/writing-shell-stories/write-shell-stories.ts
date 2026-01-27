@@ -116,12 +116,35 @@ export function registerWriteShellStoriesTool(mcp: McpServer): void {
           }
         );
 
-        // Return shell stories to user
+        // Return result based on action taken (self-healing workflow)
+        let responseText: string;
+        
+        if (result.action === 'proceed') {
+          // Shell stories were created successfully
+          responseText = result.shellStoriesContent || 'Shell stories generated successfully.';
+        } else if (result.action === 'clarify') {
+          // Too many questions, needs clarification
+          responseText = `## Clarification Needed
+
+${result.questionCount} unanswered questions found (threshold: 5). Please answer the questions in the Scope Analysis section and run this tool again.
+
+${result.scopeAnalysisContent || ''}`;
+        } else if (result.action === 'regenerate') {
+          // Regenerated scope analysis with answered questions
+          responseText = `## Scope Analysis Regenerated
+
+${result.questionCount} unanswered questions found after incorporating your answers. Please answer the remaining questions and run this tool again.
+
+${result.scopeAnalysisContent || ''}`;
+        } else {
+          responseText = result.shellStoriesContent || 'Completed.';
+        }
+        
         return {
           content: [
             {
-              type: 'text',
-              text: result.shellStoriesContent,
+              type: 'text' as const,
+              text: responseText,
             },
           ],
         };
@@ -131,7 +154,7 @@ export function registerWriteShellStoriesTool(mcp: McpServer): void {
         return {
           content: [
             {
-              type: 'text',
+              type: 'text' as const,
               text: `Error generating shell stories: ${error.message}`,
             },
           ],

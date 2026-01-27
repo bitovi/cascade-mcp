@@ -27,7 +27,8 @@ import { generateSemanticXml } from '../../../figma/semantic-xml-generator.js';
  * Screen to analyze
  */
 export interface ScreenToAnalyze {
-  name: string;           // Node ID (e.g., "1234:5678")
+  name: string;           // Sanitized kebab-case name for display
+  nodeId: string;         // Original Figma node ID (e.g., "1234:5678")
   url: string;            // Full Figma URL
   notes?: string[];       // Optional notes from Figma
   frameName?: string;     // Human-readable frame name
@@ -277,7 +278,7 @@ async function analyzeScreen(
   let notesWritten = 0;
   if (screen.notes && screen.notes.length > 0) {
     notesWritten = await writeNotesForScreen(
-      { name: screen.name, url: screen.url, notes: screen.notes },
+      { name: screen.name, nodeId: screen.nodeId, url: screen.url, notes: screen.notes },
       allNotes,
       fileCachePath
     );

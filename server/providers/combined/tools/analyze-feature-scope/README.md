@@ -1,5 +1,10 @@
 # analyze-feature-scope
 
+> ⚠️ **DEPRECATED**: This tool is deprecated. Use `write-shell-stories` instead, which now includes automatic scope analysis.
+> 
+> `write-shell-stories` automatically runs scope analysis internally if no "## Scope Analysis" section exists in the epic.
+> See [Automatic Scope Analysis Documentation](../../../../docs/self-healing-tools.md) for the new workflow.
+
 Quick prompt:
 
 > ```

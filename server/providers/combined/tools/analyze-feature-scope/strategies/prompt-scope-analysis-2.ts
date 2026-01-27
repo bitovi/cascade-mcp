@@ -39,10 +39,22 @@ CATEGORIZATION RULES:
   - These will NOT be implemented in this epic
   - Keep brief: "OAuth authentication (future epic)"
   - NO LONGER includes features to be "deferred" within this epic (use ⏬ for those)
-- ❓ Questions: Ambiguous behaviors, unclear requirements, missing information
-  - Mark ambiguous features as questions rather than guessing
+- ❓ Questions: Ambiguous behaviors, unclear requirements, missing information that has NO ANSWER in any context
+  - Mark features as ❓ ONLY if the question is truly unanswered in all provided context
   - Include enough context for the question
+- 💬 Answered Questions: Questions that HAVE BEEN ANSWERED in any context source
+  - If epic description, Confluence docs, Google Docs, or Figma comments provide an answer → use 💬
+  - Format: "💬 {original question} → {answer found in context}"
+  - Example: "💬 What authentication method? → OAuth 2.0 per security doc"
 - **PRIORITY**: Epic context scope statements are primary source of truth and override screen analysis interpretations
+
+QUESTION ANSWERING RULES:
+- Before marking any question as ❓ (unanswered), check ALL context sources for answers:
+  1. Epic description - may contain inline answers or clarifications
+  2. Referenced documentation (Confluence, Google Docs) - may have detailed specifications
+  3. Figma comments - resolved threads often contain decisions
+- If ANY context source provides a clear answer, mark the question as 💬 (answered), NOT ❓
+- Only mark ❓ for questions that are genuinely unanswered across all provided context
 
 GROUPING RULES:
 - Group features by user workflow and functional areas (e.g., "Authentication Flow", "User Profile Management", "Data Entry Workflow")
@@ -159,6 +171,7 @@ ${doc.summary || doc.markdown}
 - Technical constraints and architecture decisions
 - Definition of Done criteria (quality gates, testing requirements)
 - Cross-cutting concerns (security, accessibility, performance)
+- **Answering questions**: If a document provides a clear answer to a requirement question, that question is ANSWERED
 
 **When epic context and documentation conflict:**
 - Epic description takes precedence for scope decisions
@@ -182,9 +195,9 @@ ${ctx.markdown}`;
 
 **How to use Figma comments:**
 - Comments may clarify design intent or business requirements
-- Questions in comments may need to be surfaced as ❓ items
-- Resolved comments (✅ RESOLVED) indicate decisions already made
-- Open comments (💬 OPEN) may require attention
+- Resolved comments indicate decisions already made - use these answers
+- Unresolved comments may need to be surfaced as ❓ items if they ask unanswered questions
+- If a comment thread provides an answer to a requirement question, that question is ANSWERED
 
 `
     : '';
@@ -289,9 +302,14 @@ ${analysisSection}
 - Use markdown link format: [Screen Name](url)
 - A screen may appear in multiple areas if it has multiple types of functionality
 
-**Step 6: Collect and deduplicate questions**
-- List questions relevant to each area under that area
-- If same question applies to multiple areas, list only in the first occurrence
+**Step 6: Collect questions and check for answers**
+- For each potential question, check ALL context sources for answers:
+  - Epic description (inline answers, clarifications)
+  - Referenced documentation (Confluence, Google Docs)
+  - Figma comments (resolved threads with decisions)
+- If answer found → mark as 💬 with the answer: "💬 {question} → {answer}"
+- If no answer found → mark as ❓: "❓ {question with context}"
+- Deduplicate: list each question only in the first area where it appears
 - Cross-cutting concerns go in "Remaining Questions"
 - Include questions about error handling, accessibility, browser support, etc.
 
@@ -309,8 +327,8 @@ ${analysisSection}
 - ⏬ {Low priority feature - in scope but implement at end}
 - ✅ {Existing functionality - already implemented, brief description}
 - ❌ {Out-of-scope feature - not part of this epic, brief description}
-- ❓ {Question about this area - with context}
-- ❓ {Another question}
+- ❓ {Unanswered question - no answer found in any context}
+- 💬 {Previously asked question} → {Answer found in epic/docs/comments}
 
 ### {Second Feature Area Name}
 
@@ -320,12 +338,13 @@ ${analysisSection}
 - ⏬ {Low priority feature}
 - ✅ {Existing functionality}
 - ❌ {Out-of-scope feature}
-- ❓ {Question about this area}
+- ❓ {Unanswered question about this area}
+- 💬 {Answered question} → {The answer}
 
 ### Remaining Questions
 
-- ❓ {General question not specific to one area}
-- ❓ {Another general question}
+- ❓ {General unanswered question not specific to one area}
+- 💬 {Answered cross-cutting question} → {The answer}
 \`\`\`
 
 **CRITICAL**: Output ONLY the markdown above. No prefaces, explanations, or additional text.

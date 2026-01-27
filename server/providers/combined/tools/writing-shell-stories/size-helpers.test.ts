@@ -2,8 +2,8 @@
  * Unit tests for size-helpers.ts
  */
 
-import { calculateAdfSize, wouldExceedLimit } from '../size-helpers.js';
-import type { ADFDocument, ADFNode } from '../../../../atlassian/markdown-converter.js';
+import { calculateAdfSize, wouldExceedLimit } from './size-helpers.js';
+import type { ADFDocument, ADFNode } from '../../../atlassian/markdown-converter.js';
 
 describe('size-helpers', () => {
   describe('calculateAdfSize', () => {

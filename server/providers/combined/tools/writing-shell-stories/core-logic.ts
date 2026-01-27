@@ -6,11 +6,12 @@
  * from both MCP handlers and REST API endpoints.
  * 
  * The logic orchestrates:
- * 1. Creating temp directory for artifacts
- * 2. Setting up Figma screens and extracting epic context
- * 3. Downloading images and analyzing screens with AI
- * 4. Generating prioritized shell stories
- * 5. Updating the Jira epic with generated stories
+ * 1-3. Fetching epic, extracting context, setting up Figma screens
+ * 3.5-3.9. Setting up Confluence, Google Docs, Figma comments, and notes context
+ * 4. Downloading images and analyzing screens with AI (creates cached *.analysis.md files)
+ * 5. Automatic scope analysis: Check for existing analysis, generate if needed, count questions
+ * 6. Generating prioritized shell stories (if ≤5 questions)
+ * 7. Updating the Jira epic with generated stories
  */
 
 import * as path from 'path';
@@ -47,27 +48,30 @@ import {
 } from '../../../figma/tools/analyze-figma-scope/figma-comment-utils.js';
 import type { ScreenAnnotation } from '../shared/screen-annotation.js';
 import { notesToScreenAnnotations } from './note-text-extractor.js';
+import {
+  extractScopeAnalysis as extractScopeAnalysisFromShared,
+  countUnansweredQuestions,
+  decideSelfHealingAction,
+  SelfHealingDecision,
+  QUESTION_THRESHOLD,
+  generateScopeAnalysis,
+  type ScopeAnalysisResult,
+} from '../shared/scope-analysis-helpers.js';
+
+// Re-export for external use
+export { SelfHealingDecision };
 
 /**
  * Helper: Extract the "## Scope Analysis" section from epic context
+ * Delegates to shared helper for consistency
  */
 interface ParsedEpicContext {
   scopeAnalysis: string | null;
   remainingContext: string;
 }
 
-function extractScopeAnalysis(epicContext: string): ParsedEpicContext {
-  const scopeAnalysisMatch = epicContext.match(/## Scope Analysis\s+([\s\S]*?)(?=\n## |$)/i);
-  const scopeAnalysis = scopeAnalysisMatch ? scopeAnalysisMatch[1].trim() : null;
-  
-  const remainingContext = scopeAnalysis 
-    ? epicContext.replace(/## Scope Analysis\s+[\s\S]*?(?=\n## |$)/i, '').trim()
-    : epicContext;
-
-  return {
-    scopeAnalysis,
-    remainingContext
-  };
+function extractScopeAnalysisLocal(epicContext: string): ParsedEpicContext {
+  return extractScopeAnalysisFromShared(epicContext);
 }
 
 /**
@@ -80,13 +84,41 @@ export interface ExecuteWriteShellStoriesParams {
 }
 
 /**
+ * Action types for write-shell-stories workflow
+ * 
+ * @see contracts/write-shell-stories-response.schema.json
+ */
+export type WriteShellStoriesAction = 'proceed' | 'clarify' | 'regenerate';
+
+/**
  * Result from executing the write-shell-stories workflow
+ * 
+ * Extended with automatic scope analysis fields per spec 039-self-healing-tools
  */
 export interface ExecuteWriteShellStoriesResult {
+  /** Whether the operation completed successfully */
   success: boolean;
-  shellStoriesContent: string;
-  storyCount: number;
+  /** 
+   * Action taken:
+   * - "proceed": Created shell stories (≤5 questions)
+   * - "clarify": Created scope analysis, needs answers (>5 questions, no existing)
+   * - "regenerate": Regenerated scope analysis with answered questions (>5 questions, had existing)
+   */
+  action: WriteShellStoriesAction;
+  /** Shell stories markdown content (when action="proceed") */
+  shellStoriesContent?: string;
+  /** Number of shell stories created (when action="proceed") */
+  storyCount?: number;
+  /** Number of screens analyzed */
   screensAnalyzed: number;
+  /** Scope analysis markdown content (when action="clarify" or "regenerate") */
+  scopeAnalysisContent?: string;
+  /** Number of unanswered questions in scope analysis */
+  questionCount?: number;
+  /** Whether there was an existing scope analysis section */
+  hadExistingAnalysis?: boolean;
+  /** Error message if success=false */
+  error?: string;
 }
 
 /**
@@ -231,12 +263,16 @@ export async function executeWriteShellStories(
       const comments = await fetchCommentsForFile(figmaClient, figmaFileKey);
       if (comments.length > 0) {
         const threads = groupCommentsIntoThreads(comments);
-        // Build frame metadata from screens
-        const frameMetadata: FrameMetadata[] = screens.map((screen) => ({
+        // Build frame metadata from allFrames with bounding boxes for proximity matching
+        const frameMetadata: FrameMetadata[] = allFrames.map((frame) => ({
           fileKey: figmaFileKey,
-          nodeId: screen.name,
-          name: screen.frameName || screen.name,
-          url: screen.url,
+          nodeId: frame.id,
+          name: frame.name,
+          url: screens.find(s => s.nodeId === frame.id)?.url,
+          x: frame.absoluteBoundingBox?.x,
+          y: frame.absoluteBoundingBox?.y,
+          width: frame.absoluteBoundingBox?.width,
+          height: frame.absoluteBoundingBox?.height,
         }));
         figmaCommentContexts = formatCommentsForContext(threads, frameMetadata);
         console.log(`   💬 Fetched ${comments.length} Figma comments across ${figmaCommentContexts.length} screens`);
@@ -259,6 +295,8 @@ export async function executeWriteShellStories(
   // ==========================================
   // PHASE 4: Download images and analyze screens
   // ==========================================
+  // Screen analysis must happen BEFORE scope analysis because generateScopeAnalysis()
+  // reads the cached *.analysis.md files created by regenerateScreenAnalyses()
   console.log('  Phase 4: Downloading images and analyzing screens...');
   
   // Add steps for all screens to be analyzed
@@ -283,7 +321,119 @@ export async function executeWriteShellStories(
   await notify(`✅ AI Screen Analysis: Analyzed ${analyzedScreens} screens`);
 
   // ==========================================
-  // PHASE 5: Generate shell stories from analyses
+  // PHASE 5: Check Scope Analysis and Questions
+  // ==========================================
+  console.log('  Phase 5: Checking scope analysis...');
+  await notify('🔍 Checking for scope analysis...');
+  
+  // Check for existing scope analysis section
+  const parsedContext = extractScopeAnalysisLocal(epicWithoutShellStoriesMarkdown);
+  const hadExistingAnalysis = parsedContext.scopeAnalysis !== null;
+  
+  let scopeAnalysisContent: string | null = parsedContext.scopeAnalysis;
+  let scopeAnalysisGeneratedThisRun = false;
+  
+  // If no scope analysis, generate it (self-healing)
+  if (!scopeAnalysisContent) {
+    console.log('  📝 No scope analysis found - generating automatically...');
+    await notify('📝 Generating scope analysis...');
+    
+    try {
+      // Use the shared generateScopeAnalysis function with performance logging
+      const scopeAnalysisStartTime = Date.now();
+      const scopeResult = await generateScopeAnalysis({
+        generateText,
+        screens,
+        debugDir,
+        figmaFileKey,
+        yamlContent,
+        notify,
+        epicContext: epicWithoutShellStoriesMarkdown,
+        referenceDocs: allDocs.map(doc => ({
+          title: doc.title,
+          url: doc.url,
+          markdown: doc.markdown,
+          source: doc.source ?? 'confluence', // Default to confluence for backward compatibility
+        })),
+        commentContexts: allContexts,
+      });
+      const scopeAnalysisDuration = Date.now() - scopeAnalysisStartTime;
+      console.log(`  ⏱️ Scope analysis generation took ${(scopeAnalysisDuration / 1000).toFixed(1)}s`);
+      
+      scopeAnalysisContent = scopeResult.scopeAnalysisContent;
+      scopeAnalysisGeneratedThisRun = true;
+      console.log(`  ✅ Scope analysis generated: ${scopeResult.questionsCount} questions, ${scopeResult.featureAreasCount} feature areas`);
+    } catch (error: any) {
+      // Error during scope analysis generation - return error immediately
+      console.error('  ❌ Scope analysis generation failed:', error);
+      return {
+        success: false,
+        action: 'clarify' as const,
+        screensAnalyzed: 0,
+        error: `Failed to generate scope analysis: ${error.message}`,
+      };
+    }
+  } else {
+    console.log('  📝 Existing scope analysis found');
+  }
+  
+  // Count unanswered questions - ensure scopeAnalysisContent is not null
+  const questionCount = scopeAnalysisContent ? countUnansweredQuestions(scopeAnalysisContent) : 0;
+  console.log(`  📊 Question count: ${questionCount} (threshold: ${QUESTION_THRESHOLD})`);
+  
+  // Decide next action based on question count
+  const decision = decideSelfHealingAction(hadExistingAnalysis, questionCount);
+  console.log(`  🤔 Decision: ${decision}`);
+  
+  // Common parameters for decision handlers
+  const decisionParams = {
+    epicKey,
+    cloudId: resolvedCloudId,
+    atlassianClient,
+    generateText,
+    notify,
+    screens,
+    epicWithoutShellStoriesAdf,
+    allDocs,
+    allContexts,
+    debugDir,
+    figmaFileKey,
+    yamlContent,
+  };
+  
+  // Handle regeneration case - regenerate scope analysis with previous answers
+  if (decision === SelfHealingDecision.REGENERATE_ANALYSIS) {
+    const result = await handleRegenerateAnalysis({
+      ...decisionParams,
+      scopeAnalysisContent: scopeAnalysisContent!,
+      remainingContext: parsedContext.remainingContext,
+    });
+    
+    // If result has continueWithScopeAnalysis, update and continue to Phase 4
+    if ('continueWithScopeAnalysis' in result) {
+      scopeAnalysisContent = result.continueWithScopeAnalysis;
+    } else {
+      // Early return with clarify/regenerate result
+      return result;
+    }
+  }
+  
+  // Handle clarify action - update Jira and return early
+  if (decision === SelfHealingDecision.ASK_FOR_CLARIFICATION) {
+    return handleAskForClarification({
+      ...decisionParams,
+      scopeAnalysisContent: scopeAnalysisContent!,
+      questionCount,
+      hadExistingAnalysis,
+    });
+  }
+  
+  // Decision is PROCEED_WITH_STORIES - continue with Phase 6
+  console.log('  ✅ Proceeding with shell story generation');
+  await notify('✅ Ready to generate shell stories...');
+
+  // ==========================================
+  // PHASE 6: Generate shell stories from analyses
   // ==========================================
   const shellStoriesResult = await generateShellStoriesFromAnalyses({
     generateText, // Use injected LLM client
@@ -293,12 +443,13 @@ export async function executeWriteShellStories(
     yamlContent,
     notify,
     epicContext: epicWithoutShellStoriesMarkdown,
+    scopeAnalysisContent, // Pass the scope analysis we just generated/validated
     confluenceDocs: allDocs,
     figmaComments: allContexts
   });
 
   // ==========================================
-  // PHASE 6: Write shell stories back to Jira epic
+  // PHASE 7: Write shell stories back to Jira epic
   // ==========================================
   await notify('📝 Jira Update: Updating Jira epic...');
   
@@ -319,11 +470,17 @@ export async function executeWriteShellStories(
     shellStoriesContent = 'No shell stories were generated.';
   }
 
+  // Action="proceed" - shell stories were created successfully
+  await notify(`✅ Shell Stories Created: ${shellStoriesResult.storyCount} stories generated`);
+  
   return {
     success: true,
+    action: 'proceed' as const,
     shellStoriesContent,
     storyCount: shellStoriesResult.storyCount,
-    screensAnalyzed: shellStoriesResult.analysisCount
+    screensAnalyzed: shellStoriesResult.analysisCount,
+    questionCount: 0, // Proceeded because questions were acceptable
+    hadExistingAnalysis: false,
   };
 }
 
@@ -343,10 +500,11 @@ async function generateShellStoriesFromAnalyses(params: {
   yamlContent: string;
   notify: ToolDependencies['notify'];
   epicContext?: string;
+  scopeAnalysisContent?: string | null; // If provided, use this instead of extracting from epicContext
   confluenceDocs?: ConfluenceDocumentContext[];
   figmaComments?: ScreenAnnotation[];
 }): Promise<{ storyCount: number; analysisCount: number; shellStoriesPath: string | null; shellStoriesText: string | null }> {
-  const { generateText, screens, debugDir, figmaFileKey, yamlContent, notify, epicContext, confluenceDocs, figmaComments } = params;
+  const { generateText, screens, debugDir, figmaFileKey, yamlContent, notify, epicContext, scopeAnalysisContent, confluenceDocs, figmaComments } = params;
   
   console.log('  Phase 5: Generating shell stories from analyses...');
   
@@ -382,16 +540,33 @@ async function generateShellStoriesFromAnalyses(params: {
     return { storyCount: 0, analysisCount: 0, shellStoriesPath: null, shellStoriesText: null };
   }
   
-  // Verify epic context exists (required for scope analysis)
-  if (!epicContext || !epicContext.trim()) {
-    throw new Error('Epic context with scope analysis is required for shell story generation. Please run the "analyze-feature-scope" tool first to generate scope analysis, then run this tool again.');
+  // Get scope analysis - either from parameter or extract from epic context
+  let scopeAnalysis: string | null;
+  let remainingContext: string;
+  
+  if (scopeAnalysisContent !== undefined) {
+    // Use provided scope analysis (auto-generated in current run)
+    scopeAnalysis = scopeAnalysisContent;
+    remainingContext = epicContext || '';
+    console.log('  ℹ️  Using scope analysis from current run (not extracted from epic)');
+  } else {
+    // Extract from epic context (legacy path)
+    if (!epicContext || !epicContext.trim()) {
+      throw new Error('Epic context with scope analysis is required for shell story generation. Please run the "analyze-feature-scope" tool first to generate scope analysis, then run this tool again.');
+    }
+    
+    const parsed = extractScopeAnalysisLocal(epicContext);
+    scopeAnalysis = parsed.scopeAnalysis;
+    remainingContext = parsed.remainingContext;
+    
+    if (!scopeAnalysis) {
+      throw new Error('Epic must contain a "## Scope Analysis" section. Please run the "analyze-feature-scope" tool first to generate scope analysis, then run this tool again.');
+    }
   }
   
-  // Extract scope analysis from epic context
-  const { scopeAnalysis, remainingContext } = extractScopeAnalysis(epicContext);
-  
+  // Final null check to satisfy TypeScript (both branches above ensure scopeAnalysis is not null)
   if (!scopeAnalysis) {
-    throw new Error('Epic must contain a "## Scope Analysis" section. Please run the "analyze-feature-scope" tool first to generate scope analysis, then run this tool again.');
+    throw new Error('Scope analysis is required but was not found or generated.');
   }
   
   // Generate shell story prompt
@@ -504,7 +679,7 @@ async function updateEpicWithShellStories({
   epicWithoutShellStoriesAdf: ADFNode[];
   notify: ToolDependencies['notify'];
 }): Promise<void> {
-  console.log('  Phase 6: Updating epic with shell stories...');
+  console.log('  Phase 7: Updating epic with shell stories...');
 
   try {
     // Clean up AI-generated content and prepare section
@@ -646,4 +821,293 @@ function prepareShellStoriesSection(shellStoriesMarkdown: string): string {
   
   // Return with proper section header
   return `## Shell Stories\n\n${cleanedMarkdown}`;
+}
+
+/**
+ * Helper function: Update epic with scope analysis section
+ * 
+ * Used by self-healing workflow when:
+ * - action="clarify": No existing scope analysis, too many questions
+ * - action="regenerate": Existing scope analysis regenerated with answered questions
+ * 
+ * @param params.epicKey - The Jira epic key
+ * @param params.cloudId - The Atlassian cloud ID
+ * @param params.atlassianClient - Atlassian API client with auth
+ * @param params.scopeAnalysisMarkdown - The scope analysis markdown content
+ * @param params.epicWithoutShellStoriesAdf - The epic description ADF content
+ * @param params.notify - Progress notification function
+ */
+async function updateEpicWithScopeAnalysis({
+  epicKey,
+  cloudId,
+  atlassianClient,
+  scopeAnalysisMarkdown,
+  epicWithoutShellStoriesAdf,
+  notify
+}: {
+  epicKey: string;
+  cloudId: string;
+  atlassianClient: ToolDependencies['atlassianClient'];
+  scopeAnalysisMarkdown: string;
+  epicWithoutShellStoriesAdf: ADFNode[];
+  notify: ToolDependencies['notify'];
+}): Promise<void> {
+  console.log('  Updating epic with scope analysis...');
+
+  try {
+    // Convert scope analysis markdown to ADF
+    console.log('    Converting scope analysis to ADF...');
+    const scopeAnalysisAdf = await convertMarkdownToAdf(scopeAnalysisMarkdown);
+    
+    if (!validateAdf(scopeAnalysisAdf)) {
+      console.log('    ⚠️ Failed to convert scope analysis to valid ADF');
+      await notify('⚠️ Failed to convert scope analysis to ADF');
+      return;
+    }
+    
+    console.log('    ✅ Scope analysis converted to ADF');
+    
+    // Remove any existing scope analysis section from the epic
+    const { remainingContent } = extractADFSection(
+      epicWithoutShellStoriesAdf,
+      'Scope Analysis'
+    );
+    
+    // Combine: remaining content + new scope analysis
+    const updatedDescription: ADFDocument = {
+      version: 1,
+      type: 'doc',
+      content: [
+        ...remainingContent,
+        ...scopeAnalysisAdf.content
+      ]
+    };
+    
+    // Update the epic
+    console.log('    Updating epic description...');
+    const updateUrl = `https://api.atlassian.com/ex/jira/${cloudId}/rest/api/3/issue/${epicKey}`;
+    
+    const updateResponse = await atlassianClient.fetch(updateUrl, {
+      method: 'PUT',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        fields: {
+          description: updatedDescription
+        }
+      }),
+    });
+    
+    if (updateResponse.status === 404) {
+      console.log(`    ⚠️ Epic ${epicKey} not found`);
+      await notify(`⚠️ Epic ${epicKey} not found`);
+      return;
+    }
+    
+    if (updateResponse.status === 403) {
+      console.log(`    ⚠️ Insufficient permissions to update epic ${epicKey}`);
+      await notify(`⚠️ Insufficient permissions to update epic`);
+      return;
+    }
+    
+    await handleJiraAuthError(updateResponse, `Update epic ${epicKey} with scope analysis`);
+    
+    console.log('    ✅ Epic updated with scope analysis');
+    await notify('✅ Epic updated with scope analysis');
+    
+  } catch (error: any) {
+    console.log(`    ⚠️ Error updating epic with scope analysis: ${error.message}`);
+    await notify(`⚠️ Error updating epic: ${error.message}`);
+    throw error; // Re-throw so caller knows the update failed
+  }
+}
+
+// ==========================================
+// Decision Handler Helper Functions
+// ==========================================
+
+/**
+ * Parameters for decision handler functions
+ */
+interface DecisionHandlerParams {
+  epicKey: string;
+  cloudId: string;
+  atlassianClient: ToolDependencies['atlassianClient'];
+  generateText: ToolDependencies['generateText'];
+  notify: ToolDependencies['notify'];
+  screens: Screen[];
+  epicWithoutShellStoriesAdf: ADFNode[];
+  allDocs: ConfluenceDocumentContext[];
+  allContexts: ScreenAnnotation[];
+  debugDir: string | null;
+  figmaFileKey: string;
+  yamlContent: string;
+}
+
+/**
+ * Handle REGENERATE_ANALYSIS decision
+ * 
+ * Regenerates scope analysis with user's previous answers as context.
+ * Returns early result if still too many questions, or null to continue with shell stories.
+ */
+export async function handleRegenerateAnalysis(
+  params: DecisionHandlerParams & {
+    scopeAnalysisContent: string;
+    remainingContext: string;
+  }
+): Promise<ExecuteWriteShellStoriesResult | { continueWithScopeAnalysis: string }> {
+  const {
+    epicKey,
+    cloudId,
+    atlassianClient,
+    generateText,
+    notify,
+    screens,
+    epicWithoutShellStoriesAdf,
+    allDocs,
+    allContexts,
+    debugDir,
+    figmaFileKey,
+    yamlContent,
+    scopeAnalysisContent,
+    remainingContext,
+  } = params;
+
+  console.log('  🔄 Regenerating scope analysis with your answers...');
+  await notify('🔄 Updating scope analysis with your answers...');
+
+  try {
+    // Regenerate with previous scope analysis as context with performance logging
+    const regenStartTime = Date.now();
+    const scopeResult = await generateScopeAnalysis({
+      generateText,
+      screens,
+      debugDir,
+      figmaFileKey,
+      yamlContent,
+      notify,
+      epicContext: remainingContext,
+      referenceDocs: allDocs.map(doc => ({
+        title: doc.title,
+        url: doc.url,
+        markdown: doc.markdown,
+        source: doc.source ?? 'confluence',
+      })),
+      commentContexts: allContexts,
+      previousScopeAnalysis: scopeAnalysisContent,
+    });
+    const regenDuration = Date.now() - regenStartTime;
+    console.log(`  ⏱️ Scope analysis regeneration took ${(regenDuration / 1000).toFixed(1)}s`);
+
+    const newScopeAnalysisContent = scopeResult.scopeAnalysisContent;
+    console.log(`  ✅ Scope analysis regenerated: ${scopeResult.questionsCount} questions, ${scopeResult.featureAreasCount} feature areas`);
+
+    // Re-count questions after regeneration
+    const newQuestionCount = countUnansweredQuestions(newScopeAnalysisContent);
+    console.log(`  📊 New question count after regeneration: ${newQuestionCount}`);
+
+    // Check if regeneration reduced questions enough to proceed
+    if (newQuestionCount <= QUESTION_THRESHOLD) {
+      console.log('  ✅ Regeneration reduced questions - now proceeding with shell stories');
+      return { continueWithScopeAnalysis: newScopeAnalysisContent };
+    }
+
+    // Still too many questions - update Jira and return
+    console.log(`  ⏸️ Still ${newQuestionCount} questions after regeneration - returning for more clarification`);
+
+    await notify('📝 Jira Update: Updating scope analysis section...');
+
+    try {
+      const scopeAnalysisSectionMarkdown = `## Scope Analysis\n\n${newScopeAnalysisContent}`;
+      await updateEpicWithScopeAnalysis({
+        epicKey,
+        cloudId,
+        atlassianClient,
+        scopeAnalysisMarkdown: scopeAnalysisSectionMarkdown,
+        epicWithoutShellStoriesAdf,
+        notify
+      });
+      console.log('  ✅ Jira updated with regenerated scope analysis');
+    } catch (error: any) {
+      console.error('  ❌ Failed to update Jira with scope analysis:', error);
+    }
+
+    await notify(`⚠️ After incorporating your previous answers, still found ${newQuestionCount} unanswered questions. Please answer the remaining questions marked with ❓, then run this tool again.`);
+
+    return {
+      success: true,
+      action: 'regenerate' as const,
+      screensAnalyzed: screens.length,
+      scopeAnalysisContent: newScopeAnalysisContent,
+      questionCount: newQuestionCount,
+      hadExistingAnalysis: true,
+    };
+  } catch (error: any) {
+    console.error('  ❌ Scope analysis regeneration failed:', error);
+    return {
+      success: false,
+      action: 'regenerate' as const,
+      screensAnalyzed: 0,
+      error: `Failed to regenerate scope analysis: ${error.message}`,
+    };
+  }
+}
+
+/**
+ * Handle ASK_FOR_CLARIFICATION decision
+ * 
+ * Updates Jira with the generated scope analysis and returns early,
+ * asking user to answer questions before re-running.
+ */
+export async function handleAskForClarification(
+  params: DecisionHandlerParams & {
+    scopeAnalysisContent: string;
+    questionCount: number;
+    hadExistingAnalysis: boolean;
+  }
+): Promise<ExecuteWriteShellStoriesResult> {
+  const {
+    epicKey,
+    cloudId,
+    atlassianClient,
+    notify,
+    screens,
+    epicWithoutShellStoriesAdf,
+    scopeAnalysisContent,
+    questionCount,
+    hadExistingAnalysis,
+  } = params;
+
+  console.log(`  ⏸️ Cannot proceed with shell stories - need clarification`);
+
+  await notify('📝 Jira Update: Adding scope analysis section...');
+
+  try {
+    const scopeAnalysisSectionMarkdown = `## Scope Analysis\n\n${scopeAnalysisContent}`;
+    await updateEpicWithScopeAnalysis({
+      epicKey,
+      cloudId,
+      atlassianClient,
+      scopeAnalysisMarkdown: scopeAnalysisSectionMarkdown,
+      epicWithoutShellStoriesAdf,
+      notify
+    });
+    console.log('  ✅ Jira updated with scope analysis');
+  } catch (error: any) {
+    console.error('  ❌ Failed to update Jira with scope analysis:', error);
+    // Continue to return the scope analysis - Jira update is best effort
+  }
+
+  await notify(`⚠️ Found ${questionCount} unanswered questions (threshold: ${QUESTION_THRESHOLD}). Please answer the questions marked with ❓ in the epic's Scope Analysis section, then run this tool again.`);
+
+  return {
+    success: true,
+    action: 'clarify' as const,
+    screensAnalyzed: screens.length,
+    scopeAnalysisContent,
+    questionCount,
+    hadExistingAnalysis,
+  };
 }

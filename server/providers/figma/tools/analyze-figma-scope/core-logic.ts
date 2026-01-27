@@ -273,7 +273,7 @@ export async function executeAnalyzeFigmaScope(
           name: screen.name,
           content: analysisContent,
           url: screen.url,
-          nodeId: screen.name, // screen.name is the node ID in this context
+          nodeId: screen.nodeId,
         });
       } catch (readError: any) {
         console.warn(`  ⚠️ Could not read analysis for ${screen.name}: ${readError.message}`);

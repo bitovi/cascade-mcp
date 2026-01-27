@@ -3,7 +3,17 @@
 **Feature Branch**: `039-self-healing-tools`  
 **Created**: 2026-01-26  
 **Status**: Draft  
-**Input**: User description: "Make write-shell-stories and write-story self-healing so they automatically check for questions and guide users through clarification iterations, deprecating analyze-feature-scope as a standalone tool"
+**Input**: User description: "Make write-shell-stories self-healing so it automatically checks for questions and guides users through clarification iterations, deprecating analyze-feature-scope as a standalone tool"
+
+## Clarifications
+
+### Session 2026-01-26
+
+- Q: When Figma designs linked in an epic are no longer accessible (deleted/moved/permissions changed), what should the tool do? → A: If no Figma links, proceed without warning. If Figma links exist but can't load, error immediately. (existing behavior)
+- Q: Edge case behaviors for Jira errors, rate limits, character limits, threshold boundary? → A: All follow existing behavior patterns (error on 404/403, retry-after on 429, warn/error on character limit, `>5` comparison for threshold)
+- Q: How is question counting performed? → A: Run modified Scope Analysis (LLM outputs ❓/💬 markers), then parse output to count ❓ markers. No separate LLM call for counting.
+- Q: Should `write-story` be included in this scope? → A: Deferred to future work. This spec focuses on `write-shell-stories` only.
+- Q: When the LLM call that generates the Scope Analysis section fails (network timeout, rate limit, model unavailable), what should `write-shell-stories` do? → A: Error immediately and ask user to retry later
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -18,31 +28,13 @@ A product manager wants to break down an epic into shell stories. They call `wri
 **Acceptance Scenarios**:
 
 1. **Given** an epic with well-documented Figma designs (≤5 clarifying questions), **When** I run `write-shell-stories`, **Then** shell stories are created directly without a Scope Analysis section
-2. **Given** an epic with incomplete requirements (>5 clarifying questions), **When** I run `write-shell-stories`, **Then** a Scope Analysis section with questions is created and the tool asks me to re-run after answering
-3. **Given** an epic that already has a Scope Analysis section with answered questions, **When** I run `write-shell-stories`, **Then** shell stories are created based on the answered questions
+2. **Given** an epic with incomplete requirements (>5 unanswered questions), **When** I run `write-shell-stories`, **Then** a Scope Analysis section with ❓-marked questions is created and the tool asks me to re-run after answering
+3. **Given** an epic that already has a Scope Analysis section with answered questions, **When** I run `write-shell-stories`, **Then** the section is regenerated with 💬 markers on answered questions, and shell stories are created if ≤5 ❓ remain
 4. **Given** an epic where `figma-review-design` was previously run, **When** I run `write-shell-stories`, **Then** Figma comment threads with answers reduce the unanswered question count (inferred by LLM)
 
 ---
 
-### User Story 2 - Single Story Creation (Priority: P2)
-
-A developer wants to write a single detailed story for a small feature or bug fix without creating an epic structure. They call `write-story` with an issue key and optional Figma URLs. The tool automatically analyzes the scope (just like `analyze-feature-scope` does for epics) and either writes the story immediately (if few questions) or writes a Scope Analysis section to the issue with feature categorization and clarifying questions (if many questions).
-
-**Why this priority**: Enables quick story creation for common small-scope work without the overhead of the epic workflow.
-
-**Independent Test**: Run `write-story` on a Jira issue with linked Figma designs. Verify the tool either writes the story directly or creates a Scope Analysis section with feature categorization and questions.
-
-**Acceptance Scenarios**:
-
-1. **Given** a Jira issue with clear requirements and linked Figma designs (≤5 questions), **When** I run `write-story`, **Then** a detailed story with acceptance criteria is written to the issue
-2. **Given** a Jira issue with unclear requirements (>5 questions), **When** I run `write-story`, **Then** a Scope Analysis section is written to the issue containing feature categorization (✅ confirmed, ❌ out-of-scope, ❓ needs-clarification, ⏬ low-priority) and clarifying questions, and the tool asks me to answer and re-run
-3. **Given** a Jira issue where `figma-review-design` was previously run on linked designs, **When** I run `write-story`, **Then** Figma comment threads with answers reduce the unanswered question count (inferred by LLM)
-4. **Given** a Jira issue with no Figma designs, **When** I run `write-story` with `contextDescription`, **Then** the tool uses the context to analyze requirements
-5. **Given** a Jira issue with an existing Scope Analysis section with answered questions, **When** I re-run `write-story`, **Then** the tool recognizes answers and writes the detailed story
-
----
-
-### User Story 3 - Iterative Refinement (Priority: P1)
+### User Story 2 - Iterative Refinement (Priority: P1)
 
 A user runs a self-healing tool and receives questions. They answer the questions (either in Jira or by providing context) and re-run the tool. The tool recognizes the answered questions and proceeds with the next step.
 
@@ -52,13 +44,12 @@ A user runs a self-healing tool and receives questions. They answer the question
 
 **Acceptance Scenarios**:
 
-1. **Given** an epic with unanswered questions in Scope Analysis, **When** I answer the questions and re-run `write-shell-stories`, **Then** the tool recognizes answers and creates shell stories
-2. **Given** an issue with unanswered questions in Scope Analysis from `write-story`, **When** I answer the questions and re-run `write-story`, **Then** the tool recognizes answers and writes the detailed story
-3. **Given** some but not all questions are answered, **When** I re-run the tool, **Then** remaining questions are surfaced but the tool proceeds if count is below threshold
+1. **Given** an epic with unanswered questions (❓) in Scope Analysis, **When** I answer the questions and re-run `write-shell-stories`, **Then** the section is regenerated with 💬 markers on answered questions, and shell stories are created if ≤5 ❓ remain
+2. **Given** some but not all questions are answered, **When** I re-run `write-shell-stories`, **Then** the regenerated section shows 💬 for answered and ❓ for remaining, and the tool proceeds if ❓ count is below threshold
 
 ---
 
-### User Story 4 - Figma Comments Integration (Priority: P2)
+### User Story 3 - Figma Comments Integration (Priority: P2)
 
 A designer runs `figma-review-design` on their designs, answering questions in Figma comments. Later, when a PM runs `write-shell-stories` on the same epic, the tool reads the Figma comment threads and the LLM recognizes that questions have been answered, reducing the number of new questions it needs to ask.
 
@@ -68,18 +59,19 @@ A designer runs `figma-review-design` on their designs, answering questions in F
 
 **Acceptance Scenarios**:
 
-1. **Given** Figma designs with comment threads containing answers from `figma-review-design`, **When** I run `write-shell-stories` on an epic linking those designs, **Then** the LLM recognizes answered questions and the unanswered question count is reduced
-2. **Given** Figma designs with comment threads that don't contain clear answers, **When** I run `write-shell-stories`, **Then** those questions remain in the unanswered count
+1. **Given** Figma designs with comment threads containing answers from `figma-review-design`, **When** I run `write-shell-stories` on an epic linking those designs, **Then** the LLM recognizes answered questions and marks them with 💬, reducing the ❓ count
+2. **Given** Figma designs with comment threads that don't contain clear answers, **When** I run `write-shell-stories`, **Then** those questions remain marked with ❓
 
 ---
 
 ### Edge Cases
 
-- What happens when the Jira issue/epic doesn't exist or user lacks permissions?
-- How does the system handle Figma rate limits during question analysis?
-- What happens if the question count is exactly at the threshold (e.g., exactly 5)?
-- How does the system handle very large epics that would exceed Jira's character limit?
-- What happens if Figma designs are no longer accessible (deleted/moved)?
+- **Figma access**: If no Figma links exist, proceed without Figma (no warning). If Figma links exist but data cannot be loaded (deleted/permissions), error immediately. *(existing behavior)*
+- **Jira issue/epic not found or permissions denied**: Error with helpful message (e.g., "Issue not found" or "Insufficient permissions to update issue"). *(existing behavior)*
+- **Figma/Google rate limits**: Error with retry-after message when 429 received. *(existing behavior)*
+- **LLM call failure (Scope Analysis generation)**: Error immediately with message to retry later. Preserve existing Jira content (do not create placeholder section or proceed without analysis).
+- **Question count exactly at threshold**: Threshold comparison is `> 5` (not `>=`), so exactly 5 unanswered questions proceeds to writing.
+- **Very large epics exceeding Jira character limit**: Warn when approaching 43,838 character limit, error if exceeded with message to split content. *(existing behavior)*
 
 ## Requirements *(mandatory)*
 
@@ -89,11 +81,16 @@ A designer runs `figma-review-design` on their designs, answering questions in F
 
 - **FR-001**: `write-shell-stories` MUST automatically check for a "## Scope Analysis" section before proceeding
 - **FR-002**: `write-shell-stories` MUST run scope analysis internally if no Scope Analysis section exists
-- **FR-003**: Tools MUST use LLM to analyze current context (Figma designs, comments, Jira description, linked docs) and determine how many clarifying questions remain unanswered
-- **FR-004**: Tools MUST use a configurable question threshold (default: 5) to decide whether to proceed or ask for clarification
-- **FR-005**: If questions > threshold, tools MUST create appropriate artifacts (Scope Analysis section with questions)
-- **FR-006**: If questions ≤ threshold, tools MUST proceed with their primary function (creating shell stories or writing the story)
-- **FR-007**: On re-run, tools MUST re-analyze all context to determine remaining unanswered questions (LLM infers answers from context, no manual markers required)
+- **FR-003**: Tools MUST run a modified Scope Analysis (LLM call) that outputs questions with ❓ (unanswered) or 💬 (answered) markers, then parse the output to count remaining ❓ questions
+- **FR-004**: Tools MUST use a hardcoded question threshold of 5 to decide whether to proceed or ask for clarification
+- **FR-005**: If unanswered questions > threshold, tools MUST create/regenerate Scope Analysis section with questions
+- **FR-006**: If unanswered questions ≤ threshold, `write-shell-stories` MUST proceed with creating shell stories
+- **FR-007**: On re-run, tools MUST regenerate the Scope Analysis section by:
+  1. Including the previous Scope Analysis section in LLM context
+  2. Including all other context (Figma comments, Jira description edits, linked Confluence docs)
+  3. Having LLM re-analyze and output updated section with ❓ (unanswered) and 💬 (answered) markers
+  4. Parsing the LLM output to count ❓ markers (not a separate LLM call)
+  5. Comparing ❓ count against threshold to decide next action
 
 #### Figma Integration
 
@@ -101,34 +98,101 @@ A designer runs `figma-review-design` on their designs, answering questions in F
 - **FR-009**: LLM MUST consider Figma comment threads (including replies) when determining if questions have been answered
 - **FR-010**: Figma comments that contain answers to questions MUST reduce the unanswered question count (inferred by LLM, not by resolved status)
 
-#### Single Story Tool
-
-- **FR-011**: `write-story` MUST accept an issue key and optional Figma URLs
-- **FR-012**: `write-story` MUST perform scope analysis (feature categorization) just like `analyze-feature-scope` does for epics
-- **FR-013**: If questions > threshold, `write-story` MUST write a "## Scope Analysis" section to the issue containing feature categorization (✅ confirmed, ❌ out-of-scope, ❓ needs-clarification, ⏬ low-priority) and clarifying questions
-- **FR-014**: If questions ≤ threshold, `write-story` MUST skip the Scope Analysis artifact and write the detailed story directly
-
 #### Deprecation
 
-- **FR-015**: `analyze-feature-scope` MUST remain functional for backward compatibility
-- **FR-016**: `analyze-feature-scope` MUST be marked as deprecated in documentation and tool descriptions
-- **FR-017**: Documentation MUST recommend using `write-shell-stories` or `write-story` directly instead of `analyze-feature-scope`
+- **FR-011**: `analyze-feature-scope` MUST remain functional for backward compatibility
+- **FR-012**: `analyze-feature-scope` MUST be marked as deprecated in documentation and tool descriptions
+- **FR-013**: Documentation MUST recommend using `write-shell-stories` directly instead of `analyze-feature-scope`
 
 ### Key Entities
 
 - **Question**: A clarifying question about unclear requirements, edge cases, or missing information
   - Source: Figma design analysis, comment threads, or documentation gaps
-  - State: Open or Answered (inferred by LLM from context, not manually marked)
+  - Visual markers:
+    - ❓ = Unanswered question (needs clarification)
+    - 💬 = Answered question (LLM determined answer exists in context)
+  - State determined by LLM analyzing all context (Figma comments, Jira text, linked docs)
   
-- **Scope Analysis Section**: A markdown section in a Jira epic or issue containing categorized features and open questions
+- **Scope Analysis Section**: A markdown section in a Jira epic containing categorized features and open questions
   - Contains feature categorization: ✅ confirmed, ❌ out-of-scope, ❓ needs-clarification, ⏬ low-priority
+  - Contains questions with status markers (❓ unanswered, 💬 answered)
   - Created only when questions exceed threshold
-  - Updated on subsequent tool runs
-  - Used by both `write-shell-stories` (for epics) and `write-story` (for single issues)
+  - Regenerated on subsequent tool runs (previous section included in LLM context)
   
 - **Shell Story**: A high-level story outline in a Jira epic
   - Created after Scope Analysis questions are sufficiently answered
   - Used as input for `write-next-story`
+
+### Jira User Experience
+
+#### Progress Comments
+
+The tool MUST create a Jira comment using `progress-comment-manager` showing operation progress. Comment format follows existing pattern:
+
+**When action = "proceed" (shell stories created):**
+```markdown
+🔄 **Write Shell Stories Progress**
+
+1. Analyzing Figma designs...
+2. Scope Analysis: Found 3 questions (below threshold)
+3. Generating shell stories...
+4. ✅ Jira Update Complete: Successfully generated 8 shell stories
+```
+
+**When action = "clarify" (first time, needs answers):**
+```markdown
+🔄 **Write Shell Stories Progress**
+
+1. Analyzing Figma designs...
+2. Scope Analysis: Found 12 questions
+3. ⏸️ Clarification Required: Too many unanswered questions (12 > threshold of 5)
+```
+
+**When action = "regenerate" (subsequent runs, still needs answers):**
+```markdown
+🔄 **Write Shell Stories Progress**
+
+1. Analyzing Figma designs...
+2. Scope Analysis: Found 6 questions
+3. ⏸️ Clarification Required: Still need more answers (6 > threshold of 5)
+```
+
+**On error:**
+```markdown
+🔄 **Write Shell Stories Progress**
+
+1. Analyzing Figma designs...
+2. ❌ Error occurred
+
+---
+
+[Error details here]
+```
+
+#### Scope Analysis Section Format
+
+The `## Scope Analysis` section MUST NOT include guidance text. Format is clean analysis only:
+
+```markdown
+## Scope Analysis
+
+### Feature Area 1: Authentication
+- ☐ User login
+- ❓ How should failed login attempts be handled?
+- ⏬ Social login (low priority)
+
+### Feature Area 2: Profile Management
+- ☐ Edit profile
+- ❌ Delete account (out of scope)
+
+### Questions
+- ❓ What are the performance requirements?
+- ❓ How should errors be handled?
+
+**Figma screens**: [links]
+```
+
+No iteration tracking, status banners, or instruction text in the section itself. Users rely on the progress comment for guidance.
 
 ## Success Criteria *(mandatory)*
 
@@ -137,8 +201,7 @@ A designer runs `figma-review-design` on their designs, answering questions in F
 - **SC-001**: Users can create shell stories with a single tool call when designs are well-documented (≤5 questions)
 - **SC-002**: Users complete the epic breakdown workflow in 2 or fewer tool iterations on average
 - **SC-003**: Question count is reduced by 30%+ when `figma-review-design` was run first
-- **SC-004**: Single story creation via `write-story` completes in under 2 minutes for well-documented issues
-- **SC-005**: 95% of users successfully complete their intended workflow without needing to understand the deprecated `analyze-feature-scope` tool
+- **SC-004**: 95% of users successfully complete their intended workflow without needing to understand the deprecated `analyze-feature-scope` tool
 
 ## Assumptions
 
@@ -146,10 +209,11 @@ A designer runs `figma-review-design` on their designs, answering questions in F
 - LLM can reliably infer whether a question has been answered from surrounding context (Figma comments, Jira text, linked docs)
 - Users will provide answers in natural language (no special formatting or markers required)
 - The existing Figma comment reading infrastructure supports this workflow
-- LLM-based question counting is acceptable cost/latency trade-off for better UX
+- Question counting via parsing ❓ markers is reliable (LLM consistently uses the marker format)
 
 ## Out of Scope
 
+- **`write-story` tool for single issues** (deferred to future work)
 - Automatic question answering by AI (users must provide answers)
 - Integration with Slack or other communication tools for question routing
 - Custom per-user or per-project question thresholds (single global default)
