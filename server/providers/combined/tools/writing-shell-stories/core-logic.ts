@@ -233,25 +233,40 @@ export async function executeWriteShellStories(
     if (!deps.googleClient) {
       console.log('🔗 Skipping Google Docs context (no Google authentication)');
     } else {
-      const googleDocsContext = await setupGoogleDocsContext({
-        epicAdf: epicDescriptionAdf,
-        googleClient: deps.googleClient,
-        generateText,
-        notify,
-      });
-      
-      // Filter to docs relevant for shell story writing
-      googleDocs = googleDocsContext.byRelevance.writeStories.map((doc: GoogleDocDocument) => ({
-        title: doc.title,
-        url: doc.url,
-        markdown: doc.markdown,
-        documentType: doc.metadata.relevance?.documentType,
-        relevanceScore: doc.metadata.relevance?.toolScores.find(t => t.toolId === 'write-shell-stories')?.overallScore,
-        summary: doc.metadata.summary?.text,
-        source: 'google-docs' as const,
-      }));
-      
-      console.log(`   📄 Google Docs for shell stories: ${googleDocs.length}`);
+      try {
+        const googleDocsContext = await setupGoogleDocsContext({
+          epicAdf: epicDescriptionAdf,
+          googleClient: deps.googleClient,
+          generateText,
+          notify,
+        });
+        
+        // Report any warnings (access denied, 404s, etc.) to Jira comments
+        if (googleDocsContext.warnings && googleDocsContext.warnings.length > 0 && notify) {
+          for (const warning of googleDocsContext.warnings) {
+            await notify(`⚠️ Google Docs: ${warning}`);
+          }
+        }
+        
+        // Filter to docs relevant for shell story writing
+        googleDocs = googleDocsContext.byRelevance.writeStories.map((doc: GoogleDocDocument) => ({
+          title: doc.title,
+          url: doc.url,
+          markdown: doc.markdown,
+          documentType: doc.metadata.relevance?.documentType,
+          relevanceScore: doc.metadata.relevance?.toolScores.find(t => t.toolId === 'write-shell-stories')?.overallScore,
+          summary: doc.metadata.summary?.text,
+          source: 'google-docs' as const,
+        }));
+        
+        console.log(`   📄 Google Docs for shell stories: ${googleDocs.length}`);
+      } catch (error: any) {
+        console.log(`   ⚠️ Google Docs context setup failed: ${error.message}`);
+        if (notify) {
+          await notify(`⚠️ Google Docs processing failed: ${error.message}`);
+        }
+        // Continue without Google Docs context - it's optional
+      }
     }
   }
 

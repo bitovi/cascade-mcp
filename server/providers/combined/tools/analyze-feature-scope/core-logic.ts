@@ -321,6 +321,13 @@ async function fetchGoogleDocsContext(params: {
       notify,
     });
 
+    // Report any warnings (access denied, 404s, etc.) to Jira comments
+    if (googleDocsResult.warnings && googleDocsResult.warnings.length > 0 && notify) {
+      for (const warning of googleDocsResult.warnings) {
+        await notify(`⚠️ Google Docs: ${warning}`);
+      }
+    }
+
     // Filter to docs relevant for the specified tool
     const docs = googleDocsResult.byRelevance.analyzeScope.map((doc: GoogleDocDocument) => ({
       title: doc.title,
@@ -336,6 +343,9 @@ async function fetchGoogleDocsContext(params: {
     return docs;
   } catch (error: any) {
     console.log(`   ⚠️ Google Docs context setup failed: ${error.message}`);
+    if (notify) {
+      await notify(`⚠️ Google Docs processing failed: ${error.message}`);
+    }
     return [];
   }
 }
