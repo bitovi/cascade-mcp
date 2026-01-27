@@ -107,8 +107,8 @@ export interface ExecuteWriteShellStoriesResult {
   action: WriteShellStoriesAction;
   /** Shell stories markdown content (when action="proceed") */
   shellStoriesContent?: string;
-  /** Number of shell stories created (when action="proceed") */
-  storyCount?: number;
+  /** Number of shell stories created (0 when action="clarify" or "regenerate") */
+  storyCount: number;
   /** Number of screens analyzed */
   screensAnalyzed: number;
   /** Scope analysis markdown content (when action="clarify" or "regenerate") */
@@ -370,6 +370,7 @@ export async function executeWriteShellStories(
         success: false,
         action: 'clarify' as const,
         screensAnalyzed: 0,
+        storyCount: 0,
         error: `Failed to generate scope analysis: ${error.message}`,
       };
     }
@@ -443,7 +444,6 @@ export async function executeWriteShellStories(
     yamlContent,
     notify,
     epicContext: epicWithoutShellStoriesMarkdown,
-    scopeAnalysisContent, // Pass the scope analysis we just generated/validated
     confluenceDocs: allDocs,
     figmaComments: allContexts
   });
@@ -500,11 +500,10 @@ async function generateShellStoriesFromAnalyses(params: {
   yamlContent: string;
   notify: ToolDependencies['notify'];
   epicContext?: string;
-  scopeAnalysisContent?: string | null; // If provided, use this instead of extracting from epicContext
   confluenceDocs?: ConfluenceDocumentContext[];
   figmaComments?: ScreenAnnotation[];
 }): Promise<{ storyCount: number; analysisCount: number; shellStoriesPath: string | null; shellStoriesText: string | null }> {
-  const { generateText, screens, debugDir, figmaFileKey, yamlContent, notify, epicContext, scopeAnalysisContent, confluenceDocs, figmaComments } = params;
+  const { generateText, screens, debugDir, figmaFileKey, yamlContent, notify, epicContext, confluenceDocs, figmaComments } = params;
   
   console.log('  Phase 5: Generating shell stories from analyses...');
   
@@ -540,33 +539,16 @@ async function generateShellStoriesFromAnalyses(params: {
     return { storyCount: 0, analysisCount: 0, shellStoriesPath: null, shellStoriesText: null };
   }
   
-  // Get scope analysis - either from parameter or extract from epic context
-  let scopeAnalysis: string | null;
-  let remainingContext: string;
-  
-  if (scopeAnalysisContent !== undefined) {
-    // Use provided scope analysis (auto-generated in current run)
-    scopeAnalysis = scopeAnalysisContent;
-    remainingContext = epicContext || '';
-    console.log('  ℹ️  Using scope analysis from current run (not extracted from epic)');
-  } else {
-    // Extract from epic context (legacy path)
-    if (!epicContext || !epicContext.trim()) {
-      throw new Error('Epic context with scope analysis is required for shell story generation. Please run the "analyze-feature-scope" tool first to generate scope analysis, then run this tool again.');
-    }
-    
-    const parsed = extractScopeAnalysisLocal(epicContext);
-    scopeAnalysis = parsed.scopeAnalysis;
-    remainingContext = parsed.remainingContext;
-    
-    if (!scopeAnalysis) {
-      throw new Error('Epic must contain a "## Scope Analysis" section. Please run the "analyze-feature-scope" tool first to generate scope analysis, then run this tool again.');
-    }
+  // Verify epic context exists (required for scope analysis)
+  if (!epicContext || !epicContext.trim()) {
+    throw new Error('Epic context with scope analysis is required for shell story generation. Please run the "analyze-feature-scope" tool first to generate scope analysis, then run this tool again.');
   }
   
-  // Final null check to satisfy TypeScript (both branches above ensure scopeAnalysis is not null)
+  // Extract scope analysis from epic context
+  const { scopeAnalysis, remainingContext } = extractScopeAnalysisLocal(epicContext);
+  
   if (!scopeAnalysis) {
-    throw new Error('Scope analysis is required but was not found or generated.');
+    throw new Error('Epic must contain a "## Scope Analysis" section. Please run the "analyze-feature-scope" tool first to generate scope analysis, then run this tool again.');
   }
   
   // Generate shell story prompt
@@ -1041,6 +1023,7 @@ export async function handleRegenerateAnalysis(
       action: 'regenerate' as const,
       screensAnalyzed: screens.length,
       scopeAnalysisContent: newScopeAnalysisContent,
+      storyCount: 0, // No stories created - still need clarification
       questionCount: newQuestionCount,
       hadExistingAnalysis: true,
     };
@@ -1050,6 +1033,7 @@ export async function handleRegenerateAnalysis(
       success: false,
       action: 'regenerate' as const,
       screensAnalyzed: 0,
+      storyCount: 0,
       error: `Failed to regenerate scope analysis: ${error.message}`,
     };
   }
@@ -1107,6 +1091,7 @@ export async function handleAskForClarification(
     action: 'clarify' as const,
     screensAnalyzed: screens.length,
     scopeAnalysisContent,
+    storyCount: 0, // No stories created - need clarification first
     questionCount,
     hadExistingAnalysis,
   };

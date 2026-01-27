@@ -68,10 +68,14 @@ export interface WriteShellStoriesParams {
 
 export interface WriteShellStoriesResult {
   success: true;
-  shellStoriesContent: string;
+  action: 'proceed' | 'clarify' | 'regenerate';
+  shellStoriesContent?: string;
   storyCount: number;
   screensAnalyzed: number;
   epicKey: string;
+  scopeAnalysisContent?: string;
+  questionCount?: number;
+  hadExistingAnalysis?: boolean;
 }
 
 /**
