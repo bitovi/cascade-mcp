@@ -19,11 +19,15 @@ All REST API endpoints require authentication via HTTP headers:
 - `X-Figma-Token` - Figma Personal Access Token
 - `X-Anthropic-Token` - Anthropic API key for AI-powered story generation
 
+**Optional Headers:**
+- `X-Google-Json` - Google service account JSON (enables Google Docs context in epics)
+
 **Example Headers:**
 ```bash
 X-Atlassian-Token: eW91ci1lbWFpbEBleGFtcGxlLmNvbTpBVEFUVDN4RmZHRjA...
 X-Figma-Token: figd_5L7d0...
 X-Anthropic-Token: sk-ant-api03-...
+X-Google-Json: {"type":"service_account","project_id":"..."}
 ```
 
 ### Obtaining Tokens
@@ -49,6 +53,19 @@ X-Anthropic-Token: sk-ant-api03-...
    - File content - Read only
    - File comments - Read only
 
+**Google Service Account** :
+
+See the [Google Service Account Setup Guide](./google-service-account.md) for detailed instructions.
+
+⚠️ **CRITICAL SECURITY WARNING**: Service account keys do NOT expire and provide full access to shared resources. The X-Google-Json header should ONLY be used in secure, server-to-server environments. Never expose this endpoint to client-side applications.
+
+Quick setup:
+1. Create service account in [Google Cloud Console](https://console.cloud.google.com/)
+2. Enable Google Drive API
+3. Create and download JSON key
+4. Share Google Drive files with the service account email
+5. Use the JSON content in the `X-Google-Json` header
+
 **Anthropic API Key:**
 1. Go to https://console.anthropic.com/settings/keys
 2. Create an API key
@@ -63,12 +80,15 @@ Generates prioritized shell stories from Figma designs linked in a Jira epic.
 **Endpoint:** `POST /api/write-shell-stories`
 
 **Headers:**
+
 - `Content-Type: application/json`
 - `X-Atlassian-Token` (required) - Base64-encoded `email:token` for Basic Auth
 - `X-Figma-Token` (required) - Figma Personal Access Token (starts with `figd_...`)
 - `X-Anthropic-Token` (required) - Anthropic API key (starts with `sk-ant-...`)
+- `X-Google-Json` (optional) - Google service account JSON (enables Google Docs context)
 
 **Request Body:**
+
 ```json
 {
   "epicKey": "PROJ-123",
@@ -151,12 +171,15 @@ Writes the next Jira story from shell stories in an epic. Validates dependencies
 **Endpoint:** `POST /api/write-next-story`
 
 **Headers:**
+
 - `Content-Type: application/json`
 - `X-Atlassian-Token` (required) - Base64-encoded `email:token` for Basic Auth
 - `X-Figma-Token` (required) - Figma Personal Access Token (starts with `figd_...`)
 - `X-Anthropic-Token` (required) - Anthropic API key (starts with `sk-ant-...`)
+- `X-Google-Json` (optional) - Google service account JSON (enables Google Docs context)
 
 **Request Body:**
+
 ```json
 {
   "epicKey": "PROJ-123",

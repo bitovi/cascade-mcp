@@ -143,6 +143,13 @@ export async function executeWriteNextStory(
           notify,
         });
         
+        // Report any warnings (access denied, 404s, etc.) to Jira comments
+        if (googleDocsContext.warnings && googleDocsContext.warnings.length > 0 && notify) {
+          for (const warning of googleDocsContext.warnings) {
+            await notify(`⚠️ Google Docs: ${warning}`);
+          }
+        }
+        
         // Filter to docs relevant for story writing
         googleDocs = googleDocsContext.byRelevance.writeNextStory.map((doc: GoogleDocDocument) => ({
           title: doc.title,
@@ -157,6 +164,9 @@ export async function executeWriteNextStory(
         console.log(`   📄 Google Docs for story writing: ${googleDocs.length}`);
       } catch (error: any) {
         console.log(`   ⚠️ Google Docs context setup failed: ${error.message}`);
+        if (notify) {
+          await notify(`⚠️ Google Docs processing failed: ${error.message}`);
+        }
         // Continue without Google Docs context - it's optional
       }
     }
