@@ -1,5 +1,5 @@
 /**
- * REST API Handler for Analyze Figma Scope
+ * REST API Handler for Figma Review Design
  *
  * Accepts PAT (Personal Access Token) authentication via headers and delegates to core logic.
  * This endpoint analyzes Figma designs and posts clarifying questions as comments.
@@ -10,13 +10,13 @@
 import type { Request, Response } from 'express';
 import { createFigmaClient } from '../providers/figma/figma-api-client.js';
 import { createProviderFromHeaders } from '../llm-client/index.js';
-import { executeAnalyzeFigmaScope } from '../providers/figma/tools/analyze-figma-scope/core-logic.js';
+import { executeAnalyzeFigmaScope } from '../providers/figma/tools/figma-review-design/core-logic.js';
 import { logger } from '../observability/logger.js';
 
 /**
- * POST /api/analyze-figma-scope
+ * POST /api/figma-review-design
  *
- * Analyze Figma designs and post clarifying questions as comments
+ * Review Figma designs and post clarifying questions as comments
  *
  * Required Headers:
  *   X-Figma-Token: figd_...  (Figma PAT with file_comments:read and file_comments:write scopes)
@@ -42,7 +42,7 @@ import { logger } from '../observability/logger.js';
  *   "postingSummary": "Posted 5/7 questions"
  * }
  */
-export async function handleAnalyzeFigmaScope(req: Request, res: Response): Promise<void> {
+export async function handleFigmaReviewDesign(req: Request, res: Response): Promise<void> {
   try {
     const { figmaUrls, contextDescription } = req.body;
 
@@ -67,7 +67,7 @@ export async function handleAnalyzeFigmaScope(req: Request, res: Response): Prom
     }
 
     console.log(
-      `Tool call: analyze-figma-scope {figmaUrls: ${figmaUrls.length}, hasContext: ${!!contextDescription}}`
+      `Tool call: figma-review-design {figmaUrls: ${figmaUrls.length}, hasContext: ${!!contextDescription}}`
     );
     // TODO: Should we have some API helpers that prep the figmaClient?
     // Extract Figma token from headers
@@ -87,7 +87,7 @@ export async function handleAnalyzeFigmaScope(req: Request, res: Response): Prom
 
     // Simple console-based progress notification for REST API
     const notify = async (message: string): Promise<void> => {
-      console.log(`  [analyze-figma-scope] ${message}`);
+      console.log(`  [figma-review-design] ${message}`);
     };
 
     // Execute core logic
@@ -113,7 +113,7 @@ export async function handleAnalyzeFigmaScope(req: Request, res: Response): Prom
       errors: result.errors,
     });
   } catch (error: any) {
-    console.error('REST API: analyze-figma-scope failed:', error);
+    console.error('REST API: figma-review-design failed:', error);
 
     // Handle authentication errors
     if (error.message?.includes('403') || error.message?.includes('unauthorized')) {
