@@ -268,14 +268,15 @@ npm run dev:client
 ### Combined Provider Tools
 Advanced workflow tools that integrate multiple services:
 
-- **analyze-feature-scope** - Generate comprehensive scope analysis from Figma designs
+- **analyze-feature-scope** ⚠️ **DEPRECATED** - Use `write-shell-stories` instead
+  - **Migration**: `write-shell-stories` now includes automatic scope analysis (see below)
   - Analyzes screens against epic requirements to identify in-scope/out-of-scope features
   - Categorizes features as: ✅ confirmed, ❌ out-of-scope, ❓ needs-clarification, ⏬ low-priority
   - Updates epic description with structured scope analysis grouped by feature areas
   - **Documentation Context**: Automatically extracts and uses linked Confluence pages and Google Docs for additional requirements context
   - Parameters: `epicKey`, `figmaUrl`, optional `cloudId`
   - Example: `analyze-feature-scope({ epicKey: "PLAY-123", figmaUrl: "https://..." })`
-  - **Run this first** before write-shell-stories to establish scope
+  - **Deprecated**: Run `write-shell-stories` directly instead - it handles scope analysis automatically
 
 - **figma-review-design** - Standalone Figma design analysis without Jira integration
   - Analyzes Figma screens independently of Jira epics
@@ -289,7 +290,12 @@ Advanced workflow tools that integrate multiple services:
   - **Authentication**: Requires Figma auth only (no Atlassian needed)
 
 - **write-shell-stories** - Generate shell user stories from Figma designs
-  - **PREREQUISITE**: Epic must have a "## Scope Analysis" section (run analyze-feature-scope first)
+  - **Automatic Scope Analysis**: Runs scope analysis internally if no "## Scope Analysis" section exists
+  - **Question-Based Decision**: Counts unanswered questions (❓) and either:
+    - ≤5 questions: Proceeds with creating shell stories
+    - >5 questions: Creates Scope Analysis section, asks user to answer questions and re-run
+  - **Iterative Refinement**: On re-run, regenerates analysis with 💬 markers for answered questions
+  - **Figma Comments Integration**: Reads Figma comment threads to infer answered questions
   - Creates prioritized shell stories based on scope analysis categorizations
   - Organizes features into incremental delivery plan (stories)
   - **Documentation Context**: References linked Confluence pages and Google Docs for story planning

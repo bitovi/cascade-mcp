@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Scope Analysis Result",
+  "description": "Internal result object from shared scope analysis function",
+  "type": "object",
+  "required": ["markdown", "questionCount", "hasAnalysis"],
+  "properties": {
+    "markdown": {
+      "type": "string",
+      "description": "Full markdown content of the Scope Analysis section"
+    },
+    "questionCount": {
+      "type": "integer",
+      "description": "Count of ❓ (unanswered) markers in the markdown",
+      "minimum": 0
+    },
+    "hasAnalysis": {
+      "type": "boolean",
+      "description": "Whether analysis was successfully generated (false if LLM failed)"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Metadata about the scope analysis",
+      "required": ["featureAreasCount", "inScopeCount", "outOfScopeCount", "lowPriorityCount", "screensAnalyzed"],
+      "properties": {
+        "featureAreasCount": {
+          "type": "integer",
+          "description": "Number of feature areas identified",
+          "minimum": 0
+        },
+        "inScopeCount": {
+          "type": "integer",
+          "description": "Number of in-scope features (☐)",
+          "minimum": 0
+        },
+        "outOfScopeCount": {
+          "type": "integer",
+          "description": "Number of out-of-scope features (❌)",
+          "minimum": 0
+        },
+        "lowPriorityCount": {
+          "type": "integer",
+          "description": "Number of low priority features (⏬)",
+          "minimum": 0
+        },
+        "screensAnalyzed": {
+          "type": "integer",
+          "description": "Number of Figma screens included in analysis",
+          "minimum": 0
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "markdown": "## Scope Analysis\n\n### Feature Area 1: Authentication\n- ☐ User login\n- ☐ Password reset\n- ❌ Social login\n\n### Questions\n- ❓ How should failed login attempts be handled?\n- ❓ What is the password policy?",
+      "questionCount": 2,
+      "hasAnalysis": true,
+      "metadata": {
+        "featureAreasCount": 1,
+        "inScopeCount": 2,
+        "outOfScopeCount": 1,
+        "lowPriorityCount": 0,
+        "screensAnalyzed": 3
+      }
+    }
+  ]
+}

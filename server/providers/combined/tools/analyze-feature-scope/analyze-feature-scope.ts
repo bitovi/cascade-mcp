@@ -1,6 +1,9 @@
 /**
  * MCP Tool Handler for Analyze Feature Scope
  * 
+ * @deprecated Use `write-shell-stories` instead - it now includes self-healing scope analysis.
+ * This tool remains functional for backward compatibility but will be removed in a future version.
+ * 
  * Analyzes Figma screen designs to generate comprehensive scope analysis,
  * identifying in-scope features, out-of-scope features, and questions, grouped by feature areas.
  */
@@ -34,7 +37,7 @@ export function registerAnalyzeFeatureScopeTool(mcp: McpServer): void {
     'analyze-feature-scope',
     {
       title: 'Analyze Feature Scope from Figma',
-      description: 'Analyze Figma screens in a Jira epic to generate comprehensive scope analysis, identifying in-scope features, out-of-scope features, and questions, grouped by feature areas with workflow-based organization. Creates a Scope Analysis section in the epic.',
+      description: '[DEPRECATED: Use write-shell-stories instead] Analyze Figma screens in a Jira epic to generate comprehensive scope analysis, identifying in-scope features, out-of-scope features, and questions, grouped by feature areas with workflow-based organization. Creates a Scope Analysis section in the epic.',
       inputSchema: {
         epicKey: z.string()
           .describe('Jira epic key (e.g., "PROJ-123"). Epic description must contain Figma design URLs.'),

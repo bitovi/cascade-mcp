@@ -13,6 +13,7 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import type { ToolDependencies } from '../types.js';
+import type { Screen } from '../writing-shell-stories/screen-analyzer.js';
 import { getDebugDir } from '../writing-shell-stories/temp-directory-manager.js';
 import { setupFigmaScreens } from '../writing-shell-stories/figma-screen-setup.js';
 import { regenerateScreenAnalyses } from './screen-analysis-regenerator.js';
@@ -32,7 +33,7 @@ export interface ScreenAnalysisPipelineParams {
  * Result from screen analysis pipeline (phases 1-4)
  */
 export interface ScreenAnalysisResult {
-  screens: Array<{ name: string; url: string; notes: string[] }>;
+  screens: Screen[];
   allFrames: any[];
   allNotes: any[];
   figmaFileKey: string;

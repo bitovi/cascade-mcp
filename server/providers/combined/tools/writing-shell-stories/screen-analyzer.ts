@@ -47,7 +47,8 @@ export function calculateRectangleDistance(
  * Screen with associated notes
  */
 export interface Screen {
-  name: string;           // Node ID (existing)
+  name: string;           // Sanitized kebab-case name for display
+  nodeId: string;         // Original Figma node ID (e.g., "1106:9254")
   url: string;            // Figma URL (existing)
   notes: string[];        // Associated notes (existing)
   
@@ -167,6 +168,7 @@ export function associateNotesWithFrames(
     
     screens.push({
       name: screenName || `screen-${screens.length + 1}`,
+      nodeId: frame.id,
       url: `${baseUrl}?node-id=${frame.id.replace(/:/g, '-')}`,
       notes: assignedNoteUrls,
       frameName: frame.name,

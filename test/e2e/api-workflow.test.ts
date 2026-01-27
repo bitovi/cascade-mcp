@@ -169,13 +169,23 @@ describe('REST API: Write Shell Stories E2E', () => {
     // Verify API call was successful
     expect(apiResult.success).toBe(true);
     expect(apiResult.epicKey).toBe(createdEpicKey);
-    expect(apiResult.storyCount).toBeGreaterThan(0);
     expect(apiResult.screensAnalyzed).toBeGreaterThan(0);
+    expect(typeof apiResult.storyCount).toBe('number');
+    
+    // Handle different action types
+    if (apiResult.action === 'proceed') {
+      expect(apiResult.storyCount).toBeGreaterThan(0);
+      expect(apiResult.shellStoriesContent).toBeDefined();
+      console.log(`✅ API created ${apiResult.storyCount} shell stories from ${apiResult.screensAnalyzed} screens`);
+    } else if (apiResult.action === 'clarify' || apiResult.action === 'regenerate') {
+      expect(apiResult.storyCount).toBe(0);
+      expect(apiResult.scopeAnalysisContent).toBeDefined();
+      expect(apiResult.questionCount).toBeGreaterThan(0);
+      console.log(`⚠️ API generated scope analysis with ${apiResult.questionCount} unanswered questions - needs clarification`);
+    }
 
-    console.log(`✅ API created ${apiResult.storyCount} shell stories from ${apiResult.screensAnalyzed} screens`);
-
-    // Step 4: Fetch the epic and verify shell stories were created
-    console.log('🔍 Step 4: Verifying shell stories in epic...');
+    // Step 4: Fetch the epic and verify content was added
+    console.log('🔍 Step 4: Verifying epic was updated...');
     
     const getEpicResponse = await getJiraIssue(
       atlassianClient,
@@ -214,62 +224,77 @@ describe('REST API: Write Shell Stories E2E', () => {
     console.log('📄 Epic description length:', epicText.length);
     console.log('📄 First 500 chars:', epicText.substring(0, 500));
 
-    // Verify Shell Stories section exists (ADF converts ## to plain text)
-    expect(epicText).toContain('Shell Stories');
-    
-    // Extract shell stories (look for st001 pattern since ADF loses markdown heading markers)
-    const shellStoriesMatch = epicText.match(/(Shell Stories[\s\S]+)/);
-    expect(shellStoriesMatch).toBeTruthy();
-    
-    const shellStoriesContent = shellStoriesMatch![1];
-    console.log('📋 Shell Stories section length:', shellStoriesContent.length);
+    // Verify appropriate section exists based on action type
+    if (apiResult.action === 'proceed') {
+      // Verify Shell Stories section exists (ADF converts ## to plain text)
+      expect(epicText).toContain('Shell Stories');
+      console.log('✅ Shell Stories section found in epic');
+      
+      // Extract shell stories (look for st001 pattern since ADF loses markdown heading markers)
+      const shellStoriesMatch = epicText.match(/(Shell Stories[\s\S]+)/);
+      expect(shellStoriesMatch).toBeTruthy();
+      
+      const shellStoriesContent = shellStoriesMatch![1];
+      console.log('📋 Shell Stories section length:', shellStoriesContent.length);
 
-    // Verify shell stories were created by checking for story IDs
-    // Note: We check the API response directly since ADF-to-text conversion loses markdown formatting
-    const storyIdMatches = apiResult.shellStoriesContent.match(/`st\d+`/g);
-    const storyCount = storyIdMatches ? storyIdMatches.length : 0;
+      // Verify shell stories were created by checking for story IDs
+      // Note: We check the API response directly since ADF-to-text conversion loses markdown formatting
+      const storyIdMatches = apiResult.shellStoriesContent!.match(/`st\d+`/g);
+      const storyCount = storyIdMatches ? storyIdMatches.length : 0;
+      
+      console.log(`✅ Found ${storyCount} shell stories in API response`);
+      
+      // Verify multiple stories were created
+      expect(storyCount).toBeGreaterThan(1);
+      expect(storyCount).toBe(apiResult.storyCount); // Should match the reported count
+      
+      // Verify expected content in shell stories
+      expect(apiResult.shellStoriesContent).toBeTruthy();
+      expect(apiResult.shellStoriesContent).toContain('st001');
+    } else if (apiResult.action === 'clarify' || apiResult.action === 'regenerate') {
+      // Verify Scope Analysis section exists
+      expect(epicText).toContain('Scope Analysis');
+      console.log('✅ Scope Analysis section found in epic');
+      
+      // Verify scope analysis has questions
+      expect(apiResult.scopeAnalysisContent).toBeDefined();
+      expect(apiResult.scopeAnalysisContent).toContain('❓');
+      console.log('✅ Scope Analysis contains unanswered questions');
+    }
     
-    console.log(`✅ Found ${storyCount} shell stories in API response`);
-    
-    // Verify multiple stories were created
-    expect(storyCount).toBeGreaterThan(1);
-    expect(storyCount).toBe(apiResult.storyCount); // Should match the reported count
-    
-    // Verify expected content in shell stories
-    expect(apiResult.shellStoriesContent).toBeTruthy();
-    expect(apiResult.shellStoriesContent).toContain('st001');
-    
-    // Verify the epic was updated with shell stories
-    expect(epicText).toContain('Shell Stories');
-    expect(epicText).toContain('st001');
-    
-    console.log('✅ Shell stories test completed successfully!');
+    console.log('✅ Write shell stories test completed successfully!');
     
     // ==========================================
-    // Step 5: Call write-next-story API to write st001 using helper
+    // Step 5: Call write-next-story API to write st001 (only if we have shell stories)
     // ==========================================
-    console.log('\n📝 Step 5: Calling write-next-story API to write st001...');
-    
-    const writeNextStoryResult = await writeNextStory(apiClient, {
-      epicKey: createdEpicKey!,
-      siteName: JIRA_SITE_NAME
-    });
-    
-    console.log('📋 Write-next-story API Response:', JSON.stringify(writeNextStoryResult, null, 2));
-    
-    expect(writeNextStoryResult.success).toBe(true);
-    
-    if (!writeNextStoryResult.complete) {
-      expect(writeNextStoryResult.issueKey).toBeTruthy();
+    if (apiResult.action === 'proceed') {
+      console.log('\n📝 Step 5: Calling write-next-story API to write st001...');
       
-      // Check that the story title contains at least one of the expected words
-      const expectedWords = ['Display', 'Dashboard', 'Metrics', 'Cards'];
-      const titleLower = writeNextStoryResult.storyTitle.toLowerCase();
-      const hasExpectedWord = expectedWords.some(word => titleLower.includes(word.toLowerCase()));
-      expect(hasExpectedWord).toBe(true);
+      const writeNextStoryResult = await writeNextStory(apiClient, {
+        epicKey: createdEpicKey!,
+        siteName: JIRA_SITE_NAME
+      });
       
-      console.log(`✅ Created story ${writeNextStoryResult.issueKey}: ${writeNextStoryResult.storyTitle}`);
-      console.log(`   View at: https://bitovi.atlassian.net/browse/${writeNextStoryResult.issueKey}`);
+      console.log('📋 Write-next-story API Response:', JSON.stringify(writeNextStoryResult, null, 2));
+      
+      expect(writeNextStoryResult.success).toBe(true);
+      
+      if (!writeNextStoryResult.complete) {
+        // TypeScript narrowing - now we know it's WriteNextStoryResultSuccess
+        const successResult = writeNextStoryResult as Extract<typeof writeNextStoryResult, { complete: false }>;
+        expect(successResult.issueKey).toBeTruthy();
+        
+        // Check that the story title contains at least one of the expected words
+        const expectedWords = ['Display', 'Dashboard', 'Metrics', 'Cards'];
+        const titleLower = successResult.storyTitle.toLowerCase();
+        const hasExpectedWord = expectedWords.some(word => titleLower.includes(word.toLowerCase()));
+        expect(hasExpectedWord).toBe(true);
+        
+        console.log(`✅ Created story ${successResult.issueKey}: ${successResult.storyTitle}`);
+        console.log(`   View at: https://bitovi.atlassian.net/browse/${successResult.issueKey}`);
+      }
+    } else {
+      console.log('\n⏭️ Step 5: Skipped write-next-story (need clarification first)');
     }
     
     console.log('\n🎉 E2E test completed successfully!');

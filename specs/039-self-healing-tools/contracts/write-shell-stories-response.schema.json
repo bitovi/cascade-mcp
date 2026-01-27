@@ -1,0 +1,176 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Write Shell Stories Response (Self-Healing)",
+  "description": "Response from write-shell-stories tool with self-healing capability",
+  "type": "object",
+  "required": ["success", "action", "epicKey"],
+  "properties": {
+    "success": {
+      "type": "boolean",
+      "description": "Whether the tool execution was successful"
+    },
+    "action": {
+      "type": "string",
+      "enum": ["proceed", "clarify", "regenerate"],
+      "description": "Self-healing decision: proceed (created stories), clarify (needs answers), regenerate (updated analysis)"
+    },
+    "epicKey": {
+      "type": "string",
+      "description": "Jira epic key (e.g., 'PROJ-123')"
+    },
+    "shellStoriesContent": {
+      "type": "string",
+      "description": "Markdown content of generated shell stories (only present when action='proceed')"
+    },
+    "storyCount": {
+      "type": "integer",
+      "description": "Number of shell stories created (only present when action='proceed')",
+      "minimum": 0
+    },
+    "scopeAnalysisContent": {
+      "type": "string",
+      "description": "Markdown content of scope analysis section (only present when action='clarify' or 'regenerate')"
+    },
+    "questionCount": {
+      "type": "integer",
+      "description": "Number of unanswered questions (❓) in scope analysis",
+      "minimum": 0
+    },
+    "screensAnalyzed": {
+      "type": "integer",
+      "description": "Number of Figma screens analyzed",
+      "minimum": 0
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional metadata about the operation",
+      "properties": {
+        "featureAreasCount": {
+          "type": "integer",
+          "description": "Number of feature areas identified in scope analysis",
+          "minimum": 0
+        },
+        "inScopeCount": {
+          "type": "integer",
+          "description": "Number of in-scope features (☐)",
+          "minimum": 0
+        },
+        "outOfScopeCount": {
+          "type": "integer",
+          "description": "Number of out-of-scope features (❌)",
+          "minimum": 0
+        },
+        "lowPriorityCount": {
+          "type": "integer",
+          "description": "Number of low priority features (⏬)",
+          "minimum": 0
+        },
+        "hadExistingAnalysis": {
+          "type": "boolean",
+          "description": "Whether a Scope Analysis section already existed"
+        },
+        "threshold": {
+          "type": "integer",
+          "description": "Question threshold used for decision (default: 5)",
+          "minimum": 0
+        }
+      }
+    },
+    "message": {
+      "type": "string",
+      "description": "User-friendly message explaining the action taken"
+    },
+    "nextSteps": {
+      "type": "array",
+      "description": "List of suggested next steps for the user",
+      "items": {
+        "type": "string"
+      }
+    },
+    "error": {
+      "type": "string",
+      "description": "Error message if success=false"
+    }
+  },
+  "examples": [
+    {
+      "success": true,
+      "action": "proceed",
+      "epicKey": "PROJ-123",
+      "shellStoriesContent": "- st001: User Authentication\n- st002: Profile Management",
+      "storyCount": 2,
+      "questionCount": 3,
+      "screensAnalyzed": 5,
+      "metadata": {
+        "featureAreasCount": 3,
+        "inScopeCount": 8,
+        "outOfScopeCount": 2,
+        "lowPriorityCount": 1,
+        "hadExistingAnalysis": false,
+        "threshold": 5
+      },
+      "message": "Shell stories created successfully! 3 questions remain but are below threshold.",
+      "nextSteps": [
+        "Review the shell stories in the epic description",
+        "Use 'write-next-story' to create detailed stories from each shell story"
+      ]
+    },
+    {
+      "success": true,
+      "action": "clarify",
+      "epicKey": "PROJ-456",
+      "scopeAnalysisContent": "### Questions\n- ❓ How should errors be handled?\n- ❓ What are the performance requirements?",
+      "questionCount": 8,
+      "screensAnalyzed": 4,
+      "metadata": {
+        "featureAreasCount": 2,
+        "inScopeCount": 5,
+        "outOfScopeCount": 1,
+        "lowPriorityCount": 0,
+        "hadExistingAnalysis": false,
+        "threshold": 5
+      },
+      "message": "Scope Analysis created with 8 questions. Please answer the questions and re-run this tool.",
+      "nextSteps": [
+        "Review the Scope Analysis section in the epic",
+        "Answer the ❓ questions by editing the epic description or adding context",
+        "Re-run 'write-shell-stories' after answering questions"
+      ]
+    },
+    {
+      "success": true,
+      "action": "regenerate",
+      "epicKey": "PROJ-789",
+      "scopeAnalysisContent": "### Questions\n- 💬 How should errors be handled? (answered)\n- ❓ What are the performance requirements?",
+      "questionCount": 6,
+      "screensAnalyzed": 4,
+      "metadata": {
+        "featureAreasCount": 2,
+        "inScopeCount": 5,
+        "outOfScopeCount": 1,
+        "lowPriorityCount": 0,
+        "hadExistingAnalysis": true,
+        "threshold": 5
+      },
+      "message": "Scope Analysis regenerated. 6 questions remain (some were answered). Please answer remaining questions and re-run.",
+      "nextSteps": [
+        "Review the updated Scope Analysis section",
+        "Answer the remaining ❓ questions",
+        "Re-run 'write-shell-stories' when ready"
+      ]
+    },
+    {
+      "success": false,
+      "action": "clarify",
+      "epicKey": "PROJ-999",
+      "questionCount": 0,
+      "screensAnalyzed": 0,
+      "error": "Failed to generate scope analysis: LLM timeout. Please retry.",
+      "message": "Could not analyze questions - please retry",
+      "nextSteps": [
+        "Wait a moment and retry 'write-shell-stories'",
+        "Check that your LLM provider is accessible"
+      ]
+    }
+  ]
+}

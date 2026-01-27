@@ -37,7 +37,7 @@ import {
 import { buildIssueContext } from '../shared/issue-context-builder.js';
 import { extractFigmaUrlsFromADF } from '../../../atlassian/adf-utils.js';
 import type { JiraIssue } from '../../../atlassian/types.js';
-import { associateNotesWithFrames } from './screen-analyzer.js';
+import { associateNotesWithFrames, type Screen } from './screen-analyzer.js';
 import { generateScreensYaml } from './yaml-generator.js';
 // import { writeNotesForScreen } from './note-text-extractor.js';
 
@@ -304,18 +304,13 @@ export async function processFigmaUrls(
   };
 }
 
-
 /**
- * Screen with associated notes
+ * Screen with spatially associated note texts
+ * Extends Screen to add notes text array
  */
-export interface ScreenWithNotes {
-  name: string;        // Node ID (e.g., "1234:5678")
-  url: string;         // Full Figma URL
-  notes: string[];     // Associated note texts
-  filename?: string;   // Generated filename (e.g., "frame-name_1234-5678")
-  frameName?: string;  // Original frame name
-  sectionName?: string; // Parent SECTION name (if applicable)
-  sectionId?: string;   // Parent SECTION node ID (if applicable)
+export interface ScreenWithNotes extends Screen {
+  // Inherits all fields from Screen
+  // notes: string[] is already in Screen
 }
 
 /**
