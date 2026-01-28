@@ -42,15 +42,20 @@ describe('Google Docs Error Handling', () => {
     jest.clearAllMocks();
   });
 
-  // T045 & T046: API errors skip doc with warning
+  // T045 & T046: API errors crash the function
   // These tests verify that API errors (403, 404, network errors) result in:
-  // - Empty documents array
-  // - Warning message with error details
-  test('T045/T046: API errors generate warnings and continue processing', async () => {
-    // When the GoogleClient.fetch fails, the error is caught and a warning is generated
-    // We simulate this by providing a mock client that throws when fetch is called
+  // - Function throws the error
+  // - Processing stops immediately
+  test('T045/T046: API errors throw and stop processing', async () => {
+    // When the GoogleClient.fetch fails, the error should propagate and crash the function
+    // We simulate this by providing a mock client that returns an error response
     const failingClient = {
-      fetch: jest.fn(() => Promise.reject(new Error('API Error - 403 Forbidden'))),
+      fetch: jest.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: jest.fn().mockResolvedValue({ error: { message: 'Forbidden' } }),
+        text: jest.fn().mockResolvedValue('403 Forbidden'),
+      }),
       authType: 'oauth' as const,
     } satisfies GoogleClient;
 
@@ -70,19 +75,14 @@ describe('Google Docs Error Handling', () => {
       ],
     };
 
-    const result = await setupGoogleDocsContext({
-      epicAdf: adf,
-      googleClient: failingClient,
-      generateText: mockGenerateText,
-    });
-
-    // Document should be skipped
-    expect(result.documents).toHaveLength(0);
-    // Warning should be generated
-    expect(result.warnings).toBeDefined();
-    expect(result.warnings?.length).toBeGreaterThan(0);
-    // Warning should contain error info
-    expect(result.warnings?.[0]).toMatch(/Failed|Error/i);
+    // Should throw an error and not return successfully
+    await expect(
+      setupGoogleDocsContext({
+        epicAdf: adf,
+        googleClient: failingClient,
+        generateText: mockGenerateText,
+      })
+    ).rejects.toThrow(/Access denied|403/i);
   });
 
   // T047: Malformed URL skipped with warning
