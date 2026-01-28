@@ -49,15 +49,22 @@ describe('Google Docs Error Handling', () => {
   test('T045/T046: API errors throw and stop processing', async () => {
     // When the GoogleClient.fetch fails, the error should propagate and crash the function
     // We simulate this by providing a mock client that returns an error response
-    const failingClient = {
-      fetch: jest.fn().mockResolvedValue({
-        ok: false,
-        status: 403,
-        json: jest.fn().mockResolvedValue({ error: { message: 'Forbidden' } }),
-        text: jest.fn().mockResolvedValue('403 Forbidden'),
-      }),
+    const mockResponse: Partial<Response> = {
+      ok: false,
+      status: 403,
+      statusText: 'Forbidden',
+      json: jest.fn().mockResolvedValue({ error: { message: 'Forbidden' } }),
+      text: jest.fn().mockResolvedValue('403 Forbidden'),
+      headers: new Headers(),
+      redirected: false,
+      type: 'basic',
+      url: '',
+    };
+
+    const failingClient: GoogleClient = {
+      fetch: jest.fn().mockResolvedValue(mockResponse as Response),
       authType: 'oauth' as const,
-    } satisfies GoogleClient;
+    };
 
     const adf: ADFDocument = {
       version: 1,
