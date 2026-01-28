@@ -36,7 +36,7 @@ npm run start-local
 # Test conversion (replace YOUR_DOC_ID)
 curl -X POST http://localhost:3000/api/drive-doc-to-markdown \
   -H "Content-Type: application/json" \
-  -H "X-Google-Json: $(cat google.json | jq -c)" \
+  -H "X-Google-Token: $GOOGLE_SERVICE_ACCOUNT_ENCRYPTED" \
   -d '{
     "url": "https://docs.google.com/document/d/YOUR_DOC_ID/edit"
   }'

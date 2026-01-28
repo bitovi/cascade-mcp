@@ -14,6 +14,7 @@ import { handleAnalyzeFeatureScope } from './analyze-feature-scope.js';
 import { handleFigmaReviewDesign } from './figma-review-design.js';
 import { handleReviewWorkItem } from './review-work-item.js';
 import { debounce } from './debounce-middleware.js';
+import { encryptionManager } from '../utils/encryption-manager.js';
 
 /**
  * Register all REST API routes with the Express app
@@ -30,6 +31,19 @@ export function registerRestApiRoutes(app: Express): void {
     });
   });
   console.log('  ✓ GET /api/config');
+  
+  // Get public key for manual encryption (safe to expose)
+  app.get('/api/public-key', (req, res) => {
+    const publicKey = encryptionManager.getPublicKey();
+    if (!publicKey) {
+      res.status(503).json({ 
+        error: 'Public key not available. Encryption is not enabled.' 
+      });
+      return;
+    }
+    res.json({ publicKey });
+  });
+  console.log('  ✓ GET /api/public-key');
   
   // Generate shell stories from Figma designs in a Jira epic
   app.post('/api/write-shell-stories',
