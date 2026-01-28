@@ -20,17 +20,17 @@ describe('setupGoogleDocsContext', () => {
   beforeEach(() => {
     // Reset mocks before each test
     mockGoogleClient = {
-      fetch: jest.fn().mockResolvedValue({
+      fetch: jest.fn<(url: string, options?: RequestInit) => Promise<Response>>().mockResolvedValue({
         ok: true,
         status: 200,
-        json: jest.fn().mockResolvedValue({
+        json: jest.fn<() => Promise<any>>().mockResolvedValue({
           id: 'doc123',
           name: 'Test Document',
           mimeType: 'application/vnd.google-apps.document',
           modifiedTime: '2024-01-01T00:00:00Z',
         }),
-        text: jest.fn().mockResolvedValue(''),
-      }),
+        text: jest.fn<() => Promise<string>>().mockResolvedValue(''),
+      } as unknown as Response),
       authType: 'oauth' as const,
     } as unknown as GoogleClient;
 

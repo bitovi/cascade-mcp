@@ -53,8 +53,8 @@ describe('Google Docs Error Handling', () => {
       ok: false,
       status: 403,
       statusText: 'Forbidden',
-      json: jest.fn().mockResolvedValue({ error: { message: 'Forbidden' } }),
-      text: jest.fn().mockResolvedValue('403 Forbidden'),
+      json: jest.fn<() => Promise<any>>().mockResolvedValue({ error: { message: 'Forbidden' } }),
+      text: jest.fn<() => Promise<string>>().mockResolvedValue('403 Forbidden'),
       headers: new Headers(),
       redirected: false,
       type: 'basic',
@@ -62,7 +62,7 @@ describe('Google Docs Error Handling', () => {
     };
 
     const failingClient: GoogleClient = {
-      fetch: jest.fn().mockResolvedValue(mockResponse as Response),
+      fetch: jest.fn<(url: string, options?: RequestInit) => Promise<Response>>().mockResolvedValue(mockResponse as Response),
       authType: 'oauth' as const,
     };
 
