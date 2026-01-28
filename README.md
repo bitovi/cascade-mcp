@@ -8,6 +8,10 @@
 
 <br clear="all" />
 
+
+[![Watch the video](https://img.youtube.com/vi/MK0tdwDBTmc/0.jpg)](https://www.youtube.com/watch?v=MK0tdwDBTmc)
+
+
 Supported tools at the `https://cascade.bitovi.com/mcp` endpoint:
 
 **Combined Tools** (Multi-provider workflows):
