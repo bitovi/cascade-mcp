@@ -63,6 +63,23 @@ describe('REST API: Write Shell Stories E2E', () => {
     // Clear mock OAuth flag that jest-setup.js sets by default
     delete process.env.TEST_USE_MOCK_ATLASSIAN;
     
+    // Clear Figma cache to ensure fresh analysis (prevents screensAnalyzed: 0 from cache)
+    const { getBaseCacheDir } = await import('../../server/providers/combined/tools/writing-shell-stories/temp-directory-manager.js');
+    const { parseFigmaUrl } = await import('../../server/providers/figma/figma-helpers.js');
+    const cachePath = await import('path');
+    const fsPromises = await import('fs/promises');
+    
+    const urlInfo = parseFigmaUrl(FIGMA_DESIGN_URL);
+    if (urlInfo?.fileKey) {
+      const figmaCacheDir = cachePath.join(getBaseCacheDir(), 'figma-files', urlInfo.fileKey);
+      try {
+        await fsPromises.rm(figmaCacheDir, { recursive: true, force: true });
+        console.log(`✅ Cleared Figma cache: ${figmaCacheDir}`);
+      } catch (error: any) {
+        console.log(`⚠️  Could not clear cache (may not exist): ${error.message}`);
+      }
+    }
+    
     serverUrl = await startTestServer({ 
       testMode: false, // Not using mock OAuth
       logLevel: 'error', // Quiet logs
