@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+
 interface FooterProps {
   baseUrl: string;
 }
@@ -27,31 +29,20 @@ export function Footer({ baseUrl }: FooterProps) {
                   MCP Endpoint
                 </a>
                 {' - '}
-                <code className="bg-gray-100 px-1 py-0.5 rounded text-xs">
-                  {baseUrl}/mcp
-                </code>
+                <code className="bg-gray-100 px-1 py-0.5 rounded text-xs">{baseUrl}/mcp</code>
               </li>
               <li>
-                <a
-                  href="/.well-known/oauth-authorization-server"
-                  className="text-blue-600 hover:underline"
-                >
+                <a href="/.well-known/oauth-authorization-server" className="text-blue-600 hover:underline">
                   OAuth Server Metadata
                 </a>
               </li>
               <li>
-                <a
-                  href="/.well-known/oauth-protected-resource"
-                  className="text-blue-600 hover:underline"
-                >
+                <a href="/.well-known/oauth-protected-resource" className="text-blue-600 hover:underline">
                   Protected Resource Metadata
                 </a>
               </li>
               <li>
-                <a
-                  href="/get-access-token"
-                  className="text-blue-600 hover:underline"
-                >
+                <a href="/get-access-token" className="text-blue-600 hover:underline">
                   Manual Token Retrieval
                 </a>
               </li>
@@ -61,14 +52,15 @@ export function Footer({ baseUrl }: FooterProps) {
             <h4 className="font-medium mb-2 text-gray-800">REST API</h4>
             <ul className="space-y-1">
               <li>
-                <code className="bg-gray-100 px-1 py-0.5 rounded text-xs">
-                  POST /api/write-shell-stories
-                </code>
+                <code className="bg-gray-100 px-1 py-0.5 rounded text-xs">POST /api/write-shell-stories</code>
               </li>
               <li>
-                <code className="bg-gray-100 px-1 py-0.5 rounded text-xs">
-                  POST /api/write-next-story
-                </code>
+                <code className="bg-gray-100 px-1 py-0.5 rounded text-xs">POST /api/write-next-story</code>
+              </li>
+              <li>
+                <Link to="/google-service-encrypt" className="text-blue-600 hover:underline">
+                  🔐 Encrypt Google Service Account
+                </Link>
               </li>
             </ul>
           </div>
