@@ -983,11 +983,6 @@ async function fetchFigmaNodesBatchSingle(
   const figmaApiUrl = `${client.getBaseUrl()}/files/${fileKey}/nodes?ids=${encodeURIComponent(nodeIds.join(','))}`;
   
   console.log(`  Fetching batch of ${nodeIds.length} nodes from ${fileKey}...`);
-  console.log(`  🔍 Client type check:`, {
-    hasFetch: typeof client.fetch === 'function',
-    hasGetBaseUrl: typeof client.getBaseUrl === 'function',
-    clientKeys: Object.keys(client)
-  });
   
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);

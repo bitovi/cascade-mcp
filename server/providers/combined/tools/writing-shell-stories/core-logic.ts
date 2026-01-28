@@ -57,6 +57,11 @@ import {
   generateScopeAnalysis,
   type ScopeAnalysisResult,
 } from '../shared/scope-analysis-helpers.js';
+import {
+  extractAllLinkMetadata,
+  formatLinkCountsMessage,
+  formatServiceAvailabilityMessage,
+} from './link-metadata-extractor.js';
 
 // Re-export for external use
 export { SelfHealingDecision };
@@ -147,8 +152,11 @@ export async function executeWriteShellStories(
   // ==========================================
   // PHASE 1-3: Fetch epic, extract context, setup Figma screens
   // ==========================================
+  // Single initial message announces services and indicates we're starting (per spec 040)
+  const serviceAvailabilityMessage = formatServiceAvailabilityMessage(!!deps.googleClient);
+  await notify(`${serviceAvailabilityMessage}. Fetching Jira epic...`);
+  
   console.log('  Phase 1-3: Setting up epic and Figma screens...');
-  await notify('📝 Preparation: Fetching epic and Figma metadata...');
   
   const setupResult = await setupFigmaScreens({
     epicKey,
@@ -157,7 +165,7 @@ export async function executeWriteShellStories(
     debugDir,
     cloudId,
     siteName,
-    notify: async (msg) => await notify(msg)
+    // Don't pass notify - we'll report after with combined link metadata
   });
   
   const {
@@ -175,8 +183,12 @@ export async function executeWriteShellStories(
     yamlContent
   } = setupResult;
   
+  // Extract link metadata for comprehensive reporting
+  const linkMetadata = extractAllLinkMetadata(epicDescriptionAdf);
+  const linkCountsMessage = formatLinkCountsMessage(linkMetadata);
+  await notify(linkCountsMessage);
+  
   console.log(`  Phase 1-3 complete: ${figmaUrls.length} Figma URLs, ${screens.length} screens, ${allNotes.length} notes`);
-  await notify(`✅ Preparation Complete: ${screens.length} screens ready`);
 
   // ==========================================
   // PHASE 3.5: Setup Confluence context (if any linked docs)
@@ -184,31 +196,26 @@ export async function executeWriteShellStories(
   let confluenceDocs: ConfluenceDocumentContext[] = [];
   
   if (epicDescriptionAdf) {
-    try {
-      const confluenceContext = await setupConfluenceContext({
-        epicAdf: epicDescriptionAdf,
-        atlassianClient,
-        generateText,
-        siteName: resolvedSiteName,
-        notify,
-      });
-      
-      // Filter to docs relevant for shell story writing
-      confluenceDocs = confluenceContext.byRelevance.writeStories.map((doc: ConfluenceDocument) => ({
-        title: doc.title,
-        url: doc.url,
-        markdown: doc.markdown,
-        documentType: doc.metadata.relevance?.documentType,
-        relevanceScore: doc.metadata.relevance?.toolScores.find(t => t.toolId === 'write-shell-stories')?.overallScore,
-        summary: doc.metadata.summary?.text,
-        source: 'confluence' as const,
-      }));
-      
-      console.log(`   📚 Confluence docs for shell stories: ${confluenceDocs.length}`);
-    } catch (error: any) {
-      console.log(`   ⚠️ Confluence context setup failed: ${error.message}`);
-      // Continue without Confluence context - it's optional
-    }
+    const confluenceContext = await setupConfluenceContext({
+      epicAdf: epicDescriptionAdf,
+      atlassianClient,
+      generateText,
+      siteName: resolvedSiteName,
+      notify,
+    });
+    
+    // Filter to docs relevant for shell story writing
+    confluenceDocs = confluenceContext.byRelevance.writeStories.map((doc: ConfluenceDocument) => ({
+      title: doc.title,
+      url: doc.url,
+      markdown: doc.markdown,
+      documentType: doc.metadata.relevance?.documentType,
+      relevanceScore: doc.metadata.relevance?.toolScores.find(t => t.toolId === 'write-shell-stories')?.overallScore,
+      summary: doc.metadata.summary?.text,
+      source: 'confluence' as const,
+    }));
+    
+    console.log(`   📚 Confluence docs for shell stories: ${confluenceDocs.length}`);
   }
 
   // ==========================================
@@ -220,30 +227,25 @@ export async function executeWriteShellStories(
     if (!deps.googleClient) {
       console.log('🔗 Skipping Google Docs context (no Google authentication)');
     } else {
-      try {
-        const googleDocsContext = await setupGoogleDocsContext({
-          epicAdf: epicDescriptionAdf,
-          googleClient: deps.googleClient,
-          generateText,
-          notify,
-        });
-        
-        // Filter to docs relevant for shell story writing
-        googleDocs = googleDocsContext.byRelevance.writeStories.map((doc: GoogleDocDocument) => ({
-          title: doc.title,
-          url: doc.url,
-          markdown: doc.markdown,
-          documentType: doc.metadata.relevance?.documentType,
-          relevanceScore: doc.metadata.relevance?.toolScores.find(t => t.toolId === 'write-shell-stories')?.overallScore,
-          summary: doc.metadata.summary?.text,
-          source: 'google-docs' as const,
-        }));
-        
-        console.log(`   📄 Google Docs for shell stories: ${googleDocs.length}`);
-      } catch (error: any) {
-        console.log(`   ⚠️ Google Docs context setup failed: ${error.message}`);
-        // Continue without Google Docs context - it's optional
-      }
+      const googleDocsContext = await setupGoogleDocsContext({
+        epicAdf: epicDescriptionAdf,
+        googleClient: deps.googleClient,
+        generateText,
+        notify,
+      });
+      
+      // Filter to docs relevant for shell story writing
+      googleDocs = googleDocsContext.byRelevance.writeStories.map((doc: GoogleDocDocument) => ({
+        title: doc.title,
+        url: doc.url,
+        markdown: doc.markdown,
+        documentType: doc.metadata.relevance?.documentType,
+        relevanceScore: doc.metadata.relevance?.toolScores.find(t => t.toolId === 'write-shell-stories')?.overallScore,
+        summary: doc.metadata.summary?.text,
+        source: 'google-docs' as const,
+      }));
+      
+      console.log(`   📄 Google Docs for shell stories: ${googleDocs.length}`);
     }
   }
 
@@ -257,6 +259,7 @@ export async function executeWriteShellStories(
   // PHASE 3.8: Fetch Figma comments for context
   // ==========================================
   let figmaCommentContexts: ScreenAnnotation[] = [];
+  let matchedThreadCount = 0;
   if (figmaClient && figmaFileKey) {
     try {
       console.log('  Phase 3.8: Fetching Figma comments...');
@@ -274,8 +277,18 @@ export async function executeWriteShellStories(
           width: frame.absoluteBoundingBox?.width,
           height: frame.absoluteBoundingBox?.height,
         }));
-        figmaCommentContexts = formatCommentsForContext(threads, frameMetadata);
-        console.log(`   💬 Fetched ${comments.length} Figma comments across ${figmaCommentContexts.length} screens`);
+        
+        // Build a document tree from nodesDataMap for spatial containment checks
+        // This allows finding child nodes to check if comments on children belong to frames
+        const documentTree = {
+          id: 'root',
+          children: Array.from(nodesDataMap.values())
+        };
+        
+        const commentResult = formatCommentsForContext(threads, frameMetadata, documentTree);
+        figmaCommentContexts = commentResult.contexts;
+        matchedThreadCount = commentResult.matchedThreadCount;
+        console.log(`   💬 Fetched ${comments.length} Figma comments → ${commentResult.matchedThreadCount} threads across ${figmaCommentContexts.length} screens`);
       } else {
         console.log('   💬 No Figma comments found');
       }
@@ -290,7 +303,7 @@ export async function executeWriteShellStories(
   // ==========================================
   const noteAnnotations = notesToScreenAnnotations(screens, allNotes);
   const allContexts = [...figmaCommentContexts, ...noteAnnotations];
-  console.log(`   📝 Total contexts (comments + notes): ${allContexts.length} (${figmaCommentContexts.length} comments + ${noteAnnotations.length} notes)`);
+  const commentsCount = matchedThreadCount;
 
   // ==========================================
   // PHASE 4: Download images and analyze screens
@@ -299,10 +312,10 @@ export async function executeWriteShellStories(
   // reads the cached *.analysis.md files created by regenerateScreenAnalyses()
   console.log('  Phase 4: Downloading images and analyzing screens...');
   
-  // Add steps for all screens to be analyzed
-  await notify(`📝 AI Screen Analysis: Starting analysis of ${screens.length} screens...`, screens.length);
+  // Improved progress message: Figma context summary (per spec 040)
+  await notify(`Analyzing Figma: ${screens.length} screen(s), ${allNotes.length} note(s), ${commentsCount} comment(s)...`);
   
-  const { analyzedScreens } = await regenerateScreenAnalyses({
+  const analysisResult = await regenerateScreenAnalyses({
     generateText,
     figmaClient,
     screens,
@@ -311,20 +324,20 @@ export async function executeWriteShellStories(
     figmaFileKey,
     nodesDataMap,
     epicContext: epicWithoutShellStoriesMarkdown,
-    notify: async (message: string) => {
-      // Show progress for each screen (auto-increments)
-      await notify(message);
-    }
+    // Don't pass notify - we'll report after with combined stats
   });
   
+  const { analyzedScreens, cachedScreens } = analysisResult;
   console.log(`  Phase 4 complete: ${analyzedScreens}/${screens.length} screens analyzed`);
-  await notify(`✅ AI Screen Analysis: Analyzed ${analyzedScreens} screens`);
+  
+  // Improved cache status message (per spec 040)
+  const cacheExplanation = cachedScreens > 0 && analyzedScreens === 0 ? ' (Figma file unchanged)' : '';
+  await notify(`Screen analysis complete: ${cachedScreens} cached, ${analyzedScreens} new${cacheExplanation}`);
 
   // ==========================================
   // PHASE 5: Check Scope Analysis and Questions
   // ==========================================
   console.log('  Phase 5: Checking scope analysis...');
-  await notify('🔍 Checking for scope analysis...');
   
   // Check for existing scope analysis section
   const parsedContext = extractScopeAnalysisLocal(epicWithoutShellStoriesMarkdown);
@@ -332,11 +345,20 @@ export async function executeWriteShellStories(
   
   let scopeAnalysisContent: string | null = parsedContext.scopeAnalysis;
   let scopeAnalysisGeneratedThisRun = false;
+  let featureAreasCount = 0;
   
   // If no scope analysis, generate it (self-healing)
   if (!scopeAnalysisContent) {
     console.log('  📝 No scope analysis found - generating automatically...');
-    await notify('📝 Generating scope analysis...');
+    
+    // Build context summary for progress message (per spec 040)
+    const contextParts: string[] = [];
+    if (screens.length > 0) contextParts.push(`${screens.length} screen(s)`);
+    if (confluenceDocs.length > 0) contextParts.push(`${confluenceDocs.length} Confluence page(s)`);
+    if (googleDocs.length > 0) contextParts.push(`${googleDocs.length} Google Doc(s)`);
+    const existingNote = hadExistingAnalysis ? ' (existing scope analysis available)' : '';
+    
+    await notify(`Generating scope analysis from ${contextParts.join(', ')}${existingNote}...`);
     
     try {
       // Use the shared generateScopeAnalysis function with performance logging
@@ -362,7 +384,8 @@ export async function executeWriteShellStories(
       
       scopeAnalysisContent = scopeResult.scopeAnalysisContent;
       scopeAnalysisGeneratedThisRun = true;
-      console.log(`  ✅ Scope analysis generated: ${scopeResult.questionsCount} questions, ${scopeResult.featureAreasCount} feature areas`);
+      featureAreasCount = scopeResult.featureAreasCount;
+      console.log(`  ✅ Scope analysis generated: ${scopeResult.questionsCount} questions, ${featureAreasCount} feature areas`);
     } catch (error: any) {
       // Error during scope analysis generation - return error immediately
       console.error('  ❌ Scope analysis generation failed:', error);
@@ -376,6 +399,11 @@ export async function executeWriteShellStories(
     }
   } else {
     console.log('  📝 Existing scope analysis found');
+    // Count feature areas from existing scope analysis
+    const featureAreaMatches = scopeAnalysisContent.match(/^### .+$/gm);
+    featureAreasCount = featureAreaMatches
+      ? featureAreaMatches.filter(m => !m.includes('Remaining Questions')).length
+      : 0;
   }
   
   // Count unanswered questions - ensure scopeAnalysisContent is not null
@@ -425,13 +453,37 @@ export async function executeWriteShellStories(
       ...decisionParams,
       scopeAnalysisContent: scopeAnalysisContent!,
       questionCount,
+      featureAreasCount,
       hadExistingAnalysis,
     });
   }
   
   // Decision is PROCEED_WITH_STORIES - continue with Phase 6
   console.log('  ✅ Proceeding with shell story generation');
-  await notify('✅ Ready to generate shell stories...');
+  
+  // If we generated scope analysis this run, write it to Jira before proceeding
+  let epicContextWithScope = epicWithoutShellStoriesMarkdown;
+  if (scopeAnalysisGeneratedThisRun && scopeAnalysisContent) {
+    try {
+      const scopeAnalysisSectionMarkdown = `## Scope Analysis\n\n${scopeAnalysisContent}`;
+      await updateEpicWithScopeAnalysis({
+        epicKey,
+        cloudId: resolvedCloudId,
+        atlassianClient,
+        scopeAnalysisMarkdown: scopeAnalysisSectionMarkdown,
+        epicWithoutShellStoriesAdf,
+        notify
+      });
+      console.log('  ✅ Jira updated with scope analysis');
+      
+      // Update epic context to include the scope analysis we just wrote
+      epicContextWithScope = `${epicWithoutShellStoriesMarkdown}\n\n${scopeAnalysisSectionMarkdown}`;
+    } catch (error: any) {
+      console.error('  ❌ Failed to update Jira with scope analysis:', error);
+      // Continue anyway - Jira update is best effort, but update context for shell story generation
+      epicContextWithScope = `${epicWithoutShellStoriesMarkdown}\n\n## Scope Analysis\n\n${scopeAnalysisContent}`;
+    }
+  }
 
   // ==========================================
   // PHASE 6: Generate shell stories from analyses
@@ -443,7 +495,7 @@ export async function executeWriteShellStories(
     figmaFileKey,
     yamlContent,
     notify,
-    epicContext: epicWithoutShellStoriesMarkdown,
+    epicContext: epicContextWithScope,
     confluenceDocs: allDocs,
     figmaComments: allContexts
   });
@@ -451,8 +503,6 @@ export async function executeWriteShellStories(
   // ==========================================
   // PHASE 7: Write shell stories back to Jira epic
   // ==========================================
-  await notify('📝 Jira Update: Updating Jira epic...');
-  
   let shellStoriesContent = '';
   if (shellStoriesResult.shellStoriesText) {
     shellStoriesContent = shellStoriesResult.shellStoriesText;
@@ -471,7 +521,7 @@ export async function executeWriteShellStories(
   }
 
   // Action="proceed" - shell stories were created successfully
-  await notify(`✅ Shell Stories Created: ${shellStoriesResult.storyCount} stories generated`);
+  await notify(`Updated Jira with ${shellStoriesResult.storyCount} shell stories`);
   
   return {
     success: true,
@@ -507,7 +557,7 @@ async function generateShellStoriesFromAnalyses(params: {
   
   console.log('  Phase 5: Generating shell stories from analyses...');
   
-  await notify('📝 Shell Story Generation: Generating shell stories from screen analyses...');
+  await notify('Generating shell stories from scope analysis...');
   
   // screens.yaml content is provided directly (always generated, optionally written to file)
   const screensYamlContent = yamlContent;
@@ -630,8 +680,6 @@ No shell stories content received from AI
   // Count stories (rough estimate by counting "st" prefixes with or without backticks)
   const storyMatches = shellStoriesText.match(/^- `?st\d+/gm);
   const storyCount = storyMatches ? storyMatches.length : 0;
-  
-  await notify(`✅ Shell Story Generation Complete: Generated ${storyCount} shell stories`);
   
   return { storyCount, analysisCount: analysisFiles.length, shellStoriesPath, shellStoriesText };
 }
@@ -897,7 +945,7 @@ async function updateEpicWithScopeAnalysis({
     await handleJiraAuthError(updateResponse, `Update epic ${epicKey} with scope analysis`);
     
     console.log('    ✅ Epic updated with scope analysis');
-    await notify('✅ Epic updated with scope analysis');
+    // Note: No notification here - final message is sent by handleAskForClarification (per spec 040)
     
   } catch (error: any) {
     console.log(`    ⚠️ Error updating epic with scope analysis: ${error.message}`);
@@ -958,7 +1006,7 @@ export async function handleRegenerateAnalysis(
   } = params;
 
   console.log('  🔄 Regenerating scope analysis with your answers...');
-  await notify('🔄 Updating scope analysis with your answers...');
+  await notify('Updating scope analysis with your answers...');
 
   try {
     // Regenerate with previous scope analysis as context with performance logging
@@ -1049,6 +1097,7 @@ export async function handleAskForClarification(
   params: DecisionHandlerParams & {
     scopeAnalysisContent: string;
     questionCount: number;
+    featureAreasCount: number;
     hadExistingAnalysis: boolean;
   }
 ): Promise<ExecuteWriteShellStoriesResult> {
@@ -1061,13 +1110,13 @@ export async function handleAskForClarification(
     epicWithoutShellStoriesAdf,
     scopeAnalysisContent,
     questionCount,
+    featureAreasCount,
     hadExistingAnalysis,
   } = params;
 
   console.log(`  ⏸️ Cannot proceed with shell stories - need clarification`);
 
-  await notify('📝 Jira Update: Adding scope analysis section...');
-
+  // Update Jira with scope analysis (no separate progress message for this sync operation)
   try {
     const scopeAnalysisSectionMarkdown = `## Scope Analysis\n\n${scopeAnalysisContent}`;
     await updateEpicWithScopeAnalysis({
@@ -1084,7 +1133,8 @@ export async function handleAskForClarification(
     // Continue to return the scope analysis - Jira update is best effort
   }
 
-  await notify(`⚠️ Found ${questionCount} unanswered questions (threshold: ${QUESTION_THRESHOLD}). Please answer the questions marked with ❓ in the epic's Scope Analysis section, then run this tool again.`);
+  // Single final message with actionable information (per spec 040)
+  await notify(`Scope analysis complete: ${questionCount} question(s), ${featureAreasCount} feature area(s). Please answer ❓ questions to bring unanswered questions under ${QUESTION_THRESHOLD} and re-run.`);
 
   return {
     success: true,

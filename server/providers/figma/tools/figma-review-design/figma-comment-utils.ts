@@ -345,13 +345,13 @@ function findNodeInTree(node: any, targetId: string): any | null {
  * @param threads - Array of comment threads
  * @param frames - Array of frame metadata to associate comments with (must include bounding boxes)
  * @param documentTree - Optional Figma document tree for spatial containment checks on child nodes
- * @returns Array of screen comment contexts for each frame with comments
+ * @returns Object with screen annotations and thread statistics
  */
 export function formatCommentsForContext(
   threads: CommentThread[],
   frames: FrameMetadata[],
   documentTree?: any
-): ScreenAnnotation[] {
+): { contexts: ScreenAnnotation[]; matchedThreadCount: number; unmatchedThreadCount: number } {
   const contexts: ScreenAnnotation[] = [];
 
   // Build a quick lookup for frames by nodeId
@@ -437,6 +437,12 @@ export function formatCommentsForContext(
     }
   }
 
+  // Count matched threads
+  let matchedThreadCount = 0;
+  for (const frameThreads of threadsByFrame.values()) {
+    matchedThreadCount += frameThreads.length;
+  }
+
   // Format contexts for each frame with comments
   for (const frame of frames) {
     const frameThreads = threadsByFrame.get(frame.nodeId);
@@ -451,7 +457,7 @@ export function formatCommentsForContext(
     });
   }
 
-  return contexts;
+  return { contexts, matchedThreadCount, unmatchedThreadCount: unassociatedThreads.length };
 }
 
 /**

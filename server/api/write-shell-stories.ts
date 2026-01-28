@@ -143,15 +143,7 @@ export async function handleWriteShellStories(req: Request, res: Response, deps:
       toolDeps
     );
     
-    // Notify based on action taken (self-healing workflow)
-    // TODO: check if this is the best way to have an ending notification added to the comment.
-    if (result.action === 'proceed') {
-      await progressManager.notify(`✅ Jira Update Complete: Successfully generated ${result.storyCount} shell stories`);
-    } else if (result.action === 'clarify') {
-      await progressManager.notify(`⚠️ Clarification Needed: ${result.questionCount} unanswered questions. Please answer ❓ questions and run again.`);
-    } else if (result.action === 'regenerate') {
-      await progressManager.notify(`⚠️ Scope Analysis Regenerated: ${result.questionCount} unanswered questions remain. Please answer ❓ questions and run again.`);
-    }
+    // Note: No notifications here - core-logic.ts handles all final messaging (per spec 040)
     
     // Return success response
     res.json({

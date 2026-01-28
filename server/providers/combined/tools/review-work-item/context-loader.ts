@@ -427,7 +427,8 @@ async function loadFigmaScreens(
       }
       
     } catch (error: any) {
-      console.log(`  ⚠️  Failed to process Figma file ${fileKey}: ${error.message}`);
+      console.log(`  ❌ Failed to process Figma file ${fileKey}: ${error.message}`);
+      throw error;
     }
   }
   

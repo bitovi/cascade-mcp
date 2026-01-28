@@ -53,8 +53,16 @@ QUESTION ANSWERING RULES:
   1. Epic description - may contain inline answers or clarifications
   2. Referenced documentation (Confluence, Google Docs) - may have detailed specifications
   3. Figma comments - resolved threads often contain decisions
+  4. Previous scope analysis - if regenerating, check for inline answers added after questions
 - If ANY context source provides a clear answer, mark the question as 💬 (answered), NOT ❓
 - Only mark ❓ for questions that are genuinely unanswered across all provided context
+
+REGENERATION RULES (when "Previous Scope Analysis" is provided):
+- If a question in the previous analysis has been answered inline (text added after the ❓ question):
+  - Change ❓ to 💬 and include the answer: "💬 {original question} → {inline answer}"
+  - Example: "❓ Should there be rate limiting? No" becomes "💬 Should there be rate limiting? → No"
+- If a question remains unanswered (no text after it), keep it as ❓
+- Preserve all other content from previous analysis (features, groupings, etc.) unless new information changes them
 
 GROUPING RULES:
 - Group features by user workflow and functional areas (e.g., "Authentication Flow", "User Profile Management", "Data Entry Workflow")
@@ -316,8 +324,6 @@ ${analysisSection}
 ## OUTPUT FORMAT
 
 \`\`\`markdown
-## Scope Analysis
-
 ### {Feature Area Name}
 
 [Screen Name](figma-url) [Another Screen](figma-url)
@@ -347,6 +353,6 @@ ${analysisSection}
 - 💬 {Answered cross-cutting question} → {The answer}
 \`\`\`
 
-**CRITICAL**: Output ONLY the markdown above. No prefaces, explanations, or additional text.
+**CRITICAL**: Output ONLY the markdown above (starting with the first ### heading). No "## Scope Analysis" header, prefaces, explanations, or additional text.
 `;
 }

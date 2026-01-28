@@ -255,7 +255,7 @@ export async function generateScopeAnalysis(
   const path = await import('path');
   const fs = await import('fs/promises');
 
-  await notify('📝 Feature Identification: Analyzing features and scope...');
+  // Note: No progress notification here - caller handles progress messaging (per spec 040)
   
   // Construct file cache path for analysis files
   const fileCachePath = getFigmaFileCachePath(figmaFileKey);
@@ -341,9 +341,8 @@ Technical details:
   const questionsCount = countUnansweredQuestions(scopeAnalysisText);
   
   console.log(`    ✅ Generated: ${featureAreasCount} areas, ${questionsCount} questions`);
-  
-  await notify(`✅ Feature Identification Complete: ${featureAreasCount} areas, ${questionsCount} questions`);
-  
+
+  // Note: No progress notification here - caller handles final messaging (per spec 040)
   return {
     scopeAnalysisContent: scopeAnalysisText,
     featureAreasCount,

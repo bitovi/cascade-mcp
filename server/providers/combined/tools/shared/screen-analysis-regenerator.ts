@@ -60,6 +60,7 @@ export interface RegenerateAnalysesResult {
   analyzedScreens: number;
   downloadedNotes: number;
   usedCache: boolean;  // Whether cached data was used
+  cachedScreens: number;  // Number of screens that were already cached
 }
 
 /**
@@ -130,7 +131,7 @@ export async function regenerateScreenAnalyses(
   console.log(`  📊 Analysis needed: ${screensToAnalyze.length} screens, Cached: ${cachedScreens.length} screens`);
   if (screensToAnalyze.length === 0) {
     console.log(`  ♻️  All screens cached - returning early`);
-    return { downloadedImages: 0, analyzedScreens: 0, downloadedNotes: 0, usedCache: true };
+    return { downloadedImages: 0, analyzedScreens: 0, downloadedNotes: 0, usedCache: true, cachedScreens: cachedScreens.length };
   }
   
   // ==========================================
@@ -178,7 +179,7 @@ export async function regenerateScreenAnalyses(
     }
     
     // For other errors, return what we have
-    return { downloadedImages, analyzedScreens, downloadedNotes, usedCache: false };
+    return { downloadedImages, analyzedScreens, downloadedNotes, usedCache: false, cachedScreens: cachedScreens.length };
   }
   
   // ==========================================
@@ -235,7 +236,7 @@ export async function regenerateScreenAnalyses(
     // Non-fatal - analysis succeeded, just couldn't save timestamp
   }
   
-  return { downloadedImages, analyzedScreens, downloadedNotes, usedCache: false };
+  return { downloadedImages, analyzedScreens, downloadedNotes, usedCache: false, cachedScreens: cachedScreens.length };
 }
 
 /**

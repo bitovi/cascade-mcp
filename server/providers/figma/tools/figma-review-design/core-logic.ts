@@ -223,9 +223,9 @@ export async function executeAnalyzeFigmaScope(
     const documentTree = fileData?.document;
 
     const threads = groupCommentsIntoThreads(comments);
-    const formatted = formatCommentsForContext(threads, framesToAnalyze, documentTree);
+    const result = formatCommentsForContext(threads, framesToAnalyze, documentTree);
 
-    for (const ctx of formatted) {
+    for (const ctx of result.contexts) {
       commentContexts.push(ctx);
     }
   }
