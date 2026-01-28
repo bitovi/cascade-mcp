@@ -61,19 +61,30 @@ export async function getDocumentMetadata(
     const errorText = await response.text();
     console.log('  Drive API error:', response.status, errorText);
     
+    // Get user's email for helpful error messages
+    let userEmail: string | undefined;
+    try {
+      const userData = await getGoogleDriveUser(client);
+      userEmail = userData.user.emailAddress;
+    } catch (error) {
+      // If we can't get user email, continue without it
+      console.log('  Could not fetch user email for error message:', error);
+    }
+    
     // Provide user-friendly error messages
     if (response.status === 404) {
       throw new Error(
         `Document not found (404). The document may have been deleted, moved, or the ID is incorrect.\n` +
-        `Document ID: ${documentId}`
+        `Document ID: ${documentId}` +
+        (userEmail ? `\nMake sure the document is shared with: ${userEmail}` : '')
       );
     }
     
     if (response.status === 403) {
       throw new Error(
         `Access denied (403). You don't have permission to access this document.\n` +
-        `Please check:\n` +
-        `  - The document is shared with you\n` +
+        (userEmail ? `Please share the document with: ${userEmail}\n` : '') +
+        `Also check:\n` +
         `  - The sharing settings allow at least "View" access\n` +
         `  - Your authentication has the required Google Drive scopes`
       );

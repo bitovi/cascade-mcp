@@ -386,9 +386,9 @@ async function fetchFigmaCommentsContext(params: {
       height: frame.absoluteBoundingBox?.height,
     }));
 
-    const contexts = formatCommentsForContext(threads, frameMetadata);
-    console.log(`   💬 Figma comments: ${comments.length} comments, ${contexts.length} screen contexts`);
-    return contexts;
+    const result = formatCommentsForContext(threads, frameMetadata);
+    console.log(`   💬 Figma comments: ${comments.length} comments → ${result.matchedThreadCount} threads across ${result.contexts.length} screens`);
+    return result.contexts;
   } catch (error: any) {
     console.log(`   ⚠️ Figma comment fetching failed: ${error.message}`);
     return [];

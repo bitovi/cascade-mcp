@@ -195,7 +195,7 @@ async function processConfluenceUrl(
     
   } catch (error: any) {
     console.log(`      ❌ Failed to process ${url}: ${error.message}`);
-    return null;
+    throw error;
   }
 }
 
@@ -250,9 +250,7 @@ export async function setupConfluenceContext(
   // ==========================================
   // Step 1: Extract Confluence URLs from epic
   // ==========================================
-  if (notify) {
-    await notify('Extracting Confluence links from epic...');
-  }
+  // Note: No progress notification here - extraction is instant (per spec 040)
   
   const rawUrls = extractConfluenceUrlsFromADF(epicAdf);
   console.log(`  Found ${rawUrls.length} Confluence URLs`);

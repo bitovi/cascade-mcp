@@ -207,25 +207,50 @@ export function parseOptionalGoogleJson(
 ): GoogleServiceAccountCredentials | null {
   const jsonCredentials = headers['x-google-json'] as string;
   
+  console.log('🔍 parseOptionalGoogleJson called');
+  console.log('  Headers keys:', Object.keys(headers));
+  console.log('  x-google-json present:', !!jsonCredentials);
+  
   if (!jsonCredentials) {
+    console.log('  ⚠️ No X-Google-Json header found - skipping Google integration');
     return null; // Header not provided - this is fine for optional Google integration
   }
+  
+  console.log('  X-Google-Json length:', jsonCredentials.length);
+  console.log('  X-Google-Json preview:', jsonCredentials.substring(0, 100) + '...');
   
   // Parse JSON credentials
   let serviceAccountJson: GoogleServiceAccountCredentials;
   try {
     serviceAccountJson = JSON.parse(jsonCredentials);
-  } catch {
+    console.log('  ✅ Successfully parsed JSON');
+    console.log('  Parsed keys:', Object.keys(serviceAccountJson));
+  } catch (error) {
     console.log('  ⚠️ X-Google-Json header contains invalid JSON - skipping Google integration');
+    console.log('  Parse error:', error);
     return null;
   }
   
   // Validate it's a service account
   if (serviceAccountJson.type !== 'service_account') {
     console.log('  ⚠️ X-Google-Json is not a service account - skipping Google integration');
+    console.log('  Type found:', serviceAccountJson.type);
     return null;
   }
   
   console.log(`  ✅ Google service account provided: ${serviceAccountJson.client_email}`);
+  console.log('  Project ID:', serviceAccountJson.project_id);
+  console.log('  Private key ID:', serviceAccountJson.private_key_id);
+  console.log('  Private key length:', serviceAccountJson.private_key?.length || 0);
+  console.log('  Private key starts with:', serviceAccountJson.private_key?.substring(0, 50));
+  console.log('  Private key contains escaped newlines:', serviceAccountJson.private_key?.includes('\\n'));
+  
+  // Fix escaped newlines in private key (common issue with JSON serialization)
+  if (serviceAccountJson.private_key?.includes('\\n')) {
+    console.log('  🔧 Converting escaped newlines to actual newlines...');
+    serviceAccountJson.private_key = serviceAccountJson.private_key.replace(/\\n/g, '\n');
+    console.log('  ✅ Private key fixed, now starts with:', serviceAccountJson.private_key.substring(0, 50));
+  }
+  
   return serviceAccountJson;
 }

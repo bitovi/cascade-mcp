@@ -227,9 +227,8 @@ async function processGoogleDocUrl(
       },
     };
   } catch (error: any) {
-    const warning = `Failed to process ${url}: ${error.message}`;
-    console.log(`      ❌ ${warning}`);
-    return { doc: null, warning };
+    console.log(`      ❌ Failed to process ${url}: ${error.message}`);
+    throw error;
   }
 }
 
@@ -301,9 +300,7 @@ export async function setupGoogleDocsContext(
   // ==========================================
   // Step 1: Extract Google Docs URLs from epic
   // ==========================================
-  if (notify) {
-    await notify('Extracting Google Docs links from epic...');
-  }
+  // Note: No progress notification here - extraction is instant (per spec 040)
   
   const rawUrls = extractGoogleDocsUrlsFromADF(epicAdf);
   console.log(`  Found ${rawUrls.length} Google Docs URLs`);
