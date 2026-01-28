@@ -16,13 +16,15 @@ This guide covers deploying the Cascade MCP service on various infrastructure pl
 ## Prerequisites
 
 ### System Requirements
-- **Node.js**: 18.x 
+
+- **Node.js**: 18.x
 
 ### OAuth Application Setup
 
 Before deploying, you need to create OAuth applications for the services you want to integrate:
 
 #### Atlassian/Jira OAuth App
+
 1. Go to [Atlassian Developer Console](https://developer.atlassian.com/console/myapps/)
 2. Create a new OAuth 2.0 integration
 3. Configure settings:
@@ -31,6 +33,7 @@ Before deploying, you need to create OAuth applications for the services you wan
 4. Note your `Client ID` and `Client Secret`
 
 #### Figma OAuth App
+
 1. Go to [Figma Developer Settings](https://www.figma.com/developers/apps)
 2. Create a new app
 3. Configure settings:
@@ -39,6 +42,7 @@ Before deploying, you need to create OAuth applications for the services you wan
 4. Note your `Client ID` and `Client Secret`
 
 #### Google Drive OAuth App
+
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project or select an existing one
 3. Enable the Google Drive API:
@@ -91,6 +95,14 @@ GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 GOOGLE_OAUTH_SCOPES="https://www.googleapis.com/auth/drive"
 
+# Google Service Account (Encrypted) - Alternative to OAuth
+# Generate encrypted credentials locally using http://localhost:3000/google-service-encrypt
+# Then set this environment variable with the encrypted output
+# Format: RSA-ENCRYPTED:<base64-encoded-encrypted-credentials>
+# GOOGLE_SERVICE_ACCOUNT_ENCRYPTED=RSA-ENCRYPTED:eyJhbGci...
+# Note: Server auto-generates RSA keys in cache/keys/google-rsa/ on first use
+#       Keys must persist across restarts - use volume mount or persistent storage
+
 # Optional: AWS (for CloudWatch logging)
 AWS_ACCESS_KEY_ID=your-aws-access-key
 AWS_SECRET_ACCESS_KEY=your-aws-secret-key
@@ -124,11 +136,13 @@ The simplest way to deploy is using Docker. The provided `Dockerfile` and `docke
 1. **Create `.env` file** with your environment variables (see above)
 
 2. **Build and run:**
+
    ```bash
    docker-compose up --build -d
    ```
 
 3. **View logs:**
+
    ```bash
    docker-compose logs -f
    ```
@@ -153,6 +167,68 @@ docker run -d \
   cascade-mcp:latest
 ```
 
+### Google Service Account Encryption for Production
+
+If you're using Google Service Account credentials for Google Drive access, follow these steps for secure deployment:
+
+#### 1. Generate Encrypted Credentials Locally
+
+```bash
+# Start the server locally
+npm run start-local
+
+# Visit the encryption page
+open http://localhost:3000/google-service-encrypt
+
+# Paste your service account JSON and encrypt it
+# Copy the output starting with "RSA-ENCRYPTED:"
+```
+
+#### 2. Configure Environment Variable
+
+Add the encrypted credentials to your deployment environment:
+
+```bash
+GOOGLE_SERVICE_ACCOUNT_ENCRYPTED=RSA-ENCRYPTED:eyJhbGci...
+```
+
+**Deployment Options:**
+
+- **GitHub Actions**: Add as a repository secret
+- **AWS**: Store in AWS Secrets Manager or Parameter Store
+- **Docker**: Add to `.env` file (ensure it's not committed)
+- **Kubernetes**: Store in a Secret resource
+
+#### 3. RSA Key Persistence
+
+The server auto-generates RSA keys in `cache/keys/google-rsa/` on first use. These keys **must persist** across restarts:
+
+**Docker Volume:**
+
+```yaml
+# docker-compose.yaml
+services:
+  cascade-mcp:
+    volumes:
+      - ./cache:/app/cache
+```
+
+**Important Notes:**
+
+- Different environments (staging, production) should have **separate RSA key pairs**
+- Encrypted credentials from one environment **cannot** be decrypted in another
+- If you lose the RSA keys, you'll need to re-encrypt all credentials
+
+#### 4. Security Considerations
+
+- **Never commit** `cache/keys/` directory to version control
+- **Never commit** plaintext service account JSON files
+- Use GitHub Secrets or a secrets manager for production
+- Rotate service account keys periodically
+- Private RSA keys have file permissions set to `0600` automatically
+
+For more details, see: [docs/google-service-account-encryption.md](google-service-account-encryption.md)
+
 ### Using docker-to-ec2
 
 TBD:
@@ -163,7 +239,7 @@ The following are incremental verification steps you can use to ensure the app i
 
 ### Visit the homepage
 
-The homepage should load properly.  You should see the right url for the MCP service:
+The homepage should load properly. You should see the right url for the MCP service:
 
 > <img width="568" height="424" alt="image" src="https://github.com/user-attachments/assets/39034d87-a872-4da3-9003-30a3200d8967" />
 
@@ -175,4 +251,4 @@ The homepage has links to the metadata endpoints. Check that these also have the
 
 ### Connect with an MCP client
 
-The final step is to connect with an MCP client. The homepage has instructions on how to do this. 
+The final step is to connect with an MCP client. The homepage has instructions on how to do this.
