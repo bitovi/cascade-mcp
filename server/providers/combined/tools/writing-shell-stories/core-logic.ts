@@ -44,7 +44,7 @@ import {
   groupCommentsIntoThreads,
   formatCommentsForContext,
   type FrameMetadata,
-} from '../../../figma/tools/analyze-figma-scope/figma-comment-utils.js';
+} from '../../../figma/tools/figma-review-design/figma-comment-utils.js';
 import type { ScreenAnnotation } from '../shared/screen-annotation.js';
 import { notesToScreenAnnotations } from './note-text-extractor.js';
 import {
@@ -257,7 +257,7 @@ export async function executeWriteShellStories(
           name: screen.frameName || screen.name,
           url: screen.url,
         }));
-        figmaCommentContexts = formatCommentsForContext(threads, frameMetadata);
+        figmaCommentContexts = formatCommentsForContext(threads, frameMetadata).contexts;
         console.log(`   💬 Fetched ${comments.length} Figma comments across ${figmaCommentContexts.length} screens`);
       } else {
         console.log('   💬 No Figma comments found');
