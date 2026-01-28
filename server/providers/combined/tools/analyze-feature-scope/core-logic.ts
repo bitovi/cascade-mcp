@@ -31,7 +31,7 @@ import {
   fetchCommentsForFile,
   groupCommentsIntoThreads,
   formatCommentsForContext,
-} from '../../../figma/tools/analyze-figma-scope/figma-comment-utils.js';
+} from '../../../figma/tools/figma-review-design/figma-comment-utils.js';
 import type { ScreenAnnotation } from '../shared/screen-annotation.js';
 import { notesToScreenAnnotations } from '../writing-shell-stories/note-text-extractor.js';
 
@@ -503,7 +503,7 @@ async function fetchFigmaCommentsContext(params: {
       url: screen.url,
     }));
 
-    const contexts = formatCommentsForContext(threads, frameMetadata);
+    const contexts = formatCommentsForContext(threads, frameMetadata).contexts;
     console.log(`   💬 Figma comments: ${comments.length} comments, ${contexts.length} screen contexts`);
     return contexts;
   } catch (error: any) {
