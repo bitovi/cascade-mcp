@@ -15,11 +15,7 @@ import { getFigmaFileCachePath } from '../../../figma/figma-cache.js';
 import { executeScreenAnalysisPipeline } from '../shared/screen-analysis-pipeline.js';
 import { setupConfluenceContext, type ConfluenceDocument } from '../shared/confluence-setup.js';
 import { setupGoogleDocsContext, type GoogleDocDocument, type DocumentContext } from '../shared/google-docs-setup.js';
-import {
-  generateFeatureIdentificationPrompt,
-  FEATURE_IDENTIFICATION_SYSTEM_PROMPT,
-  FEATURE_IDENTIFICATION_MAX_TOKENS,
-} from './strategies/prompt-scope-analysis-2.js';
+import { generateScopeAnalysis } from '../shared/scope-analysis-helpers.js';
 import {
   convertMarkdownToAdf,
   validateAdf,
@@ -87,6 +83,7 @@ export async function executeAnalyzeFeatureScope(
   
   const {
     screens,
+    allFrames,
     debugDir,
     figmaFileKey,
     yamlContent,
@@ -159,6 +156,7 @@ export async function executeAnalyzeFeatureScope(
     figmaClient,
     figmaFileKey,
     screens,
+    allFrames,
     notify,
   });
 
@@ -202,126 +200,6 @@ export async function executeAnalyzeFeatureScope(
     featureAreasCount: scopeAnalysisResult.featureAreasCount,
     questionsCount: scopeAnalysisResult.questionsCount,
     screensAnalyzed: analyzedScreens
-  };
-}
-
-/**
- * Phase 5: Generate scope analysis from screen analyses
- * 
- * Reads all screen analysis files and uses AI to identify and categorize features
- * into in-scope (☐), already done (✅), low priority (⏬), out-of-scope (❌), and questions (❓), grouped by workflow areas.
- * 
- * @returns Object with scopeAnalysisContent, featureAreasCount, and questionsCount
- */
-async function generateScopeAnalysis(params: {
-  generateText: ToolDependencies['generateText'];
-  screens: Screen[];
-  debugDir: string | null;
-  figmaFileKey: string;
-  yamlContent: string;
-  notify: ToolDependencies['notify'];
-  epicContext?: string;
-  referenceDocs?: DocumentContext[];
-  commentContexts?: ScreenAnnotation[];
-}): Promise<{
-  scopeAnalysisContent: string;
-  featureAreasCount: number;
-  questionsCount: number;
-  scopeAnalysisPath: string;
-}> {
-  const { generateText, screens, debugDir, figmaFileKey, yamlContent, notify, epicContext, referenceDocs, commentContexts } = params;
-  
-  await notify('📝 Feature Identification: Analyzing features and scope...');
-  
-  // Construct file cache path for analysis files (always available)
-  const fileCachePath = getFigmaFileCachePath(figmaFileKey);
-  
-  // Read all analysis files with URLs from file cache
-  // Note: Files are guaranteed to exist because regenerateScreenAnalyses already created them
-  const analysisFiles: Array<{ screenName: string; content: string; url: string }> = [];
-  for (const screen of screens) {
-    const filename = screen.filename || screen.name;
-    const analysisPath = path.join(fileCachePath, `${filename}.analysis.md`);
-    try {
-      const content = await fs.readFile(analysisPath, 'utf-8');
-      analysisFiles.push({
-        screenName: screen.name,
-        content,
-        url: screen.url
-      });
-    } catch (error: any) {
-      // This should never happen since pipeline already created these files
-      throw new Error(`Failed to read analysis file for screen ${screen.name} at ${analysisPath}. This indicates a filesystem error or race condition. Original error: ${error.message}`);
-    }
-  }
-  
-  // Generate feature identification prompt
-  const prompt = generateFeatureIdentificationPrompt(
-    yamlContent,
-    analysisFiles,
-    epicContext,
-    referenceDocs,
-    commentContexts
-  );
-  
-  // Save prompt to debug directory for debugging (if enabled)
-  if (debugDir) {
-    const promptPath = path.join(debugDir, 'scope-analysis-prompt.md');
-    await fs.writeFile(promptPath, prompt, 'utf-8');
-  }
-  
-  console.log(`    🤖 Scope analysis (${prompt.length} chars / ${FEATURE_IDENTIFICATION_MAX_TOKENS} max tokens)`);
-  
-  // Request scope analysis generation via injected LLM client
-  const response = await generateText({
-    messages: [
-      { role: 'system', content: FEATURE_IDENTIFICATION_SYSTEM_PROMPT },
-      { role: 'user', content: prompt }
-    ],
-    maxTokens: FEATURE_IDENTIFICATION_MAX_TOKENS
-  });
-  
-  const scopeAnalysisText = response.text;
-  
-  if (!scopeAnalysisText) {
-    throw new Error(`No scope analysis content received from AI.
-Possible causes:
-- AI service timeout or rate limit
-- Invalid prompt or context
-- Epic description may not contain valid Figma links
-- Network connectivity issues
-
-Technical details:
-- AI response was empty or malformed
-- Screens analyzed: ${screens.length}
-- Analysis files loaded: ${analysisFiles.length}`);
-  }
-  
-  // Save scope analysis to debug directory (if enabled)
-  let scopeAnalysisPath = '';
-  if (debugDir) {
-    scopeAnalysisPath = path.join(debugDir, 'scope-analysis.md');
-    await fs.writeFile(scopeAnalysisPath, scopeAnalysisText, 'utf-8');
-  }
-  
-  // Count feature areas and questions
-  const featureAreaMatches = scopeAnalysisText.match(/^### .+$/gm);
-  const featureAreasCount = featureAreaMatches
-    ? featureAreaMatches.filter(m => !m.includes('Remaining Questions')).length
-    : 0;
-  
-  const questionMatches = scopeAnalysisText.match(/^- ❓/gm);
-  const questionsCount = questionMatches ? questionMatches.length : 0;
-  
-  console.log(`    ✅ Generated: ${featureAreasCount} areas, ${questionsCount} questions`);
-  
-  await notify(`✅ Feature Identification Complete: ${featureAreasCount} areas, ${questionsCount} questions`);
-  
-  return {
-    scopeAnalysisContent: scopeAnalysisText,
-    featureAreasCount,
-    questionsCount,
-    scopeAnalysisPath
   };
 }
 
@@ -474,9 +352,10 @@ async function fetchFigmaCommentsContext(params: {
   figmaClient: ToolDependencies['figmaClient'];
   figmaFileKey: string;
   screens: Screen[];
+  allFrames: any[];
   notify: ToolDependencies['notify'];
 }): Promise<ScreenAnnotation[]> {
-  const { figmaClient, figmaFileKey, screens, notify } = params;
+  const { figmaClient, figmaFileKey, screens, allFrames, notify } = params;
 
   if (!figmaClient || !figmaFileKey) {
     return [];
@@ -495,17 +374,21 @@ async function fetchFigmaCommentsContext(params: {
     // Group comments into threads and format for context
     const threads = groupCommentsIntoThreads(comments);
 
-    // Build frame metadata from screens for association
-    const frameMetadata = screens.map((screen) => ({
+    // Build frame metadata from allFrames with bounding boxes for proximity matching
+    const frameMetadata = allFrames.map((frame) => ({
       fileKey: figmaFileKey,
-      nodeId: screen.name,
-      name: (screen as Screen).frameName || screen.name,
-      url: screen.url,
+      nodeId: frame.id,
+      name: frame.name,
+      url: screens.find(s => s.nodeId === frame.id)?.url,
+      x: frame.absoluteBoundingBox?.x,
+      y: frame.absoluteBoundingBox?.y,
+      width: frame.absoluteBoundingBox?.width,
+      height: frame.absoluteBoundingBox?.height,
     }));
 
-    const contexts = formatCommentsForContext(threads, frameMetadata).contexts;
-    console.log(`   💬 Figma comments: ${comments.length} comments, ${contexts.length} screen contexts`);
-    return contexts;
+    const result = formatCommentsForContext(threads, frameMetadata);
+    console.log(`   💬 Figma comments: ${comments.length} comments → ${result.matchedThreadCount} threads across ${result.contexts.length} screens`);
+    return result.contexts;
   } catch (error: any) {
     console.log(`   ⚠️ Figma comment fetching failed: ${error.message}`);
     return [];
