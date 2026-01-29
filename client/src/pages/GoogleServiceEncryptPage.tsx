@@ -1,5 +1,5 @@
 import { Footer } from '../components/Footer/Footer';
-import { EncryptionPage } from '../components/EncryptionPage/EncryptionPage';
+import { GoogleServiceEncryptionForm } from '../components/GoogleServiceEncryptionForm/GoogleServiceEncryptionForm';
 import { useConfig } from '../hooks/useConfig';
 
 export function GoogleServiceEncryptPage() {
@@ -19,7 +19,7 @@ export function GoogleServiceEncryptPage() {
 
       <main className="flex-1 p-6">
         <div className="max-w-4xl mx-auto">
-          <EncryptionPage />
+          <GoogleServiceEncryptionForm />
         </div>
       </main>
 

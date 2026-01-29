@@ -6,7 +6,7 @@ interface EncryptionResult {
   projectId: string;
 }
 
-export function EncryptionPage() {
+export function GoogleServiceEncryptionForm() {
   const [serviceAccountJson, setServiceAccountJson] = useState('');
   const [isEncrypting, setIsEncrypting] = useState(false);
   const [result, setResult] = useState<EncryptionResult | null>(null);
