@@ -60,13 +60,21 @@ const TIMESTAMP_MARKER_TEXT_PATTERN = /Last updated by write-story:\s*(\d{4}-\d{
 /**
  * Extract text from an ADF node (recursive)
  */
-function extractTextFromNode(node: ADFNode): string {
+function extractTextFromNode(node: ADFNode, prefix: string = ''): string {
+  // For list items, add "- " prefix and newline to preserve markdown list format
+  if (node.type === 'listItem') {
+    const itemText = node.content?.map(n => extractTextFromNode(n)).join('') || '';
+    return `- ${itemText}\n`;
+  }
+  
   if (node.type === 'text' && node.text) {
     return node.text;
   }
+  
   if (node.content) {
-    return node.content.map(extractTextFromNode).join('');
+    return node.content.map(n => extractTextFromNode(n, prefix)).join('');
   }
+  
   return '';
 }
 
@@ -216,7 +224,7 @@ export function filterChangedComments(
  */
 function extractTextFromAdf(adf: ADFDocument | null | undefined): string {
   if (!adf?.content) return '';
-  return adf.content.map(extractTextFromNode).join('\n');
+  return adf.content.map(node => extractTextFromNode(node)).join('\n');
 }
 
 /**

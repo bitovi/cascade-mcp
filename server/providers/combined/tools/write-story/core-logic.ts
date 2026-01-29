@@ -278,7 +278,7 @@ export async function executeWriteStory(
   let scopeAnalysisContent: string | undefined;
   
   if (loadedContext?.analyzedScreens && loadedContext.analyzedScreens.length > 0) {
-    await notify('Generating scope analysis from Figma screens...');
+    await notify('🤖 Generating scope analysis from Figma screens...');
     
     // Convert AnalyzedScreen[] to ScreenAnalysisData[] format
     const analysisData: ScreenAnalysisData[] = loadedContext.analyzedScreens.map(screen => ({
@@ -320,7 +320,7 @@ export async function executeWriteStory(
   // ==========================================================================
   // PHASE 5: Generate story content with LLM
   // ==========================================================================
-  await notify('Generating story content...');
+  await notify('🤖 Generating story content...');
   
   const prompt = generateStoryContentPrompt({
     issueSummary: hierarchy.target.fields.summary,

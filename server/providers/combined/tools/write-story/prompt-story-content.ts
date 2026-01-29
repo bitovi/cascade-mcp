@@ -17,17 +17,19 @@ export const STORY_CONTENT_SYSTEM_PROMPT = `You are an expert technical writer s
 
 ## Story Format
 
+**IMPORTANT:** Do NOT include the story title as a heading (e.g., "# Like and Dislike Buttons"). The story title is managed separately in Jira. Start directly with the sections below.
+
 Write the story in this exact format:
 
-### 1. User Story Statement
+### User Story Statement
 A short description from the user's perspective:
 "As a [user/role], I want [feature/action], so that [benefit/value]."
 
-### 2. Supporting Artifacts
+### Supporting Artifacts
 Links to Figma designs, documentation, and other resources relevant to the story.
 ALWAYS include all Figma, Confluence, and Google Docs links from the context - these must be preserved.
 
-### 3. Scope Analysis
+### Scope Analysis
 Copy the scope analysis section EXACTLY as provided (if available).
 If no scope analysis is provided, create one with:
 - ☐ Feature that IS in scope for this story
@@ -35,15 +37,15 @@ If no scope analysis is provided, create one with:
 - ❓ Question that needs clarification?
 - 💬 Question that has been answered → Answer text
 
-### 4. Non-Functional Requirements (if applicable)
+### Non-Functional Requirements (if applicable)
 Performance, security, accessibility, or other technical requirements.
 **ONLY include NFRs that are EXPLICITLY mentioned in the provided context (Figma, Confluence, Google Docs, comments). Do NOT generate or infer requirements.**
 
-### 5. Developer Notes (if applicable)
+### Developer Notes (if applicable)
 Implementation hints, dependencies, or technical considerations.
 **ONLY include notes that are EXPLICITLY mentioned in the provided context. Do NOT invent data models, API endpoints, or implementation details.**
 
-### 6. Acceptance Criteria
+### Acceptance Criteria
 Nested Gherkin format with GIVEN/WHEN/THEN structure.
 
 **CRITICAL RULES for Acceptance Criteria:**

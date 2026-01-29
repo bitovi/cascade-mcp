@@ -464,7 +464,7 @@ async function loadFigmaScreens(
       allFigmaComments = [...allFigmaComments, ...fileComments];
       
       // Notify about Figma analysis (similar to write-shell-stories pattern)
-      await notify(`Analyzing Figma: ${allFrames.length} screen(s), ${allNotes.length} note(s), ${matchedThreadCount} comment(s)...`);
+      await notify(`🤖 Analyzing Figma: ${allFrames.length} screen(s), ${allNotes.length} note(s), ${matchedThreadCount} comment(s)...`);
       
       // Associate notes with frames
       const baseUrl = `https://www.figma.com/file/${fileKey}`;
