@@ -94,7 +94,7 @@ export async function fetchJiraIssueHierarchy(
   const fetchedKeys = new Set<string>();
   
   // Step 1: Fetch target issue
-  await notify(`Fetching ${issueKey}...`);
+  // Note: Caller (write-story) already sends the initial "Fetching" notification
   const targetResponse = await getJiraIssue(client, cloudId, issueKey, HIERARCHY_FIELDS);
   const target = await targetResponse.json() as JiraIssue;
   fetchedKeys.add(target.key);

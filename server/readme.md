@@ -159,6 +159,7 @@ npm run dev:client
   Express route handlers for PAT-authenticated REST API endpoints.
   - **api/write-shell-stories.ts** - Generate shell stories from Figma designs in a Jira epic
   - **api/write-next-story.ts** - Write the next Jira story from shell stories
+  - **api/write-story.ts** - Generate or refine a Jira story description with iterative feedback
   - **api/analyze-feature-scope.ts** - Analyze feature scope from Figma designs (generates scope analysis)
   - **api/figma-review-design.ts** - Standalone Figma analysis with comment integration (no Jira required)
   - **api/identify-features.ts** - Identify in-scope and out-of-scope features from Figma
@@ -317,6 +318,18 @@ Advanced workflow tools that integrate multiple services:
   - Identifies Definition of Ready compliance issues
   - Parameters: `issueKey`, optional `cloudId`, `siteName`, `maxDepth`
   - Example: `review-work-item({ issueKey: "PLAY-456" })`
+
+- **write-story** - Generate or refine a Jira story description with iterative feedback
+  - **Timestamp-Based Change Detection**: Only re-generates when context actually changes
+  - **Scope Analysis Section**: Uses ❓/💬 markers to track unanswered/answered questions
+  - **Multi-Source Context**: Gathers parent/child issues, comments, linked Confluence docs, Figma designs
+  - **Inline Answer Detection**: Recognizes answers added directly in the description (at ❓ questions)
+  - **Comment Answer Detection**: Recognizes answers in Jira comments that reference question text
+  - **Iterative Refinement**: Re-run to incorporate new answers and update scope analysis
+  - Generates: Overview, Scope Analysis (with ❓/💬 markers), Acceptance Criteria, Technical Notes
+  - Parameters: `issueKey`, optional `cloudId`, `siteName`, `maxDepth`
+  - Example: `write-story({ issueKey: "PLAY-789" })`
+  - **Workflow**: Run once to generate story → Answer questions → Re-run to refine
 
 **Documentation Context Feature**: 
 All combined tools automatically extract and process Confluence page and Google Docs links from the epic description:

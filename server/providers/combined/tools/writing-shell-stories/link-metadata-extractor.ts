@@ -115,29 +115,3 @@ export function formatLinkCountsMessage(metadata: LinkMetadata): string {
   
   return `Found ${parts.join(', ')}`;
 }
-
-/**
- * Format service availability message
- * 
- * @param hasGoogleAuth - Whether Google authentication is available
- * @returns Human-readable service list string
- */
-export function formatServiceAvailabilityMessage(hasGoogleAuth: boolean): string {
-  const services = [
-    'Figma',
-    'Atlassian',
-  ];
-  
-  if (hasGoogleAuth) {
-    services.push('Google Drive');
-  }
-  
-  // Format with "and" before last item
-  if (services.length === 2) {
-    return `Connected to ${services[0]} and ${services[1]}`;
-  } else if (services.length === 3) {
-    return `Connected to ${services[0]}, ${services[1]}, and ${services[2]}`;
-  }
-  
-  return `Connected to ${services.join(', ')}`;
-}

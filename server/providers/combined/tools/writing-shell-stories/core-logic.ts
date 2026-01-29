@@ -60,8 +60,8 @@ import {
 import {
   extractAllLinkMetadata,
   formatLinkCountsMessage,
-  formatServiceAvailabilityMessage,
 } from './link-metadata-extractor.js';
+import { formatServiceAvailabilityMessage } from '../shared/service-availability.js';
 
 // Re-export for external use
 export { SelfHealingDecision };
@@ -153,7 +153,12 @@ export async function executeWriteShellStories(
   // PHASE 1-3: Fetch epic, extract context, setup Figma screens
   // ==========================================
   // Single initial message announces services and indicates we're starting (per spec 040)
-  const serviceAvailabilityMessage = formatServiceAvailabilityMessage(!!deps.googleClient);
+  // write-shell-stories always has Figma (required) and Atlassian
+  const serviceAvailabilityMessage = formatServiceAvailabilityMessage({
+    atlassian: true,
+    figma: true,
+    google: !!deps.googleClient,
+  });
   await notify(`${serviceAvailabilityMessage}. Fetching Jira epic...`);
   
   console.log('  Phase 1-3: Setting up epic and Figma screens...');

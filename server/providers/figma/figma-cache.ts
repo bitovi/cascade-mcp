@@ -10,7 +10,7 @@ import * as fs from 'fs/promises';
 import { getBaseCacheDir } from '../combined/tools/writing-shell-stories/temp-directory-manager.js';
 import type { FigmaClient } from './figma-api-client.js';
 import type { FigmaFileMetadata, FigmaMetadata } from './figma-helpers.js';
-import { fetchFigmaFileMetadata } from './figma-helpers.js';
+import { fetchFigmaFileMetadata, FigmaUnrecoverableError } from './figma-helpers.js';
 
 /**
  * Get the cache directory path for a Figma file
@@ -83,7 +83,12 @@ export async function ensureValidCacheForFigmaFile(
       }
       // If valid, cache is ready to use
     } catch (error: any) {
-      // Error validating cache - clear it and rebuild
+      // Re-throw unrecoverable errors (403 permission denied, 429 rate limit)
+      // These indicate authentication/authorization issues that won't be fixed by retrying
+      if (error instanceof FigmaUnrecoverableError) {
+        throw error;
+      }
+      // Other errors - clear cache and rebuild
       console.log(`    ⚠️  Error validating cache: ${error.message}`);
       console.log('  🗑️  Clearing cache folder due to error');
       await clearFigmaCache(figmaFileKey);

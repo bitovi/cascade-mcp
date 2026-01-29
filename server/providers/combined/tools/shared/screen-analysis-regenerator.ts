@@ -13,7 +13,7 @@ import * as fs from 'fs/promises';
 import type { FigmaClient } from '../../../figma/figma-api-client.js';
 import type { GenerateTextFn } from '../../../../llm-client/types.js';
 import type { FigmaNodeMetadata } from '../../../figma/figma-helpers.js';
-import { downloadFigmaImagesBatch, fetchFigmaFileMetadata } from '../../../figma/figma-helpers.js';
+import { downloadFigmaImagesBatch, fetchFigmaFileMetadata, FigmaUnrecoverableError } from '../../../figma/figma-helpers.js';
 import { getFigmaFileCachePath, ensureValidCacheForFigmaFile, saveFigmaMetadata } from '../../../figma/figma-cache.js';
 import { writeNotesForScreen } from '../writing-shell-stories/note-text-extractor.js';
 import {
@@ -173,8 +173,9 @@ export async function regenerateScreenAnalyses(
   } catch (error: any) {
     console.log(`  ⚠️  Batch download failed: ${error.message}`);
     
-    // If this is a rate limit error, propagate it to the user
-    if (error.message && error.message.includes('Figma API rate limit exceeded')) {
+    // Re-throw unrecoverable errors (403 permission denied, 429 rate limit)
+    // These indicate authentication/authorization issues that won't be fixed by retrying
+    if (error instanceof FigmaUnrecoverableError) {
       throw error;
     }
     

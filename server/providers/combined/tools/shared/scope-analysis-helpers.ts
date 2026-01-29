@@ -107,24 +107,34 @@ export function extractScopeAnalysis(epicContext: string): ParsedScopeAnalysis {
  * Uses regex to match question markers at the start of bullet points.
  * Only counts ❓ (unanswered), not 💬 (answered).
  * 
+ * Matches both:
+ * - Markdown format: "- ❓ Question"
+ * - ADF extracted text: "❓ Question" (at start of line)
+ * 
  * @param scopeAnalysisMarkdown - The scope analysis markdown content
  * @returns Number of unanswered questions
  */
 export function countUnansweredQuestions(scopeAnalysisMarkdown: string): number {
-  // Match bullet points starting with ❓
-  // Pattern: optional whitespace, dash, whitespace, ❓
-  const questionMatches = scopeAnalysisMarkdown.match(/^\s*-\s*❓/gm);
+  // Match question markers at start of line
+  // Pattern: optional whitespace, optional dash+whitespace, ❓
+  const questionMatches = scopeAnalysisMarkdown.match(/^\s*(-\s*)?❓/gm);
   return questionMatches ? questionMatches.length : 0;
 }
 
 /**
  * Count answered questions (💬 markers) in scope analysis markdown
  * 
+ * Matches both:
+ * - Markdown format: "- 💬 Answer"
+ * - ADF extracted text: "💬 Answer" (at start of line)
+ * 
  * @param scopeAnalysisMarkdown - The scope analysis markdown content
  * @returns Number of answered questions
  */
 export function countAnsweredQuestions(scopeAnalysisMarkdown: string): number {
-  const answeredMatches = scopeAnalysisMarkdown.match(/^\s*-\s*💬/gm);
+  // Match answer markers at start of line
+  // Pattern: optional whitespace, optional dash+whitespace, 💬
+  const answeredMatches = scopeAnalysisMarkdown.match(/^\s*(-\s*)?💬/gm);
   return answeredMatches ? answeredMatches.length : 0;
 }
 
@@ -148,6 +158,85 @@ export function countFeatureMarkers(scopeAnalysisMarkdown: string): {
     alreadyDone: (scopeAnalysisMarkdown.match(/^\s*-\s*✅/gm) || []).length,
     needsClarification: (scopeAnalysisMarkdown.match(/^\s*-\s*❓/gm) || []).length,
   };
+}
+
+/**
+ * Collapse sections where ALL items are already done (✅) into a summary.
+ * 
+ * Sections that contain only ✅ markers are collapsed into a single
+ * "Already Completed Areas" section at the end, reducing visual noise
+ * while preserving the information.
+ * 
+ * @example
+ * Before:
+ * ### Case Navigation
+ * - ✅ Sidebar case list
+ * - ✅ Visual selection state
+ * 
+ * ### Comment Reactions
+ * - ☐ Upvote button
+ * - ✅ Basic comment display
+ * 
+ * After:
+ * ### Comment Reactions
+ * - ☐ Upvote button
+ * - ✅ Basic comment display
+ * 
+ * ### Already Completed Areas
+ * - ✅ Case Navigation
+ * 
+ * @param scopeAnalysisMarkdown - The scope analysis markdown content
+ * @returns Markdown with all-done sections collapsed
+ */
+export function collapseDoneSections(scopeAnalysisMarkdown: string): string {
+  // Split into sections by ### headings (lookahead to keep delimiter)
+  const sections = scopeAnalysisMarkdown.split(/(?=^### )/gm);
+  
+  const activeSections: string[] = [];
+  const completedHeadings: string[] = [];
+  
+  for (const section of sections) {
+    if (!section.trim()) continue;
+    
+    // Check if this is a heading section
+    const headingMatch = section.match(/^### (.+)/);
+    if (!headingMatch) {
+      // Not a section (e.g., content before first heading)
+      activeSections.push(section);
+      continue;
+    }
+    
+    const heading = headingMatch[1].trim();
+    
+    // Skip special sections - always keep them
+    if (heading.toLowerCase().includes('remaining questions') ||
+        heading.toLowerCase().includes('already completed')) {
+      activeSections.push(section);
+      continue;
+    }
+    
+    // Count markers in this section
+    const allMarkerBullets = section.match(/^\s*-\s*[☐✅⏬❌❓💬]/gm) || [];
+    const doneMarkers = section.match(/^\s*-\s*✅/gm) || [];
+    
+    // If ALL bullets are ✅ (and there is at least one), collapse this section
+    if (allMarkerBullets.length > 0 && doneMarkers.length === allMarkerBullets.length) {
+      completedHeadings.push(heading);
+    } else {
+      activeSections.push(section);
+    }
+  }
+  
+  // Build result
+  let result = activeSections.join('');
+  
+  // Add collapsed "Already Completed Areas" section if we have any
+  if (completedHeadings.length > 0) {
+    const completedList = completedHeadings.map(h => `- ✅ ${h}`).join('\n');
+    result = result.trimEnd() + `\n\n### Already Completed Areas\n\n${completedList}\n`;
+  }
+  
+  return result.trim();
 }
 
 /**
@@ -179,21 +268,40 @@ export function decideSelfHealingAction(
 export type { DocumentContext } from './google-docs-setup.js';
 
 /**
+ * Pre-loaded analysis data for a screen
+ * Used when analysis is already loaded (e.g., from context-loader)
+ */
+export interface ScreenAnalysisData {
+  /** Screen name */
+  screenName: string;
+  /** Screen URL */
+  url: string;
+  /** AI-generated analysis content */
+  content: string;
+}
+
+/**
  * Parameters for generating scope analysis
  */
 export interface GenerateScopeAnalysisParams {
   /** LLM text generation function */
   generateText: ToolDependencies['generateText'];
-  /** Analyzed screens from Figma */
-  screens: Screen[];
+  /** 
+   * Pre-loaded analysis data (optional)
+   * If provided, this data is used directly instead of reading from cache files.
+   * Use this when you already have the analysis content loaded.
+   */
+  analysisData?: ScreenAnalysisData[];
+  /** Analyzed screens from Figma (required if analysisData not provided) */
+  screens?: Screen[];
   /** Debug directory for saving artifacts (optional) */
-  debugDir: string | null;
-  /** Figma file key for caching */
-  figmaFileKey: string;
+  debugDir?: string | null;
+  /** Figma file key for caching (required if reading from files) */
+  figmaFileKey?: string;
   /** YAML content with screen analysis */
-  yamlContent: string;
+  yamlContent?: string;
   /** Notification callback */
-  notify: ToolDependencies['notify'];
+  notify?: ToolDependencies['notify'];
   /** Epic context markdown (without scope analysis section) */
   epicContext?: string;
   /** Reference documents (Confluence, Google Docs) */
@@ -225,6 +333,10 @@ export interface GenerateScopeAnalysisOutput {
  * into in-scope (☐), already done (✅), low priority (⏬), out-of-scope (❌), and questions (❓),
  * grouped by workflow areas.
  * 
+ * Supports two modes:
+ * 1. File-based: Provide `screens` and `figmaFileKey` to read from cache files
+ * 2. Data-based: Provide `analysisData` directly (useful when analysis already loaded)
+ * 
  * @param params - Generation parameters including screens, context, and LLM function
  * @returns Scope analysis content with metadata
  * @throws Error if AI response is empty or malformed
@@ -234,11 +346,11 @@ export async function generateScopeAnalysis(
 ): Promise<GenerateScopeAnalysisOutput> {
   const {
     generateText,
+    analysisData,
     screens,
     debugDir,
     figmaFileKey,
     yamlContent,
-    notify,
     epicContext,
     referenceDocs,
     commentContexts,
@@ -246,7 +358,6 @@ export async function generateScopeAnalysis(
   } = params;
   
   // Dynamic imports to avoid circular dependencies
-  const { getFigmaFileCachePath } = await import('../../../figma/figma-cache.js');
   const {
     generateFeatureIdentificationPrompt,
     FEATURE_IDENTIFICATION_SYSTEM_PROMPT,
@@ -257,24 +368,34 @@ export async function generateScopeAnalysis(
 
   // Note: No progress notification here - caller handles progress messaging (per spec 040)
   
-  // Construct file cache path for analysis files
-  const fileCachePath = getFigmaFileCachePath(figmaFileKey);
+  // Build analysis files array - either from provided data or read from cache
+  let analysisFiles: Array<{ screenName: string; content: string; url: string }>;
   
-  // Read all analysis files with URLs from file cache
-  const analysisFiles: Array<{ screenName: string; content: string; url: string }> = [];
-  for (const screen of screens) {
-    const filename = screen.filename || screen.name;
-    const analysisPath = path.join(fileCachePath, `${filename}.analysis.md`);
-    try {
-      const content = await fs.readFile(analysisPath, 'utf-8');
-      analysisFiles.push({
-        screenName: screen.name,
-        content,
-        url: screen.url
-      });
-    } catch (error: any) {
-      throw new Error(`Failed to read analysis file for screen ${screen.name} at ${analysisPath}. This indicates a filesystem error or race condition. Original error: ${error.message}`);
+  if (analysisData) {
+    // Use pre-loaded analysis data directly
+    analysisFiles = analysisData;
+  } else if (screens && figmaFileKey) {
+    // Read from file cache
+    const { getFigmaFileCachePath } = await import('../../../figma/figma-cache.js');
+    const fileCachePath = getFigmaFileCachePath(figmaFileKey);
+    
+    analysisFiles = [];
+    for (const screen of screens) {
+      const filename = screen.filename || screen.name;
+      const analysisPath = path.join(fileCachePath, `${filename}.analysis.md`);
+      try {
+        const content = await fs.readFile(analysisPath, 'utf-8');
+        analysisFiles.push({
+          screenName: screen.name,
+          content,
+          url: screen.url
+        });
+      } catch (error: any) {
+        throw new Error(`Failed to read analysis file for screen ${screen.name} at ${analysisPath}. This indicates a filesystem error or race condition. Original error: ${error.message}`);
+      }
     }
+  } else {
+    throw new Error('generateScopeAnalysis requires either analysisData or (screens + figmaFileKey)');
   }
   
   // Build context with previous analysis if provided (for regeneration)
@@ -285,7 +406,7 @@ export async function generateScopeAnalysis(
   
   // Generate feature identification prompt
   const prompt = generateFeatureIdentificationPrompt(
-    yamlContent,
+    yamlContent || '',
     analysisFiles,
     effectiveEpicContext,
     referenceDocs,
@@ -321,7 +442,6 @@ Possible causes:
 
 Technical details:
 - AI response was empty or malformed
-- Screens analyzed: ${screens.length}
 - Analysis files loaded: ${analysisFiles.length}`);
   }
   

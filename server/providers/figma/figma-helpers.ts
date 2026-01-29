@@ -655,8 +655,12 @@ export function getFramesAndNotesForNode(
     return extractFramesAndNotes(fileData);
   }
   
+  // Handle both full file responses (with .document) and direct node responses
+  // fetchFigmaNode returns the node directly, while fetchFigmaFile returns { document: ... }
+  const documentRoot = fileData.document || fileData;
+  
   // Find the target node
-  const targetNode = findNodeInDocument(fileData.document, nodeId);
+  const targetNode = findNodeInDocument(documentRoot, nodeId);
   
   if (!targetNode) {
     console.log(`  Node ${nodeId} not found in document`);

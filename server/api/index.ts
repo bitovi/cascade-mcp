@@ -8,6 +8,7 @@
 import { Express } from 'express';
 import { handleWriteShellStories } from './write-shell-stories.js';
 import { handleWriteNextStory } from './write-next-story.js';
+import { handleWriteStory } from './write-story.js';
 import { handleIdentifyFeatures } from './identify-features.js';
 import { handleAnalyzeFeatureScope } from './analyze-feature-scope.js';
 import { handleFigmaReviewDesign } from './figma-review-design.js';
@@ -40,6 +41,10 @@ export function registerRestApiRoutes(app: Express): void {
   // Wrap handler to match Express signature (req, res) => void
   app.post('/api/write-next-story', (req, res) => handleWriteNextStory(req, res));
   console.log('  ✓ POST /api/write-next-story');
+  
+  // Generate or refine a Jira story's description with scope analysis and questions
+  app.post('/api/write-story', (req, res) => handleWriteStory(req, res));
+  console.log('  ✓ POST /api/write-story');
   
   // Analyze feature scope from Figma designs (new endpoint)
   // Wrap handler to match Express signature (req, res) => void
