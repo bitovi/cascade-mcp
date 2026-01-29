@@ -51,6 +51,7 @@ import { notesToScreenAnnotations } from './note-text-extractor.js';
 import {
   extractScopeAnalysis as extractScopeAnalysisFromShared,
   countUnansweredQuestions,
+  countAnsweredQuestions,
   decideSelfHealingAction,
   SelfHealingDecision,
   QUESTION_THRESHOLD,
@@ -60,8 +61,8 @@ import {
 import {
   extractAllLinkMetadata,
   formatLinkCountsMessage,
-  formatServiceAvailabilityMessage,
 } from './link-metadata-extractor.js';
+import { formatServiceAvailabilityMessage } from '../shared/service-availability.js';
 
 // Re-export for external use
 export { SelfHealingDecision };
@@ -153,7 +154,12 @@ export async function executeWriteShellStories(
   // PHASE 1-3: Fetch epic, extract context, setup Figma screens
   // ==========================================
   // Single initial message announces services and indicates we're starting (per spec 040)
-  const serviceAvailabilityMessage = formatServiceAvailabilityMessage(!!deps.googleClient);
+  // write-shell-stories always has Figma (required) and Atlassian
+  const serviceAvailabilityMessage = formatServiceAvailabilityMessage({
+    atlassian: true,
+    figma: true,
+    google: !!deps.googleClient,
+  });
   await notify(`${serviceAvailabilityMessage}. Fetching Jira epic...`);
   
   console.log('  Phase 1-3: Setting up epic and Figma screens...');
@@ -313,7 +319,7 @@ export async function executeWriteShellStories(
   console.log('  Phase 4: Downloading images and analyzing screens...');
   
   // Improved progress message: Figma context summary (per spec 040)
-  await notify(`Analyzing Figma: ${screens.length} screen(s), ${allNotes.length} note(s), ${commentsCount} comment(s)...`);
+  await notify(`🤖 Analyzing Figma: ${screens.length} screen(s), ${allNotes.length} note(s), ${commentsCount} comment(s)...`);
   
   const analysisResult = await regenerateScreenAnalyses({
     generateText,
@@ -358,7 +364,7 @@ export async function executeWriteShellStories(
     if (googleDocs.length > 0) contextParts.push(`${googleDocs.length} Google Doc(s)`);
     const existingNote = hadExistingAnalysis ? ' (existing scope analysis available)' : '';
     
-    await notify(`Generating scope analysis from ${contextParts.join(', ')}${existingNote}...`);
+    await notify(`🤖 Generating scope analysis from ${contextParts.join(', ')}${existingNote}...`);
     
     try {
       // Use the shared generateScopeAnalysis function with performance logging
@@ -408,7 +414,8 @@ export async function executeWriteShellStories(
   
   // Count unanswered questions - ensure scopeAnalysisContent is not null
   const questionCount = scopeAnalysisContent ? countUnansweredQuestions(scopeAnalysisContent) : 0;
-  console.log(`  📊 Question count: ${questionCount} (threshold: ${QUESTION_THRESHOLD})`);
+  const answeredCount = scopeAnalysisContent ? countAnsweredQuestions(scopeAnalysisContent) : 0;
+  console.log(`  📊 Question count: ${questionCount} unanswered (❓), ${answeredCount} answered (💬), threshold: ${QUESTION_THRESHOLD}`);
   
   // Decide next action based on question count
   const decision = decideSelfHealingAction(hadExistingAnalysis, questionCount);

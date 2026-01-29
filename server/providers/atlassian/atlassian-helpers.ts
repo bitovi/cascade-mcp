@@ -8,7 +8,8 @@ import { sanitizeObjectWithJWTs } from '../../tokens.ts';
 import type { ADFDocument } from './markdown-converter.ts';
 import { convertMarkdownToAdf } from './markdown-converter.ts';
 import type { AtlassianClient } from './atlassian-api-client.js';
-import type { JiraIssuePayload } from './types.ts';
+import type { JiraIssuePayload, JiraCommentRaw, IssueComment } from './types.ts';
+import { parseComments } from './types.ts';
 
 // Atlassian site information structure
 export interface AtlassianSite {
@@ -591,3 +592,67 @@ export async function createJiraIssue(
 // JiraIssuePayload is now imported from ./types.ts
 // Re-export for backwards compatibility
 export type { JiraIssuePayload } from './types.ts';
+
+/**
+ * Fetch all comments for a Jira issue with pagination
+ * 
+ * Jira's REST API paginates comments (default ~20 per request).
+ * This function fetches all comments by paginating through results.
+ * 
+ * @param client - Atlassian API client
+ * @param cloudId - Cloud ID for the Jira site
+ * @param issueKey - Issue key (e.g., "PROJ-123")
+ * @returns Array of all comments on the issue
+ */
+export async function fetchAllComments(
+  client: AtlassianClient,
+  cloudId: string,
+  issueKey: string
+): Promise<IssueComment[]> {
+  // TODO: couldn't we make the first request, find the count, and then get all the others in parallel?
+  const baseUrl = `${client.getJiraBaseUrl(cloudId)}/issue/${issueKey}/comment`;
+  const allComments: JiraCommentRaw[] = [];
+  let startAt = 0;
+  const maxResults = 50; // Jira's typical page size
+  
+  logger.info('Fetching all comments for issue', { issueKey, cloudId });
+  
+  while (true) {
+    const url = `${baseUrl}?startAt=${startAt}&maxResults=${maxResults}`;
+    
+    const response = await client.fetch(url);
+    await handleJiraAuthError(response, `Fetch comments for ${issueKey}`);
+    
+    const data = await response.json() as {
+      startAt: number;
+      maxResults: number;
+      total: number;
+      comments: JiraCommentRaw[];
+    };
+    
+    allComments.push(...data.comments);
+    
+    logger.info('Fetched comment page', {
+      issueKey,
+      startAt,
+      fetched: data.comments.length,
+      total: data.total,
+      accumulated: allComments.length,
+    });
+    
+    // Check if we've fetched all comments
+    if (startAt + data.comments.length >= data.total) {
+      break;
+    }
+    
+    startAt += data.comments.length;
+  }
+  
+  logger.info('Completed fetching all comments', {
+    issueKey,
+    totalComments: allComments.length,
+  });
+  
+  // Convert to normalized IssueComment format
+  return parseComments(allComments);
+}

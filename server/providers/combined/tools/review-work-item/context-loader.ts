@@ -16,12 +16,16 @@ import type { JiraIssueHierarchy, JiraIssue } from './jira-hierarchy-fetcher.js'
 import { buildJiraIssueUrl } from './jira-hierarchy-fetcher.js';
 import type { ExtractedLinks } from './link-extractor.js';
 import { setupConfluenceContext, type ConfluenceDocument } from '../shared/confluence-setup.js';
+import { setupGoogleDocsContext, type GoogleDocDocument } from '../shared/google-docs-setup.js';
+import type { GoogleClient } from '../../../google/google-api-client.js';
 import { getJiraIssue } from '../../../atlassian/atlassian-helpers.js';
 import { 
   parseFigmaUrl,
   fetchFigmaNode,
   getFramesAndNotesForNode,
   downloadFigmaImagesBatch,
+  FigmaUnrecoverableError,
+  convertNodeIdToApiFormat,
   type FigmaNodeMetadata
 } from '../../../figma/figma-helpers.js';
 import { getFigmaFileCachePath, ensureValidCacheForFigmaFile } from '../../../figma/figma-cache.js';
@@ -32,6 +36,13 @@ import {
 } from '../writing-shell-stories/prompt-screen-analysis.js';
 import { associateNotesWithFrames } from '../writing-shell-stories/screen-analyzer.js';
 import { buildIssueContextFromHierarchy } from '../shared/issue-context-builder.js';
+import {
+  fetchCommentsForFile,
+  groupCommentsIntoThreads,
+  formatCommentsForContext,
+  type FrameMetadata
+} from '../../../figma/tools/figma-review-design/figma-comment-utils.js';
+import type { ScreenAnnotation } from '../shared/screen-annotation.js';
 
 // ============================================================================
 // Types
@@ -44,8 +55,14 @@ export interface LoadedContext {
   /** Confluence documents with content and metadata */
   confluenceDocs: ConfluenceDocument[];
   
+  /** Google Docs with content and metadata */
+  googleDocs: GoogleDocDocument[];
+  
   /** Analyzed Figma screens with AI-generated descriptions */
   analyzedScreens: AnalyzedScreen[];
+  
+  /** Figma comments associated with screens */
+  figmaComments: ScreenAnnotation[];
   
   /** Additional Jira issues referenced in the hierarchy */
   additionalJiraIssues: AdditionalJiraIssue[];
@@ -106,6 +123,8 @@ export interface LoadContextOptions {
   atlassianClient: AtlassianClient;
   /** Figma API client (optional - for Figma context) */
   figmaClient?: FigmaClient;
+  /** Google API client (optional - for Google Docs context) */
+  googleClient?: GoogleClient;
   /** LLM client for Confluence relevance scoring */
   generateText: GenerateTextFn;
   /** Cloud ID for Jira site */
@@ -114,6 +133,8 @@ export interface LoadContextOptions {
   siteName: string;
   /** Progress notification callback */
   notify?: (message: string) => Promise<void>;
+  /** Source ADF for extracting Google Docs URLs */
+  sourceAdf?: ADFDocument;
 }
 
 // ============================================================================
@@ -142,10 +163,12 @@ export async function loadLinkedResources(
 ): Promise<LoadedContext> {
   const { 
     atlassianClient, 
-    figmaClient, 
+    figmaClient,
+    googleClient,
     generateText, 
     cloudId, 
-    siteName, 
+    siteName,
+    sourceAdf,
     notify = async () => {} 
   } = options;
   
@@ -154,8 +177,8 @@ export async function loadLinkedResources(
   console.log(`  Figma: ${links.figma.length}`);
   console.log(`  Jira: ${links.jira.length}`);
   
-  // Load all resources in parallel
-  await notify(`Loading ${links.confluence.length + links.figma.length + links.jira.length} linked resources...`);
+  // Note: Caller (write-story) already reported link counts
+  // Individual loaders (Confluence, Figma) will send their own progress notifications
   
   // Build issue context for Figma analysis (from target issue and parents)
   // Exclude "Shell Stories" section since it's tool-generated content
@@ -163,9 +186,12 @@ export async function loadLinkedResources(
     excludeSections: ['Shell Stories'] 
   });
   
-  const [confluenceResult, figmaResults, jiraResults] = await Promise.all([
+  const [confluenceResult, googleDocsResult, figmaResult, jiraResults] = await Promise.all([
     // Load Confluence documents
     loadConfluenceDocuments(hierarchy, links.confluence, atlassianClient, generateText, siteName, notify),
+    
+    // Load Google Docs (if sourceAdf provided and googleClient available)
+    loadGoogleDocs(sourceAdf, googleClient, generateText, notify),
     
     // Load and analyze Figma screens (full analysis when figmaClient available)
     loadFigmaScreens(links.figma, figmaClient, generateText, issueContext.markdown, notify),
@@ -177,14 +203,16 @@ export async function loadLinkedResources(
   // Identify Definition of Ready document (if any)
   const definitionOfReady = identifyDefinitionOfReady(confluenceResult);
   
-  console.log(`  ✅ Loaded: ${confluenceResult.length} Confluence, ${figmaResults.length} Figma screens, ${jiraResults.length} Jira`);
+  console.log(`  ✅ Loaded: ${confluenceResult.length} Confluence, ${googleDocsResult.length} Google Docs, ${figmaResult.screens.length} Figma screens, ${figmaResult.comments.length} comments, ${jiraResults.length} Jira`);
   if (definitionOfReady) {
     console.log(`  📋 Definition of Ready identified: "${definitionOfReady.title}"`);
   }
   
   return {
     confluenceDocs: confluenceResult,
-    analyzedScreens: figmaResults,
+    googleDocs: googleDocsResult,
+    analyzedScreens: figmaResult.screens,
+    figmaComments: figmaResult.comments,
     additionalJiraIssues: jiraResults,
     definitionOfReady
   };
@@ -251,6 +279,44 @@ function createAdfWithUrls(urls: string[]): ADFDocument {
 }
 
 /**
+ * Load Google Docs using the shared setup function
+ */
+async function loadGoogleDocs(
+  sourceAdf: ADFDocument | undefined,
+  googleClient: GoogleClient | undefined,
+  generateText: GenerateTextFn,
+  notify: (message: string) => Promise<void>
+): Promise<GoogleDocDocument[]> {
+  if (!sourceAdf) {
+    console.log('  Skipping Google Docs (no source ADF provided)');
+    return [];
+  }
+  
+  if (!googleClient) {
+    console.log('  Skipping Google Docs (no Google authentication)');
+    return [];
+  }
+  
+  try {
+    const googleDocsContext = await setupGoogleDocsContext({
+      epicAdf: sourceAdf,
+      googleClient,
+      generateText,
+      notify: async (msg) => await notify(msg)
+    });
+    
+    // Return documents relevant for write-story (use writeNextStory relevance)
+    const relevantDocs = googleDocsContext.byRelevance.writeNextStory;
+    console.log(`  📄 Loaded ${relevantDocs.length} Google Doc(s)`);
+    return relevantDocs;
+  } catch (error: any) {
+    console.log(`  ⚠️ Failed to load Google Docs: ${error.message}`);
+    // Don't throw - Google Docs failure shouldn't block the story
+    return [];
+  }
+}
+
+/**
  * Load and analyze Figma screens with full AI analysis
  * 
  * When figmaClient is available:
@@ -258,9 +324,10 @@ function createAdfWithUrls(urls: string[]): ADFDocument {
  * 2. Fetches node metadata (frames, notes)
  * 3. Downloads screen images
  * 4. Runs AI analysis on each screen
- * 5. Returns analyzed screens with descriptions
+ * 5. Fetches and formats Figma comments
+ * 6. Returns analyzed screens with descriptions and comments
  * 
- * Falls back to empty array if no figmaClient or if URLs can't be processed.
+ * Falls back to empty result if no figmaClient or if URLs can't be processed.
  */
 async function loadFigmaScreens(
   figmaUrls: string[],
@@ -268,19 +335,22 @@ async function loadFigmaScreens(
   generateText: GenerateTextFn,
   epicContext: string,
   notify: (message: string) => Promise<void>
-): Promise<AnalyzedScreen[]> {
+): Promise<{ screens: AnalyzedScreen[]; comments: ScreenAnnotation[] }> {
   if (figmaUrls.length === 0) {
-    return [];
+    return { screens: [], comments: [] };
   }
   
   if (!figmaClient) {
     console.log('  ⚠️  No Figma client available - skipping Figma analysis');
-    return [];
+    return { screens: [], comments: [] };
   }
   
-  await notify(`Analyzing ${figmaUrls.length} Figma screens...`);
-  
   const analyzedScreens: AnalyzedScreen[] = [];
+  let allFigmaComments: ScreenAnnotation[] = [];
+  
+  // Track cache stats for summary message (similar to write-shell-stories pattern)
+  let cachedCount = 0;
+  let analyzedCount = 0;
   
   // Group URLs by file key for efficient batching
   const urlsByFileKey = new Map<string, Array<{ url: string; nodeId: string }>>();
@@ -307,6 +377,7 @@ async function loadFigmaScreens(
       // Collect all frames and notes for this file
       const allFrames: FigmaNodeMetadata[] = [];
       const allNotes: FigmaNodeMetadata[] = [];
+      const nodesDataMap = new Map<string, any>(); // Store node data for comment association
       
       for (const { url, nodeId } of urls) {
         if (!nodeId) {
@@ -314,9 +385,16 @@ async function loadFigmaScreens(
           continue;
         }
         
+        // Convert node ID from URL format (123-456) to API format (123:456)
+        const apiNodeId = convertNodeIdToApiFormat(nodeId);
+        
         try {
-          const nodeData = await fetchFigmaNode(figmaClient, fileKey, nodeId);
-          const nodesMetadata = getFramesAndNotesForNode(nodeData, nodeId);
+          const nodeData = await fetchFigmaNode(figmaClient, fileKey, apiNodeId);
+          
+          // Store node data for document tree (used for comment spatial matching)
+          nodesDataMap.set(apiNodeId, nodeData);
+          
+          const nodesMetadata = getFramesAndNotesForNode(nodeData, apiNodeId);
           
           // Separate frames and notes by type
           for (const node of nodesMetadata) {
@@ -331,7 +409,9 @@ async function loadFigmaScreens(
             }
           }
         } catch (error: any) {
-          console.log(`  ⚠️  Failed to fetch node ${nodeId}: ${error.message}`);
+          // Any Figma fetch error should fail the tool - don't silently continue without data
+          console.log(`  ❌ Failed to fetch Figma node ${apiNodeId}: ${error.message}`);
+          throw error;
         }
       }
       
@@ -342,12 +422,56 @@ async function loadFigmaScreens(
       
       console.log(`  🎨 Found ${allFrames.length} frames in file ${fileKey}`);
       
+      // Fetch Figma comments for this file (similar to write-shell-stories Phase 3.8)
+      let fileComments: ScreenAnnotation[] = [];
+      let matchedThreadCount = 0;
+      try {
+        const comments = await fetchCommentsForFile(figmaClient, fileKey);
+        if (comments.length > 0) {
+          const threads = groupCommentsIntoThreads(comments);
+          
+          // Build frame metadata with bounding boxes for proximity matching
+          const frameMetadata: FrameMetadata[] = allFrames.map((frame) => ({
+            fileKey,
+            nodeId: frame.id,
+            name: frame.name,
+            url: `https://www.figma.com/file/${fileKey}?node-id=${frame.id.replace(/:/g, '-')}`,
+            x: frame.absoluteBoundingBox?.x,
+            y: frame.absoluteBoundingBox?.y,
+            width: frame.absoluteBoundingBox?.width,
+            height: frame.absoluteBoundingBox?.height,
+          }));
+          
+          // Build document tree from nodesDataMap for spatial containment checks
+          const documentTree = {
+            id: 'root',
+            children: Array.from(nodesDataMap.values())
+          };
+          
+          const commentResult = formatCommentsForContext(threads, frameMetadata, documentTree);
+          fileComments = commentResult.contexts;
+          matchedThreadCount = commentResult.matchedThreadCount;
+          console.log(`   💬 Fetched ${comments.length} comments → ${matchedThreadCount} threads across ${fileComments.length} screens`);
+        } else {
+          console.log('   💬 No Figma comments found');
+        }
+      } catch (error: any) {
+        console.log(`   ⚠️ Figma comment fetching failed: ${error.message}`);
+        // Continue without comments - they're optional context
+      }
+      
+      // Accumulate comments from this file
+      allFigmaComments = [...allFigmaComments, ...fileComments];
+      
+      // Notify about Figma analysis (similar to write-shell-stories pattern)
+      await notify(`🤖 Analyzing Figma: ${allFrames.length} screen(s), ${allNotes.length} note(s), ${matchedThreadCount} comment(s)...`);
+      
       // Associate notes with frames
       const baseUrl = `https://www.figma.com/file/${fileKey}`;
       const associationResult = associateNotesWithFrames(allFrames, allNotes, baseUrl);
       
       // Download images for all frames in batch
-      await notify(`Downloading ${allFrames.length} Figma images...`);
+      // Note: No separate notification - part of the analysis phase
       const frameIds = allFrames.map(f => f.id);
       const imagesMap = await downloadFigmaImagesBatch(figmaClient, fileKey, frameIds);
       
@@ -372,6 +496,7 @@ async function loadFigmaScreens(
           // Try to read from cache
           analysis = await fs.readFile(analysisPath, 'utf-8');
           console.log(`  ✓ Cache hit: ${frame.name}`);
+          cachedCount++;
         } catch {
           // Not in cache - need to analyze
           const imageData = imagesMap.get(frame.id);
@@ -386,8 +511,8 @@ async function loadFigmaScreens(
           const imageBuffer = Buffer.from(imageData.base64Data, 'base64');
           await fs.writeFile(imagePath, imageBuffer);
           
-          // Generate analysis
-          await notify(`Analyzing screen ${screenIndex}/${allFrames.length}: ${frame.name}...`);
+          // Generate analysis (no per-screen notification - summary at end)
+          console.log(`  🔍 Analyzing: ${frame.name}...`);
           
           const prompt = generateScreenAnalysisPrompt(
             frame.name,
@@ -416,6 +541,7 @@ async function loadFigmaScreens(
           // Save to cache
           await fs.writeFile(analysisPath, analysis, 'utf-8');
           console.log(`  ✓ Analyzed: ${frame.name}`);
+          analyzedCount++;
         }
         
         analyzedScreens.push({
@@ -432,7 +558,13 @@ async function loadFigmaScreens(
     }
   }
   
-  return analyzedScreens;
+  // Summary notification (similar to write-shell-stories pattern)
+  if (analyzedScreens.length > 0) {
+    const cacheExplanation = cachedCount > 0 && analyzedCount === 0 ? ' (Figma file unchanged)' : '';
+    await notify(`Screen analysis complete: ${cachedCount} cached, ${analyzedCount} new${cacheExplanation}`);
+  }
+  
+  return { screens: analyzedScreens, comments: allFigmaComments };
 }
 
 /**

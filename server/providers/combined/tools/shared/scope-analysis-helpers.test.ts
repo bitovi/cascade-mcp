@@ -12,6 +12,7 @@ import {
   countUnansweredQuestions,
   countAnsweredQuestions,
   countFeatureMarkers,
+  collapseDoneSections,
   extractScopeAnalysis,
   decideSelfHealingAction,
   SelfHealingDecision,
@@ -80,6 +81,24 @@ describe('scope-analysis-helpers', () => {
       `;
       expect(countUnansweredQuestions(markdown)).toBe(2);
     });
+
+    it('should count questions from ADF-extracted text (no bullet prefix)', () => {
+      // ADF extractTextFromAdf strips the "- " prefix
+      const adfExtractedText = `
+❓ What is the error handling?
+❓ How should validation work?
+💬 This one is answered
+      `;
+      expect(countUnansweredQuestions(adfExtractedText)).toBe(2);
+    });
+
+    it('should count mixed markdown and ADF formats', () => {
+      const mixedText = `
+- ❓ Markdown format question
+❓ ADF format question
+      `;
+      expect(countUnansweredQuestions(mixedText)).toBe(2);
+    });
   });
 
   describe('countAnsweredQuestions', () => {
@@ -90,6 +109,16 @@ describe('scope-analysis-helpers', () => {
 - 💬 What are performance requirements? (answered)
       `;
       expect(countAnsweredQuestions(markdown)).toBe(2);
+    });
+
+    it('should count answers from ADF-extracted text (no bullet prefix)', () => {
+      // ADF extractTextFromAdf strips the "- " prefix
+      const adfExtractedText = `
+💬 What is the error handling? (answered)
+❓ How should validation work?
+💬 What are performance requirements? (answered)
+      `;
+      expect(countAnsweredQuestions(adfExtractedText)).toBe(2);
     });
 
     it('should return 0 when no answered markers', () => {
@@ -244,6 +273,119 @@ Some description
 
       expect(countUnansweredQuestions(regeneratedOutput)).toBe(1);
       expect(countAnsweredQuestions(regeneratedOutput)).toBe(2);
+    });
+  });
+
+  describe('collapseDoneSections', () => {
+    it('should collapse sections with only ✅ markers', () => {
+      const input = `## Scope Analysis
+
+### Comment Reactions
+- ☐ Upvote button
+- ✅ Basic comment display
+
+### Case Navigation
+- ✅ Sidebar case list
+- ✅ Visual selection state
+- ✅ Case ID format`;
+
+      const result = collapseDoneSections(input);
+      
+      // Should keep Comment Reactions (has mixed markers)
+      expect(result).toContain('### Comment Reactions');
+      expect(result).toContain('- ☐ Upvote button');
+      expect(result).toContain('- ✅ Basic comment display');
+      
+      // Should collapse Case Navigation (all ✅)
+      expect(result).not.toContain('### Case Navigation');
+      expect(result).not.toContain('- ✅ Sidebar case list');
+      
+      // Should have new collapsed section
+      expect(result).toContain('### Already Completed Areas');
+      expect(result).toContain('- ✅ Case Navigation');
+    });
+
+    it('should collapse multiple all-done sections', () => {
+      const input = `### Feature A
+- ✅ Done item 1
+- ✅ Done item 2
+
+### Feature B
+- ☐ Todo item
+
+### Feature C
+- ✅ Done item 3`;
+
+      const result = collapseDoneSections(input);
+      
+      expect(result).toContain('### Feature B');
+      expect(result).toContain('- ☐ Todo item');
+      expect(result).toContain('### Already Completed Areas');
+      expect(result).toContain('- ✅ Feature A');
+      expect(result).toContain('- ✅ Feature C');
+    });
+
+    it('should preserve Remaining Questions section', () => {
+      const input = `### Comment Reactions
+- ✅ All done
+
+### Remaining Questions
+- ❓ How should errors be handled?`;
+
+      const result = collapseDoneSections(input);
+      
+      expect(result).toContain('### Remaining Questions');
+      expect(result).toContain('- ❓ How should errors be handled?');
+      expect(result).toContain('### Already Completed Areas');
+      expect(result).toContain('- ✅ Comment Reactions');
+    });
+
+    it('should handle empty input', () => {
+      expect(collapseDoneSections('')).toBe('');
+    });
+
+    it('should handle input with no sections to collapse', () => {
+      const input = `### Feature A
+- ☐ Todo item
+- ✅ Done item`;
+
+      const result = collapseDoneSections(input);
+      
+      expect(result).toContain('### Feature A');
+      expect(result).not.toContain('### Already Completed Areas');
+    });
+
+    it('should handle sections with question and answer markers', () => {
+      const input = `### Feature A
+- ✅ Done
+- ❓ Question here
+
+### Feature B  
+- ✅ All done`;
+
+      const result = collapseDoneSections(input);
+      
+      // Feature A has mixed, should stay
+      expect(result).toContain('### Feature A');
+      expect(result).toContain('- ❓ Question here');
+      
+      // Feature B is all done, should collapse
+      expect(result).toContain('### Already Completed Areas');
+      expect(result).toContain('- ✅ Feature B');
+    });
+
+    it('should preserve Figma links in active sections', () => {
+      const input = `### Comment Reactions
+
+[Screen 1](https://figma.com/123) [Screen 2](https://figma.com/456)
+
+- ☐ Upvote button
+- ✅ Basic display`;
+
+      const result = collapseDoneSections(input);
+      
+      expect(result).toContain('[Screen 1](https://figma.com/123)');
+      expect(result).toContain('- ☐ Upvote button');
     });
   });
 });

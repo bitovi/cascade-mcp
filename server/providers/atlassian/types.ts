@@ -137,6 +137,8 @@ export interface IssueComment {
   author: string;
   /** Created timestamp */
   created: string;
+  /** Updated timestamp (if comment was edited) */
+  updated?: string;
 }
 
 /**
@@ -219,7 +221,8 @@ export function parseComments(rawComments: JiraCommentRaw[] | undefined): IssueC
   return rawComments.map((comment) => ({
     body: comment.body,
     author: comment.author?.displayName || 'Unknown',
-    created: comment.created
+    created: comment.created,
+    updated: comment.updated,
   }));
 }
 

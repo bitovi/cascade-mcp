@@ -7,6 +7,7 @@
 import type { McpServer } from '../../mcp-core/mcp-types.js';
 import { registerWriteShellStoriesTool } from './tools/writing-shell-stories/index.js';
 import { registerWriteNextStoryTool } from './tools/write-next-story/index.js';
+import { registerWriteStoryTool } from './tools/write-story/index.js';
 import { registerAnalyzeFeatureScopeTool } from './tools/analyze-feature-scope/index.js';
 import { registerReviewWorkItemTool } from './tools/review-work-item/index.js';
 // import { registerTestJiraUpdateTool } from './tools/writing-shell-stories/test-jira-update.js';
@@ -24,6 +25,7 @@ export const combinedProvider = {
     console.log('Registering combined provider tools');
     registerWriteShellStoriesTool(mcp);
     registerWriteNextStoryTool(mcp);
+    registerWriteStoryTool(mcp);
     registerAnalyzeFeatureScopeTool(mcp);
     registerReviewWorkItemTool(mcp);
     // registerTestJiraUpdateTool(mcp); // Quick test tool for debugging

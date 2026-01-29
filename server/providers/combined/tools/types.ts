@@ -31,6 +31,8 @@ export interface ToolDependencies {
   /**
    * Pre-configured Figma API client
    * Token captured in closure
+   * 
+   * Required for Figma-centric tools (write-shell-stories, write-next-story).
    */
   figmaClient: FigmaClient;
   
@@ -55,5 +57,19 @@ export interface ToolDependencies {
    * 
    * Always call this - no conditional checks needed!
    */
+  notify: (message: string, step?: number) => Promise<void>;
+}
+
+/**
+ * Dependencies for tools that don't require Figma
+ * 
+ * Used by tools like write-story that can work with just Atlassian,
+ * but can optionally leverage Figma if available.
+ */
+export interface ToolDependenciesWithOptionalFigma {
+  atlassianClient: AtlassianClient;
+  figmaClient?: FigmaClient;
+  googleClient?: GoogleClient;
+  generateText: GenerateTextFn;
   notify: (message: string, step?: number) => Promise<void>;
 }

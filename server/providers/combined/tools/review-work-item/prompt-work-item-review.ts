@@ -64,7 +64,7 @@ export function generateWorkItemReviewPrompt(
   context: LoadedContext
 ): string {
   const { target, parents, blockers, siteName } = hierarchy;
-  const { definitionOfReady, confluenceDocs, analyzedScreens, additionalJiraIssues } = context;
+  const { definitionOfReady, confluenceDocs, googleDocs, analyzedScreens, additionalJiraIssues, figmaComments } = context;
   
   const otherDocs = confluenceDocs.filter(doc => doc !== definitionOfReady);
   
@@ -166,6 +166,27 @@ ${docSections.join('\n\n')}`;
     })(),
 
     // =========================================================================
+    // GOOGLE DOCS
+    // =========================================================================
+    (() => {
+      if (!googleDocs || googleDocs.length === 0) return '';
+      
+      const docSections = googleDocs.map(doc => {
+        return `### ${doc.title}
+
+**URL**: ${doc.url}
+
+${truncate(doc.markdown, 1500)}`;
+      });
+      
+      return `## GOOGLE DOCS
+
+The following linked Google Docs provide additional context:
+
+${docSections.join('\n\n')}`;
+    })(),
+
+    // =========================================================================
     // FIGMA DESIGN ANALYSIS
     // =========================================================================
     (() => {
@@ -194,6 +215,29 @@ ${screenSections.join('\n\n')}
 ---
 
 *Consider: Do the designs match the requirements? Are there missing states? Unclear interactions? Contradictions with acceptance criteria?*`;
+    })(),
+
+    // =========================================================================
+    // FIGMA COMMENTS (Design Review)
+    // =========================================================================
+    (() => {
+      if (!figmaComments || figmaComments.length === 0) return '';
+      
+      const commentSections = figmaComments.map(screenComment => {
+        return `### Comments on: ${screenComment.screenName}
+
+${screenComment.markdown}`;
+      });
+      
+      return `## FIGMA COMMENTS (Design Review)
+
+The following comments are from designers, stakeholders, or previous analysis on Figma screens. Use these to understand design intent, clarifications, and questions that have been raised:
+
+${commentSections.join('\n\n')}
+
+---
+
+*Consider: Have all design questions been answered? Are there unresolved discussions? Do comments reveal requirements not captured elsewhere?*`;
     })(),
 
     // =========================================================================
