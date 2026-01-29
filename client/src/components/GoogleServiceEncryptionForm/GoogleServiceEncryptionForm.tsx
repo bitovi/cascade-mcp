@@ -22,33 +22,26 @@ export function GoogleServiceEncryptionForm() {
       const response = await fetch('/google-service-encrypt', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'application/json',
         },
-        body: new URLSearchParams({ serviceAccountJson }),
+        body: JSON.stringify({ serviceAccountJson }),
       });
 
       if (!response.ok) {
-        const text = await response.text();
-        // Extract error message from HTML response
-        const match = text.match(/<p class="error-message">(.*?)<\/p>/);
-        throw new Error(match ? match[1] : 'Encryption failed');
+        const data = await response.json();
+        throw new Error(data.error || 'Encryption failed');
       }
 
+      // Parse JSON response
+      const data = await response.json();
+      
       // Parse the service account to get email and project
       const parsed = JSON.parse(serviceAccountJson);
       
-      // Extract encrypted string from HTML response
-      const text = await response.text();
-      const encryptedMatch = text.match(/<textarea id="encrypted"[^>]*>(.*?)<\/textarea>/s);
-      
-      if (!encryptedMatch) {
-        throw new Error('Failed to extract encrypted credentials');
-      }
-
       setResult({
-        encrypted: encryptedMatch[1].trim(),
-        clientEmail: parsed.client_email,
-        projectId: parsed.project_id,
+        encrypted: data.encrypted,
+        clientEmail: data.clientEmail,
+        projectId: data.projectId,
       });
       setServiceAccountJson(''); // Clear the form
     } catch (err) {
