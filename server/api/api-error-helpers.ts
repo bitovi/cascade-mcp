@@ -145,36 +145,37 @@ export function validateEpicKey(
 }
 
 /**
- * Validate Google service account credentials from X-Google-Json header
+ * Validate Google service account credentials from X-Google-Token header
  * 
  * @param headers - Request headers object
  * @param res - Express response object
- * @returns Parsed service account credentials, or null if validation failed (response already sent)
+ * @returns Decrypted service account credentials, or null if validation failed (response already sent)
  */
-export function validateGoogleJsonApiHeaders(
+export async function validateGoogleTokenApiHeaders(
   headers: Record<string, string | string[] | undefined>,
   res: Response
-): GoogleServiceAccountCredentials | null {
-  const jsonCredentials = headers['x-google-json'] as string;
+): Promise<GoogleServiceAccountCredentials | null> {
+  const { googleKeyManager } = await import('../utils/key-manager.js');
+  const encryptedToken = headers['x-google-token'] as string;
   
-  if (!jsonCredentials) {
+  if (!encryptedToken) {
     res.status(401).json({ 
       success: false, 
-      error: 'Missing required header: X-Google-Json',
-      details: 'Please provide credentials via X-Google-Json header (plaintext service account JSON)'
+      error: 'Missing required header: X-Google-Token',
+      details: 'Please provide encrypted credentials via X-Google-Token header. Visit /google-service-encrypt to encrypt your service account JSON.'
     });
     return null;
   }
   
-  // Parse JSON credentials
+  // Decrypt the token
   let serviceAccountJson: GoogleServiceAccountCredentials;
   try {
-    serviceAccountJson = JSON.parse(jsonCredentials);
-  } catch {
+    serviceAccountJson = await googleKeyManager.decrypt(encryptedToken);
+  } catch (error: any) {
     res.status(401).json({ 
       success: false, 
-      error: 'Invalid JSON format',
-      details: 'X-Google-Json header must contain valid JSON'
+      error: 'Invalid or corrupted encrypted token',
+      details: `Failed to decrypt X-Google-Token: ${error.message}. Please re-encrypt your credentials at /google-service-encrypt`
     });
     return null;
   }
@@ -193,41 +194,42 @@ export function validateGoogleJsonApiHeaders(
 }
 
 /**
- * Parse optional Google service account credentials from X-Google-Json header
+ * Parse optional Google service account credentials from X-Google-Token header
  * 
- * Unlike validateGoogleJsonApiHeaders, this function does NOT send error responses.
+ * Unlike validateGoogleTokenApiHeaders, this function does NOT send error responses.
  * It returns null silently if header is missing or invalid, allowing the caller
  * to continue without Google integration.
  * 
  * @param headers - Request headers object
- * @returns Parsed service account credentials, or null if not provided or invalid
+ * @returns Decrypted service account credentials, or null if not provided or invalid
  */
-export function parseOptionalGoogleJson(
+export async function parseOptionalGoogleToken(
   headers: Record<string, string | string[] | undefined>
-): GoogleServiceAccountCredentials | null {
-  const jsonCredentials = headers['x-google-json'] as string;
+): Promise<GoogleServiceAccountCredentials | null> {
+  const { googleKeyManager } = await import('../utils/key-manager.js');
+  const encryptedToken = headers['x-google-token'] as string;
   
-  console.log('🔍 parseOptionalGoogleJson called');
+  console.log('🔍 parseOptionalGoogleToken called');
   console.log('  Headers keys:', Object.keys(headers));
-  console.log('  x-google-json present:', !!jsonCredentials);
+  console.log('  x-google-token present:', !!encryptedToken);
   
-  if (!jsonCredentials) {
-    console.log('  ⚠️ No X-Google-Json header found - skipping Google integration');
+  if (!encryptedToken) {
+    console.log('  ⚠️ No X-Google-Token header found - skipping Google integration');
     return null; // Header not provided - this is fine for optional Google integration
   }
   
-  console.log('  X-Google-Json length:', jsonCredentials.length);
-  console.log('  X-Google-Json preview:', jsonCredentials.substring(0, 100) + '...');
+  console.log('  X-Google-Token length:', encryptedToken.length);
+  console.log('  X-Google-Token preview:', encryptedToken.substring(0, 60) + '...');
   
-  // Parse JSON credentials
+  // Decrypt the token
   let serviceAccountJson: GoogleServiceAccountCredentials;
   try {
-    serviceAccountJson = JSON.parse(jsonCredentials);
-    console.log('  ✅ Successfully parsed JSON');
-    console.log('  Parsed keys:', Object.keys(serviceAccountJson));
+    serviceAccountJson = await googleKeyManager.decrypt(encryptedToken);
+    console.log('  ✅ Successfully decrypted token');
+    console.log('  Service account keys:', Object.keys(serviceAccountJson));
   } catch (error) {
-    console.log('  ⚠️ X-Google-Json header contains invalid JSON - skipping Google integration');
-    console.log('  Parse error:', error);
+    console.log('  ⚠️ X-Google-Token decryption failed - skipping Google integration');
+    console.log('  Decryption error:', error);
     return null;
   }
   
