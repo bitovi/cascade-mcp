@@ -31,7 +31,7 @@ import { googleProvider } from './providers/google/index.js';
 import { logEnvironmentInfo } from './debug-helpers.js';
 import { registerRestApiRoutes } from './api/index.js';
 import { getProjectRoot } from './utils/file-paths.js';
-import { renderEncryptionPage, handleEncryptionRequest } from './google-service-encrypt.js';
+import { handleEncryptionRequest } from './google-service-encrypt.js';
 
 // configurations
 dotenv.config();
@@ -227,9 +227,6 @@ if (hasClientBuild) {
       </ul>
     `);
   });
-
-  // Fallback encryption page
-  app.get('/google-service-encrypt', renderEncryptionPage);
 }
 
 app.get('/.well-known/oauth-authorization-server', oauthMetadata);
