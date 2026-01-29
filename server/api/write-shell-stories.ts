@@ -18,7 +18,7 @@ import {
   handleApiError, 
   validateApiHeaders, 
   validateEpicKey,
-  parseOptionalGoogleJson,
+  parseOptionalGoogleToken,
   type ErrorCommentContext 
 } from './api-error-helpers.js';
 import { 
@@ -45,7 +45,7 @@ export interface WriteShellStoriesHandlerDeps {
  *   X-Figma-Token: figd_...      (Figma PAT)
  * 
  * Optional Headers:
- *   X-Google-Json: {...}  (Google service account JSON - enables Google Docs context)
+ *   X-Google-Token: RSA-ENCRYPTED:...  (Encrypted Google service account - enables Google Docs context)
  *   X-Anthropic-Token: sk-...    (Anthropic API key, or use X-LLM-Provider)
  * 
  * To create the Atlassian token, see:
@@ -104,7 +104,7 @@ export async function handleWriteShellStories(req: Request, res: Response, deps:
     const generateText = createProviderFromHeaders(req.headers as Record<string, string>);
     
     // Create Google client if service account credentials provided (optional)
-    const googleServiceAccount = parseOptionalGoogleJson(req.headers);
+    const googleServiceAccount = await parseOptionalGoogleToken(req.headers);
     const googleClient = googleServiceAccount 
       ? await createGoogleClientWithServiceAccountJSON(googleServiceAccount) 
       : undefined;
