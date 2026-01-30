@@ -17,6 +17,9 @@ import type {
 import { BrowserOAuthClientProvider } from './oauth/provider.js';
 import type { SamplingProvider } from './sampling/types.js';
 
+/** Default timeout for MCP tool calls (5 minutes) */
+const DEFAULT_TOOL_TIMEOUT_MS = 5 * 60 * 1000;
+
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'authorizing' | 'connected' | 'error';
 
 export interface ConnectionState {
@@ -266,11 +269,12 @@ export class BrowserMcpClient {
   /**
    * Call a tool on the server
    */
-  async callTool(name: string, args: Record<string, unknown>): Promise<CallToolResult> {
+  async callTool(name: string, args: Record<string, unknown>, options?: { timeout?: number }): Promise<CallToolResult> {
     if (!this.client) {
       throw new Error('Not connected');
     }
-    const result = await this.client.callTool({ name, arguments: args });
+    const timeout = options?.timeout ?? DEFAULT_TOOL_TIMEOUT_MS;
+    const result = await this.client.callTool({ name, arguments: args }, undefined, { timeout });
     return result as CallToolResult;
   }
 
