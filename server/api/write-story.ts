@@ -17,7 +17,7 @@ import { logger } from '../observability/logger.js';
 import { 
   handleApiError, 
   validateApiHeaders,
-  parseOptionalGoogleJson,
+  parseOptionalGoogleToken,
   type ErrorCommentContext 
 } from './api-error-helpers.js';
 import { 
@@ -68,7 +68,7 @@ function validateIssueKey(body: any, res: Response): string | null {
  *   X-Figma-Token: figd_...      (Figma PAT)
  * 
  * Optional Headers:
- *   X-Google-Json: {...}  (Google service account JSON - enables Google Docs context)
+ *   X-Google-Token: RSA-ENCRYPTED:...  (Encrypted Google service account - enables Google Docs context)
  *   X-Anthropic-Token: sk-...    (Anthropic API key, or use X-LLM-Provider)
  * 
  * Request body:
@@ -137,7 +137,7 @@ export async function handleWriteStory(req: Request, res: Response, deps: WriteS
     const generateText = createProviderFromHeaders(req.headers as Record<string, string>);
     
     // Create Google client if service account credentials provided (optional)
-    const googleServiceAccount = parseOptionalGoogleJson(req.headers);
+    const googleServiceAccount = await parseOptionalGoogleToken(req.headers);
     const googleClient = googleServiceAccount 
       ? await createGoogleClientWithServiceAccountJSON(googleServiceAccount) 
       : undefined;
