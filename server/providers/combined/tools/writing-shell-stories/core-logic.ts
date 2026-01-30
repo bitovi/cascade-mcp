@@ -256,37 +256,6 @@ export async function executeWriteShellStories(
   }
 
   // ==========================================
-  // PHASE 3.6: Setup Google Docs context (if any linked docs)
-  // ==========================================
-  let googleDocs: ConfluenceDocumentContext[] = [];
-  
-  if (epicDescriptionAdf) {
-    if (!deps.googleClient) {
-      console.log('🔗 Skipping Google Docs context (no Google authentication)');
-    } else {
-      const googleDocsContext = await setupGoogleDocsContext({
-        epicAdf: epicDescriptionAdf,
-        googleClient: deps.googleClient,
-        generateText,
-        notify,
-      });
-      
-      // Filter to docs relevant for shell story writing
-      googleDocs = googleDocsContext.byRelevance.writeStories.map((doc: GoogleDocDocument) => ({
-        title: doc.title,
-        url: doc.url,
-        markdown: doc.markdown,
-        documentType: doc.metadata.relevance?.documentType,
-        relevanceScore: doc.metadata.relevance?.toolScores.find(t => t.toolId === 'write-shell-stories')?.overallScore,
-        summary: doc.metadata.summary?.text,
-        source: 'google-docs' as const,
-      }));
-      
-      console.log(`   📄 Google Docs for shell stories: ${googleDocs.length}`);
-    }
-  }
-
-  // ==========================================
   // PHASE 3.7: Merge documentation contexts
   // ==========================================
   const allDocs = [...confluenceDocs, ...googleDocs];
