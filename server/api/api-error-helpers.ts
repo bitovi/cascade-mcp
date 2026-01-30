@@ -235,7 +235,7 @@ export async function parseOptionalGoogleToken(
   
   // Validate it's a service account
   if (serviceAccountJson.type !== 'service_account') {
-    console.log('  ⚠️ X-Google-Json is not a service account - skipping Google integration');
+    console.log('  ⚠️ X-Google-Token is not a service account - skipping Google integration');
     console.log('  Type found:', serviceAccountJson.type);
     return null;
   }

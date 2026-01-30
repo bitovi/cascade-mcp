@@ -107,26 +107,18 @@ google.json
 
 ### Step 6: Add to Environment Variables
 
-**For local development**, add the service account JSON to your `.env` file:
+**For local development**, encrypt your service account JSON:
 
 ```bash
-# Option 1: Reference the file path (recommended for development)
-# Read the file and convert to single-line JSON
-GOOGLE_SERVICE_ACCOUNT_JSON='{"type":"service_account","project_id":"your-project-id","private_key_id":"abc123...","private_key":"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n","client_email":"cascade-mcp-drive@your-project.iam.gserviceaccount.com",...}'
-```
+# 1. Start the server
+npm run start-local
 
-**To convert the JSON file to a single-line string:**
+# 2. Visit http://localhost:3000/google-service-encrypt in your browser
 
-```bash
-# macOS/Linux
-cat google.json | jq -c . | sed "s/'/'\\\\''/g"
+# 3. Paste your service account JSON and click "Encrypt"
 
-# Or manually:
-# 1. Open google.json
-# 2. Copy all content
-# 3. Remove all line breaks (make it one line)
-# 4. Escape any single quotes if present
-# 5. Wrap in single quotes
+# 4. Add the encrypted token to your .env file:
+GOOGLE_SERVICE_ACCOUNT_ENCRYPTED='RSA-ENCRYPTED:base64encryptedcredentials...'
 ```
 
 **For REST API usage**, you must:
@@ -193,11 +185,11 @@ Service accounts can only access Google Drive files that are explicitly shared w
 Test with the analyze-feature-scope or write-shell-stories CLI scripts:
 
 ```bash
-# Ensure GOOGLE_SERVICE_ACCOUNT_JSON is in your .env file
+# Ensure GOOGLE_SERVICE_ACCOUNT_ENCRYPTED is in your .env file
 node --import ./loader.mjs scripts/api/analyze-feature-scope.ts https://bitovi.atlassian.net/browse/EPIC-123
 
 # Or set inline (for testing)
-GOOGLE_SERVICE_ACCOUNT_JSON='{"type":"service_account",...}' \
+GOOGLE_SERVICE_ACCOUNT_ENCRYPTED='RSA-ENCRYPTED:...' \
   node --import ./loader.mjs scripts/api/write-shell-stories.ts https://bitovi.atlassian.net/browse/EPIC-123
 ```
 
@@ -207,7 +199,7 @@ The service account credentials can be tested using the Google Drive MCP tools t
 
 1. Start the server: `npm run start-local`
 2. Open http://localhost:3000
-3. The server will use `GOOGLE_SERVICE_ACCOUNT_JSON` from your `.env` file
+3. The server will use `GOOGLE_SERVICE_ACCOUNT_ENCRYPTED` from your `.env` file
 
 ### Option 3: Using REST API
 
