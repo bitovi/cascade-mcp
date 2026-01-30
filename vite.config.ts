@@ -14,13 +14,13 @@ const proxyConfig = {
 
 export default defineConfig({
   plugins: [react()],
-  root: '.', // Project root
-  publicDir: 'static', // Existing static folder
+  root: './client',
+  publicDir: 'static',
   build: {
-    outDir: 'dist/client',
+    outDir: '../dist/client',
     rollupOptions: {
       input: {
-        main: resolve(__dirname, 'index.html'),
+        main: resolve(__dirname, 'client/index.html'),
       },
     },
   },
@@ -39,6 +39,7 @@ export default defineConfig({
       '/access-token': proxyConfig,
       '/authorize': proxyConfig,
       '/callback': proxyConfig,
+      '/google-service-encrypt': proxyConfig,
     },
   },
 });

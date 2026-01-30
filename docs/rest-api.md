@@ -20,14 +20,14 @@ All REST API endpoints require authentication via HTTP headers:
 - `X-Anthropic-Token` - Anthropic API key for AI-powered story generation
 
 **Optional Headers:**
-- `X-Google-Json` - Google service account JSON (enables Google Docs context in epics)
+- `X-Google-Token` - Encrypted Google service account (enables Google Docs context in epics)
 
 **Example Headers:**
 ```bash
 X-Atlassian-Token: eW91ci1lbWFpbEBleGFtcGxlLmNvbTpBVEFUVDN4RmZHRjA...
 X-Figma-Token: figd_5L7d0...
 X-Anthropic-Token: sk-ant-api03-...
-X-Google-Json: {"type":"service_account","project_id":"..."}
+X-Google-Token: RSA-ENCRYPTED:fx/3go4xa4K/...
 ```
 
 ### Obtaining Tokens
@@ -53,18 +53,19 @@ X-Google-Json: {"type":"service_account","project_id":"..."}
    - File content - Read only
    - File comments - Read only
 
-**Google Service Account** :
+**Google Service Account Encrypted Credentials:**
 
-See the [Google Service Account Setup Guide](./google-service-account.md) for detailed instructions.
+See the [Google Service Account Encryption Guide](./google-service-account-encryption.md) for detailed instructions.
 
-⚠️ **CRITICAL SECURITY WARNING**: Service account keys do NOT expire and provide full access to shared resources. The X-Google-Json header should ONLY be used in secure, server-to-server environments. Never expose this endpoint to client-side applications.
+⚠️ **SECURITY**: Always use encrypted credentials (`X-Google-Token`). Never pass plaintext service account JSON in production.
 
 Quick setup:
 1. Create service account in [Google Cloud Console](https://console.cloud.google.com/)
 2. Enable Google Drive API
 3. Create and download JSON key
 4. Share Google Drive files with the service account email
-5. Use the JSON content in the `X-Google-Json` header
+5. Encrypt your credentials at `/google-service-encrypt`
+6. Use the encrypted string in the `X-Google-Token` header
 
 **Anthropic API Key:**
 1. Go to https://console.anthropic.com/settings/keys
@@ -85,7 +86,7 @@ Generates prioritized shell stories from Figma designs linked in a Jira epic.
 - `X-Atlassian-Token` (required) - Base64-encoded `email:token` for Basic Auth
 - `X-Figma-Token` (required) - Figma Personal Access Token (starts with `figd_...`)
 - `X-Anthropic-Token` (required) - Anthropic API key (starts with `sk-ant-...`)
-- `X-Google-Json` (optional) - Google service account JSON (enables Google Docs context)
+- `X-Google-Token` (optional) - Encrypted Google service account (enables Google Docs context)
 
 **Request Body:**
 
@@ -176,7 +177,7 @@ Writes the next Jira story from shell stories in an epic. Validates dependencies
 - `X-Atlassian-Token` (required) - Base64-encoded `email:token` for Basic Auth
 - `X-Figma-Token` (required) - Figma Personal Access Token (starts with `figd_...`)
 - `X-Anthropic-Token` (required) - Anthropic API key (starts with `sk-ant-...`)
-- `X-Google-Json` (optional) - Google service account JSON (enables Google Docs context)
+- `X-Google-Token` (optional) - Encrypted Google service account (enables Google Docs context)
 
 **Request Body:**
 

@@ -2,31 +2,36 @@
 
 ## Overview
 
-Google service accounts allow server-to-server authentication without user interaction. Service account credentials are JSON key files that contain a private key for signing requests to Google APIs.
+Google service accounts allow server-to-server authentication without user interaction. Cascade MCP uses **encrypted** service account credentials to securely integrate with Google Drive for accessing Google Docs referenced in Jira epics.
 
-**🚨 TEMPORARY PROOF OF CONCEPT**
+**🔐 SECURITY FIRST**
 
-The `X-Google-Json` header currently accepts **unencrypted** service account JSON keys. This will be replaced with an encrypted key mechanism soon. Until then, only use for internal testing and local development.
+Cascade MCP requires **encrypted** Google service account credentials:
+- Service account JSON is encrypted using RSA-4096 encryption
+- Only the server can decrypt using its private key
+- Safe to store encrypted credentials in config files, environment variables, or CI/CD secrets
+- Use the `/google-service-encrypt` endpoint to encrypt your credentials
 
 **⚠️ CRITICAL SECURITY WARNING**
 
-Service account keys are **EXTREMELY DANGEROUS**:
+Service account keys are **EXTREMELY DANGEROUS** when unencrypted:
 - **Keys DO NOT expire** - They remain valid until manually revoked
 - **Full access** - Anyone with the key has complete access to resources shared with the service account
 - **No user context** - Keys work even if you're not logged in
 - **Irreversible access** - Leaked keys can be used immediately by attackers
 
 **DO NOT:**
-- ❌ Commit service account keys to version control
+- ❌ Commit unencrypted service account keys to version control
 - ❌ Send keys via email, Slack, or insecure channels
 - ❌ Store keys in client-side applications or public-facing code
-- ❌ Use the X-Google-Json API header outside of secure server-to-server environments
+- ❌ Pass unencrypted JSON via API headers
 - ❌ Share keys with untrusted parties
-- ❌ Use this in any production environment
 
-**ONLY USE FOR:**
-- ✅ Internal testing and local development
-- ✅ Demonstration purposes in secure environments
+**ALWAYS:**
+- ✅ Encrypt your service account JSON at `/google-service-encrypt`
+- ✅ Use `X-Google-Token` header with encrypted credentials
+- ✅ Store encrypted string in environment variables or secure configuration
+- ✅ Keep the unencrypted JSON file secure and delete after encryption
 
 ## Creating a Service Account
 
@@ -102,31 +107,24 @@ google.json
 
 ### Step 6: Add to Environment Variables
 
-**For local development**, add the service account JSON to your `.env` file:
+**For local development**, encrypt your service account JSON:
 
 ```bash
-# Option 1: Reference the file path (recommended for development)
-# Read the file and convert to single-line JSON
-GOOGLE_SERVICE_ACCOUNT_JSON='{"type":"service_account","project_id":"your-project-id","private_key_id":"abc123...","private_key":"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n","client_email":"cascade-mcp-drive@your-project.iam.gserviceaccount.com",...}'
+# 1. Start the server
+npm run start-local
+
+# 2. Visit http://localhost:3000/google-service-encrypt in your browser
+
+# 3. Paste your service account JSON and click "Encrypt"
+
+# 4. Add the encrypted token to your .env file:
+GOOGLE_SERVICE_ACCOUNT_ENCRYPTED='RSA-ENCRYPTED:base64encryptedcredentials...'
 ```
 
-**To convert the JSON file to a single-line string:**
-
-```bash
-# macOS/Linux
-cat google.json | jq -c . | sed "s/'/'\\\\''/g"
-
-# Or manually:
-# 1. Open google.json
-# 2. Copy all content
-# 3. Remove all line breaks (make it one line)
-# 4. Escape any single quotes if present
-# 5. Wrap in single quotes
-```
-
-**For REST API usage**, you can either:
-1. Use the environment variable (recommended for CLI scripts)
-2. Pass directly in the `X-Google-Json` header (for programmatic access)
+**For REST API usage**, you must:
+1. Encrypt your service account JSON at `/google-service-encrypt`
+2. Pass the encrypted token in the `X-Google-Token` header
+3. Or use the `GOOGLE_SERVICE_ACCOUNT_ENCRYPTED` environment variable
 
 ## Service Account JSON Structure
 
@@ -187,11 +185,11 @@ Service accounts can only access Google Drive files that are explicitly shared w
 Test with the analyze-feature-scope or write-shell-stories CLI scripts:
 
 ```bash
-# Ensure GOOGLE_SERVICE_ACCOUNT_JSON is in your .env file
+# Ensure GOOGLE_SERVICE_ACCOUNT_ENCRYPTED is in your .env file
 node --import ./loader.mjs scripts/api/analyze-feature-scope.ts https://bitovi.atlassian.net/browse/EPIC-123
 
 # Or set inline (for testing)
-GOOGLE_SERVICE_ACCOUNT_JSON='{"type":"service_account",...}' \
+GOOGLE_SERVICE_ACCOUNT_ENCRYPTED='RSA-ENCRYPTED:...' \
   node --import ./loader.mjs scripts/api/write-shell-stories.ts https://bitovi.atlassian.net/browse/EPIC-123
 ```
 
@@ -201,22 +199,22 @@ The service account credentials can be tested using the Google Drive MCP tools t
 
 1. Start the server: `npm run start-local`
 2. Open http://localhost:3000
-3. The server will use `GOOGLE_SERVICE_ACCOUNT_JSON` from your `.env` file
+3. The server will use `GOOGLE_SERVICE_ACCOUNT_ENCRYPTED` from your `.env` file
 
 ### Option 3: Using REST API
 
 Test with curl:
 
 ```bash
-# Read the service account JSON
-GOOGLE_JSON=$(cat google.json | jq -c .)
+# Encrypt your credentials first at /google-service-encrypt
+# Copy the encrypted output and use it in the header below
 
 curl -X POST http://localhost:3000/api/analyze-feature-scope \
   -H "Content-Type: application/json" \
   -H "X-Atlassian-Token: <base64-token>" \
   -H "X-Figma-Token: figd_..." \
   -H "X-Anthropic-Token: sk-ant-..." \
-  -H "X-Google-Json: $GOOGLE_JSON" \
+  -H "X-Google-Token: RSA-ENCRYPTED:fx/3go4xa4K/..." \
   -d '{"epicKey": "EPIC-123", "siteName": "bitovi"}'
 ```
 

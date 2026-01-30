@@ -8,6 +8,7 @@ Thank you for your interest in contributing! To contribute to this project, you'
 **Both Atlassian (Jira) and Figma are required** for the application to function.
 
 ## Table of Contents
+
 - [Prerequisites](#prerequisites)
 - [Setup Overview](#setup-overview)
 - [Setup for API Clients](#setup-for-api-clients) - Step 1: PAT-based setup
@@ -16,6 +17,7 @@ Thank you for your interest in contributing! To contribute to this project, you'
 - [Contributing Code](#contributing-code)
 
 ## Prerequisites
+
 - Node.js (v20 or higher required)
 - npm (v9 or higher recommended)
 - An Atlassian account with access to Jira ([atlassian.com](https://www.atlassian.com/))
@@ -77,9 +79,11 @@ npm install
 #### Figma Test File
 
 The E2E tests and PAT validation script require access to a specific Figma file. By default, the project uses the "TaskFlow" design file:
+
 - **File URL:** `https://www.figma.com/design/3JgSzy4U8gdIGm1oyHiovy/TaskFlow?node-id=0-321`
 
 To use a different test file:
+
 1. Open your Figma file in the browser
 2. Select a specific node/frame to use for testing (optional)
 3. Copy the full URL from the browser address bar (including `node-id` parameter if you selected a node)
@@ -88,6 +92,7 @@ To use a different test file:
 ### 4. Configure Environment Variables
 
 1. Copy the example environment file:
+
    ```bash
    cp .env.example .env
    ```
@@ -97,29 +102,30 @@ To use a different test file:
    ```bash
    # Atlassian PAT (base64-encoded email:token)
    ATLASSIAN_TEST_PAT="<your-base64-encoded-credentials>"
-   
+
    # Figma PAT
    FIGMA_TEST_PAT="figd_..."
-   
+
    # Figma test file URL (full URL with node-id for E2E tests)
    # Copy the full URL from your Figma file, including the node-id parameter
    FIGMA_TEST_URL="https://www.figma.com/design/3JgSzy4U8gdIGm1oyHiovy/TaskFlow?node-id=0-321"
-   
+
    # LLM Client API Key (for AI-powered API endpoints)
    # Default client: Anthropic - see server/llm-client/README.md for all LLM clients
    ANTHROPIC_API_KEY="sk-ant-..."
    # Or use the standard naming: PROVIDER_API_KEY="sk-ant-..."
-   
+
    # Security secrets (use random strings for local development)
    SESSION_SECRET="changeme_in_production"
    JWT_SECRET="devsecret_change_in_production"
    ```
 
 3. **Optional** variables:
+
    ```bash
    # Override API base URL (defaults to http://localhost:3000)
    API_BASE_URL=http://localhost:3000
-   
+
    # Cache location (defaults to /tmp, use ./cache to keep in project)
    DEV_CACHE_DIR=./cache
    ```
@@ -141,6 +147,7 @@ npm run validate-pat-tokens
 ```
 
 **What it checks:**
+
 - **Atlassian:** Authentication, project access (PLAY), issue creation permissions
 - **Figma:** Basic authentication, optional E2E test file access
 
@@ -176,6 +183,7 @@ This setup configures OAuth 2.0 authentication for MCP (Model Context Protocol) 
 You must register a new OAuth 2.0 (3LO) app in the Atlassian Developer Console to obtain credentials for MCP integration.
 
 **Steps:**
+
 1. Go to the [Atlassian Developer Console](https://developer.atlassian.com/console/myapps/).
 2. Click **Create app** > **OAuth 2.0 integration**.
 3. Enter an app name (e.g., `Cascade MCP - Atlassian Local`).
@@ -192,6 +200,7 @@ You must register a new OAuth 2.0 (3LO) app in the Atlassian Developer Console t
 You must register a new OAuth app in Figma to obtain credentials for MCP integration.
 
 **Steps:**
+
 1. Go to [Figma Developer Settings](https://www.figma.com/developers/apps).
 2. Click **Create new app**.
 3. Enter an app name (e.g., `Cascade MCP - Figma Local`).
@@ -209,6 +218,7 @@ You must register a new OAuth app in Figma to obtain credentials for MCP integra
 If you want to use Google Drive integration, you'll need to create OAuth credentials in Google Cloud Console.
 
 **Steps:**
+
 1. Go to [Google Cloud Console](https://console.cloud.google.com/).
 2. Create a new project or select an existing one:
    - Click the project dropdown in the top navigation bar
@@ -236,9 +246,49 @@ If you want to use Google Drive integration, you'll need to create OAuth credent
      - Click **Create**
 5. Note your `Client ID` and `Client Secret` from the confirmation dialog
 
-### 4. Configure Environment Variables
+### 4. Configure Google Service Account (Alternative to OAuth)
+
+If you prefer to use a Google Service Account instead of OAuth for Google Drive access, you can use encrypted credentials:
+
+**Steps:**
+
+1. Create a Service Account in [Google Cloud Console](https://console.cloud.google.com/):
+   - Go to **IAM & Admin** > **Service Accounts**
+   - Click **Create Service Account**
+   - Fill in the details and grant necessary permissions
+   - Create and download the JSON key file
+2. Encrypt your service account credentials:
+   - Start the server: `npm run start-local`
+   - Visit `http://localhost:3000/google-service-encrypt`
+   - Paste your service account JSON
+   - Click **Encrypt Credentials**
+   - Copy the encrypted output (starts with `RSA-ENCRYPTED:`)
+3. Add the encrypted credentials to your `.env` file:
+
+   ```bash
+   GOOGLE_SERVICE_ACCOUNT_ENCRYPTED="RSA-ENCRYPTED:eyJhbGci..."
+   ```
+
+**RSA Keys (Auto-Generated):**
+
+- On first use, the server automatically generates an RSA-4096 key pair
+- Keys are stored in `cache/keys/google-rsa/` (git-ignored)
+- Private key file permissions are set to `0600` (owner read/write only)
+- No manual setup required - keys persist across restarts
+
+**Security Notes:**
+
+- Never commit `cache/keys/` directory or encrypted credentials to version control
+- The private key remains server-side and is never exposed
+- Encrypted credentials are safe to store in `.env` or environment variables
+- For production, use GitHub Secrets or a secrets manager (AWS Secrets Manager, HashiCorp Vault)
+
+For more details, see: [`docs/google-service-account-encryption.md`](docs/google-service-account-encryption.md)
+
+### 5. Configure Environment Variables
 
 1. Copy the example environment file:
+
    ```bash
    cp .env.example .env
    ```
@@ -246,17 +296,20 @@ If you want to use Google Drive integration, you'll need to create OAuth credent
 2. Fill in the following **required** variables in your `.env` file:
 
    **Atlassian/Jira OAuth** (from Step 1):
+
    - `VITE_JIRA_CLIENT_ID` - Your Atlassian OAuth Client ID
    - `JIRA_CLIENT_SECRET` - Your Atlassian OAuth Client Secret
    - `VITE_JIRA_CALLBACK_URL` - Must be `http://localhost:3000/auth/callback/atlassian`
    - `VITE_JIRA_SCOPE` - Should be `"read:jira-work write:jira-work offline_access"`
 
    **Figma OAuth** (from Step 2):
+
    - `FIGMA_CLIENT_ID` - Your Figma OAuth Client ID
    - `FIGMA_CLIENT_SECRET` - Your Figma OAuth Client Secret
    - `FIGMA_OAUTH_SCOPES` - Should be `"file_content:read file_metadata:read file_comments:read file_comments:write current_user:read"`
 
    **Google Drive OAuth** (from Step 3, optional):
+
    - `GOOGLE_CLIENT_ID` - Your Google OAuth Client ID
    - `GOOGLE_CLIENT_SECRET` - Your Google OAuth Client Secret
    - `GOOGLE_OAUTH_SCOPES` - Should be `"https://www.googleapis.com/auth/drive"`
@@ -264,16 +317,18 @@ If you want to use Google Drive integration, you'll need to create OAuth credent
    **Note:** The `ANTHROPIC_API_KEY`, `SESSION_SECRET`, and `JWT_SECRET` variables were already set during API setup.
 
 3. **Understanding Callback URLs**: The application uses provider-specific callback URLs following the pattern:
-   ```
+
+   ```text
    {BASE_URL}/auth/callback/{provider}
    ```
+
    - Atlassian: `http://localhost:3000/auth/callback/atlassian`
    - Figma: `http://localhost:3000/auth/callback/figma`
    - Google: `http://localhost:3000/auth/callback/google`
-   
+
    These URLs **must match exactly** in your OAuth app configurations.
 
-### 4. Restart the Server
+### 6. Restart the Server
 
 If the server is still running from the API setup, restart it to pick up the new OAuth environment variables:
 
@@ -281,7 +336,7 @@ If the server is still running from the API setup, restart it to pick up the new
 npm run start-local
 ```
 
-### 5. Connect Your MCP Client
+### 7. Connect Your MCP Client
 
 Follow the MCP client-specific instructions for connecting to `http://localhost:3000/mcp`. The OAuth flow will guide you through authentication with Atlassian and Figma.
 
@@ -292,6 +347,7 @@ Follow the MCP client-specific instructions for connecting to `http://localhost:
 ### LLM Clients
 
 The default LLM client is Anthropic (Claude), but you can use any of the 8 supported LLM clients. See the **[LLM Provider Guide](./server/llm-client/README.md)** for complete documentation on:
+
 - Supported LLM clients (Anthropic, OpenAI, Google, AWS Bedrock, Mistral, DeepSeek, Groq, xAI)
 - Authentication methods and credential formats
 - Header and environment variable naming conventions
@@ -309,9 +365,11 @@ You can configure optional environment variables in your `.env` file to help wit
 ---
 
 ## Contributing Code
+
 - Please follow the code style and documentation patterns in the repo.
 - Update `server/readme.md` with any API or file changes.
 - Open a pull request with a clear description of your changes.
 
 ---
+
 For more details, see the main `README.md` and `server/readme.md`.

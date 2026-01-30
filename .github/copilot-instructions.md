@@ -5,6 +5,24 @@
 
 - With all api changes or file changes, keep the documentation in `server/readme.md` up to date.
 
+### Security Guidelines - CRITICAL
+
+**NEVER log or expose sensitive credentials:**
+- ❌ NEVER log RSA private keys (`GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`)
+- ❌ NEVER log unencrypted Google service account JSON
+- ❌ NEVER log decrypted service account credentials in console output
+- ❌ NEVER include private keys or unencrypted credentials in error messages
+- ✅ ALWAYS use encrypted credentials (`X-Google-Token` header with `RSA-ENCRYPTED:` prefix)
+- ✅ ALWAYS decrypt credentials only when needed and never log the decrypted result
+- ✅ ONLY log metadata (like client_email or project_id) if absolutely necessary for debugging
+
+**Google Service Account Credentials:**
+- Server accepts ONLY `X-Google-Token` header with encrypted credentials
+- Users must encrypt their service account JSON at `/google-service-encrypt`
+- Encryption uses RSA-4096 with public/private key pair
+- Private key is stored securely on the server (never exposed)
+- Encrypted credentials are safe to store in config files, environment variables, and version control
+
 ### Code Organization for MCP Tools
 
 **Folder Structure:**
