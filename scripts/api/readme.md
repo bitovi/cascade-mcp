@@ -5,19 +5,13 @@ CLI scripts for calling the Cascade MCP API directly from the command line.
 ## Quick Reference
 
 ```bash
-# 1. Get Google Drive user info
-node --import ./loader.mjs scripts/api/drive-about-user.ts
-
-# 2. Convert Google Doc to Markdown
-node --import ./loader.mjs scripts/api/drive-doc-to-markdown.ts "https://docs.google.com/document/d/YOUR_DOC_ID/edit"
-
-# 3. Analyze feature scope from Figma designs
+# 1. Analyze feature scope from Figma designs
 node --import ./loader.mjs scripts/api/analyze-feature-scope.ts https://bitovi.atlassian.net/browse/PLAY-123
 
-# 4. Generate shell stories from scope analysis
+# 2. Generate shell stories from scope analysis
 node --import ./loader.mjs scripts/api/write-shell-stories.ts https://bitovi.atlassian.net/browse/PLAY-123
 
-# 5. Write next story (run repeatedly to create all stories)
+# 3. Write next story (run repeatedly to create all stories)
 node --import ./loader.mjs scripts/api/write-next-story.ts https://bitovi.atlassian.net/browse/PLAY-123
 ```
 
@@ -33,14 +27,6 @@ FIGMA_TEST_PAT=your-figma-pat
 ANTHROPIC_API_KEY=your-anthropic-key
 API_BASE_URL=http://localhost:3000  # Optional, defaults to localhost:3000
 ```
-
-### Google Service Account (for Drive scripts)
-
-For `drive-about-user.ts` and `drive-doc-to-markdown.ts`:
-- Place `google.json` (service account credentials) in project root
-- Or use `--file` to specify a custom path
-- Or use `--json` to pass credentials as argument
-- See [docs/google-service-account.md](../../docs/google-service-account.md) for setup
 
 ### Validate Tokens
 

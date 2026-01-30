@@ -13,8 +13,6 @@ import { handleIdentifyFeatures } from './identify-features.js';
 import { handleAnalyzeFeatureScope } from './analyze-feature-scope.js';
 import { handleFigmaReviewDesign } from './figma-review-design.js';
 import { handleReviewWorkItem } from './review-work-item.js';
-import { handleDriveAboutUser } from './drive-about-user.js';
-import { handleDriveDocToMarkdown } from './drive-doc-to-markdown.js';
 
 /**
  * Register all REST API routes with the Express app
@@ -63,14 +61,6 @@ export function registerRestApiRoutes(app: Express): void {
   // Review work item completeness and post questions as comments
   app.post('/api/review-work-item', (req, res) => handleReviewWorkItem(req, res));
   console.log('  ✓ POST /api/review-work-item');
-  
-  // Get Google Drive user info using service account
-  app.post('/api/drive-about-user', (req, res) => handleDriveAboutUser(req, res));
-  console.log('  ✓ POST /api/drive-about-user');
-  
-  // Convert Google Docs to Markdown using service account
-  app.post('/api/drive-doc-to-markdown', (req, res) => handleDriveDocToMarkdown(req, res));
-  console.log('  ✓ POST /api/drive-doc-to-markdown');
   
   console.log('REST API routes registered successfully');
 }

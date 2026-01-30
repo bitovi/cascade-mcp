@@ -7,6 +7,7 @@ export interface ApiClientConfig {
   baseUrl: string;
   atlassianToken: string;
   figmaToken: string;
+  googleServiceAccountJson?: string; // Google service account JSON (optional)
   headers?: Record<string, string>; // Additional headers (e.g., X-LLM-Provider, X-LLM-Model, etc.)
   timeout?: number;
 }
@@ -38,10 +39,18 @@ export class ApiClient {
       ...this.config.headers, // Merge any additional headers
     };
     
+    // Add Google service account JSON if provided
+    if (this.config.googleServiceAccountJson) {
+      headers['X-Google-Json'] = this.config.googleServiceAccountJson;
+    }
+    
     const logHeaders: Record<string, string> = {
       'X-Atlassian-Token': this.config.atlassianToken?.substring(0, 20) + '...',
       'X-Figma-Token': this.config.figmaToken?.substring(0, 20) + '...',
     };
+    if (this.config.googleServiceAccountJson) {
+      logHeaders['X-Google-Json'] = 'service-account-json...';
+    }
     // Log additional headers (truncate values that look like API keys)
     if (this.config.headers) {
       for (const [key, value] of Object.entries(this.config.headers)) {
@@ -86,6 +95,7 @@ export function createApiClient(options?: Partial<ApiClientConfig>): ApiClient {
   const baseUrl = options?.baseUrl || process.env.API_BASE_URL || 'http://localhost:3000';
   const atlassianToken = options?.atlassianToken || process.env.ATLASSIAN_TEST_PAT || '';
   const figmaToken = options?.figmaToken || process.env.FIGMA_TEST_PAT || '';
+  const googleServiceAccountJson = options?.googleServiceAccountJson || process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
   
   // Build LLM headers from environment variables if not provided
   const headers: Record<string, string> = { ...options?.headers };
@@ -124,6 +134,7 @@ export function createApiClient(options?: Partial<ApiClientConfig>): ApiClient {
     baseUrl,
     atlassianToken,
     figmaToken,
+    googleServiceAccountJson,
     headers: Object.keys(headers).length > 0 ? headers : undefined,
     ...options,
   });

@@ -46,12 +46,13 @@ Options:
   --help, -h            Show this help message
 
 Environment Variables Required:
-  ATLASSIAN_TEST_PAT         Atlassian Personal Access Token
-  FIGMA_TEST_PAT             Figma Personal Access Token
-  LLM_PROVIDER               LLM provider (default: anthropic) - optional if --provider specified
-  LLM_MODEL                  LLM model ID - optional
-  LLMCLIENT_{PROVIDER}_API_KEY  Provider API key (e.g., LLMCLIENT_OPENAI_API_KEY)
-  API_BASE_URL               API base URL (default: http://localhost:3000)
+  ATLASSIAN_TEST_PAT                Atlassian Personal Access Token
+  FIGMA_TEST_PAT                    Figma Personal Access Token
+  GOOGLE_SERVICE_ACCOUNT_JSON       Google service account JSON (optional - enables Google Docs context)
+  LLM_PROVIDER                      LLM provider (default: anthropic) - optional if --provider specified
+  LLM_MODEL                         LLM model ID - optional
+  LLMCLIENT_{PROVIDER}_API_KEY      Provider API key (e.g., LLMCLIENT_OPENAI_API_KEY)
+  API_BASE_URL                      API base URL (default: http://localhost:3000)
 
 Example:
   # Use default provider (Anthropic)

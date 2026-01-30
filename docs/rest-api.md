@@ -19,11 +19,15 @@ All REST API endpoints require authentication via HTTP headers:
 - `X-Figma-Token` - Figma Personal Access Token
 - `X-Anthropic-Token` - Anthropic API key for AI-powered story generation
 
+**Optional Headers:**
+- `X-Google-Json` - Google service account JSON (enables Google Docs context in epics)
+
 **Example Headers:**
 ```bash
 X-Atlassian-Token: eW91ci1lbWFpbEBleGFtcGxlLmNvbTpBVEFUVDN4RmZHRjA...
 X-Figma-Token: figd_5L7d0...
 X-Anthropic-Token: sk-ant-api03-...
+X-Google-Json: {"type":"service_account","project_id":"..."}
 ```
 
 ### Obtaining Tokens
@@ -49,9 +53,9 @@ X-Anthropic-Token: sk-ant-api03-...
    - File content - Read only
    - File comments - Read only
 
-**Google Service Account** (for drive-about-user endpoint):
+**Google Service Account** :
 
-See the [Google Service Account Setup Guide](./google-service-account.md) for detailed instructions with screenshots.
+See the [Google Service Account Setup Guide](./google-service-account.md) for detailed instructions.
 
 ⚠️ **CRITICAL SECURITY WARNING**: Service account keys do NOT expire and provide full access to shared resources. The X-Google-Json header should ONLY be used in secure, server-to-server environments. Never expose this endpoint to client-side applications.
 
@@ -76,12 +80,15 @@ Generates prioritized shell stories from Figma designs linked in a Jira epic.
 **Endpoint:** `POST /api/write-shell-stories`
 
 **Headers:**
+
 - `Content-Type: application/json`
 - `X-Atlassian-Token` (required) - Base64-encoded `email:token` for Basic Auth
 - `X-Figma-Token` (required) - Figma Personal Access Token (starts with `figd_...`)
 - `X-Anthropic-Token` (required) - Anthropic API key (starts with `sk-ant-...`)
+- `X-Google-Json` (optional) - Google service account JSON (enables Google Docs context)
 
 **Request Body:**
+
 ```json
 {
   "epicKey": "PROJ-123",
@@ -164,12 +171,15 @@ Writes the next Jira story from shell stories in an epic. Validates dependencies
 **Endpoint:** `POST /api/write-next-story`
 
 **Headers:**
+
 - `Content-Type: application/json`
 - `X-Atlassian-Token` (required) - Base64-encoded `email:token` for Basic Auth
 - `X-Figma-Token` (required) - Figma Personal Access Token (starts with `figd_...`)
 - `X-Anthropic-Token` (required) - Anthropic API key (starts with `sk-ant-...`)
+- `X-Google-Json` (optional) - Google service account JSON (enables Google Docs context)
 
 **Request Body:**
+
 ```json
 {
   "epicKey": "PROJ-123",
@@ -299,91 +309,6 @@ while (true) {
 
 console.log(`Total stories written: ${storiesWritten}`);
 ```
-
----
-
-### Drive About User (Google Service Account)
-
-Get authenticated user information from Google Drive using service account credentials.
-
-🚨 **TEMPORARY PROOF OF CONCEPT** - The `X-Google-Json` header currently accepts unencrypted service account credentials and will be replaced with an encrypted key mechanism soon. Only use for internal testing and local development. See [Google Service Account Setup Guide](./google-service-account.md) for details.
-
-**Endpoint:** `POST /api/drive-about-user`
-
-**Headers:**
-- `Content-Type: application/json`
-- `X-Google-Json` (required) - Service account JSON as string
-
-**Request Body:**
-```json
-{}
-```
-
-**Parameters:**
-- None (empty request body)
-
-**Success Response (200 OK):**
-```json
-{
-  "user": {
-    "kind": "drive#user",
-    "displayName": "cascade-mcp-drive",
-    "emailAddress": "cascade-mcp-drive@project.iam.gserviceaccount.com",
-    "permissionId": "12345678901234567890",
-    "photoLink": "https://lh3.googleusercontent.com/...",
-    "me": true
-  }
-}
-```
-
-**Error Response (401 Unauthorized):**
-```json
-{
-  "error": "Missing credentials header",
-  "details": "Please provide credentials via X-Google-Json header (plaintext service account JSON)"
-}
-```
-
-**Example using curl:**
-```bash
-# Load service account JSON from file
-# Note: The JSON must be passed as a single-line string in the header
-curl -X POST http://localhost:3000/api/drive-about-user \
-  -H "Content-Type: application/json" \
-  -H "X-Google-Json: $(cat google.json | tr -d '\n')" \
-  -d '{}'
-
-# Alternative: Use a variable to avoid shell escaping issues
-GOOGLE_JSON=$(cat google.json | tr -d '\n')
-curl -X POST http://localhost:3000/api/drive-about-user \
-  -H "Content-Type: application/json" \
-  -H "X-Google-Json: $GOOGLE_JSON" \
-  -d '{}'
-```
-
-**Example using Node.js:**
-```javascript
-const fs = require('fs');
-
-// Load service account JSON
-const serviceAccountJson = fs.readFileSync('./google.json', 'utf-8');
-
-const response = await fetch('http://localhost:3000/api/drive-about-user', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'X-Google-Json': serviceAccountJson,
-  },
-  body: JSON.stringify({}),
-});
-
-const data = await response.json();
-console.log(`User: ${data.user.displayName}`);
-console.log(`Email: ${data.user.emailAddress}`);
-console.log(`Permission ID: ${data.user.permissionId}`);
-```
-
-For more information, see the [Google Service Account Setup Guide](./google-service-account.md).
 
 ---
 

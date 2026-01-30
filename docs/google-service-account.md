@@ -100,6 +100,34 @@ git status  # google.json should NOT appear in untracked files
 google.json
 ```
 
+### Step 6: Add to Environment Variables
+
+**For local development**, add the service account JSON to your `.env` file:
+
+```bash
+# Option 1: Reference the file path (recommended for development)
+# Read the file and convert to single-line JSON
+GOOGLE_SERVICE_ACCOUNT_JSON='{"type":"service_account","project_id":"your-project-id","private_key_id":"abc123...","private_key":"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n","client_email":"cascade-mcp-drive@your-project.iam.gserviceaccount.com",...}'
+```
+
+**To convert the JSON file to a single-line string:**
+
+```bash
+# macOS/Linux
+cat google.json | jq -c . | sed "s/'/'\\\\''/g"
+
+# Or manually:
+# 1. Open google.json
+# 2. Copy all content
+# 3. Remove all line breaks (make it one line)
+# 4. Escape any single quotes if present
+# 5. Wrap in single quotes
+```
+
+**For REST API usage**, you can either:
+1. Use the environment variable (recommended for CLI scripts)
+2. Pass directly in the `X-Google-Json` header (for programmatic access)
+
 ## Service Account JSON Structure
 
 The downloaded JSON file contains:
@@ -154,47 +182,57 @@ Service accounts can only access Google Drive files that are explicitly shared w
 
 ## Testing the Service Account
 
-### Direct Client Test
+### Option 1: Using CLI Scripts
 
-Test the service account credentials directly:
+Test with the analyze-feature-scope or write-shell-stories CLI scripts:
 
 ```bash
-node --import ./loader.mjs scripts/api/drive-about-user.ts
+# Ensure GOOGLE_SERVICE_ACCOUNT_JSON is in your .env file
+node --import ./loader.mjs scripts/api/analyze-feature-scope.ts https://bitovi.atlassian.net/browse/EPIC-123
+
+# Or set inline (for testing)
+GOOGLE_SERVICE_ACCOUNT_JSON='{"type":"service_account",...}' \
+  node --import ./loader.mjs scripts/api/write-shell-stories.ts https://bitovi.atlassian.net/browse/EPIC-123
 ```
 
-This will display the service account's email and permission ID.
+### Option 2: Using the Browser MCP Client
 
-### API Endpoint Test
+The service account credentials can be tested using the Google Drive MCP tools through the browser-based MCP client:
 
-**Test with curl:**
+1. Start the server: `npm run start-local`
+2. Open http://localhost:3000
+3. The server will use `GOOGLE_SERVICE_ACCOUNT_JSON` from your `.env` file
+
+### Option 3: Using REST API
+
+Test with curl:
+
 ```bash
-# Make sure server is running: npm run dev
+# Read the service account JSON
+GOOGLE_JSON=$(cat google.json | jq -c .)
 
-curl -X POST http://localhost:3000/api/drive-about-user \
+curl -X POST http://localhost:3000/api/analyze-feature-scope \
   -H "Content-Type: application/json" \
-  -H "X-Google-Json: $(cat google.json)" \
-  -d '{}'
+  -H "X-Atlassian-Token: <base64-token>" \
+  -H "X-Figma-Token: figd_..." \
+  -H "X-Anthropic-Token: sk-ant-..." \
+  -H "X-Google-Json: $GOOGLE_JSON" \
+  -d '{"epicKey": "EPIC-123", "siteName": "bitovi"}'
 ```
 
-**Test with Node.js:**
-```javascript
-const fs = require('fs');
+### What to Expect
 
-const serviceAccountJson = fs.readFileSync('./google.json', 'utf-8');
+When working correctly, the tools will:
+1. Extract Google Drive links from the Jira epic description
+2. Fetch Google Docs using the service account
+3. Convert docs to markdown
+4. Include relevant docs as context in AI prompts
+5. Use doc content to generate better stories/analysis
 
-const response = await fetch('http://localhost:3000/api/drive-about-user', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'X-Google-Json': serviceAccountJson,
-  },
-  body: JSON.stringify({}),
-});
-
-const data = await response.json();
-console.log(`User: ${data.user.displayName}`);
-console.log(`Email: ${data.user.emailAddress}`);
-```
+**Troubleshooting:**
+- If no Google Docs are found, verify the epic has Google Drive links
+- If access is denied, verify the service account has access to the files
+- Check logs for "📄 Google Docs for analyze-feature-scope: N" messages
 
 ## Revoking Service Account Keys
 
