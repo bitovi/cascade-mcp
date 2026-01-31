@@ -319,7 +319,8 @@ export async function executeWriteShellStories(
   console.log('  Phase 4: Downloading images and analyzing screens...');
   
   // Improved progress message: Figma context summary (per spec 040)
-  await notify(`🤖 Analyzing Figma: ${screens.length} screen(s), ${allNotes.length} note(s), ${commentsCount} comment(s)...`);
+  const screenNames = screens.map(s => s.name).join(', ');
+  await notify(`🤖 Analyzing Figma: ${screens.length} screen(s) [${screenNames}], ${allNotes.length} note(s), ${commentsCount} comment(s)...`);
   
   const analysisResult = await regenerateScreenAnalyses({
     generateText,
