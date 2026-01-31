@@ -198,8 +198,15 @@ export async function regenerateScreenAnalyses(
   }
   
   // Use Promise.all - queue wrapper handles sequencing for MCP sampling
-  const analysisPromises = screensToAnalyze.map(async (screen) => {
+  const isSequential = !generateText.supportsParallelRequests;
+  
+  const analysisPromises = screensToAnalyze.map(async (screen, index) => {
     const originalIndex = screens.indexOf(screen);
+    
+    // Send progress notification BEFORE analysis starts (only for sequential execution)
+    if (notify && isSequential) {
+      await notify(`📱 Analyzing screen ${index + 1} of ${screensToAnalyze.length}: ${screen.name}...`);
+    }
     
     const result = await analyzeScreen(screen, {
       generateText,
@@ -213,7 +220,7 @@ export async function regenerateScreenAnalyses(
       totalScreens: screens.length
     });
     
-    // Notify after each completes
+    // Notify after each completes (for both parallel and sequential)
     if (notify && result.analyzed) {
       await notify(`✅ Analyzed: ${screen.name}`);
     }
