@@ -1,43 +1,70 @@
-# Analyze Figma Scope Tool
+# figma-review-design
 
-This tool provides AI-powered analysis of Figma designs without requiring Jira integration. It generates scope analysis with feature areas, implementation priorities, and questions for the design team.
+Quick prompt:
 
-## Overview
+> ```
+> MCP call figma-review-design with https://www.figma.com/design/abc123/MyDesign?node-id=1-1
+> ```
 
-The `analyze-figma-scope` tool allows you to:
-- Analyze Figma designs independently of Jira
-- Read and incorporate existing Figma comments as context
-- Post AI-generated questions back to Figma as comments
-- Provide optional additional context to guide the analysis
+## Purpose
 
-## Features
+The `figma-review-design` tool posts AI-generated questions as Figma comments to clarify design requirements. It reviews Figma screens, generates questions about ambiguities and missing details, then posts those questions directly on the relevant frames for designers to answer.
 
-### Standalone Figma Analysis
-Unlike `analyze-feature-scope` which requires a Jira epic, this tool works directly with Figma URLs and doesn't require Atlassian authentication.
+**Primary use cases:**
+- Post AI-generated questions as Figma comments to gather clarifications from designers
+- Surface ambiguities and missing requirements before implementation begins
+- Enable async collaboration by putting questions directly where designers work
 
-### Comment Integration
-- **Read Comments**: Fetches existing comments from Figma files and uses them as context for the AI analysis
-- **Post Questions**: Generates clarifying questions and posts them back to Figma as comments
-- **Thread Awareness**: Groups comments into threads and preserves conversation context
+**What problem it solves:**
+- **Missing requirements discovered late**: Questions appear during development instead of during design review
+- **Context switching**: Developers have to leave Figma to ask questions elsewhere
+- **Incomplete design review**: Human reviewers miss edge cases and ambiguities that AI can catch
+- **Comment overload**: Automatically consolidates questions to respect Figma's rate limits
 
-### Rate Limit Handling
-- Respects Figma's 25 requests/minute rate limit for comment posting
-- Automatically consolidates questions when count exceeds threshold
-- Includes retry logic with exponential backoff
+## API Reference
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `figmaUrls` | string[] | ✅ Yes | Array of Figma frame/screen URLs to analyze (e.g., `["https://www.figma.com/design/abc123/MyDesign?node-id=1-1"]`) |
+| `contextDescription` | string | Optional | Additional context to guide the analysis (e.g., "Mobile app onboarding flow for task management") |
+
+### Returns
+
+The tool returns a structured response with:
+
+```typescript
+{
+  content: [
+    {
+      type: "text",
+      text: string  // Markdown-formatted scope analysis
+    }
+  ]
+}
+```
+
+**Output format includes:**
+- **Feature Areas**: Grouped by screen/function with Figma links
+- **In-Scope Items (☐)**: Features clearly visible in designs
+- **Low Priority Items (⏬)**: Nice-to-have features
+- **Out-of-Scope Items (❌)**: Items explicitly not included
+- **Questions (❓)**: Clarifications posted as Figma comments
 
 ## Usage
 
-### MCP Tool
+### MCP Interface
 
 ```json
 {
-  "tool": "analyze-figma-scope",
-  "params": {
+  "name": "figma-review-design",
+  "arguments": {
     "figmaUrls": [
       "https://www.figma.com/design/abc123/MyDesign?node-id=1-1",
       "https://www.figma.com/design/abc123/MyDesign?node-id=2-2"
     ],
-    "contextDescription": "This is a mobile app for task management. Focus on the onboarding flow."
+    "contextDescription": "Mobile app onboarding flow"
   }
 }
 ```
@@ -45,75 +72,37 @@ Unlike `analyze-feature-scope` which requires a Jira epic, this tool works direc
 ### REST API
 
 ```bash
-curl -X POST http://localhost:3000/api/analyze-figma-scope \
+curl -X POST http://localhost:3000/api/figma-review-design \
   -H "Content-Type: application/json" \
   -H "X-Figma-Token: your-figma-token" \
   -H "X-Anthropic-Token: your-anthropic-token" \
   -d '{
     "figmaUrls": ["https://www.figma.com/design/abc123/MyDesign?node-id=1-1"],
-    "contextDescription": "Mobile task management app onboarding"
+    "contextDescription": "Mobile task management app"
   }'
 ```
 
-## Parameters
+## How It Works
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `figmaUrls` | `string[]` | Yes | Array of Figma frame/screen URLs to analyze |
-| `contextDescription` | `string` | No | Additional context to guide the analysis |
+1. **Fetch Design Context**: Downloads Figma screens and existing comments
+2. **AI Analysis**: Generates scope analysis with feature areas and questions
+3. **Post Questions**: Creates Figma comments for clarifications (respects rate limits)
+4. **Return Analysis**: Provides markdown-formatted scope document
 
-## Output
+### Comment Integration
 
-The tool returns a scope analysis in markdown format including:
-
-- **Feature Areas**: Grouped by screen/function
-- **In-Scope Items (☐)**: Features clearly visible in designs
-- **Low Priority Items (⏬)**: Nice-to-have features
-- **Out-of-Scope Items (❌)**: Items explicitly not included
-- **Questions (❓)**: Clarifications needed from design team
+- **Read Comments**: Fetches existing comments and uses them as context
+- **Post Questions**: Generated questions appear as Figma comments on relevant screens
+- **Thread Awareness**: Preserves conversation context and grouping
+- **Rate Limiting**: Automatically handles Figma's 25 requests/minute limit
 
 ## Environment Variables
 
 | Variable | Description |
 |----------|-------------|
-| `SAVE_FIGMA_COMMENTS_TO_CACHE` | Set to `true` or `1` to save fetched comments to debug cache files |
-
-## Debug Output
-
-When `SAVE_FIGMA_COMMENTS_TO_CACHE=true`, the tool writes a `comments.md` file to the Figma file cache directory containing:
-
-- Comment summary statistics
-- Comments grouped by user
-- Full thread details with positions and timestamps
-
-## File Structure
-
-```
-analyze-figma-scope/
-├── index.ts                  # Tool registration export
-├── analyze-figma-scope.ts    # MCP tool wrapper
-├── core-logic.ts             # Shared business logic
-├── prompt-figma-analysis.ts  # AI prompt generation
-├── figma-comment-utils.ts    # Comment fetch/post utilities
-└── README.md                 # This file
-```
-
-## Dependencies
-
-### Required
-- Figma authentication (OAuth or PAT via X-Figma-Token)
-- LLM provider (MCP sampling or X-Anthropic-Token header)
-
-### Optional
-- Atlassian authentication (not required for standalone analysis)
+| `SAVE_FIGMA_COMMENTS_TO_CACHE` | Set to `true` or `1` to save fetched comments to debug cache files at `cache/figma-files/{fileKey}/comments.md` |
 
 ## Related Tools
 
-- **analyze-feature-scope**: Full Jira epic analysis with Figma integration
-- **write-shell-stories**: Generates shell stories from scope analysis (uses comment context)
-
-## Error Handling
-
-- **Rate Limit (429)**: Retries with exponential backoff, then consolidates if needed
-- **Missing Auth**: Clear error messages indicating which auth is required
-- **Invalid URLs**: Validates Figma URL format before processing
+- **write-shell-stories**: Generates shell stories from Jira epics with Figma designs (includes automatic scope analysis)
+- **analyze-feature-scope** (deprecated): Use `write-shell-stories` instead for Jira-integrated analysis

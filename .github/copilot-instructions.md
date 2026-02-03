@@ -37,7 +37,9 @@
 
 **Utility Function Placement:**
 - **General utilities** (date formatting, string manipulation) → `server/utils/` (to be created as needed)
-- **Provider-specific utilities** (Jira helpers, Figma helpers) → `server/providers/{provider}/` directory
+- **Provider-specific utilities** (Jira/Atlassian API helpers, Figma helpers, Google helpers) → `server/providers/{provider}/` directory
+  - Atlassian object helpers (issue key parsing, ADF manipulation, Jira-specific utilities) → `server/providers/atlassian/`
+  - Functions that only operate on Atlassian data structures belong in the Atlassian provider folder
 - **Tool-specific but reusable** (parsers, validators) → Separate module in tool folder
 
 **Example Structure:**
@@ -46,6 +48,11 @@ server/providers/combined/tools/write-next-story/
 ├── index.ts                    # export { registerWriteNextStoryTool }
 ├── write-next-story.ts         # Main tool + workflow step functions at bottom
 └── shell-story-parser.ts       # Semi-specific helper (parser logic)
+
+server/providers/atlassian/
+├── atlassian-api-client.ts     # API client
+├── atlassian-helpers.ts        # Jira API helpers
+└── jira-issue-helpers.ts       # Issue key parsing, Jira object utilities
 ```
 
 ## Architecture Overview

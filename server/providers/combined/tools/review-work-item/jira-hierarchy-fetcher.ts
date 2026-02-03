@@ -6,7 +6,7 @@
  */
 
 import type { AtlassianClient } from '../../../atlassian/atlassian-api-client.js';
-import { getJiraIssue, getJiraProject } from '../../../atlassian/atlassian-helpers.js';
+import { getJiraIssue, getJiraProject, extractProjectKeyFromIssueKey } from '../../../atlassian/atlassian-helpers.js';
 import {
   type JiraIssue,
   type JiraProject,
@@ -60,6 +60,105 @@ export interface FetchHierarchyOptions {
 }
 
 // ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Fetch parents and blockers in parallel where possible
+ * 
+ * Strategy:
+ * 1. Fetch all parents recursively (must be sequential due to parent chain)
+ * 2. Extract blocker links from target AND parents
+ * 3. Fetch all blockers in parallel
+ * 4. Fetch all blocking in parallel
+ * 
+ * @param target - The target issue
+ * @param client - Atlassian API client
+ * @param cloudId - Cloud ID for the Jira site
+ * @param maxDepth - Maximum depth for parent traversal
+ * @param fetchedKeys - Set of already-fetched issue keys
+ * @param notify - Progress notification callback
+ * @returns Tuple of [parents, blockers, blocking]
+ */
+async function fetchParentsAndBlockers(
+  target: JiraIssue,
+  client: AtlassianClient,
+  cloudId: string,
+  maxDepth: number,
+  fetchedKeys: Set<string>,
+  notify: (message: string) => Promise<void>
+): Promise<[JiraIssue[], JiraIssue[], JiraIssue[]]> {
+  
+  // Step 1: Recursively fetch parents (must be sequential)
+  const parents: JiraIssue[] = [];
+  let currentItem = target;
+  let depth = 0;
+  
+  while (currentItem.fields.parent?.key && depth < maxDepth) {
+    const parentKey = currentItem.fields.parent.key;
+    
+    if (fetchedKeys.has(parentKey)) {
+      console.log(`  ⚠️ Circular reference detected at ${parentKey}, stopping`);
+      break;
+    }
+    
+    await notify(`Fetching parent ${parentKey}...`);
+    const parentResponse = await getJiraIssue(client, cloudId, parentKey, HIERARCHY_FIELDS);
+    const parent = await parentResponse.json() as JiraIssue;
+    parents.push(parent);
+    fetchedKeys.add(parent.key);
+    
+    currentItem = parent;
+    depth++;
+  }
+  
+  console.log(`  ✅ Fetched ${parents.length} parents`);
+  
+  // Step 2: Extract blocker links from target AND parents
+  const allLinks = [target, ...parents].flatMap(item => parseIssueLinks(item.fields.issuelinks));
+  
+  // Step 3: Group links by type and fetch in parallel
+  const blockerLinks = allLinks.filter(link => 
+    link.type.toLowerCase().includes('block') && 
+    link.direction === 'inward' &&
+    !fetchedKeys.has(link.linkedIssueKey)
+  );
+  
+  const blockingLinks = allLinks.filter(link => 
+    link.type.toLowerCase().includes('block') && 
+    link.direction === 'outward' &&
+    !fetchedKeys.has(link.linkedIssueKey)
+  );
+  
+  // Fetch all blockers in parallel
+  const blockerPromises = blockerLinks.map(async (link) => {
+    await notify(`Fetching blocker ${link.linkedIssueKey}...`);
+    const response = await getJiraIssue(client, cloudId, link.linkedIssueKey, HIERARCHY_FIELDS);
+    const blocker = await response.json() as JiraIssue;
+    fetchedKeys.add(blocker.key);
+    return blocker;
+  });
+  
+  // Fetch all blocking in parallel
+  const blockingPromises = blockingLinks.map(async (link) => {
+    await notify(`Fetching blocked item ${link.linkedIssueKey}...`);
+    const response = await getJiraIssue(client, cloudId, link.linkedIssueKey, HIERARCHY_FIELDS);
+    const blocked = await response.json() as JiraIssue;
+    fetchedKeys.add(blocked.key);
+    return blocked;
+  });
+  
+  const [blockers, blocking] = await Promise.all([
+    Promise.all(blockerPromises),
+    Promise.all(blockingPromises)
+  ]);
+  
+  console.log(`  ✅ Fetched ${blockers.length} blockers, ${blocking.length} blocking`);
+  
+  return [parents, blockers, blocking];
+}
+
+// ============================================================================
 // Main Export
 // ============================================================================
 
@@ -93,80 +192,41 @@ export async function fetchJiraIssueHierarchy(
   // Track fetched items to avoid duplicates
   const fetchedKeys = new Set<string>();
   
-  // Step 1: Fetch target issue
-  // Note: Caller (write-story) already sends the initial "Fetching" notification
-  const targetResponse = await getJiraIssue(client, cloudId, issueKey, HIERARCHY_FIELDS);
+  // IMMEDIATE: Extract project key from issue key (no API call)
+  const projectKey = extractProjectKeyFromIssueKey(issueKey);
+  console.log(`  Extracted project key: ${projectKey}`);
+  
+  // PARALLEL BATCH 1: Fetch target issue and project simultaneously
+  await notify(`Fetching ${issueKey} and project ${projectKey}...`);
+  
+  const [targetResponse, projectResponse] = await Promise.all([
+    getJiraIssue(client, cloudId, issueKey, HIERARCHY_FIELDS),
+    getJiraProject(client, cloudId, projectKey)
+  ]);
+  
   const target = await targetResponse.json() as JiraIssue;
   fetchedKeys.add(target.key);
   
-  // Step 2: Recursively fetch parents
-  const parents: JiraIssue[] = [];
-  let currentItem = target;
-  let depth = 0;
-  
-  while (currentItem.fields.parent?.key && depth < maxDepth) {
-    const parentKey = currentItem.fields.parent.key;
-    
-    if (fetchedKeys.has(parentKey)) {
-      console.log(`  ⚠️ Circular reference detected at ${parentKey}, stopping`);
-      break;
-    }
-    
-    await notify(`Fetching parent ${parentKey}...`);
-    const parentResponse = await getJiraIssue(client, cloudId, parentKey, HIERARCHY_FIELDS);
-    const parent = await parentResponse.json() as JiraIssue;
-    parents.push(parent);
-    fetchedKeys.add(parent.key);
-    
-    currentItem = parent;
-    depth++;
-  }
-  
-  // Step 3: Fetch blockers and blocked-by issues
-  const blockers: JiraIssue[] = [];
-  const blocking: JiraIssue[] = [];
-  
-  // Find blocking relationships from target and all parents
-  const allLinks = [target, ...parents].flatMap(item => parseIssueLinks(item.fields.issuelinks));
-  
-  for (const link of allLinks) {
-    if (fetchedKeys.has(link.linkedIssueKey)) {
-      continue; // Already fetched
-    }
-    
-    if (link.type.toLowerCase().includes('block')) {
-      if (link.direction === 'inward') {
-        // This issue IS blocked BY link.linkedIssueKey (blocker)
-        await notify(`Fetching blocker ${link.linkedIssueKey}...`);
-        const blockerResponse = await getJiraIssue(client, cloudId, link.linkedIssueKey, HIERARCHY_FIELDS);
-        const blocker = await blockerResponse.json() as JiraIssue;
-        blockers.push(blocker);
-        fetchedKeys.add(blocker.key);
-      } else if (link.direction === 'outward') {
-        // This issue BLOCKS link.linkedIssueKey
-        await notify(`Fetching blocked item ${link.linkedIssueKey}...`);
-        const blockedResponse = await getJiraIssue(client, cloudId, link.linkedIssueKey, HIERARCHY_FIELDS);
-        const blocked = await blockedResponse.json() as JiraIssue;
-        blocking.push(blocked);
-        fetchedKeys.add(blocked.key);
-      }
-    }
-  }
-  
-  // Step 4: Fetch project description
-  const projectKey = target.fields.project?.key;
-  if (!projectKey) {
-    throw new Error(`Issue ${issueKey} has no project key`);
-  }
-  
-  await notify(`Fetching project ${projectKey}...`);
-  const projectResponse = await getJiraProject(client, cloudId, projectKey);
   const projectData = await projectResponse.json() as { key: string; name: string; description?: string | null };
   const project: JiraProject = {
     key: projectData.key,
     name: projectData.name,
     description: projectData.description || null
   };
+  
+  console.log(`  ✅ Target and project fetched in parallel`);
+  
+  // PARALLEL BATCH 2: Fetch parents and blockers
+  await notify(`Fetching parents and blockers...`);
+  
+  const [parents, blockers, blocking] = await fetchParentsAndBlockers(
+    target,
+    client,
+    cloudId,
+    maxDepth,
+    fetchedKeys,
+    notify
+  );
   
   // Combine all items
   const allItems = [target, ...parents, ...blockers, ...blocking];

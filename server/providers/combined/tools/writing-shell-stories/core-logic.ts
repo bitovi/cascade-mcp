@@ -19,11 +19,11 @@ import * as fs from 'fs/promises';
 import type { ToolDependencies } from '../types.js';
 import type { Screen } from './screen-analyzer.js';
 import { getDebugDir, getBaseCacheDir } from './temp-directory-manager.js';
-import { getFigmaFileCachePath } from '../../../figma/figma-cache.js';
+import { getFigmaFileCachePath } from '../../../figma/screen-analyses-workflow/figma-cache.js';
 import { setupFigmaScreens } from './figma-screen-setup.js';
 import { setupConfluenceContext, type ConfluenceDocument } from '../shared/confluence-setup.js';
 import { setupGoogleDocsContext, type GoogleDocDocument } from '../shared/google-docs-setup.js';
-import { regenerateScreenAnalyses } from '../shared/screen-analysis-regenerator.js';
+import { analyzeScreens, type AnalyzedFrame } from '../../../figma/screen-analyses-workflow/index.js';
 import {
   generateShellStoryPrompt,
   SHELL_STORY_SYSTEM_PROMPT,
@@ -315,26 +315,31 @@ export async function executeWriteShellStories(
   // PHASE 4: Download images and analyze screens
   // ==========================================
   // Screen analysis must happen BEFORE scope analysis because generateScopeAnalysis()
-  // reads the cached *.analysis.md files created by regenerateScreenAnalyses()
+  // reads the cached *.analysis.md files
   console.log('  Phase 4: Downloading images and analyzing screens...');
   
   // Improved progress message: Figma context summary (per spec 040)
   const screenNames = screens.map(s => s.name).join(', ');
   await notify(`🤖 Analyzing Figma: ${screens.length} screen(s) [${screenNames}], ${allNotes.length} note(s), ${commentsCount} comment(s)...`);
   
-  const analysisResult = await regenerateScreenAnalyses({
-    generateText,
+  // Use consolidated screen-analyses-workflow
+  const figmaUrlsForAnalysis = screens.map(s => s.url);
+  const analysisWorkflowResult = await analyzeScreens(
+    figmaUrlsForAnalysis,
     figmaClient,
-    screens,
-    allFrames,
-    allNotes,
-    figmaFileKey,
-    nodesDataMap,
-    epicContext: epicWithoutShellStoriesMarkdown,
-    // Don't pass notify - we'll report after with combined stats
-  });
+    generateText,
+    {
+      analysisOptions: {
+        contextMarkdown: epicWithoutShellStoriesMarkdown,
+      },
+      notify: async (msg: string) => {}, // Don't pass notify - we'll report after with combined stats
+    }
+  );
   
-  const { analyzedScreens, cachedScreens } = analysisResult;
+  // Count cached vs newly analyzed
+  const cachedScreens = analysisWorkflowResult.frames.filter(f => f.cached).length;
+  const analyzedScreens = analysisWorkflowResult.frames.filter(f => !f.cached).length;
+  
   console.log(`  Phase 4 complete: ${analyzedScreens}/${screens.length} screens analyzed`);
   
   // Improved cache status message (per spec 040)

@@ -327,6 +327,9 @@ Update `/server/readme.md` or create `/test/e2e/README.md` with:
 
 2. **CLI Library Preference**: Use `minimist` for argument parsing
 
+
+Do this
+
 3. **Test Organization**: Keep integrated workflow test as primary E2E test
 
 4. **Error Handling in CLI Scripts**: Fail fast - no automatic retries

@@ -46,10 +46,11 @@ import {
   type FigmaNodeMetadata,
   type FigmaImageDownloadResult,
 } from '../../../figma/figma-helpers.js';
-import { processFigmaUrls } from '../../../combined/tools/writing-shell-stories/figma-screen-setup.js';
-import { getFigmaFileCachePath, ensureValidCacheForFigmaFile } from '../../../figma/figma-cache.js';
-import { regenerateScreenAnalyses } from '../../../combined/tools/shared/screen-analysis-regenerator.js';
-import { notesToScreenAnnotations } from '../../../combined/tools/writing-shell-stories/note-text-extractor.js';
+import {
+  analyzeScreens,
+  type AnalyzedFrame,
+  type FrameAnalysisResult,
+} from '../../../figma/screen-analyses-workflow/index.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -155,19 +156,45 @@ export async function executeAnalyzeFigmaScope(
   }
 
   // ==========================================
-  // STEP 3: Process Figma URLs (extract frames, notes, spatial associations)
+  // STEP 3: Analyze screens using consolidated workflow
   // ==========================================
-  await notify('🖼️ Processing Figma screens and notes...');
+  await notify('🖼️ Analyzing Figma screens...');
 
-  const {
-    allFrames,
-    allNotes,
-    screens,
-    figmaFileKey: primaryFileKey,
-    nodesDataMap,
-  } = await processFigmaUrls(figmaUrls, figmaClient);
+  let analysisResult: FrameAnalysisResult;
+  try {
+    // Use consolidated screen-analyses-workflow
+    analysisResult = await analyzeScreens(
+      figmaUrls,
+      figmaClient,
+      generateText,
+      {
+        analysisOptions: {
+          contextMarkdown: contextDescription,
+        },
+        notify,
+      }
+    );
 
-  // Build framesToAnalyze array with file key context
+    console.log(`  ✅ Analyzed ${analysisResult.frames.length} screens`);
+  } catch (error: any) {
+    errors.push(`Failed to analyze screens: ${error.message}`);
+    console.error(`  ❌ Screen analysis failed:`, error.message);
+    return {
+      analysis: 'Failed to analyze any screens.',
+      questions: [],
+      errors,
+    };
+  }
+
+  if (analysisResult.frames.length === 0) {
+    return {
+      analysis: 'No frames found in the provided Figma URLs.',
+      questions: [],
+      errors: errors.length > 0 ? errors : undefined,
+    };
+  }
+
+  // Build framesToAnalyze array for comment posting (extract from AnalyzedFrame[])
   const framesToAnalyze: Array<{
     fileKey: string;
     nodeId: string;
@@ -177,119 +204,68 @@ export async function executeAnalyzeFigmaScope(
     y?: number;
     width?: number;
     height?: number;
-  }> = [];
+  }> = analysisResult.frames.map(frame => ({
+    fileKey: fileKeys[0], // Use primary file key
+    nodeId: frame.nodeId,
+    name: frame.frameName || frame.name,
+    url: frame.url,
+    x: frame.position?.x,
+    y: frame.position?.y,
+    width: frame.position?.width,
+    height: frame.position?.height,
+  }));
 
-  const screenFrameMap = new Map<string, { nodeId: string; name: string }>();
+  // Convert AnalyzedFrame[] to screenAnalyses format for questions generation
+  const screenAnalyses: Array<{ name: string; content: string; url: string; nodeId: string }> = 
+    analysisResult.frames.map(frame => ({
+      name: frame.frameName || frame.name,
+      content: frame.analysis || '',
+      url: frame.url,
+      nodeId: frame.nodeId,
+    }));
 
-  // Convert allFrames to framesToAnalyze format
-  for (const frame of allFrames) {
-    const bbox = frame.absoluteBoundingBox;
-    const fileKey = fileKeys[0]; // Use primary file key from parsed URLs
-    
-    framesToAnalyze.push({
-      fileKey,
-      nodeId: frame.id,
-      name: frame.name,
-      url: `${figmaUrls[0].split('?')[0]}?node-id=${frame.id.replace(/:/g, '-')}`,
-      x: bbox?.x,
-      y: bbox?.y,
-      width: bbox?.width,
-      height: bbox?.height,
-    });
-    screenFrameMap.set(frame.name, { nodeId: frame.id, name: frame.name });
-  }
+  // Extract comment contexts from annotations (already associated by workflow)
+  const commentContexts: ScreenAnnotation[] = analysisResult.frames.flatMap(frame =>
+    frame.annotations
+      .filter(a => a.type === 'comment')
+      .map(a => ({
+        screenName: frame.frameName || frame.name,
+        screenUrl: frame.url,
+        screenId: frame.nodeId,
+        annotation: a.content,
+        author: a.author,
+        source: 'comments' as const,
+        markdown: a.author ? `**${a.author}:** ${a.content}` : a.content,
+      }))
+  );
 
-  console.log(`  📐 Found ${framesToAnalyze.length} frames to analyze`);
-  console.log(`  📝 Found ${allNotes.length} notes (spatially associated with ${screens.length} screens)`);
+  // Add notes from annotations
+  const noteContexts: ScreenAnnotation[] = analysisResult.frames.flatMap(frame =>
+    frame.annotations
+      .filter(a => a.type === 'note')
+      .map(a => ({
+        screenName: frame.frameName || frame.name,
+        screenUrl: frame.url,
+        screenId: frame.nodeId,
+        annotation: a.content,
+        author: a.author,
+        source: 'notes' as const,
+        markdown: a.author ? `**${a.author}:** ${a.content}` : a.content,
+      }))
+  );
 
-  if (framesToAnalyze.length === 0) {
-    return {
-      analysis: 'No frames found in the provided Figma URLs.',
-      questions: [],
-      errors: errors.length > 0 ? errors : undefined,
-    };
-  }
-
-  // ==========================================
-  // STEP 4: Format existing comments as context
-  // ==========================================
-  const commentContexts: ScreenAnnotation[] = [];
-
-  for (const [fileKey, comments] of commentsMap) {
-    if (comments.length === 0) continue;
-
-    // Get document tree for spatial containment checks on child node comments
-    const fileData = fileDataMap.get(fileKey);
-    const documentTree = fileData?.document;
-
-    const threads = groupCommentsIntoThreads(comments);
-    const result = formatCommentsForContext(threads, framesToAnalyze, documentTree);
-
-    for (const ctx of result.contexts) {
-      commentContexts.push(ctx);
+  commentContexts.push(...noteContexts);
+  console.log(`  📝 Total contexts (${commentContexts.length}): ${commentContexts.filter(c => c.source === 'comments').length} comments + ${commentContexts.filter(c => c.source === 'notes').length} notes`);
+  
+  // Log details of each context
+  if (commentContexts.length > 0) {
+    console.log(`  📋 Context details:`);
+    for (const ctx of commentContexts) {
+      const contentPreview = ctx.markdown.length > 100 
+        ? `${ctx.markdown.substring(0, 100)}...` 
+        : ctx.markdown;
+      console.log(`    ${ctx.source === 'comments' ? '💬' : '📝'} [${ctx.screenName}]: ${contentPreview}`);
     }
-  }
-
-  console.log(`  📝 Prepared ${commentContexts.length} comment contexts`);
-
-  // Add notes as context (using shared notesToScreenAnnotations)
-  const noteAnnotations = notesToScreenAnnotations(screens, allNotes);
-  commentContexts.push(...noteAnnotations);
-
-  console.log(`  📝 Total contexts (comments + notes): ${commentContexts.length}`);
-
-  // ==========================================
-  // STEP 5: Download images and analyze screens (using shared regenerator)
-  // ==========================================
-  await notify(`🎨 Analyzing ${framesToAnalyze.length} screens with AI...`);
-
-  const screenAnalyses: Array<{ name: string; content: string; url: string; nodeId: string }> = [];
-
-  try {
-    // Use shared screen analysis pipeline (includes semantic XML support)
-    const { analyzedScreens } = await regenerateScreenAnalyses({
-      generateText,
-      figmaClient,
-      screens,
-      allFrames,
-      allNotes,
-      figmaFileKey: primaryFileKey,
-      nodesDataMap,
-      epicContext: contextDescription,
-      notify: async (msg) => await notify(msg),
-    });
-
-    console.log(`  ✅ Analyzed ${analyzedScreens} screens`);
-
-    // Load analysis files from cache
-    const cachePath = getFigmaFileCachePath(primaryFileKey);
-    for (const screen of screens) {
-      const filename = screen.filename || screen.name;
-      const analysisPath = path.join(cachePath, `${filename}.analysis.md`);
-      
-      try {
-        const analysisContent = await fs.readFile(analysisPath, 'utf-8');
-        screenAnalyses.push({
-          name: screen.name,
-          content: analysisContent,
-          url: screen.url,
-          nodeId: screen.nodeId,
-        });
-      } catch (readError: any) {
-        console.warn(`  ⚠️ Could not read analysis for ${screen.name}: ${readError.message}`);
-      }
-    }
-  } catch (error: any) {
-    errors.push(`Failed to analyze screens: ${error.message}`);
-    console.error(`  ❌ Screen analysis failed:`, error.message);
-  }
-
-  if (screenAnalyses.length === 0) {
-    return {
-      analysis: 'Failed to analyze any screens.',
-      questions: [],
-      errors,
-    };
   }
 
   // ==========================================

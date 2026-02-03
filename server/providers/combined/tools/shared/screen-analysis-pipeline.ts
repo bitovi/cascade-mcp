@@ -16,7 +16,7 @@ import type { ToolDependencies } from '../types.js';
 import type { Screen } from '../writing-shell-stories/screen-analyzer.js';
 import { getDebugDir } from '../writing-shell-stories/temp-directory-manager.js';
 import { setupFigmaScreens } from '../writing-shell-stories/figma-screen-setup.js';
-import { regenerateScreenAnalyses } from './screen-analysis-regenerator.js';
+import { analyzeScreens, type AnalyzedFrame } from '../../../figma/screen-analyses-workflow/index.js';
 import type { ADFNode, ADFDocument } from '../../../atlassian/markdown-converter.js';
 
 /**
@@ -115,22 +115,26 @@ export async function executeScreenAnalysisPipeline(
   // Add steps for all screens to be analyzed
   await notify(`📝 AI Screen Analysis: Starting analysis of ${screens.length} screens...`, screens.length);
   
-  const { analyzedScreens } = await regenerateScreenAnalyses({
-    generateText,
+  // Use consolidated screen-analyses-workflow
+  const figmaUrlsForAnalysis = screens.map(s => s.url);
+  const analysisWorkflowResult = await analyzeScreens(
+    figmaUrlsForAnalysis,
     figmaClient,
-    screens,
-    allFrames,
-    allNotes,
-    figmaFileKey,
-    epicContext: epicWithoutShellStoriesMarkdown,
-    nodesDataMap,
-    notify: async (message: string) => {
-      // Show progress for each screen (auto-increments)
-      await notify(message);
+    generateText,
+    {
+      analysisOptions: {
+        contextMarkdown: epicWithoutShellStoriesMarkdown,
+      },
+      notify: async (message: string) => {
+        // Show progress for each screen (auto-increments)
+        await notify(message);
+      }
     }
-  });
+  );
   
-  await notify(`✅ AI Screen Analysis: Analyzed ${analyzedScreens} screens`);
+  const analyzedCount = analysisWorkflowResult.frames.filter(f => !f.cached).length;
+  
+  await notify(`✅ AI Screen Analysis: Analyzed ${analyzedCount} screens`);
 
   // Return all the data needed for subsequent phases
   return {
@@ -146,6 +150,6 @@ export async function executeScreenAnalysisPipeline(
     figmaUrls,
     cloudId: resolvedCloudId,
     siteName: resolvedSiteName,
-    analyzedScreens
+    analyzedScreens: analyzedCount
   };
 }

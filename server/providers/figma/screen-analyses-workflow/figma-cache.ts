@@ -7,10 +7,10 @@
 
 import * as path from 'path';
 import * as fs from 'fs/promises';
-import { getBaseCacheDir } from '../combined/tools/writing-shell-stories/temp-directory-manager.js';
-import type { FigmaClient } from './figma-api-client.js';
-import type { FigmaFileMetadata, FigmaMetadata } from './figma-helpers.js';
-import { fetchFigmaFileMetadata, FigmaUnrecoverableError } from './figma-helpers.js';
+import { getBaseCacheDir } from '../../combined/tools/writing-shell-stories/temp-directory-manager.js';
+import type { FigmaClient } from '../figma-api-client.js';
+import type { FigmaFileMetadata, FigmaMetadata } from '../figma-helpers.js';
+import { fetchFigmaFileMetadata, FigmaUnrecoverableError } from '../figma-helpers.js';
 
 /**
  * Get the cache directory path for a Figma file
@@ -166,6 +166,29 @@ export async function saveFigmaMetadata(
   
   const metadataPath = getFigmaMetadataPath(figmaFileKey);
   await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2), 'utf-8');
+}
+
+/**
+ * Load Figma metadata from cache
+ * 
+ * @param figmaFileKey - Figma file key
+ * @returns Cached metadata, or null if not found
+ */
+export async function loadFigmaMetadata(
+  figmaFileKey: string
+): Promise<FigmaMetadata | null> {
+  const metadataPath = getFigmaMetadataPath(figmaFileKey);
+  
+  try {
+    const metadataContent = await fs.readFile(metadataPath, 'utf-8');
+    const metadata: FigmaMetadata = JSON.parse(metadataContent);
+    return metadata;
+  } catch (error: any) {
+    if (error.code !== 'ENOENT') {
+      console.log(`    ⚠️  Error reading cache metadata: ${error.message}`);
+    }
+    return null;
+  }
 }
 
 /**

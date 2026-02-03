@@ -12,7 +12,7 @@
  * - Write notes files to temp directory
  * - Generate screens.yaml
  * 
- * The slow part (image download + AI analysis) is handled separately by screen-analysis-regenerator.
+ * The slow part (image download + AI analysis) is handled separately by screen-analyses-workflow.
  */
 
 import * as path from 'path';

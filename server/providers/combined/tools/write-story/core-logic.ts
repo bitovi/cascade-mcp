@@ -108,7 +108,7 @@ export async function executeWriteStory(
   console.log('  Starting story generation for:', issueKey);
   
   // ==========================================================================
-  // PHASE 1: Resolve cloud ID and fetch target issue
+  // PHASE 1: Resolve cloud ID
   // ==========================================================================
   
   // Build service availability message based on available clients
@@ -128,16 +128,21 @@ export async function executeWriteStory(
   console.log(`  Resolved: cloudId=${resolvedCloudId}, siteName=${resolvedSiteName}`);
   
   // ==========================================================================
-  // PHASE 2: Fetch hierarchy and parse timestamp
+  // PHASE 2: Fetch hierarchy (with parallel project fetch) and comments in parallel
   // ==========================================================================
-  // Note: Initial notify already sent above - hierarchy fetch is part of that
+  // Note: Initial notify already sent above - both fetches are part of that phase
   
-  const hierarchy = await fetchJiraIssueHierarchy(issueKey, atlassianClient, {
-    maxDepth,
-    cloudId: resolvedCloudId,
-    siteName: resolvedSiteName,
-    notify,
-  });
+  const [hierarchy, allComments] = await Promise.all([
+    fetchJiraIssueHierarchy(issueKey, atlassianClient, {
+      maxDepth,
+      cloudId: resolvedCloudId,
+      siteName: resolvedSiteName,
+      notify,
+    }),
+    fetchAllComments(atlassianClient, resolvedCloudId, issueKey)
+  ]);
+  
+  console.log(`  Fetched ${allComments.length} total comments`);
   
   // Get existing description ADF (keep as ADF for parsing)
   const existingDescriptionAdf = hierarchy.target.fields.description || null;
@@ -151,14 +156,7 @@ export async function executeWriteStory(
   // Convert to markdown only for prompt context (lossy but OK for AI prompts)
   const existingDescriptionMarkdown = existingDescriptionAdf 
     ? await convertAdfToMarkdown(existingDescriptionAdf)
-    : '';  
-  // ==========================================================================
-  // PHASE 2b: Fetch ALL comments with pagination
-  // ==========================================================================
-  // Note: Part of the initial fetch phase - no separate notification needed
-  
-  const allComments = await fetchAllComments(atlassianClient, resolvedCloudId, issueKey);
-  console.log(`  Fetched ${allComments.length} total comments`);
+    : '';
   
   // ==========================================================================
   // PHASE 3: Change detection (if not first run)
