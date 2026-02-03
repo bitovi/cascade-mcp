@@ -1,6 +1,6 @@
 # Cascade MCP
 
-<img width="60" height="60" alt="cascade-mcp" src="https://github.com/user-attachments/assets/79a3f9d3-d323-4948-a563-e6788b32cda9" align="left" /> Cascade MCP helps you analyze Figma screens and write Jira tickets with AI! This open source project provides a collection of MCP (Model Context Protocol) capabilities for [Bitovi's Cascading AI Enablement Initiative](https://wiki.at.bitovi.com/wiki/spaces/AIEnabledDevelopment/pages/1520435217/Cascading+AI+Delivery). 
+<img width="60" height="60" alt="cascade-mcp" src="https://github.com/user-attachments/assets/79a3f9d3-d323-4948-a563-e6788b32cda9" align="left" /> Cascade MCP helps you analyze Figma, Google Docs and Confluence, and write Jira tickets with AI! This open source project provides a collection of MCP (Model Context Protocol) capabilities for [Bitovi's Cascading AI Enablement Initiative](https://wiki.at.bitovi.com/wiki/spaces/AIEnabledDevelopment/pages/1520435217/Cascading+AI+Delivery). 
 
 <br />
 
