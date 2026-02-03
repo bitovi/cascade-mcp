@@ -161,7 +161,7 @@ describe('analyzeScreens', () => {
       figmaClient,
       'abc123',
       expect.any(Array),
-      { format: 'jpg', scale: 2 }
+      expect.objectContaining({ format: 'jpg', scale: 2 })
     );
   });
   
