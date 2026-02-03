@@ -10,7 +10,7 @@ Specifically, we will show how to take these designs showing a `Like & Dislike` 
 
 And show how to turn them into stories that look like:
 
-
+> <img width="920" height="787" alt="image" src="https://github.com/user-attachments/assets/6186272c-c6cd-4762-8395-5bd7cec4bce3" />
 
 
 ## Step 1: Preparing Figma
@@ -32,5 +32,15 @@ By doing this, you can simply give the page link as context instead of having to
 
 
 ### Specifying the Scope
+
+Next, is important to tell the AI agent what feature to focus on. For example, the `Like & Dislike` designs above show many other features that are not part of the story:
+
+- Listing and viewing a _case_
+- Listing and creating _comments_
+
+To add context, you can add a `Note` component specifying the scope of the feature. 
+
+<img width="1756" height="1068" alt="image" src="https://github.com/user-attachments/assets/6d6447c2-722c-433f-a0a9-3c76d123a086" />
+
 
 
