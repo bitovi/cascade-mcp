@@ -1,7 +1,5 @@
 # Getting Started Writing Stories from Figma
 
-> This is a work in progress. It should be done Feb 10th.
-
 This guide will show how to take a Figma design and make Jira stories.
 
 Specifically, we will show how to take these designs showing a `Like & Dislike` behavior on comments:
