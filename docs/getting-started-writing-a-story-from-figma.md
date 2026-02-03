@@ -38,9 +38,10 @@ Next, is important to tell the AI agent what feature to focus on. For example, t
 - Listing and viewing a _case_
 - Listing and creating _comments_
 
-To add context, you can add a `Note` component specifying the scope of the feature. 
+To ensure the AI agent focuses on the right work, include a Note component named exactly Note (case-sensitive). Use it to clearly state what the story covers and what it excludes as follows:
 
-> <img width="1756" height="1068" alt="image" src="https://github.com/user-attachments/assets/6d6447c2-722c-433f-a0a9-3c76d123a086" />
+> <img width="1756" height="1068" alt="image" src="https://github.com/user-attachments/assets/39de5041-ab45-40d3-baa4-1777960c7292" />
+
 
 
 
