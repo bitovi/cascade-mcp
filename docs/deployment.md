@@ -95,13 +95,18 @@ GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 GOOGLE_OAUTH_SCOPES="https://www.googleapis.com/auth/drive"
 
+# Google Encryption Keys (Required for service account encryption)
+# Generate keys locally: ./scripts/generate-rsa-keys.sh
+# Store in GitHub Secrets for staging/production deployments
+# Use different keys for each environment (dev/staging/prod)
+GOOGLE_RSA_PUBLIC_KEY=LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K...
+GOOGLE_RSA_PRIVATE_KEY=LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1J...
+
 # Google Service Account (Encrypted) - Alternative to OAuth
 # Generate encrypted credentials locally using http://localhost:3000/google-service-encrypt
 # Then set this environment variable with the encrypted output
 # Format: RSA-ENCRYPTED:<base64-encoded-encrypted-credentials>
 # GOOGLE_SERVICE_ACCOUNT_ENCRYPTED=RSA-ENCRYPTED:eyJhbGci...
-# Note: Server auto-generates RSA keys in cache/keys/google-rsa/ on first use
-#       Keys must persist across restarts - use volume mount or persistent storage
 
 # Optional: AWS (for CloudWatch logging)
 AWS_ACCESS_KEY_ID=your-aws-access-key
@@ -148,6 +153,7 @@ The simplest way to deploy is using Docker. The provided `Dockerfile` and `docke
    ```
 
 4. **Stop the service:**
+
    ```bash
    docker-compose down
    ```
@@ -171,20 +177,56 @@ docker run -d \
 
 If you're using Google Service Account credentials for Google Drive access, follow these steps for secure deployment:
 
-#### 1. Generate Encrypted Credentials Locally
+#### 1. Generate RSA Encryption Keys
+
+**For each environment (dev/staging/production), generate separate keys:**
 
 ```bash
-# Start the server locally
-npm run start-local
+# Run the key generation script
+./scripts/generate-rsa-keys.sh
 
-# Visit the encryption page
-open http://localhost:3000/google-service-encrypt
-
-# Paste your service account JSON and encrypt it
-# Copy the output starting with "RSA-ENCRYPTED:"
+# This creates private.pem and public.pem
+# And outputs base64-encoded keys for environment variables
 ```
 
-#### 2. Configure Environment Variable
+**Important:** Use different key pairs for each environment. This ensures encrypted credentials cannot be decrypted across environments.
+
+#### 2. Store Keys in GitHub Secrets
+
+For staging and production, add keys to GitHub Secrets:
+
+- `STAGING_GOOGLE_RSA_PUBLIC_KEY` - Staging public key
+- `STAGING_GOOGLE_RSA_PRIVATE_KEY` - Staging private key
+- `PROD_GOOGLE_RSA_PUBLIC_KEY` - Production public key
+- `PROD_GOOGLE_RSA_PRIVATE_KEY` - Production private key
+
+**GitHub Actions Workflow Example:**
+
+```yaml
+# .github/workflows/deploy-staging.yml
+env:
+  GOOGLE_RSA_PUBLIC_KEY: ${{ secrets.STAGING_GOOGLE_RSA_PUBLIC_KEY }}
+  GOOGLE_RSA_PRIVATE_KEY: ${{ secrets.STAGING_GOOGLE_RSA_PRIVATE_KEY }}
+```
+
+#### 3. Encrypt Service Account Credentials
+
+**For each environment:**
+
+```bash
+# 1. Start server with environment-specific keys
+export GOOGLE_RSA_PUBLIC_KEY="<base64-key-for-this-env>"
+export GOOGLE_RSA_PRIVATE_KEY="<base64-key-for-this-env>"
+npm run start-local
+
+# 2. Visit encryption page
+open http://localhost:3000/google-service-encrypt
+
+# 3. Paste service account JSON and encrypt
+# 4. Copy the output starting with "RSA-ENCRYPTED:"
+```
+
+#### 4. Configure Environment Variables
 
 Add the encrypted credentials to your deployment environment:
 
@@ -194,38 +236,32 @@ GOOGLE_SERVICE_ACCOUNT_ENCRYPTED=RSA-ENCRYPTED:eyJhbGci...
 
 **Deployment Options:**
 
-- **GitHub Actions**: Add as a repository secret
+- **GitHub Actions**: Add as repository secrets (separate for staging/prod)
 - **AWS**: Store in AWS Secrets Manager or Parameter Store
-- **Docker**: Add to `.env` file (ensure it's not committed)
-- **Kubernetes**: Store in a Secret resource
+- **Docker**: Add to environment-specific `.env` files
+- **Kubernetes**: Store in Secret resources (separate per namespace)
 
-#### 3. RSA Key Persistence
+#### 5. Security Considerations
 
-The server auto-generates RSA keys in `cache/keys/google-rsa/` on first use. These keys **must persist** across restarts:
-
-**Docker Volume:**
-
-```yaml
-# docker-compose.yaml
-services:
-  cascade-mcp:
-    volumes:
-      - ./cache:/app/cache
-```
-
-**Important Notes:**
-
-- Different environments (staging, production) should have **separate RSA key pairs**
-- Encrypted credentials from one environment **cannot** be decrypted in another
-- If you lose the RSA keys, you'll need to re-encrypt all credentials
-
-#### 4. Security Considerations
-
-- **Never commit** `cache/keys/` directory to version control
+- **Never commit** `private.pem`, `public.pem`, or private keys to version control
 - **Never commit** plaintext service account JSON files
-- Use GitHub Secrets or a secrets manager for production
-- Rotate service account keys periodically
-- Private RSA keys have file permissions set to `0600` automatically
+- **Use different keys** for dev, staging, and production
+- **Store private keys** only in secure secrets managers (GitHub Secrets, AWS Secrets Manager)
+- **Rotate keys** when team members with access leave
+- **No filesystem dependencies** - keys load from environment variables only
+- **Graceful degradation** - if keys not configured, encryption features are disabled
+
+#### 6. Key Rotation Process
+
+```bash
+# 1. Generate new keys for the environment
+./scripts/generate-rsa-keys.sh
+
+# 2. Update GitHub Secrets with new keys
+# 3. Re-encrypt all service account credentials with new keys
+# 4. Update GOOGLE_SERVICE_ACCOUNT_ENCRYPTED in deployment
+# 5. Deploy with new keys and encrypted credentials
+```
 
 For more details, see: [docs/google-service-account-encryption.md](google-service-account-encryption.md)
 

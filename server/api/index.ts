@@ -13,6 +13,7 @@ import { handleIdentifyFeatures } from './identify-features.js';
 import { handleAnalyzeFeatureScope } from './analyze-feature-scope.js';
 import { handleFigmaReviewDesign } from './figma-review-design.js';
 import { handleReviewWorkItem } from './review-work-item.js';
+import { googleKeyManager } from '../utils/key-manager.js';
 
 /**
  * Register all REST API routes with the Express app
@@ -29,6 +30,20 @@ export function registerRestApiRoutes(app: Express): void {
     });
   });
   console.log('  ✓ GET /api/config');
+  
+  // Encryption status endpoint for frontend to check if encryption is available
+  app.get('/api/encryption-status', (req, res) => {
+    const state = googleKeyManager.getState();
+    res.json({
+      enabled: state.enabled,
+      message: state.enabled 
+        ? 'Encryption is available' 
+        : state.reason === 'keys-not-configured'
+          ? 'Encryption keys not configured. Run ./scripts/generate-rsa-keys.sh to generate keys and add them to your .env file.'
+          : (state as any).message || 'Encryption unavailable'
+    });
+  });
+  console.log('  ✓ GET /api/encryption-status');
   
   // Generate shell stories from Figma designs in a Jira epic
   // Wrap handler to match Express signature (req, res) => void

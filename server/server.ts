@@ -32,6 +32,7 @@ import { logEnvironmentInfo } from './debug-helpers.js';
 import { registerRestApiRoutes } from './api/index.js';
 import { getProjectRoot } from './utils/file-paths.js';
 import { handleEncryptionRequest } from './google-service-encrypt.js';
+import { googleKeyManager, InvalidKeyFormatError } from './utils/key-manager.js';
 
 // configurations
 dotenv.config();
@@ -276,8 +277,36 @@ app.post('/token', accessToken);
 // OAuth refresh token endpoint (kept for backwards compatibility)
 app.post('/refresh-token', accessToken);
 
-// Start server
-app.listen(port, () => console.log(`Server is listening on port ${port}!`));
+// Initialize Google encryption and start server
+(async () => {
+  // Initialize Google encryption key manager
+  console.log('\n========== GOOGLE ENCRYPTION INITIALIZATION ==========');
+  try {
+    await googleKeyManager.initialize();
+    const state = googleKeyManager.getState();
+    
+    if (state.enabled) {
+      console.log('✅ Google encryption enabled');
+      console.log('   Keys loaded successfully from environment variables');
+    } else {
+      console.log('ℹ️  Google encryption keys not configured');
+      console.log('   Google Drive/Docs features will be unavailable');
+      console.log('   To enable: Set GOOGLE_RSA_PUBLIC_KEY and GOOGLE_RSA_PRIVATE_KEY');
+      console.log('   See docs/google-service-account-encryption.md for setup');
+    }
+  } catch (error) {
+    if (error instanceof InvalidKeyFormatError) {
+      console.error('❌ FATAL: Invalid Google encryption key format');
+      console.error(`   ${error.message}`);
+      process.exit(1);
+    }
+    throw error;
+  }
+  console.log('========== GOOGLE ENCRYPTION INITIALIZATION END ==========\n');
+
+  // Start server
+  app.listen(port, () => console.log(`Server is listening on port ${port}!`));
+})();
 
 // Handle unhandled promise rejections and exceptions
 process.on('unhandledRejection', (err: Error) => {

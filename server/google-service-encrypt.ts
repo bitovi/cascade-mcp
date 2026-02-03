@@ -6,7 +6,7 @@
  */
 
 import type { Request, Response } from 'express';
-import { googleKeyManager } from './utils/key-manager.js';
+import { googleKeyManager, EncryptionNotEnabledError } from './utils/key-manager.js';
 import type { GoogleServiceAccountCredentials } from './providers/google/types.js';
 
 /**
@@ -14,6 +14,17 @@ import type { GoogleServiceAccountCredentials } from './providers/google/types.j
  */
 export async function handleEncryptionRequest(req: Request, res: Response): Promise<void> {
   try {
+    // Check if encryption is enabled
+    if (!googleKeyManager.isEnabled()) {
+      res.status(503).json({ 
+        error: 'Google encryption is not enabled. ' +
+               'Configure GOOGLE_RSA_PUBLIC_KEY and GOOGLE_RSA_PRIVATE_KEY environment variables. ' +
+               'Run ./scripts/generate-rsa-keys.sh to generate keys. ' +
+               'See docs/google-service-account-encryption.md for setup instructions.'
+      });
+      return;
+    }
+
     const { serviceAccountJson } = req.body;
 
     if (!serviceAccountJson) {

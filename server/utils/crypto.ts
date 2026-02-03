@@ -5,10 +5,7 @@
  * Uses Node.js built-in crypto module (no external dependencies).
  */
 
-import { generateKeyPair, publicEncrypt, privateDecrypt, constants } from 'crypto';
-import { promisify } from 'util';
-
-const generateKeyPairAsync = promisify(generateKeyPair);
+import { publicEncrypt, privateDecrypt, constants } from 'crypto';
 
 /**
  * RSA key pair in PEM format
@@ -16,43 +13,6 @@ const generateKeyPairAsync = promisify(generateKeyPair);
 export interface RSAKeyPair {
   publicKey: string; // PEM format (-----BEGIN PUBLIC KEY-----)
   privateKey: string; // PEM format (-----BEGIN PRIVATE KEY-----)
-}
-
-/**
- * Generate a new RSA-4096 key pair
- *
- * @returns Promise resolving to public/private key pair in PEM format
- *
- * @example
- * ```typescript
- * const keyPair = await generateRSAKeyPair();
- * console.log(keyPair.publicKey);  // -----BEGIN PUBLIC KEY-----\n...
- * console.log(keyPair.privateKey); // -----BEGIN PRIVATE KEY-----\n...
- * ```
- */
-export async function generateRSAKeyPair(): Promise<RSAKeyPair> {
-  console.log('Generating RSA-4096 key pair...');
-
-  const { publicKey, privateKey } = await generateKeyPairAsync('rsa', {
-    modulusLength: 4096, // Strong encryption (industry standard)
-    publicKeyEncoding: {
-      type: 'spki',
-      format: 'pem',
-    },
-    privateKeyEncoding: {
-      type: 'pkcs8',
-      format: 'pem',
-    },
-  });
-
-  console.log('  Key generation complete');
-  console.log(`  Public key: ${publicKey.split('\n')[0]}...`);
-  console.log(`  Private key: ${privateKey.split('\n')[0]}...`);
-
-  return {
-    publicKey,
-    privateKey,
-  };
 }
 
 /**
