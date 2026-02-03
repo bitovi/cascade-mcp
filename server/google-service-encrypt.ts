@@ -6,7 +6,7 @@
  */
 
 import type { Request, Response } from 'express';
-import { credentialKeyManager, EncryptionNotEnabledError } from './utils/key-manager.js';
+import { encryptionManager, EncryptionNotEnabledError } from './utils/encryption-manager.js';
 import type { GoogleServiceAccountCredentials } from './providers/google/types.js';
 
 /**
@@ -15,7 +15,7 @@ import type { GoogleServiceAccountCredentials } from './providers/google/types.j
 export async function handleEncryptionRequest(req: Request, res: Response): Promise<void> {
   try {
     // Check if encryption is enabled
-    if (!credentialKeyManager.isEnabled()) {
+    if (!encryptionManager.isEnabled()) {
       res.status(503).json({ 
         error: 'Encryption is not enabled. ' +
                'Configure RSA_PUBLIC_KEY and RSA_PRIVATE_KEY environment variables. ' +
@@ -55,7 +55,7 @@ export async function handleEncryptionRequest(req: Request, res: Response): Prom
     }
 
     // Encrypt
-    const encrypted = await credentialKeyManager.encrypt(parsed);
+    const encrypted = await encryptionManager.encrypt(parsed);
 
     // Return JSON response
     res.json({

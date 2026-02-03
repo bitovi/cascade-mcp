@@ -32,7 +32,7 @@ import { logEnvironmentInfo } from './debug-helpers.js';
 import { registerRestApiRoutes } from './api/index.js';
 import { getProjectRoot } from './utils/file-paths.js';
 import { handleEncryptionRequest } from './google-service-encrypt.js';
-import { credentialKeyManager, InvalidKeyFormatError } from './utils/key-manager.js';
+import { encryptionManager, InvalidKeyFormatError } from './utils/encryption-manager.js';
 
 // configurations
 dotenv.config();
@@ -282,8 +282,8 @@ app.post('/refresh-token', accessToken);
   // Initialize Google encryption key manager
   console.log('\n========== GOOGLE ENCRYPTION INITIALIZATION ==========');
   try {
-    await credentialKeyManager.initialize();
-    const state = credentialKeyManager.getState();
+    await encryptionManager.initialize();
+    const state = encryptionManager.getState();
     
     if (state.enabled) {
       console.log('✅ Google encryption enabled');

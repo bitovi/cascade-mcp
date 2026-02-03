@@ -1,11 +1,11 @@
 /**
- * Credential Key Manager Unit Tests
+ * Encryption Manager Unit Tests
  * 
- * Tests for CredentialKeyManager class and helper functions for RSA encryption key management.
+ * Tests for EncryptionManager class and helper functions for RSA encryption management.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { CredentialKeyManager, InvalidKeyFormatError, EncryptionNotEnabledError } from './key-manager.js';
+import { EncryptionManager, InvalidKeyFormatError, EncryptionNotEnabledError } from './encryption-manager.js';
 import type { GoogleServiceAccountCredentials } from '../providers/google/types.js';
 
 // ============================================================================
@@ -75,7 +75,7 @@ describe('loadKeyFromEnv - Missing Environment Variable (T027)', () => {
   });
 
   it('should gracefully degrade when both keys are missing', async () => {
-    const keyManager = new CredentialKeyManager();
+    const keyManager = new EncryptionManager();
     
     await keyManager.initialize(); // Should not throw
     expect(keyManager.isEnabled()).toBe(false);
@@ -90,7 +90,7 @@ describe('loadKeyFromEnv - Missing Environment Variable (T027)', () => {
   it('should gracefully degrade when only public key is set', async () => {
     setEnvKeys(VALID_PUBLIC_KEY_BASE64, undefined);
     
-    const keyManager = new CredentialKeyManager();
+    const keyManager = new EncryptionManager();
     
     await keyManager.initialize(); // Should not throw
     expect(keyManager.isEnabled()).toBe(false);
@@ -115,7 +115,7 @@ describe('loadKeyFromEnv - Invalid Base64 (T028)', () => {
     const invalidPem = Buffer.from('not a valid PEM key').toString('base64');
     setEnvKeys(invalidPem, VALID_PRIVATE_KEY_BASE64);
     
-    const keyManager = new CredentialKeyManager();
+    const keyManager = new EncryptionManager();
     
     await expect(keyManager.initialize()).rejects.toThrow(InvalidKeyFormatError);
     await expect(keyManager.initialize()).rejects.toThrow(/Invalid PEM format/i);
@@ -139,7 +139,7 @@ describe('validatePemKey (T029, T030)', () => {
   it('T029: should succeed with valid PEM public key', async () => {
     setEnvKeys(VALID_PUBLIC_KEY_BASE64, VALID_PRIVATE_KEY_BASE64);
     
-    const keyManager = new CredentialKeyManager();
+    const keyManager = new EncryptionManager();
     
     await expect(keyManager.initialize()).resolves.not.toThrow();
     expect(keyManager.isEnabled()).toBe(true);
@@ -148,7 +148,7 @@ describe('validatePemKey (T029, T030)', () => {
   it('T030: should throw InvalidKeyFormatError with invalid PEM format', async () => {
     setEnvKeys(VALID_BASE64_INVALID_PEM, VALID_PRIVATE_KEY_BASE64);
     
-    const keyManager = new CredentialKeyManager();
+    const keyManager = new EncryptionManager();
     
     await expect(keyManager.initialize()).rejects.toThrow(InvalidKeyFormatError);
     await expect(keyManager.initialize()).rejects.toThrow(/Invalid public key format/i);
@@ -171,7 +171,7 @@ describe('areKeysConfigured (T031)', () => {
   it('should return true when both env vars set', async () => {
     setEnvKeys(VALID_PUBLIC_KEY_BASE64, VALID_PRIVATE_KEY_BASE64);
     
-    const keyManager = new CredentialKeyManager();
+    const keyManager = new EncryptionManager();
     await keyManager.initialize();
     
     expect(keyManager.isEnabled()).toBe(true);
@@ -180,7 +180,7 @@ describe('areKeysConfigured (T031)', () => {
   it('should return false (disabled) when both env vars missing', async () => {
     clearEnvKeys();
     
-    const keyManager = new CredentialKeyManager();
+    const keyManager = new EncryptionManager();
     await keyManager.initialize();
     
     expect(keyManager.isEnabled()).toBe(false);
@@ -189,7 +189,7 @@ describe('areKeysConfigured (T031)', () => {
   it('should return false (disabled) when only public key is set', async () => {
     setEnvKeys(VALID_PUBLIC_KEY_BASE64, undefined);
     
-    const keyManager = new CredentialKeyManager();
+    const keyManager = new EncryptionManager();
     
     await keyManager.initialize(); // Should not throw
     expect(keyManager.isEnabled()).toBe(false);
@@ -198,7 +198,7 @@ describe('areKeysConfigured (T031)', () => {
   it('should return false (disabled) when only private key is set', async () => {
     setEnvKeys(undefined, VALID_PRIVATE_KEY_BASE64);
     
-    const keyManager = new CredentialKeyManager();
+    const keyManager = new EncryptionManager();
     
     await keyManager.initialize(); // Should not throw
     expect(keyManager.isEnabled()).toBe(false);
@@ -221,7 +221,7 @@ describe('GoogleKeyManager.initialize() - Enabled State (T032)', () => {
   it('should set state to enabled when valid keys provided', async () => {
     setEnvKeys(VALID_PUBLIC_KEY_BASE64, VALID_PRIVATE_KEY_BASE64);
     
-    const keyManager = new CredentialKeyManager();
+    const keyManager = new EncryptionManager();
     await keyManager.initialize();
     
     const state = keyManager.getState();
@@ -246,7 +246,7 @@ describe('GoogleKeyManager.initialize() - Disabled State (T033)', () => {
   it('should set state to disabled when keys not configured', async () => {
     clearEnvKeys();
     
-    const keyManager = new CredentialKeyManager();
+    const keyManager = new EncryptionManager();
     await keyManager.initialize();
     
     const state = keyManager.getState();
@@ -273,7 +273,7 @@ describe('GoogleKeyManager.encrypt() - Disabled State (T034)', () => {
   it('should throw EncryptionNotEnabledError when encryption disabled', async () => {
     clearEnvKeys();
     
-    const keyManager = new CredentialKeyManager();
+    const keyManager = new EncryptionManager();
     await keyManager.initialize();
     
     await expect(keyManager.encrypt(TEST_SERVICE_ACCOUNT))
@@ -297,7 +297,7 @@ describe('GoogleKeyManager.decrypt() - Disabled State (T035)', () => {
   it('should throw EncryptionNotEnabledError when decryption disabled', async () => {
     clearEnvKeys();
     
-    const keyManager = new CredentialKeyManager();
+    const keyManager = new EncryptionManager();
     await keyManager.initialize();
     
     await expect(keyManager.decrypt('RSA-ENCRYPTED:test'))
@@ -321,7 +321,7 @@ describe('Full Encryption/Decryption Cycle (T036)', () => {
   it('should encrypt and decrypt service account JSON successfully', async () => {
     setEnvKeys(VALID_PUBLIC_KEY_BASE64, VALID_PRIVATE_KEY_BASE64);
     
-    const keyManager = new CredentialKeyManager();
+    const keyManager = new EncryptionManager();
     await keyManager.initialize();
     
     // Encrypt
@@ -339,7 +339,7 @@ describe('Full Encryption/Decryption Cycle (T036)', () => {
   it('should produce identical result after multiple encrypt/decrypt cycles', async () => {
     setEnvKeys(VALID_PUBLIC_KEY_BASE64, VALID_PRIVATE_KEY_BASE64);
     
-    const keyManager = new CredentialKeyManager();
+    const keyManager = new EncryptionManager();
     await keyManager.initialize();
     
     // First cycle
@@ -371,7 +371,7 @@ describe('Backward Compatibility (T037)', () => {
   it('should decrypt existing RSA-ENCRYPTED credentials', async () => {
     setEnvKeys(VALID_PUBLIC_KEY_BASE64, VALID_PRIVATE_KEY_BASE64);
     
-    const keyManager = new CredentialKeyManager();
+    const keyManager = new EncryptionManager();
     await keyManager.initialize();
     
     // Create an encrypted credential using current implementation
@@ -381,7 +381,7 @@ describe('Backward Compatibility (T037)', () => {
     expect(encrypted).toMatch(/^RSA-ENCRYPTED:/);
     
     // New key manager instance (simulating server restart)
-    const keyManager2 = new CredentialKeyManager();
+    const keyManager2 = new EncryptionManager();
     await keyManager2.initialize();
     
     // Should decrypt successfully

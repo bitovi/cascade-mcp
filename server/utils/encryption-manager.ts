@@ -131,14 +131,14 @@ function validatePemKey(pemKey: string, keyType: 'public' | 'private'): void {
 }
 
 /**
- * Key Manager for Credential Encryption
+ * Encryption Manager
  *
  * Handles:
  * - Loading pre-generated RSA keys from environment variables
  * - Graceful degradation when keys are not configured
  * - Encryption/decryption of sensitive credentials
  */
-export class CredentialKeyManager {
+export class EncryptionManager {
   private state: EncryptionState = {
     enabled: false,
     reason: 'keys-not-configured',
@@ -232,7 +232,7 @@ export class CredentialKeyManager {
    *
    * @example
    * ```typescript
-   * const encrypted = await credentialKeyManager.encrypt(credentials);
+   * const encrypted = await encryptionManager.encrypt(credentials);
    * // Store encrypted string in config/env
    * ```
    */
@@ -264,7 +264,7 @@ export class CredentialKeyManager {
    *
    * @example
    * ```typescript
-   * const decrypted = await credentialKeyManager.decrypt(encryptedString);
+   * const decrypted = await encryptionManager.decrypt(encryptedString);
    * // Use decrypted credentials to create client
    * ```
    */
@@ -299,7 +299,7 @@ export class CredentialKeyManager {
 }
 
 /**
- * Singleton instance for credential key management
+ * Singleton instance for encryption management
  * Keys loaded from environment variables (RSA_PUBLIC_KEY, RSA_PRIVATE_KEY)
  */
-export const credentialKeyManager = new CredentialKeyManager();
+export const encryptionManager = new EncryptionManager();

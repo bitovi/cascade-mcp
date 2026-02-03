@@ -155,7 +155,7 @@ export async function validateGoogleTokenApiHeaders(
   headers: Record<string, string | string[] | undefined>,
   res: Response
 ): Promise<GoogleServiceAccountCredentials | null> {
-  const { googleKeyManager } = await import('../utils/key-manager.js');
+  const { encryptionManager } = await import('../utils/encryption-manager.js');
   const encryptedToken = headers['x-google-token'] as string;
   
   if (!encryptedToken) {
@@ -170,7 +170,7 @@ export async function validateGoogleTokenApiHeaders(
   // Decrypt the token
   let serviceAccountJson: GoogleServiceAccountCredentials;
   try {
-    serviceAccountJson = await googleKeyManager.decrypt(encryptedToken);
+    serviceAccountJson = await encryptionManager.decrypt(encryptedToken);
   } catch (error: any) {
     res.status(401).json({ 
       success: false, 
@@ -206,7 +206,7 @@ export async function validateGoogleTokenApiHeaders(
 export async function parseOptionalGoogleToken(
   headers: Record<string, string | string[] | undefined>
 ): Promise<GoogleServiceAccountCredentials | null> {
-  const { googleKeyManager } = await import('../utils/key-manager.js');
+  const { encryptionManager } = await import('../utils/encryption-manager.js');
   const encryptedToken = headers['x-google-token'] as string;
   
   console.log('🔍 parseOptionalGoogleToken called');
@@ -224,7 +224,7 @@ export async function parseOptionalGoogleToken(
   // Decrypt the token
   let serviceAccountJson: GoogleServiceAccountCredentials;
   try {
-    serviceAccountJson = await googleKeyManager.decrypt(encryptedToken);
+    serviceAccountJson = await encryptionManager.decrypt(encryptedToken);
     console.log('  ✅ Successfully decrypted token');
     console.log('  Service account keys:', Object.keys(serviceAccountJson));
   } catch (error) {

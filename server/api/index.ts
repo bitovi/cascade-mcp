@@ -13,7 +13,7 @@ import { handleIdentifyFeatures } from './identify-features.js';
 import { handleAnalyzeFeatureScope } from './analyze-feature-scope.js';
 import { handleFigmaReviewDesign } from './figma-review-design.js';
 import { handleReviewWorkItem } from './review-work-item.js';
-import { googleKeyManager } from '../utils/key-manager.js';
+import { encryptionManager } from '../utils/encryption-manager.js';
 
 /**
  * Register all REST API routes with the Express app
@@ -33,7 +33,7 @@ export function registerRestApiRoutes(app: Express): void {
   
   // Encryption status endpoint for frontend to check if encryption is available
   app.get('/api/encryption-status', (req, res) => {
-    const state = googleKeyManager.getState();
+    const state = encryptionManager.getState();
     res.json({
       enabled: state.enabled,
       message: state.enabled 
