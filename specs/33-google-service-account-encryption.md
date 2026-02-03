@@ -1,5 +1,7 @@
 # Spec: Google Service Account Encryption
 
+> ⚠️ **DEPRECATED**: This spec describes the original auto-generation approach. The feature has been refactored to use static pre-generated keys from environment variables. See [specs/001-static-encryption-keys/](./001-static-encryption-keys/) for the current implementation.
+
 **Feature**: Encrypt Google service account JSON credentials using RSA asymmetric encryption  
 **Ticket**: [FE-720](https://bitovi.atlassian.net/browse/FE-720)  
 **Date**: January 2026

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface EncryptionResult {
   encrypted: string;
@@ -6,11 +6,27 @@ interface EncryptionResult {
   projectId: string;
 }
 
+interface EncryptionStatus {
+  enabled: boolean;
+  message: string;
+}
+
 export function GoogleServiceEncryptionForm() {
   const [serviceAccountJson, setServiceAccountJson] = useState('');
   const [isEncrypting, setIsEncrypting] = useState(false);
   const [result, setResult] = useState<EncryptionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [encryptionStatus, setEncryptionStatus] = useState<EncryptionStatus | null>(null);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(true);
+
+  useEffect(() => {
+    // Check encryption status on mount
+    fetch('/api/encryption-status')
+      .then((res) => res.json())
+      .then((data) => setEncryptionStatus(data))
+      .catch(() => setEncryptionStatus({ enabled: false, message: 'Failed to check encryption status' }))
+      .finally(() => setIsCheckingStatus(false));
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -136,6 +152,30 @@ GOOGLE_SERVICE_ACCOUNT_ENCRYPTED=RSA-ENCRYPTED:...
 
   return (
     <div className="space-y-4">
+      {/* Encryption Status Warning */}
+      {!isCheckingStatus && encryptionStatus && !encryptionStatus.enabled && (
+        <div className="bg-white rounded-lg shadow-sm border border-red-300 p-6">
+          <div className="bg-red-50 border-l-4 border-red-500 p-4">
+            <h3 className="font-semibold text-red-900 mb-2">🔒 Encryption Not Available</h3>
+            <p className="text-sm text-red-800 mb-3">
+              {encryptionStatus.message}
+            </p>
+            <div className="bg-red-100 rounded-md p-3 mt-3">
+              <p className="text-xs text-red-900 font-semibold mb-2">To enable encryption:</p>
+              <ol className="text-xs text-red-900 space-y-1 ml-4 list-decimal">
+                <li>Run <code className="bg-red-200 px-1 py-0.5 rounded">./scripts/generate-rsa-keys.sh</code> to generate keys</li>
+                <li>Copy the base64-encoded keys to your <code className="bg-red-200 px-1 py-0.5 rounded">.env</code> file</li>
+                <li>Set <code className="bg-red-200 px-1 py-0.5 rounded">GOOGLE_RSA_PUBLIC_KEY</code> and <code className="bg-red-200 px-1 py-0.5 rounded">GOOGLE_RSA_PRIVATE_KEY</code></li>
+                <li>Restart the server</li>
+              </ol>
+              <p className="text-xs text-red-900 mt-2">
+                See <code className="bg-red-200 px-1 py-0.5 rounded">docs/google-service-account-encryption.md</code> for detailed instructions.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Instructions */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-4">
@@ -174,7 +214,7 @@ Example:
   ...
 }`}
           required
-          disabled={isEncrypting}
+          disabled={isEncrypting || !encryptionStatus?.enabled}
           className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm resize-vertical focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
         />
         
@@ -186,7 +226,7 @@ Example:
         
         <button
           type="submit"
-          disabled={isEncrypting || !serviceAccountJson.trim()}
+          disabled={isEncrypting || !serviceAccountJson.trim() || !encryptionStatus?.enabled}
           className="mt-4 px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
         >
           {isEncrypting ? '🔄 Encrypting...' : '🔒 Encrypt Credentials'}

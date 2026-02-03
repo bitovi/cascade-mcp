@@ -246,7 +246,41 @@ If you want to use Google Drive integration, you'll need to create OAuth credent
      - Click **Create**
 5. Note your `Client ID` and `Client Secret` from the confirmation dialog
 
-### 4. Configure Google Service Account (Alternative to OAuth)
+### 4. Configure Google Encryption Keys (Optional)
+
+If you want to use the Google service account encryption feature:
+
+1. **Generate encryption keys:**
+
+   ```bash
+   ./scripts/generate-rsa-keys.sh
+   ```
+
+2. **Add keys to `.env`:**
+
+   Copy the base64-encoded output from the script:
+
+   ```bash
+   GOOGLE_RSA_PUBLIC_KEY=LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K...
+   GOOGLE_RSA_PRIVATE_KEY=LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1J...
+   ```
+
+3. **Encrypt your service account:**
+
+   - Start the server: `npm run start-local`
+   - Visit: `http://localhost:3000/google-service-encrypt`
+   - Paste your Google service account JSON
+   - Copy the encrypted output
+
+4. **Add encrypted credentials to `.env`:**
+
+   ```bash
+   GOOGLE_SERVICE_ACCOUNT_ENCRYPTED=RSA-ENCRYPTED:eyJh...
+   ```
+
+**Note:** If encryption keys are not configured, Google features will be gracefully disabled. The server will still start normally.
+
+### 5. Configure Google Service Account (Alternative to OAuth)
 
 If you prefer to use a Google Service Account instead of OAuth for Google Drive access, you can use encrypted credentials:
 
@@ -269,19 +303,21 @@ If you prefer to use a Google Service Account instead of OAuth for Google Drive 
    GOOGLE_SERVICE_ACCOUNT_ENCRYPTED="RSA-ENCRYPTED:eyJhbGci..."
    ```
 
-**RSA Keys (Auto-Generated):**
+**RSA Keys (Pre-Generated):**
 
-- On first use, the server automatically generates an RSA-4096 key pair
-- Keys are stored in `cache/keys/google-rsa/` (git-ignored)
-- Private key file permissions are set to `0600` (owner read/write only)
-- No manual setup required - keys persist across restarts
+- Generate keys manually using `./scripts/generate-rsa-keys.sh`
+- Keys are stored in environment variables: `GOOGLE_RSA_PUBLIC_KEY` and `GOOGLE_RSA_PRIVATE_KEY`
+- Keys are base64-encoded for easy storage in `.env` or GitHub Secrets
+- Server validates keys at startup, providing clear error messages if invalid
+- If keys are not configured, Google encryption features are gracefully disabled
 
 **Security Notes:**
 
-- Never commit `cache/keys/` directory or encrypted credentials to version control
-- The private key remains server-side and is never exposed
-- Encrypted credentials are safe to store in `.env` or environment variables
+- Never commit `private.pem`, `public.pem`, or `GOOGLE_RSA_PRIVATE_KEY` to version control
+- The private key remains server-side and is never exposed to the client
+- Encrypted credentials are safe to store in `.env`, environment variables, or version control
 - For production, use GitHub Secrets or a secrets manager (AWS Secrets Manager, HashiCorp Vault)
+- Use different key pairs for dev, staging, and production environments
 
 For more details, see: [`docs/google-service-account-encryption.md`](docs/google-service-account-encryption.md)
 
