@@ -19,7 +19,7 @@ import * as fs from 'fs/promises';
 import type { ToolDependencies } from '../types.js';
 import type { Screen } from './screen-analyzer.js';
 import { getDebugDir, getBaseCacheDir } from './temp-directory-manager.js';
-import { getFigmaFileCachePath } from '../../../figma/figma-cache.js';
+import { getFigmaFileCachePath } from '../../../figma/screen-analyses-workflow/figma-cache.js';
 import { setupFigmaScreens } from './figma-screen-setup.js';
 import { setupConfluenceContext, type ConfluenceDocument } from '../shared/confluence-setup.js';
 import { setupGoogleDocsContext, type GoogleDocDocument } from '../shared/google-docs-setup.js';

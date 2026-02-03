@@ -7,10 +7,10 @@
 
 import * as path from 'path';
 import * as fs from 'fs/promises';
-import { getBaseCacheDir } from '../combined/tools/writing-shell-stories/temp-directory-manager.js';
-import type { FigmaClient } from './figma-api-client.js';
-import type { FigmaFileMetadata, FigmaMetadata } from './figma-helpers.js';
-import { fetchFigmaFileMetadata, FigmaUnrecoverableError } from './figma-helpers.js';
+import { getBaseCacheDir } from '../../combined/tools/writing-shell-stories/temp-directory-manager.js';
+import type { FigmaClient } from '../figma-api-client.js';
+import type { FigmaFileMetadata, FigmaMetadata } from '../figma-helpers.js';
+import { fetchFigmaFileMetadata, FigmaUnrecoverableError } from '../figma-helpers.js';
 
 /**
  * Get the cache directory path for a Figma file

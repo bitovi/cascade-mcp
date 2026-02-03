@@ -28,9 +28,11 @@ import {
   parseFigmaUrls,
 } from './url-processor.js';
 import { expandNodes } from './frame-expander.js';
+import { saveAnalysisToCache, validateCache, saveCacheMetadata, type CacheValidationResult } from './cache-validator.js';
+import { loadFigmaMetadata, getFigmaFileCachePath, saveFigmaMetadata } from './figma-cache.js';
+import { access } from 'fs/promises';
+import { join } from 'path';
 import { fetchAndAssociateAnnotations, checkCommentsForInvalidation } from './annotation-associator.js';
-import { validateCache, saveCacheMetadata, type CacheValidationResult } from './cache-validator.js';
-import { loadFigmaMetadata } from '../figma-cache.js';
 import { downloadImages } from './image-downloader.js';
 import { analyzeFrames, type FrameAnalysisInput, type ScreenAnalysisOptions } from './screen-analyzer.js';
 
@@ -246,16 +248,29 @@ export async function analyzeScreens(
   );
   
   // Step 7.5: Save analyses to cache
-  const { saveAnalysisToCache } = await import('./cache-validator.js');
-  const { getFigmaFileCachePath } = await import('../figma-cache.js');
   const cachePath = getFigmaFileCachePath(fileKey);
   
+  // Save all analyses and verify they're readable
+  const savedFiles: string[] = [];
   for (const result of analysisResults) {
     if (result.success && result.frame.analysis && !result.frame.cached) {
       const filename = result.frame.cacheFilename || result.frame.name;
       // Prepend Figma URL to analysis content before saving
       const analysisWithUrl = `**Figma URL:** ${result.frame.url}\n\n${result.frame.analysis}`;
       await saveAnalysisToCache(cachePath, filename, analysisWithUrl);
+      savedFiles.push(filename);
+    }
+  }
+  
+  // Verify saved files are readable (helps catch race conditions early)
+  if (savedFiles.length > 0) {
+    for (const filename of savedFiles) {
+      const analysisPath = join(cachePath, `${filename}.analysis.md`);
+      try {
+        await access(analysisPath);
+      } catch (error: any) {
+        console.warn(`  ⚠️  Warning: Saved file ${filename}.analysis.md not immediately accessible (${error.code})`);
+      }
     }
   }
   

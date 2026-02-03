@@ -21,7 +21,7 @@ import type { ToolDependencies } from '../types.js';
 // import type { AtlassianClient } from '../../../atlassian/atlassian-api-client.js';
 import type { FigmaClient } from '../../../figma/figma-api-client.js';
 import { getDebugDir, getBaseCacheDir } from '../writing-shell-stories/temp-directory-manager.js';
-import { getFigmaFileCachePath } from '../../../figma/figma-cache.js';
+import { getFigmaFileCachePath } from '../../../figma/screen-analyses-workflow/figma-cache.js';
 import { setupFigmaScreens, type FigmaScreenSetupResult } from '../writing-shell-stories/figma-screen-setup.js';
 import { setupConfluenceContext, type ConfluenceDocument } from '../shared/confluence-setup.js';
 import { setupGoogleDocsContext, type GoogleDocDocument } from '../shared/google-docs-setup.js';

@@ -15,7 +15,7 @@ import {
   type FigmaUrlInfo,
 } from '../figma-helpers.js';
 import type { FigmaClient } from '../figma-api-client.js';
-import { getFigmaFileCachePath } from '../figma-cache.js';
+import { getFigmaFileCachePath } from './figma-cache.js';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 

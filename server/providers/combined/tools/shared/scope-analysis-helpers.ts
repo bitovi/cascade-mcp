@@ -18,6 +18,9 @@ import type { ToolDependencies } from '../types.js';
 import type { Screen } from '../writing-shell-stories/screen-analyzer.js';
 import type { ScreenAnnotation } from './screen-annotation.js';
 import type { DocumentContext } from './google-docs-setup.js';
+import { getFigmaFileCachePath } from '../../../figma/screen-analyses-workflow/figma-cache.js';
+import path from 'path';
+import { readFile, writeFile } from 'fs/promises';
 
 /**
  * Question threshold for self-healing decision
@@ -363,8 +366,6 @@ export async function generateScopeAnalysis(
     FEATURE_IDENTIFICATION_SYSTEM_PROMPT,
     FEATURE_IDENTIFICATION_MAX_TOKENS,
   } = await import('../analyze-feature-scope/strategies/prompt-scope-analysis-2.js');
-  const path = await import('path');
-  const fs = await import('fs/promises');
 
   // Note: No progress notification here - caller handles progress messaging (per spec 040)
   
@@ -375,24 +376,21 @@ export async function generateScopeAnalysis(
     // Use pre-loaded analysis data directly
     analysisFiles = analysisData;
   } else if (screens && figmaFileKey) {
-    // Read from file cache
-    const { getFigmaFileCachePath } = await import('../../../figma/figma-cache.js');
+    // Read from file cache (files are synced to disk on write, so no retry needed)
     const fileCachePath = getFigmaFileCachePath(figmaFileKey);
     
     analysisFiles = [];
     for (const screen of screens) {
       const filename = screen.filename || screen.name;
       const analysisPath = path.join(fileCachePath, `${filename}.analysis.md`);
-      try {
-        const content = await fs.readFile(analysisPath, 'utf-8');
-        analysisFiles.push({
-          screenName: screen.name,
-          content,
-          url: screen.url
-        });
-      } catch (error: any) {
-        throw new Error(`Failed to read analysis file for screen ${screen.name} at ${analysisPath}. This indicates a filesystem error or race condition. Original error: ${error.message}`);
-      }
+      
+      const content = await readFile(analysisPath, 'utf-8');
+      
+      analysisFiles.push({
+        screenName: screen.name,
+        content,
+        url: screen.url
+      });
     }
   } else {
     throw new Error('generateScopeAnalysis requires either analysisData or (screens + figmaFileKey)');
@@ -416,7 +414,7 @@ export async function generateScopeAnalysis(
   // Save prompt to debug directory for debugging (if enabled)
   if (debugDir) {
     const promptPath = path.join(debugDir, 'scope-analysis-prompt.md');
-    await fs.writeFile(promptPath, prompt, 'utf-8');
+    await writeFile(promptPath, prompt, 'utf-8');
   }
   
   console.log(`    🤖 Scope analysis (${prompt.length} chars / ${FEATURE_IDENTIFICATION_MAX_TOKENS} max tokens)`);
@@ -449,7 +447,7 @@ Technical details:
   let scopeAnalysisPath = '';
   if (debugDir) {
     scopeAnalysisPath = path.join(debugDir, 'scope-analysis.md');
-    await fs.writeFile(scopeAnalysisPath, scopeAnalysisText, 'utf-8');
+    await writeFile(scopeAnalysisPath, scopeAnalysisText, 'utf-8');
   }
   
   // Count feature areas and questions

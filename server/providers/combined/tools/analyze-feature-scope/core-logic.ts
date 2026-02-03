@@ -11,7 +11,7 @@ import * as fs from 'fs/promises';
 import type { ToolDependencies } from '../types.js';
 import type { Screen } from '../writing-shell-stories/screen-analyzer.js';
 import { getBaseCacheDir } from '../writing-shell-stories/temp-directory-manager.js';
-import { getFigmaFileCachePath } from '../../../figma/figma-cache.js';
+import { getFigmaFileCachePath } from '../../../figma/screen-analyses-workflow/figma-cache.js';
 import { executeScreenAnalysisPipeline } from '../shared/screen-analysis-pipeline.js';
 import { setupConfluenceContext, type ConfluenceDocument } from '../shared/confluence-setup.js';
 import { setupGoogleDocsContext, type GoogleDocDocument, type DocumentContext } from '../shared/google-docs-setup.js';

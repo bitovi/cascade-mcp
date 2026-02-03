@@ -14,8 +14,11 @@ import {
   isCacheValid as defaultIsCacheValid,
   clearFigmaCache as defaultClearFigmaCache,
   saveFigmaMetadata as defaultSaveFigmaMetadata,
-} from '../figma-cache.js';
+} from './figma-cache.js';
 import type { FigmaClient } from '../figma-api-client.js';
+import { existsSync } from 'fs';
+import { readFile, writeFile, mkdir, access, open } from 'fs/promises';
+import { join } from 'path';
 
 // ============================================================================
 // Types
@@ -134,9 +137,6 @@ export async function hasAnalysisInCache(
   cachePath: string,
   filename: string
 ): Promise<boolean> {
-  const { existsSync } = await import('fs');
-  const { join } = await import('path');
-  
   const analysisPath = join(cachePath, `${filename}.analysis.md`);
   return existsSync(analysisPath);
 }
@@ -152,9 +152,6 @@ export async function loadAnalysisFromCache(
   cachePath: string,
   filename: string
 ): Promise<string | null> {
-  const { readFile } = await import('fs/promises');
-  const { join } = await import('path');
-  
   const analysisPath = join(cachePath, `${filename}.analysis.md`);
   
   try {
@@ -179,12 +176,18 @@ export async function saveAnalysisToCache(
   filename: string,
   analysis: string
 ): Promise<void> {
-  const { writeFile, mkdir } = await import('fs/promises');
-  const { join } = await import('path');
-  
   // Ensure cache directory exists
   await mkdir(cachePath, { recursive: true });
   
   const analysisPath = join(cachePath, `${filename}.analysis.md`);
-  await writeFile(analysisPath, analysis, 'utf-8');
+  
+  // Use file handle with fsync to ensure data is flushed to disk
+  // This prevents race conditions when reading immediately after writing
+  const handle = await open(analysisPath, 'w');
+  try {
+    await handle.writeFile(analysis, 'utf-8');
+    await handle.sync(); // Force flush to disk
+  } finally {
+    await handle.close();
+  }
 }

@@ -10,6 +10,8 @@ import type { GenerateTextFn, LLMRequest } from '../../../llm-client/types.js';
 import { generateSemanticXml as defaultGenerateSemanticXml } from '../semantic-xml-generator.js';
 import type { AnalyzedFrame, FrameAnnotation } from './types.js';
 import type { DownloadedImage } from './image-downloader.js';
+import { loadAnalysisFromCache } from './cache-validator.js';
+import { getFigmaFileCachePath } from './figma-cache.js';
 
 // ============================================================================
 // Types
@@ -210,8 +212,6 @@ export async function analyzeFrames(
   const framesToAnalyze: FrameAnalysisInput[] = [];
   
   if (fileKey) {
-    const { loadAnalysisFromCache } = await import('./cache-validator.js');
-    const { getFigmaFileCachePath } = await import('../figma-cache.js');
     const cachePath = getFigmaFileCachePath(fileKey);
     
     for (const input of inputs) {

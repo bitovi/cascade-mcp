@@ -11,6 +11,9 @@ import {
   type FigmaImageDownloadOptions,
 } from '../figma-helpers.js';
 import type { FigmaClient } from '../figma-api-client.js';
+import { getFigmaFileCachePath } from './figma-cache.js';
+import { readFile, access, writeFile, mkdir } from 'fs/promises';
+import { join } from 'path';
 
 // ============================================================================
 // Types
@@ -98,9 +101,6 @@ export async function downloadImages(
   const nodeIdsToDownload: string[] = [];
   
   if (cacheFilenames) {
-    const { getFigmaFileCachePath } = await import('../figma-cache.js');
-    const { readFile, access } = await import('fs/promises');
-    const { join } = await import('path');
     const cachePath = getFigmaFileCachePath(fileKey);
     
     for (const nodeId of nodeIds) {
@@ -165,7 +165,6 @@ export async function downloadImages(
         if (cacheFilenames) {
           const filename = cacheFilenames.get(nodeId);
           if (filename) {
-            const { getFigmaFileCachePath } = await import('../figma-cache.js');
             const cachePath = getFigmaFileCachePath(fileKey);
             await saveImageToCache(cachePath, filename, {
               nodeId,
@@ -227,9 +226,6 @@ export async function saveImageToCache(
   filename: string,
   image: DownloadedImage
 ): Promise<void> {
-  const { writeFile, mkdir } = await import('fs/promises');
-  const { join } = await import('path');
-  
   // Ensure cache directory exists
   await mkdir(cachePath, { recursive: true });
   

@@ -26,7 +26,7 @@ import type {
 } from '../../../figma/figma-comment-types.js';
 import { isFrameOffset } from '../../../figma/figma-comment-types.js';
 import type { ScreenAnnotation } from '../../../combined/tools/shared/screen-annotation.js';
-import { getFigmaFileCachePath } from '../../../figma/figma-cache.js';
+import { getFigmaFileCachePath } from '../../screen-analyses-workflow/figma-cache.js';
 
 // ============================================================================
 // Constants
