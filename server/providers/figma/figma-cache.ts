@@ -169,6 +169,29 @@ export async function saveFigmaMetadata(
 }
 
 /**
+ * Load Figma metadata from cache
+ * 
+ * @param figmaFileKey - Figma file key
+ * @returns Cached metadata, or null if not found
+ */
+export async function loadFigmaMetadata(
+  figmaFileKey: string
+): Promise<FigmaMetadata | null> {
+  const metadataPath = getFigmaMetadataPath(figmaFileKey);
+  
+  try {
+    const metadataContent = await fs.readFile(metadataPath, 'utf-8');
+    const metadata: FigmaMetadata = JSON.parse(metadataContent);
+    return metadata;
+  } catch (error: any) {
+    if (error.code !== 'ENOENT') {
+      console.log(`    ⚠️  Error reading cache metadata: ${error.message}`);
+    }
+    return null;
+  }
+}
+
+/**
  * Get file path for cached node asset
  * 
  * Converts node IDs (with colons) to filesystem-safe names

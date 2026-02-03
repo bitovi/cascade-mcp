@@ -25,7 +25,7 @@ import { getFigmaFileCachePath } from '../../../figma/figma-cache.js';
 import { setupFigmaScreens, type FigmaScreenSetupResult } from '../writing-shell-stories/figma-screen-setup.js';
 import { setupConfluenceContext, type ConfluenceDocument } from '../shared/confluence-setup.js';
 import { setupGoogleDocsContext, type GoogleDocDocument } from '../shared/google-docs-setup.js';
-import { regenerateScreenAnalyses } from '../shared/screen-analysis-regenerator.js';
+import { analyzeScreens, type AnalyzedFrame } from '../../../figma/screen-analyses-workflow/index.js';
 import { parseShellStoriesFromAdf, addCompletionMarkerToShellStory, type ParsedShellStoryADF } from './shell-story-parser.js';
 import { 
   generateStoryPrompt, 
@@ -481,21 +481,21 @@ export async function generateStoryContent(
     
     await notify(`Regenerating ${missingScreens.length} missing screen analyses...`);
     
-    const screensToAnalyze = setupResult.screens.filter(screen =>
-      missingScreens.some(missing => screen.name === missing.name)
-    );
-
-    await regenerateScreenAnalyses({
-      generateText,
+    // Get URLs for missing screens
+    const missingUrls = missingScreens.map(s => s.url);
+    
+    // Use consolidated screen-analyses-workflow
+    await analyzeScreens(
+      missingUrls,
       figmaClient,
-      screens: screensToAnalyze,
-      allFrames: setupResult.allFrames,
-      allNotes: setupResult.allNotes,
-      figmaFileKey: setupResult.figmaFileKey,
-      epicContext: setupResult.epicWithoutShellStoriesMarkdown,
-      nodesDataMap: setupResult.nodesDataMap,
-      notify: async (msg) => await notify(msg)
-    });
+      generateText,
+      {
+        analysisOptions: {
+          contextMarkdown: setupResult.epicWithoutShellStoriesMarkdown,
+        },
+        notify: async (msg: string) => await notify(msg),
+      }
+    );
     
     console.log(`  ✅ Regenerated ${missingScreens.length} analysis files`);
   }

@@ -222,6 +222,17 @@ npm run dev:client
   - `ensureValidCacheForGoogleDoc(documentId, modifiedTime)` - Validate/clear stale cache
   - Cache includes relevance scores to avoid re-scoring unchanged documents
 
+- **providers/figma/screen-analyses-workflow/** - Consolidated Figma Screen Analysis  
+  Unified workflow for analyzing Figma screens with AI-generated documentation.
+  - **Main Entry Point**: `analyzeScreens(urls, figmaClient, generateText, options)` - Complete workflow from URLs to documented frames
+  - **Features**: Semantic XML generation, meta-first caching (tier 3 API), node caching, comment/note association
+  - **Options**: `imageOptions` (format, scale), `analysisOptions` (contextMarkdown, systemPrompt), `notify` (progress callback)
+  - **Returns**: `FrameAnalysisResult` with `frames: AnalyzedFrame[]` and `figmaFileUrl`
+  - **Types**: `AnalyzedFrame`, `FrameAnnotation`, `ScreenAnalysisOptions`
+  - **Modules**: url-processor, frame-expander, annotation-associator, cache-validator, image-downloader, screen-analyzer
+  - *Used by*: `write-story`, `review-work-item` (via context-loader adapter)
+  - *Example*: `analyzeScreens(['https://figma.com/...'], client, generateText, { analysisOptions: { contextMarkdown } })`
+
 - **llm-client/** - LLM Client Integration (Vercel AI SDK)  
   Abstracts LLM access for API routes (Anthropic via AI SDK). MCP tools use MCP sampling separately.
   - **llm-client/types.ts** - Core types: `LLMRequest` (messages array), `LLMResponse`, `GenerateTextFn`

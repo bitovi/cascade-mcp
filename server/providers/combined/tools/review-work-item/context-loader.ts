@@ -5,8 +5,6 @@
  * in parallel to gather comprehensive context for story review.
  */
 
-import * as path from 'path';
-import * as fs from 'fs/promises';
 import type { AtlassianClient } from '../../../atlassian/atlassian-api-client.js';
 import type { FigmaClient } from '../../../figma/figma-api-client.js';
 import type { GenerateTextFn } from '../../../../llm-client/types.js';
@@ -19,30 +17,12 @@ import { setupConfluenceContext, type ConfluenceDocument } from '../shared/confl
 import { setupGoogleDocsContext, type GoogleDocDocument } from '../shared/google-docs-setup.js';
 import type { GoogleClient } from '../../../google/google-api-client.js';
 import { getJiraIssue } from '../../../atlassian/atlassian-helpers.js';
-import { 
-  parseFigmaUrl,
-  fetchFigmaNode,
-  getFramesAndNotesForNode,
-  downloadFigmaImagesBatch,
-  FigmaUnrecoverableError,
-  convertNodeIdToApiFormat,
-  type FigmaNodeMetadata
-} from '../../../figma/figma-helpers.js';
-import { getFigmaFileCachePath, ensureValidCacheForFigmaFile } from '../../../figma/figma-cache.js';
-import { 
-  generateScreenAnalysisPrompt, 
-  SCREEN_ANALYSIS_SYSTEM_PROMPT,
-  SCREEN_ANALYSIS_MAX_TOKENS 
-} from '../writing-shell-stories/prompt-screen-analysis.js';
-import { associateNotesWithFrames } from '../writing-shell-stories/screen-analyzer.js';
 import { buildIssueContextFromHierarchy } from '../shared/issue-context-builder.js';
-import {
-  fetchCommentsForFile,
-  groupCommentsIntoThreads,
-  formatCommentsForContext,
-  type FrameMetadata
-} from '../../../figma/tools/figma-review-design/figma-comment-utils.js';
 import type { ScreenAnnotation } from '../shared/screen-annotation.js';
+import {
+  analyzeScreens,
+  type AnalyzedFrame,
+} from '../../../figma/screen-analyses-workflow/index.js';
 
 // ============================================================================
 // Types
@@ -193,8 +173,8 @@ export async function loadLinkedResources(
     // Load Google Docs (if sourceAdf provided and googleClient available)
     loadGoogleDocs(sourceAdf, googleClient, generateText, notify),
     
-    // Load and analyze Figma screens (full analysis when figmaClient available)
-    loadFigmaScreens(links.figma, figmaClient, generateText, issueContext.markdown, notify),
+    // Load and analyze Figma screens using consolidated workflow
+    loadFigmaScreensViaWorkflow(links.figma, figmaClient, generateText, issueContext.markdown, notify),
     
     // Load additional Jira issues
     loadAdditionalJiraIssues(links.jira, atlassianClient, cloudId, siteName, notify)
@@ -317,264 +297,74 @@ async function loadGoogleDocs(
 }
 
 /**
- * Load and analyze Figma screens with full AI analysis
+ * Load and analyze Figma screens using the consolidated workflow
  * 
- * When figmaClient is available:
- * 1. Parses each Figma URL to extract file key and node ID
- * 2. Fetches node metadata (frames, notes)
- * 3. Downloads screen images
- * 4. Runs AI analysis on each screen
- * 5. Fetches and formats Figma comments
- * 6. Returns analyzed screens with descriptions and comments
+ * This is the new implementation that uses the screen-analyses-workflow module.
+ * It provides:
+ * - Semantic XML generation for better context
+ * - Meta-first caching (tier 3 API optimization)
+ * - Node-level caching
+ * - Unified annotation handling (comments + sticky notes)
  * 
- * Falls back to empty result if no figmaClient or if URLs can't be processed.
+ * @param figmaUrls - Array of Figma URLs to analyze
+ * @param figmaClient - Authenticated Figma API client
+ * @param generateText - LLM text generation function
+ * @param issueContext - Markdown context from the issue (for AI analysis)
+ * @param notify - Progress notification callback
+ * @returns Analyzed screens with AI descriptions and associated comments
  */
-async function loadFigmaScreens(
+async function loadFigmaScreensViaWorkflow(
   figmaUrls: string[],
   figmaClient: FigmaClient | undefined,
   generateText: GenerateTextFn,
-  epicContext: string,
+  issueContext: string,
   notify: (message: string) => Promise<void>
 ): Promise<{ screens: AnalyzedScreen[]; comments: ScreenAnnotation[] }> {
   if (figmaUrls.length === 0) {
     return { screens: [], comments: [] };
   }
-  
+
   if (!figmaClient) {
     console.log('  ⚠️  No Figma client available - skipping Figma analysis');
     return { screens: [], comments: [] };
   }
-  
-  const analyzedScreens: AnalyzedScreen[] = [];
-  let allFigmaComments: ScreenAnnotation[] = [];
-  
-  // Track cache stats for summary message (similar to write-shell-stories pattern)
-  let cachedCount = 0;
-  let analyzedCount = 0;
-  
-  // Group URLs by file key for efficient batching
-  const urlsByFileKey = new Map<string, Array<{ url: string; nodeId: string }>>();
-  
-  for (const url of figmaUrls) {
-    const parsed = parseFigmaUrl(url);
-    if (!parsed) {
-      console.log(`  ⚠️  Invalid Figma URL: ${url}`);
-      continue;
-    }
-    
-    const existing = urlsByFileKey.get(parsed.fileKey) || [];
-    existing.push({ url, nodeId: parsed.nodeId || '' });
-    urlsByFileKey.set(parsed.fileKey, existing);
-  }
-  
-  // Process each file key
-  for (const [fileKey, urls] of urlsByFileKey) {
-    try {
-      // Ensure cache is valid
-      await ensureValidCacheForFigmaFile(figmaClient, fileKey);
-      const fileCachePath = getFigmaFileCachePath(fileKey);
-      
-      // Collect all frames and notes for this file
-      const allFrames: FigmaNodeMetadata[] = [];
-      const allNotes: FigmaNodeMetadata[] = [];
-      const nodesDataMap = new Map<string, any>(); // Store node data for comment association
-      
-      for (const { url, nodeId } of urls) {
-        if (!nodeId) {
-          console.log(`  ⚠️  No node ID in URL: ${url}`);
-          continue;
-        }
-        
-        // Convert node ID from URL format (123-456) to API format (123:456)
-        const apiNodeId = convertNodeIdToApiFormat(nodeId);
-        
-        try {
-          const nodeData = await fetchFigmaNode(figmaClient, fileKey, apiNodeId);
-          
-          // Store node data for document tree (used for comment spatial matching)
-          nodesDataMap.set(apiNodeId, nodeData);
-          
-          const nodesMetadata = getFramesAndNotesForNode(nodeData, apiNodeId);
-          
-          // Separate frames and notes by type
-          for (const node of nodesMetadata) {
-            if (node.type === 'FRAME') {
-              if (!allFrames.some(existing => existing.id === node.id)) {
-                allFrames.push(node);
-              }
-            } else if (node.type === 'INSTANCE' && node.name === 'Note') {
-              if (!allNotes.some(existing => existing.id === node.id)) {
-                allNotes.push(node);
-              }
-            }
-          }
-        } catch (error: any) {
-          // Any Figma fetch error should fail the tool - don't silently continue without data
-          console.log(`  ❌ Failed to fetch Figma node ${apiNodeId}: ${error.message}`);
-          throw error;
-        }
-      }
-      
-      if (allFrames.length === 0) {
-        console.log(`  ⚠️  No frames found for file ${fileKey}`);
-        continue;
-      }
-      
-      console.log(`  🎨 Found ${allFrames.length} frames in file ${fileKey}`);
-      
-      // Fetch Figma comments for this file (similar to write-shell-stories Phase 3.8)
-      let fileComments: ScreenAnnotation[] = [];
-      let matchedThreadCount = 0;
-      try {
-        const comments = await fetchCommentsForFile(figmaClient, fileKey);
-        if (comments.length > 0) {
-          const threads = groupCommentsIntoThreads(comments);
-          
-          // Build frame metadata with bounding boxes for proximity matching
-          const frameMetadata: FrameMetadata[] = allFrames.map((frame) => ({
-            fileKey,
-            nodeId: frame.id,
-            name: frame.name,
-            url: `https://www.figma.com/file/${fileKey}?node-id=${frame.id.replace(/:/g, '-')}`,
-            x: frame.absoluteBoundingBox?.x,
-            y: frame.absoluteBoundingBox?.y,
-            width: frame.absoluteBoundingBox?.width,
-            height: frame.absoluteBoundingBox?.height,
-          }));
-          
-          // Build document tree from nodesDataMap for spatial containment checks
-          const documentTree = {
-            id: 'root',
-            children: Array.from(nodesDataMap.values())
-          };
-          
-          const commentResult = formatCommentsForContext(threads, frameMetadata, documentTree);
-          fileComments = commentResult.contexts;
-          matchedThreadCount = commentResult.matchedThreadCount;
-          console.log(`   💬 Fetched ${comments.length} comments → ${matchedThreadCount} threads across ${fileComments.length} screens`);
-        } else {
-          console.log('   💬 No Figma comments found');
-        }
-      } catch (error: any) {
-        console.log(`   ⚠️ Figma comment fetching failed: ${error.message}`);
-        // Continue without comments - they're optional context
-      }
-      
-      // Accumulate comments from this file
-      allFigmaComments = [...allFigmaComments, ...fileComments];
-      
-      // Notify about Figma analysis (similar to write-shell-stories pattern)
-      await notify(`🤖 Analyzing Figma: ${allFrames.length} screen(s), ${allNotes.length} note(s), ${matchedThreadCount} comment(s)...`);
-      
-      // Associate notes with frames
-      const baseUrl = `https://www.figma.com/file/${fileKey}`;
-      const associationResult = associateNotesWithFrames(allFrames, allNotes, baseUrl);
-      
-      // Download images for all frames in batch
-      // Note: No separate notification - part of the analysis phase
-      const frameIds = allFrames.map(f => f.id);
-      const imagesMap = await downloadFigmaImagesBatch(figmaClient, fileKey, frameIds);
-      
-      // Analyze each screen
-      let screenIndex = 0;
-      for (const frame of allFrames) {
-        screenIndex++;
-        const screenUrl = `https://www.figma.com/file/${fileKey}?node-id=${frame.id.replace(/:/g, '-')}`;
-        
-        // Get notes for this frame from association result
-        const screenData = associationResult.screens.find(s => s.url.includes(frame.id.replace(/:/g, '-')));
-        const notes = screenData?.notes || [];
-        const notesContent = notes.length > 0 ? notes.join('\n\n') : '';
-        
-        // Check cache first
-        const filename = sanitizeFilename(frame.name);
-        const analysisPath = path.join(fileCachePath, `${filename}.analysis.md`);
-        
-        let analysis: string;
-        
-        try {
-          // Try to read from cache
-          analysis = await fs.readFile(analysisPath, 'utf-8');
-          console.log(`  ✓ Cache hit: ${frame.name}`);
-          cachedCount++;
-        } catch {
-          // Not in cache - need to analyze
-          const imageData = imagesMap.get(frame.id);
-          
-          if (!imageData) {
-            console.log(`  ⚠️  No image for ${frame.name}`);
-            continue;
-          }
-          
-          // Save image to cache
-          const imagePath = path.join(fileCachePath, `${filename}.png`);
-          const imageBuffer = Buffer.from(imageData.base64Data, 'base64');
-          await fs.writeFile(imagePath, imageBuffer);
-          
-          // Generate analysis (no per-screen notification - summary at end)
-          console.log(`  🔍 Analyzing: ${frame.name}...`);
-          
-          const prompt = generateScreenAnalysisPrompt(
-            frame.name,
-            screenUrl,
-            `${screenIndex} of ${allFrames.length}`,
-            notesContent,
-            epicContext
-          );
-          
-          const response = await generateText({
-            messages: [
-              { role: 'system', content: SCREEN_ANALYSIS_SYSTEM_PROMPT },
-              {
-                role: 'user',
-                content: [
-                  { type: 'text', text: prompt },
-                  { type: 'image', data: imageData.base64Data, mimeType: 'image/png' }
-                ]
-              }
-            ],
-            maxTokens: SCREEN_ANALYSIS_MAX_TOKENS
-          });
-          
-          analysis = response.text;
-          
-          // Save to cache
-          await fs.writeFile(analysisPath, analysis, 'utf-8');
-          console.log(`  ✓ Analyzed: ${frame.name}`);
-          analyzedCount++;
-        }
-        
-        analyzedScreens.push({
-          name: frame.name,
-          url: screenUrl,
-          analysis,
-          notes
-        });
-      }
-      
-    } catch (error: any) {
-      console.log(`  ❌ Failed to process Figma file ${fileKey}: ${error.message}`);
-      throw error;
-    }
-  }
-  
-  // Summary notification (similar to write-shell-stories pattern)
-  if (analyzedScreens.length > 0) {
-    const cacheExplanation = cachedCount > 0 && analyzedCount === 0 ? ' (Figma file unchanged)' : '';
-    await notify(`Screen analysis complete: ${cachedCount} cached, ${analyzedCount} new${cacheExplanation}`);
-  }
-  
-  return { screens: analyzedScreens, comments: allFigmaComments };
-}
 
-/**
- * Sanitize filename for cache storage
- */
-function sanitizeFilename(name: string): string {
-  return name
-    .replace(/[^a-zA-Z0-9-_]/g, '-')
-    .replace(/-+/g, '-')
-    .toLowerCase();
+  // Call the consolidated workflow
+  const result = await analyzeScreens(
+    figmaUrls,
+    figmaClient,
+    generateText,
+    {
+      analysisOptions: {
+        contextMarkdown: issueContext, // Map caller's issueContext to workflow's contextMarkdown
+      },
+      notify,
+    }
+  );
+
+  // Convert AnalyzedFrame[] to AnalyzedScreen[]
+  const screens: AnalyzedScreen[] = result.frames.map(frame => ({
+    name: frame.frameName || frame.name,
+    url: frame.url,
+    analysis: frame.analysis || '',
+    notes: frame.annotations
+      .filter(a => a.type === 'note')
+      .map(a => a.content)
+  }));
+
+  // Extract comments from annotations
+  const comments: ScreenAnnotation[] = result.frames.flatMap(frame =>
+    frame.annotations
+      .filter(a => a.type === 'comment')
+      .map(a => ({
+        screenId: frame.nodeId,
+        screenName: frame.frameName || frame.name,
+        source: 'comments' as const,
+        markdown: a.author ? `**${a.author}:** ${a.content}` : a.content,
+      }))
+  );
+
+  return { screens, comments };
 }
 
 /**

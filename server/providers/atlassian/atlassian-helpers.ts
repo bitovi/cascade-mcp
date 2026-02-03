@@ -656,3 +656,25 @@ export async function fetchAllComments(
   // Convert to normalized IssueComment format
   return parseComments(allComments);
 }
+
+/**
+ * Extract project key from issue key
+ * 
+ * Jira issue keys follow the format "PROJECT-123" where the project key
+ * is everything before the first hyphen.
+ * 
+ * @param issueKey - Full issue key (e.g., "TF-101", "PROJ-1234")
+ * @returns Project key (e.g., "TF", "PROJ")
+ * @throws Error if issue key format is invalid
+ * 
+ * @example
+ * extractProjectKeyFromIssueKey('TF-101') // => 'TF'
+ * extractProjectKeyFromIssueKey('PROJ-1234') // => 'PROJ'
+ */
+export function extractProjectKeyFromIssueKey(issueKey: string): string {
+  const parts = issueKey.split('-');
+  if (parts.length < 2 || !parts[0]) {
+    throw new Error(`Invalid issue key format: ${issueKey}. Expected format: PROJECT-123`);
+  }
+  return parts[0];
+}

@@ -20,10 +20,15 @@ FUNDAMENTAL RULE: HOLISTIC ANALYSIS
 - Each question should be assigned to the MOST RELEVANT screen
 
 SCOPE AWARENESS:
-- **PRIORITY**: Context description is the primary source of truth for what's in/out of scope
-- If context says a feature is out-of-scope or already implemented, DO NOT ask questions about it
-- If context says a feature is in-scope, focus questions on implementation details and edge cases
-- When in doubt about scope, refer to context description first
+- **PRIORITY**: Context description and designer notes are the primary sources of truth for scope
+- If context or notes say a feature is out-of-scope or already implemented, DO NOT ask questions about it
+- In screen analyses, look for scope markers:
+  * ☐ = In-Scope: Features to implement (ASK questions about these)
+  * ✅ = Already Done: Existing features (DO NOT ask questions about these)
+  * ❌ = Out-of-Scope: Features to ignore (DO NOT ask questions about these)
+- ONLY generate questions about features marked with ☐ (in-scope checkboxes)
+- IGNORE all features marked with ✅ (already done) or ❌ (out-of-scope)
+- When in doubt about scope, refer to context description and notes first
 
 QUESTION QUALITY:
 - Ask about unclear behaviors, edge cases, and missing states
@@ -114,6 +119,11 @@ ${commentContexts.map((ctx) => `### ${ctx.screenName}\n\n${ctx.markdown}`).join(
 `
       : '';
 
+  // Log when comments/notes are included in prompt
+  if (commentContexts && commentContexts.length > 0) {
+    console.log(`  📝 Including ${commentContexts.length} context(s) in question generation prompt`);
+  }
+
   // Build screen analyses section
   const screensSection = screens
     .map(
@@ -134,13 +144,20 @@ ${screensSection}
 ## Instructions
 
 1. **Review context description** - Understand what's in-scope, out-of-scope, and already implemented
-2. **Review notes for scope guidance** - Notes on screens may specify what to focus on or ignore
-3. **Review all screens holistically** - Understand the complete user flow across all screens
-4. **Identify gaps in scope** - What would a developer need to know for in-scope features?
-5. **Check existing comments** - Skip questions already asked in comments
-6. **Respect scope boundaries** - Don't ask questions about out-of-scope or already-implemented features (from context or notes)
-7. **Assign questions to screens** - Each question goes under the most relevant screen
-8. **Avoid duplicates** - Don't repeat yourself or existing comments/notes
+2. **Review notes for scope guidance** - Notes on screens specify what to focus on or ignore
+3. **Review scope markers in analyses** - Look for ☐ (in-scope), ✅ (already done), ❌ (out-of-scope) markers
+4. **ONLY ask questions about ☐ in-scope features** - Skip all ✅ and ❌ features entirely
+5. **Review all screens holistically** - Understand the complete user flow across all screens
+6. **Identify gaps in scope** - What would a developer need to know for in-scope features?
+7. **Check existing comments** - Skip questions already asked in comments
+8. **Assign questions to screens** - Each question goes under the most relevant screen
+9. **Avoid duplicates** - Don't repeat yourself or existing comments/notes
+
+**CRITICAL FILTERING RULE:**
+- If a feature is marked with ✅ (Already Done) anywhere in the analysis, DO NOT generate questions about it
+- If a feature is marked with ❌ (Out-of-Scope), DO NOT generate questions about it
+- ONLY generate questions for features marked with ☐ (In-Scope checkboxes)
+- Example: If you see "✅ Already Done: Case management interface", skip ALL questions about case management
 
 ## Output Format
 
