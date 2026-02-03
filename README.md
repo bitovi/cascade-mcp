@@ -1,16 +1,28 @@
-# Cascading MCP Tools
+# Cascade MCP
 
-<img width="60" height="60" alt="cascade-mcp" src="https://github.com/user-attachments/assets/79a3f9d3-d323-4948-a563-e6788b32cda9" align="left" /> Cascading MCP Tools provides a collection of MCP (Model Context Protocol) capabilities for [Bitovi's Cascading AI Enablement](https://bitovi.atlassian.net/wiki/spaces/AIEnabledDevelopment/pages/1523351554/Cascading+v1+Desktop+AI+implements+Figma+and+Jira). This service enables AI agents to work with design and project management tools through OAuth-authenticated integrations.
+<img width="60" height="60" alt="cascade-mcp" src="https://github.com/user-attachments/assets/79a3f9d3-d323-4948-a563-e6788b32cda9" align="left" /> Cascade MCP helps you analyze Figma screens and write Jira tickets with AI! This open source project provides a collection of MCP (Model Context Protocol) capabilities for [Bitovi's Cascading AI Enablement Initiative](https://wiki.at.bitovi.com/wiki/spaces/AIEnabledDevelopment/pages/1520435217/Cascading+AI+Delivery). 
 
 <br />
 
-👉 Bitovi can help you integrate this into your own SDLC workflow: [AI for Software Teams](https://www.bitovi.com/ai-for-software-teams)
-
 <br clear="all" />
 
+Checkout our introduction video to understand what it can do:
 
 [![Watch the video](https://img.youtube.com/vi/MK0tdwDBTmc/0.jpg)](https://www.youtube.com/watch?v=MK0tdwDBTmc)
 
+👉 Btw, Bitovi can help you integrate this into your own SDLC workflow: [AI for Software Teams](https://www.bitovi.com/ai-for-software-teams)
+
+## Getting Started
+
+Read our [Getting Started Writing a Story from Figma](./docs/getting-started-writing-a-story-from-figma.md) on how to set up your Figma designs and Jira story for best results.
+
+Read our [Getting Started Building Epics and Stories from Figma](./docs/getting-started-building-epics-and-stories-from-figma.md) on how to set up your Figma designs and Jira story for best results.
+
+
+
+
+
+## Supported Tools 
 
 Supported tools at the `https://cascade.bitovi.com/mcp` endpoint:
 
