@@ -10,7 +10,7 @@ And show how to turn them into stories that look like:
 
 > <img width="920" height="787" alt="image" src="https://github.com/user-attachments/assets/6186272c-c6cd-4762-8395-5bd7cec4bce3" />
 
-There are 4 steps:
+There are 5 steps:
 
 1. Preparing Figma
 2. Asking clarifying questions with CascadeMCP
