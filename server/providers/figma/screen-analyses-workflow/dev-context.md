@@ -61,13 +61,17 @@ analyzeScreens(urls, figmaClient, generateText, options)
   │     └─ Returns: { frames: FigmaNodeMetadata[], notes: FigmaNodeMetadata[] }
   │
   ├─ 5. downloadImages(figmaClient, fileKey, nodeIds, options)
-  │     ├─ If cacheValid AND imagesCached(fileKey, nodeIds):
-  │     │     └─ Load from cache/figma-files/:key/:filename.png
-  │     ├─ Else:
-  │     │     ├─ downloadFigmaImagesBatch(figmaClient, fileKey, nodeIds, options)
+  │     ├─ Build cacheFilenames map (nodeId -> filename)
+  │     ├─ For each nodeId:
+  │     │     ├─ Check if image exists in cache: {filename}.png
+  │     │     ├─ If exists: Load from cache (no download)
+  │     │     └─ If missing: Add to download list
+  │     ├─ If nodesToDownload > 0:
+  │     │     ├─ downloadFigmaImagesBatch(figmaClient, fileKey, nodesToDownload, options)
   │     │     │     ├─ API call: GET /v1/images/:key?ids=...
   │     │     │     └─ Fetch images from Figma CDN URLs
-  │     │     └─ saveImageToCache(fileKey, nodeId, imageData)
+  │     │     └─ saveImageToCache(fileKey, filename, imageData)
+  │     │           └─ Write to cache/figma-files/:key/{filename}.png
   │     └─ Returns: { images: Map<nodeId, ImageData>, totalBytes }
   │
   ├─ 6. fetchAndAssociateAnnotations(figmaClient, fileKey, frames, notes)
@@ -90,9 +94,10 @@ analyzeScreens(urls, figmaClient, generateText, options)
   │
   ├─ 7. analyzeFrames(inputs, generateText, options)
   │     ├─ For each frame (parallel):
-  │     │     ├─ Check if frame invalidated by new comments
-  │     │     ├─ If not invalidated: Check cache: loadCachedAnalysis(fileKey, frame)
-  │     │     │     └─ Read from cache/figma-files/:key/:filename.analysis.md
+  │     │     ├─ Check if frame invalidated by new comments (in invalidatedFrameIds)
+  │     │     ├─ If NOT invalidated: Check cache: loadAnalysisFromCache(fileKey, frame)
+  │     │     │     ├─ Read from cache/figma-files/:key/{filename}.analysis.md
+  │     │     │     └─ If found: Return cached analysis (no AI call)
   │     │     ├─ If cache miss OR invalidated:
   │     │     │     ├─ generateSemanticXml(nodeData)
   │     │     │     │     └─ Build XML representation of Figma component tree

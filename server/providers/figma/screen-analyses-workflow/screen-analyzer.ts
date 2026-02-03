@@ -182,30 +182,79 @@ export async function analyzeFrame(
  * Analyze multiple frames in parallel
  * 
  * Processes frames concurrently with a configurable concurrency limit
- * to avoid overwhelming the LLM API.
+ * to avoid overwhelming the LLM API. Checks cache first and only re-analyzes
+ * frames that are missing from cache or invalidated by new comments.
  * 
  * @param inputs - Array of frame inputs to analyze
  * @param generateText - LLM text generation function
- * @param options - Analysis options
+ * @param options - Analysis options with cache control
  * @param deps - Optional dependency overrides
  * @returns Array of analysis results
  */
 export async function analyzeFrames(
   inputs: FrameAnalysisInput[],
   generateText: GenerateTextFn,
-  options: ScreenAnalysisOptions = {},
+  options: ScreenAnalysisOptions & { fileKey?: string; invalidatedFrameIds?: string[] } = {},
   deps: ScreenAnalyzerDeps = {}
 ): Promise<FrameAnalysisOutput[]> {
   if (inputs.length === 0) {
     return [];
   }
   
+  const { fileKey, invalidatedFrameIds = [] } = options;
+  
   console.log(`Analyzing ${inputs.length} frames...`);
   
-  // Process all frames (could add concurrency control here)
-  const results = await Promise.all(
-    inputs.map(input => analyzeFrame(input, generateText, options, deps))
-  );
+  // Check cache for each frame
+  const results: FrameAnalysisOutput[] = [];
+  const framesToAnalyze: FrameAnalysisInput[] = [];
+  
+  if (fileKey) {
+    const { loadAnalysisFromCache } = await import('./cache-validator.js');
+    const { getFigmaFileCachePath } = await import('../figma-cache.js');
+    const cachePath = getFigmaFileCachePath(fileKey);
+    
+    for (const input of inputs) {
+      const filename = input.frame.cacheFilename || input.frame.name;
+      const isInvalidated = invalidatedFrameIds.includes(input.frame.nodeId);
+      
+      // Try to load from cache if not invalidated
+      if (!isInvalidated) {
+        const cachedAnalysis = await loadAnalysisFromCache(cachePath, filename);
+        
+        if (cachedAnalysis) {
+          console.log(`  ♻️  Cache hit: ${filename}`);
+          results.push({
+            frame: {
+              ...input.frame,
+              analysis: cachedAnalysis,
+              cached: true,
+            },
+            semanticXml: '', // Not needed for cached results
+            success: true,
+          });
+          continue;
+        }
+      }
+      
+      // Cache miss or invalidated - need to analyze
+      console.log(`  ✗ Cache miss: ${filename}`);
+      framesToAnalyze.push(input);
+    }
+  } else {
+    // No fileKey provided, analyze all frames
+    framesToAnalyze.push(...inputs);
+  }
+  
+  console.log(`  📊 Analysis needed: ${framesToAnalyze.length} frames, Cached: ${results.length} frames`);
+  
+  // Analyze frames that need it
+  if (framesToAnalyze.length > 0) {
+    const freshResults = await Promise.all(
+      framesToAnalyze.map(input => analyzeFrame(input, generateText, options, deps))
+    );
+    results.push(...freshResults);
+  }
   
   const successCount = results.filter(r => r.success).length;
   console.log(`  ✅ Analyzed ${successCount}/${inputs.length} frames`);

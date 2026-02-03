@@ -17,6 +17,7 @@
 
 import type { FigmaClient } from '../figma-api-client.js';
 import type { GenerateTextFn } from '../../../llm-client/types.js';
+import { toKebabCase } from '../figma-helpers.js';
 import type { 
   AnalyzedFrame, 
   FrameAnalysisResult,
@@ -181,11 +182,19 @@ export async function analyzeScreens(
   // Step 5: Download frame images
   console.log(`\n🖼️ Step 5: Downloading frame images...`);
   const frameNodeIds = expanded.frames.map(f => f.id);
+  
+  // Build cache filename map for image caching
+  const cacheFilenames = new Map<string, string>();
+  for (const frame of expanded.frames) {
+    const filename = `${toKebabCase(frame.name)}_${frame.id.replace(/:/g, '-')}`;
+    cacheFilenames.set(frame.id, filename);
+  }
+  
   const imageResult = await d.downloadImages(
     figmaClient,
     fileKey,
     frameNodeIds,
-    imageOptions
+    { ...imageOptions, cacheFilenames }
   );
   
   // Step 6: Associate annotations
@@ -229,7 +238,11 @@ export async function analyzeScreens(
   const analysisResults = await d.analyzeFrames(
     analysisInputs,
     generateText,
-    analysisOptions
+    {
+      ...analysisOptions,
+      fileKey,
+      invalidatedFrameIds: annotationResult.invalidatedFrames || [],
+    }
   );
   
   // Step 7.5: Save analyses to cache

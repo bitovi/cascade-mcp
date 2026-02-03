@@ -65,12 +65,12 @@ export interface ImageDownloadResult {
  * 
  * Makes one API call to get all image URLs from Figma, then downloads
  * from CDN in parallel. For large batches (>50 images), automatically
- * chunks the API requests.
+ * chunks the API requests. Checks cache first to avoid re-downloading.
  * 
  * @param figmaClient - Authenticated Figma API client
  * @param fileKey - Figma file key
  * @param nodeIds - Array of node IDs in API format (e.g., "123:456")
- * @param options - Download options (format, scale)
+ * @param options - Download options (format, scale, cacheFilenames)
  * @param deps - Optional dependency overrides for testing
  * @returns Download result with images and failure info
  */
@@ -78,7 +78,7 @@ export async function downloadImages(
   figmaClient: FigmaClient,
   fileKey: string,
   nodeIds: string[],
-  options: FigmaImageDownloadOptions = {},
+  options: FigmaImageDownloadOptions & { cacheFilenames?: Map<string, string> } = {},
   {
     downloadFigmaImagesBatch = defaultDownloadFigmaImagesBatch,
   }: ImageDownloaderDeps = {}
@@ -87,34 +87,97 @@ export async function downloadImages(
     return { images: new Map(), failed: [], totalBytes: 0 };
   }
   
+  const { cacheFilenames } = options;
+  
   console.log(`  Downloading ${nodeIds.length} images...`);
   
-  // Use batch download (handles chunking internally)
-  const rawResults = await downloadFigmaImagesBatch(
-    figmaClient,
-    fileKey,
-    nodeIds,
-    options
-  );
-  
-  // Process results
+  // Check cache first if filenames provided
   const images = new Map<string, DownloadedImage>();
   const failed: string[] = [];
   let totalBytes = 0;
+  const nodeIdsToDownload: string[] = [];
   
-  for (const nodeId of nodeIds) {
-    const result = rawResults.get(nodeId);
+  if (cacheFilenames) {
+    const { getFigmaFileCachePath } = await import('../figma-cache.js');
+    const { readFile, access } = await import('fs/promises');
+    const { join } = await import('path');
+    const cachePath = getFigmaFileCachePath(fileKey);
     
-    if (result) {
-      images.set(nodeId, {
-        nodeId,
-        base64Data: result.base64Data,
-        mimeType: result.mimeType,
-        byteSize: result.byteSize,
-      });
-      totalBytes += result.byteSize;
-    } else {
-      failed.push(nodeId);
+    for (const nodeId of nodeIds) {
+      const filename = cacheFilenames.get(nodeId);
+      if (!filename) {
+        nodeIdsToDownload.push(nodeId);
+        continue;
+      }
+      
+      const imagePath = join(cachePath, `${filename}.png`);
+      
+      try {
+        await access(imagePath);
+        // File exists - load from cache
+        const imageBuffer = await readFile(imagePath);
+        const base64Data = imageBuffer.toString('base64');
+        
+        images.set(nodeId, {
+          nodeId,
+          base64Data,
+          mimeType: 'image/png',
+          byteSize: imageBuffer.length,
+        });
+        totalBytes += imageBuffer.length;
+        console.log(`    ♻️  Cache hit: ${filename}.png`);
+      } catch {
+        // Cache miss - need to download
+        console.log(`    ✗ Cache miss: ${filename}.png`);
+        nodeIdsToDownload.push(nodeId);
+      }
+    }
+  } else {
+    // No cache filenames provided, download all
+    nodeIdsToDownload.push(...nodeIds);
+  }
+  
+  // Download any images not in cache
+  if (nodeIdsToDownload.length > 0) {
+    console.log(`  Downloading batch of ${nodeIdsToDownload.length} images (${options.format || 'png'}, ${options.scale || 1}x)...`);
+    
+    const rawResults = await downloadFigmaImagesBatch(
+      figmaClient,
+      fileKey,
+      nodeIdsToDownload,
+      options
+    );
+    
+    // Process download results
+    for (const nodeId of nodeIdsToDownload) {
+      const result = rawResults.get(nodeId);
+      
+      if (result) {
+        images.set(nodeId, {
+          nodeId,
+          base64Data: result.base64Data,
+          mimeType: result.mimeType,
+          byteSize: result.byteSize,
+        });
+        totalBytes += result.byteSize;
+        
+        // Save to cache if filename provided
+        if (cacheFilenames) {
+          const filename = cacheFilenames.get(nodeId);
+          if (filename) {
+            const { getFigmaFileCachePath } = await import('../figma-cache.js');
+            const cachePath = getFigmaFileCachePath(fileKey);
+            await saveImageToCache(cachePath, filename, {
+              nodeId,
+              base64Data: result.base64Data,
+              mimeType: result.mimeType,
+              byteSize: result.byteSize,
+            });
+          }
+        }
+      } else {
+        failed.push(nodeId);
+      }
     }
   }
   
