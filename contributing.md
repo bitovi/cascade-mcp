@@ -272,13 +272,13 @@ If you want to use the Google service account encryption feature:
    - Paste your Google service account JSON
    - Copy the encrypted output
 
-4. **Add encrypted credentials to `.env`:**
+4. **Add encrypted credentials to `.env` (local development):**
 
    ```bash
    GOOGLE_SERVICE_ACCOUNT_ENCRYPTED=RSA-ENCRYPTED:eyJh...
    ```
 
-**Note:** If encryption keys are not configured, Google features will be gracefully disabled. The server will still start normally.
+**Note:** If encryption keys are not configured, Google features will be gracefully disabled. The server will still start normally. For production deployments, use GitHub Secrets or your cloud provider's secrets manager.
 
 ### 5. Configure Google Service Account (Alternative to OAuth)
 
@@ -297,11 +297,13 @@ If you prefer to use a Google Service Account instead of OAuth for Google Drive 
    - Paste your service account JSON
    - Click **Encrypt Credentials**
    - Copy the encrypted output (starts with `RSA-ENCRYPTED:`)
-3. Add the encrypted credentials to your `.env` file:
+3. Add the encrypted credentials to your `.env` file (local development):
 
    ```bash
    GOOGLE_SERVICE_ACCOUNT_ENCRYPTED="RSA-ENCRYPTED:eyJhbGci..."
    ```
+
+   **For production:** Use GitHub Secrets or your cloud provider's secrets manager to store `GOOGLE_SERVICE_ACCOUNT_ENCRYPTED`.
 
 **RSA Keys (Pre-Generated):**
 

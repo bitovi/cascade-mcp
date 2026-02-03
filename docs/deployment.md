@@ -99,6 +99,7 @@ GOOGLE_OAUTH_SCOPES="https://www.googleapis.com/auth/drive"
 # Generate keys locally: ./scripts/generate-rsa-keys.sh
 # Store in GitHub Secrets for staging/production deployments
 # Use different keys for each environment (dev/staging/prod)
+# See: docs/google-service-account-encryption.md for complete setup guide
 GOOGLE_RSA_PUBLIC_KEY=LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K...
 GOOGLE_RSA_PRIVATE_KEY=LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1J...
 
@@ -106,6 +107,7 @@ GOOGLE_RSA_PRIVATE_KEY=LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1J...
 # Generate encrypted credentials locally using http://localhost:3000/google-service-encrypt
 # Then set this environment variable with the encrypted output
 # Format: RSA-ENCRYPTED:<base64-encoded-encrypted-credentials>
+# See: docs/google-service-account-encryption.md for encryption workflow
 # GOOGLE_SERVICE_ACCOUNT_ENCRYPTED=RSA-ENCRYPTED:eyJhbGci...
 
 # Optional: AWS (for CloudWatch logging)
