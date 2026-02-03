@@ -1,7 +1,7 @@
 /**
- * Google RSA Key Manager
+ * RSA Credential Key Manager
  *
- * Manages RSA key pair for encrypting/decrypting Google service account credentials.
+ * Manages RSA key pair for encrypting/decrypting sensitive credentials.
  * Keys are loaded from environment variables (base64-encoded PEM format).
  */
 
@@ -44,8 +44,8 @@ export class EncryptionNotEnabledError extends Error {
 
   constructor(operation: string) {
     super(
-      `Google encryption not enabled. Cannot perform ${operation}.\n` +
-      'Configure encryption keys in environment variables (GOOGLE_RSA_PUBLIC_KEY, GOOGLE_RSA_PRIVATE_KEY).\n' +
+      `Encryption not enabled. Cannot perform ${operation}.\n` +
+      'Configure encryption keys in environment variables (RSA_PUBLIC_KEY, RSA_PRIVATE_KEY).\n' +
       'See docs/google-service-account-encryption.md for setup instructions.'
     );
     this.name = 'EncryptionNotEnabledError';
@@ -63,7 +63,7 @@ export class InvalidKeyFormatError extends Error {
   constructor(keyType: 'public' | 'private', details: string) {
     super(
       `Invalid ${keyType} key format: ${details}\n` +
-      `Ensure GOOGLE_RSA_${keyType.toUpperCase()}_KEY environment variable contains valid base64-encoded PEM format.\n` +
+      `Ensure RSA_${keyType.toUpperCase()}_KEY environment variable contains valid base64-encoded PEM format.\n` +
       'Run scripts/generate-rsa-keys.sh to generate new keys.'
     );
     this.name = 'InvalidKeyFormatError';
@@ -76,8 +76,8 @@ export class InvalidKeyFormatError extends Error {
  */
 function areKeysConfigured(): boolean {
   return !!(
-    process.env.GOOGLE_RSA_PUBLIC_KEY &&
-    process.env.GOOGLE_RSA_PRIVATE_KEY
+    process.env.RSA_PUBLIC_KEY &&
+    process.env.RSA_PRIVATE_KEY
   );
 }
 
@@ -131,14 +131,14 @@ function validatePemKey(pemKey: string, keyType: 'public' | 'private'): void {
 }
 
 /**
- * Key Manager for Google Service Account Encryption
+ * Key Manager for Credential Encryption
  *
  * Handles:
  * - Loading pre-generated RSA keys from environment variables
  * - Graceful degradation when keys are not configured
- * - Encryption/decryption of service account credentials
+ * - Encryption/decryption of sensitive credentials
  */
-export class GoogleKeyManager {
+export class CredentialKeyManager {
   private state: EncryptionState = {
     enabled: false,
     reason: 'keys-not-configured',
@@ -154,29 +154,29 @@ export class GoogleKeyManager {
    * @throws {InvalidKeyFormatError} if keys are malformed or invalid
    */
   async initialize(): Promise<void> {
-    console.log('Initializing Google encryption key manager...');
+    console.log('Initializing credential encryption key manager...');
 
     // Check if keys are configured
     if (!areKeysConfigured()) {
       this.state = {
         enabled: false,
         reason: 'keys-not-configured',
-        message: 'Environment variables GOOGLE_RSA_PUBLIC_KEY and GOOGLE_RSA_PRIVATE_KEY are not set',
+        message: 'Environment variables RSA_PUBLIC_KEY and RSA_PRIVATE_KEY are not set',
       };
-      console.log('  Google encryption keys not configured (graceful degradation)');
+      console.log('  Encryption keys not configured (graceful degradation)');
       return;
     }
 
     try {
       // Load and validate public key
       console.log('  Loading public key from environment...');
-      const publicKeyPem = loadKeyFromEnv('GOOGLE_RSA_PUBLIC_KEY', 'public');
+      const publicKeyPem = loadKeyFromEnv('RSA_PUBLIC_KEY', 'public');
       validatePemKey(publicKeyPem, 'public');
       this.publicKey = publicKeyPem;
 
       // Load and validate private key
       console.log('  Loading private key from environment...');
-      const privateKeyPem = loadKeyFromEnv('GOOGLE_RSA_PRIVATE_KEY', 'private');
+      const privateKeyPem = loadKeyFromEnv('RSA_PRIVATE_KEY', 'private');
       validatePemKey(privateKeyPem, 'private');
       this.privateKey = privateKeyPem;
 
@@ -187,7 +187,7 @@ export class GoogleKeyManager {
         privateKeyLoaded: true,
       };
 
-      console.log('  Google encryption keys loaded and validated successfully');
+      console.log('  Encryption keys loaded and validated successfully');
     } catch (error) {
       // Handle validation errors
       if (error instanceof InvalidKeyFormatError) {
@@ -204,7 +204,7 @@ export class GoogleKeyManager {
   }
 
   /**
-   * Check if Google encryption is enabled and ready to use
+   * Check if encryption is enabled and ready to use
    *
    * @returns true if keys are loaded and valid, false otherwise
    */
@@ -222,9 +222,9 @@ export class GoogleKeyManager {
   }
 
   /**
-   * Encrypt Google service account credentials
+   * Encrypt credentials
    *
-   * @param serviceAccountJson - Plaintext service account credentials
+   * @param credentials - Plaintext credentials object
    * @returns Encrypted string with format "RSA-ENCRYPTED:<base64>"
    *
    * @throws {EncryptionNotEnabledError} if encryption not enabled
@@ -232,20 +232,20 @@ export class GoogleKeyManager {
    *
    * @example
    * ```typescript
-   * const encrypted = await googleKeyManager.encrypt(serviceAccount);
+   * const encrypted = await credentialKeyManager.encrypt(credentials);
    * // Store encrypted string in config/env
    * ```
    */
-  async encrypt(serviceAccountJson: GoogleServiceAccountCredentials): Promise<string> {
+  async encrypt(credentials: GoogleServiceAccountCredentials): Promise<string> {
     if (!this.isEnabled()) {
       throw new EncryptionNotEnabledError('encrypt');
     }
 
-    console.log('Encrypting Google service account credentials...');
-    console.log(`  Service Account: ${serviceAccountJson.client_email}`);
-    console.log(`  Project ID: ${serviceAccountJson.project_id}`);
+    console.log('Encrypting credentials...');
+    console.log(`  Client Email: ${credentials.client_email}`);
+    console.log(`  Project ID: ${credentials.project_id}`);
 
-    const plaintext = JSON.stringify(serviceAccountJson);
+    const plaintext = JSON.stringify(credentials);
     const encrypted = await encryptWithPublicKey(plaintext, this.publicKey!);
 
     console.log('  Encryption successful');
@@ -254,18 +254,18 @@ export class GoogleKeyManager {
   }
 
   /**
-   * Decrypt encrypted Google service account credentials
+   * Decrypt encrypted credentials
    *
    * @param encryptedData - Encrypted string in format "RSA-ENCRYPTED:<base64>"
-   * @returns Decrypted service account credentials
+   * @returns Decrypted credentials
    *
    * @throws {EncryptionNotEnabledError} if encryption not enabled
    * @throws {Error} if decryption operation fails or data is invalid
    *
    * @example
    * ```typescript
-   * const decrypted = await googleKeyManager.decrypt(encryptedString);
-   * // Use decrypted credentials to create Google client
+   * const decrypted = await credentialKeyManager.decrypt(encryptedString);
+   * // Use decrypted credentials to create client
    * ```
    */
   async decrypt(encryptedData: string): Promise<GoogleServiceAccountCredentials> {
@@ -273,33 +273,33 @@ export class GoogleKeyManager {
       throw new EncryptionNotEnabledError('decrypt');
     }
 
-    console.log('Decrypting Google service account credentials...');
+    console.log('Decrypting credentials...');
 
     const decrypted = await decryptWithPrivateKey(encryptedData, this.privateKey!);
 
     // Parse and validate JSON
-    let serviceAccount: GoogleServiceAccountCredentials;
+    let credentials: GoogleServiceAccountCredentials;
     try {
-      serviceAccount = JSON.parse(decrypted);
+      credentials = JSON.parse(decrypted);
     } catch (error) {
       throw new Error('Decrypted data is not valid JSON');
     }
 
     // Validate it's a service account
-    if (serviceAccount.type !== 'service_account') {
-      throw new Error('Decrypted data is not a Google service account JSON');
+    if (credentials.type !== 'service_account') {
+      throw new Error('Decrypted data is not a valid service account JSON');
     }
 
     console.log('  Decryption successful');
-    console.log(`  Service Account: ${serviceAccount.client_email}`);
-    console.log(`  Project ID: ${serviceAccount.project_id}`);
+    console.log(`  Client Email: ${credentials.client_email}`);
+    console.log(`  Project ID: ${credentials.project_id}`);
 
-    return serviceAccount;
+    return credentials;
   }
 }
 
 /**
- * Singleton instance for Google key management
- * Keys loaded from environment variables (GOOGLE_RSA_PUBLIC_KEY, GOOGLE_RSA_PRIVATE_KEY)
+ * Singleton instance for credential key management
+ * Keys loaded from environment variables (RSA_PUBLIC_KEY, RSA_PRIVATE_KEY)
  */
-export const googleKeyManager = new GoogleKeyManager();
+export const credentialKeyManager = new CredentialKeyManager();

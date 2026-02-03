@@ -51,22 +51,22 @@ PUBLIC_KEY_B64=$(base64 < public.pem | tr -d '\n')
 PRIVATE_KEY_B64=$(base64 < private.pem | tr -d '\n')
 
 # Output in .env format for easy copy-paste
-echo "GOOGLE_RSA_PUBLIC_KEY=\"${PUBLIC_KEY_B64}\""
+echo "RSA_PUBLIC_KEY=\"${PUBLIC_KEY_B64}\""
 echo ""
-echo "GOOGLE_RSA_PRIVATE_KEY=\"${PRIVATE_KEY_B64}\""
+echo "RSA_PRIVATE_KEY=\"${PRIVATE_KEY_B64}\""
 echo ""
 
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${YELLOW}⚠️  Security Notes:${NC}"
 echo ""
-echo "  • Keep private.pem and GOOGLE_RSA_PRIVATE_KEY secret"
+echo "  • Keep private.pem and RSA_PRIVATE_KEY secret"
 echo "  • Never commit private keys to version control"
 echo "  • Use different keys for dev, staging, and production"
 echo "  • Store production keys in GitHub Secrets Manager"
 echo ""
 echo -e "${YELLOW}💡 Copy-Paste Tips:${NC}"
 echo ""
-echo "  • Copy the ENTIRE line including quotes: GOOGLE_RSA_PUBLIC_KEY=\"...\""
+echo "  • Copy the ENTIRE line including quotes: RSA_PUBLIC_KEY=\"...\""
 echo "  • The quotes are REQUIRED to preserve special characters"
 echo "  • Don't add extra line breaks when pasting into .env"
 echo "  • Verify: keys should be one continuous base64 string"

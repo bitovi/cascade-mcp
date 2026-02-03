@@ -32,7 +32,7 @@ import { logEnvironmentInfo } from './debug-helpers.js';
 import { registerRestApiRoutes } from './api/index.js';
 import { getProjectRoot } from './utils/file-paths.js';
 import { handleEncryptionRequest } from './google-service-encrypt.js';
-import { googleKeyManager, InvalidKeyFormatError } from './utils/key-manager.js';
+import { credentialKeyManager, InvalidKeyFormatError } from './utils/key-manager.js';
 
 // configurations
 dotenv.config();
@@ -282,8 +282,8 @@ app.post('/refresh-token', accessToken);
   // Initialize Google encryption key manager
   console.log('\n========== GOOGLE ENCRYPTION INITIALIZATION ==========');
   try {
-    await googleKeyManager.initialize();
-    const state = googleKeyManager.getState();
+    await credentialKeyManager.initialize();
+    const state = credentialKeyManager.getState();
     
     if (state.enabled) {
       console.log('✅ Google encryption enabled');
@@ -291,7 +291,7 @@ app.post('/refresh-token', accessToken);
     } else {
       console.log('ℹ️  Google encryption keys not configured');
       console.log('   Google Drive/Docs features will be unavailable');
-      console.log('   To enable: Set GOOGLE_RSA_PUBLIC_KEY and GOOGLE_RSA_PRIVATE_KEY');
+      console.log('   To enable: Set RSA_PUBLIC_KEY and RSA_PRIVATE_KEY');
       console.log('   See docs/google-service-account-encryption.md for setup');
     }
   } catch (error) {
