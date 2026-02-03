@@ -14,6 +14,7 @@ import {
 import type { CommentThread } from '../figma-comment-types.js';
 import type { FigmaClient } from '../figma-api-client.js';
 import type { FigmaNodeMetadata } from '../figma-helpers.js';
+import { toKebabCase } from '../figma-helpers.js';
 import type { AnalyzedFrame, FrameAnnotation } from './types.js';
 import { buildFigmaUrl } from './url-processor.js';
 
@@ -402,6 +403,7 @@ function mergeAnnotationsIntoFrames(
       url: buildFigmaUrl(fileKey, frame.id),
       annotations,
       frameName: frame.name,
+      cacheFilename: `${toKebabCase(frame.name)}_${frame.id.replace(/:/g, '-')}`,
       position: frame.absoluteBoundingBox ? {
         x: frame.absoluteBoundingBox.x,
         y: frame.absoluteBoundingBox.y,

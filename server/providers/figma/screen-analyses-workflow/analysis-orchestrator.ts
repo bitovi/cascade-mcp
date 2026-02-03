@@ -232,6 +232,20 @@ export async function analyzeScreens(
     analysisOptions
   );
   
+  // Step 7.5: Save analyses to cache
+  const { saveAnalysisToCache } = await import('./cache-validator.js');
+  const { getFigmaFileCachePath } = await import('../figma-cache.js');
+  const cachePath = getFigmaFileCachePath(fileKey);
+  
+  for (const result of analysisResults) {
+    if (result.success && result.frame.analysis && !result.frame.cached) {
+      const filename = result.frame.cacheFilename || result.frame.name;
+      // Prepend Figma URL to analysis content before saving
+      const analysisWithUrl = `**Figma URL:** ${result.frame.url}\n\n${result.frame.analysis}`;
+      await saveAnalysisToCache(cachePath, filename, analysisWithUrl);
+    }
+  }
+  
   // Extract frames from results
   const analyzedFrames = analysisResults.map(r => r.frame);
   
