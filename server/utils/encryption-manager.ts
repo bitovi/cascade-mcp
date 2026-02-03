@@ -254,6 +254,28 @@ export class EncryptionManager {
   }
 
   /**
+   * Get the base64-encoded public key for client-side encryption
+   *
+   * @returns Base64-encoded public key or null if not available
+   *
+   * @example
+   * ```typescript
+   * const publicKey = encryptionManager.getPublicKey();
+   * if (publicKey) {
+   *   // User can copy and use for manual encryption
+   * }
+   * ```
+   */
+  getPublicKey(): string | null {
+    if (!this.isEnabled() || !this.publicKey) {
+      return null;
+    }
+    
+    // Return base64-encoded version (same as environment variable format)
+    return Buffer.from(this.publicKey, 'utf8').toString('base64');
+  }
+
+  /**
    * Decrypt encrypted credentials
    *
    * @param encryptedData - Encrypted string in format "RSA-ENCRYPTED:<base64>"

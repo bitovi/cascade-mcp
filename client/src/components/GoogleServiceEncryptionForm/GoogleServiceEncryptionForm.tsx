@@ -11,6 +11,10 @@ interface EncryptionStatus {
   message: string;
 }
 
+interface PublicKeyResponse {
+  publicKey: string;
+}
+
 export function GoogleServiceEncryptionForm() {
   const [serviceAccountJson, setServiceAccountJson] = useState('');
   const [isEncrypting, setIsEncrypting] = useState(false);
@@ -18,12 +22,22 @@ export function GoogleServiceEncryptionForm() {
   const [error, setError] = useState<string | null>(null);
   const [encryptionStatus, setEncryptionStatus] = useState<EncryptionStatus | null>(null);
   const [isCheckingStatus, setIsCheckingStatus] = useState(true);
+  const [publicKey, setPublicKey] = useState<string | null>(null);
 
   useEffect(() => {
     // Check encryption status on mount
     fetch('/api/encryption-status')
       .then((res) => res.json())
-      .then((data) => setEncryptionStatus(data))
+      .then((data) => {
+        setEncryptionStatus(data);
+        // If enabled, fetch public key
+        if (data.enabled) {
+          return fetch('/api/public-key')
+            .then((res) => res.json())
+            .then((keyData: PublicKeyResponse) => setPublicKey(keyData.publicKey))
+            .catch(() => {});
+        }
+      })
       .catch(() => setEncryptionStatus({ enabled: false, message: 'Failed to check encryption status' }))
       .finally(() => setIsCheckingStatus(false));
   }, []);
@@ -73,6 +87,17 @@ export function GoogleServiceEncryptionForm() {
     try {
       await navigator.clipboard.writeText(result.encrypted);
       alert('✅ Copied to clipboard!');
+    } catch {
+      alert('❌ Failed to copy. Please select and copy manually.');
+    }
+  };
+
+  const handleCopyPublicKey = async () => {
+    if (!publicKey) return;
+    
+    try {
+      await navigator.clipboard.writeText(publicKey);
+      alert('✅ Public key copied to clipboard!');
     } catch {
       alert('❌ Failed to copy. Please select and copy manually.');
     }
@@ -185,11 +210,30 @@ GOOGLE_SERVICE_ACCOUNT_ENCRYPTED=RSA-ENCRYPTED:...
           </p>
         </div>
         
-        <div className="bg-blue-50 border-l-4 border-blue-500 p-4">
+        <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
           <p className="text-sm text-blue-900">
             📝 Paste your Google service account JSON below (typically named <code className="bg-blue-100 px-1 py-0.5 rounded text-xs">google.json</code>). We'll encrypt it and give you a string you can use with Google Doc conversion tools.
           </p>
         </div>
+
+        {/* Public Key Section - Only show if encryption is enabled */}
+        {publicKey && (
+          <div className="bg-purple-50 border-l-4 border-purple-500 p-4">
+            <h4 className="font-semibold text-purple-900 mb-2">🔑 Manual Encryption</h4>
+            <p className="text-sm text-purple-800 mb-3">
+              Want to encrypt locally without using this form? Copy the public key and use it programmatically with your own encryption script.
+            </p>
+            <button
+              onClick={handleCopyPublicKey}
+              className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-md hover:bg-purple-700 transition-colors"
+            >
+              📋 Copy Public Key
+            </button>
+            <p className="text-xs text-purple-700 mt-2">
+              Public key is safe to share and can only be used for encryption, not decryption.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Form */}
