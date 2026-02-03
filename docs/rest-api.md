@@ -57,7 +57,6 @@ X-Google-Token: RSA-ENCRYPTED:fx/3go4xa4K/...
 
 See the [Google Service Account Encryption Guide](./google-service-account-encryption.md) for detailed instructions.
 
-⚠️ **SECURITY**: Always use encrypted credentials (`X-Google-Token`). Never pass plaintext service account JSON in production.
 
 Quick setup:
 1. Create service account in [Google Cloud Console](https://console.cloud.google.com/)
