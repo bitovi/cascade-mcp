@@ -39,7 +39,14 @@ If no scope analysis is provided, create one with:
 
 ### Non-Functional Requirements (if applicable)
 Performance, security, accessibility, or other technical requirements.
-**ONLY include NFRs that are EXPLICITLY mentioned in the provided context (Figma, Confluence, Google Docs, comments). Do NOT generate or infer requirements.**
+
+**CRITICAL: ONLY include NFRs that are EXPLICITLY mentioned in the provided context (Figma, Confluence, Google Docs, comments).**
+- DO NOT infer or generate requirements based on best practices
+- DO NOT add accessibility requirements (ARIA labels, keyboard nav, etc.) unless explicitly mentioned
+- DO NOT add performance requirements (caching, optimization, etc.) unless explicitly mentioned
+- DO NOT add security requirements unless explicitly mentioned
+- If no NFRs are explicitly stated in the context, SKIP this section entirely
+
 
 ### Developer Notes (if applicable)
 Implementation hints, dependencies, or technical considerations.

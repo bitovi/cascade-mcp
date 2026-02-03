@@ -221,7 +221,7 @@ describe('analyzeFrame', () => {
       ? userMessage.content 
       : userMessage.content.find((c: any) => c.type === 'text')?.text;
     
-    expect(textContent).toContain('### Context');
+    expect(textContent).toContain('## Feature Context & Priorities');
     expect(textContent).toContain('Epic Context');
   });
 });
@@ -300,14 +300,14 @@ describe('buildAnalysisPrompt', () => {
     const frame = createMockFrame({ frameName: 'Login Screen' });
     const prompt = buildAnalysisPrompt(frame, '<Screen>...</Screen>');
     
-    expect(prompt).toContain('## Screen: Login Screen');
+    expect(prompt).toContain('# Screen: Login Screen');
   });
   
   it('should fall back to sanitized name', () => {
     const frame = createMockFrame({ name: 'login-screen', frameName: undefined });
     const prompt = buildAnalysisPrompt(frame, '<Screen>...</Screen>');
     
-    expect(prompt).toContain('## Screen: login-screen');
+    expect(prompt).toContain('# Screen: login-screen');
   });
   
   it('should include section context when available', () => {
@@ -315,6 +315,28 @@ describe('buildAnalysisPrompt', () => {
     const prompt = buildAnalysisPrompt(frame, '<Screen>...</Screen>');
     
     expect(prompt).toContain('**Section**: Authentication Flow');
+  });
+  
+  it('should include screen order when frame has order and totalFrames provided', () => {
+    const frame = createMockFrame({ order: 2 }); // 0-indexed, so this is screen 3
+    const prompt = buildAnalysisPrompt(frame, '<Screen>...</Screen>', undefined, 5);
+    
+    expect(prompt).toContain('- **Screen Order:** 3 of 5');
+  });
+  
+  it('should include screen order without total when totalFrames not provided', () => {
+    const frame = createMockFrame({ order: 0 }); // First screen
+    const prompt = buildAnalysisPrompt(frame, '<Screen>...</Screen>');
+    
+    // Should show "1" without " of X"
+    expect(prompt).toContain('- **Screen Order:** 1\n');
+  });
+  
+  it('should omit screen order when frame has no order', () => {
+    const frame = createMockFrame({ order: undefined });
+    const prompt = buildAnalysisPrompt(frame, '<Screen>...</Screen>');
+    
+    expect(prompt).not.toContain('Screen Order');
   });
   
   it('should include annotations when available', () => {
@@ -325,7 +347,7 @@ describe('buildAnalysisPrompt', () => {
     const frame = createMockFrame({ annotations });
     const prompt = buildAnalysisPrompt(frame, '<Screen>...</Screen>');
     
-    expect(prompt).toContain('### Designer Notes');
+    expect(prompt).toContain('## Design Notes & Annotations');
     expect(prompt).toContain('**Note**: This is the main login screen');
     expect(prompt).toContain('**Comment (Designer)**: Add forgot password link');
   });
@@ -335,7 +357,7 @@ describe('buildAnalysisPrompt', () => {
     const xml = '<Screen name="Test"><Button>Click me</Button></Screen>';
     const prompt = buildAnalysisPrompt(frame, xml);
     
-    expect(prompt).toContain('### UI Structure (Semantic XML)');
+    expect(prompt).toContain('## Figma Semantic Structure');
     expect(prompt).toContain('```xml');
     expect(prompt).toContain(xml);
     expect(prompt).toContain('```');
@@ -343,24 +365,26 @@ describe('buildAnalysisPrompt', () => {
   
   it('should include contextMarkdown when provided', () => {
     const frame = createMockFrame();
-    const contextMarkdown = `## Epic: Login Feature
+    const contextMarkdown = `## Feature: Login Feature
 
-This epic covers the authentication flow including:
+This feature covers the authentication flow including:
 - Login form
 - Password reset
 - OAuth integration`;
     const prompt = buildAnalysisPrompt(frame, '<Screen>...</Screen>', contextMarkdown);
     
-    expect(prompt).toContain('### Context');
-    expect(prompt).toContain('## Epic: Login Feature');
+    expect(prompt).toContain('## Feature Context & Priorities');
+    expect(prompt).toContain('## Feature: Login Feature');
     expect(prompt).toContain('OAuth integration');
   });
   
-  it('should omit context section when contextMarkdown is undefined', () => {
+  it('should show no feature context message when contextMarkdown is undefined', () => {
     const frame = createMockFrame();
     const prompt = buildAnalysisPrompt(frame, '<Screen>...</Screen>');
     
-    expect(prompt).not.toContain('### Context');
+    // The section header is always present, but shows fallback message
+    expect(prompt).toContain('## Feature Context & Priorities');
+    expect(prompt).toContain('No feature context provided for this analysis.');
   });
 });
 
