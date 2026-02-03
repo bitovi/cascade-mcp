@@ -261,8 +261,8 @@ If you want to use the Google service account encryption feature:
    Copy the base64-encoded output from the script:
 
    ```bash
-   GOOGLE_RSA_PUBLIC_KEY=LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K...
-   GOOGLE_RSA_PRIVATE_KEY=LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1J...
+   RSA_PUBLIC_KEY=LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K...
+   RSA_PRIVATE_KEY=LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1J...
    ```
 
 3. **Encrypt your service account:**
@@ -308,14 +308,14 @@ If you prefer to use a Google Service Account instead of OAuth for Google Drive 
 **RSA Keys (Pre-Generated):**
 
 - Generate keys manually using `./scripts/generate-rsa-keys.sh`
-- Keys are stored in environment variables: `GOOGLE_RSA_PUBLIC_KEY` and `GOOGLE_RSA_PRIVATE_KEY`
+- Keys are stored in environment variables: `RSA_PUBLIC_KEY` and `RSA_PRIVATE_KEY`
 - Keys are base64-encoded for easy storage in `.env` or GitHub Secrets
 - Server validates keys at startup, providing clear error messages if invalid
 - If keys are not configured, Google encryption features are gracefully disabled
 
 **Security Notes:**
 
-- Never commit `private.pem`, `public.pem`, or `GOOGLE_RSA_PRIVATE_KEY` to version control
+- Never commit `private.pem`, `public.pem`, or `RSA_PRIVATE_KEY` to version control
 - The private key remains server-side and is never exposed to the client
 - Encrypted credentials are safe to store in `.env`, environment variables, or version control
 - For production, use GitHub Secrets or a secrets manager (AWS Secrets Manager, HashiCorp Vault)

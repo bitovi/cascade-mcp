@@ -165,7 +165,7 @@ GOOGLE_SERVICE_ACCOUNT_ENCRYPTED=RSA-ENCRYPTED:...
               <ol className="text-xs text-red-900 space-y-1 ml-4 list-decimal">
                 <li>Run <code className="bg-red-200 px-1 py-0.5 rounded">./scripts/generate-rsa-keys.sh</code> to generate keys</li>
                 <li>Copy the base64-encoded keys to your <code className="bg-red-200 px-1 py-0.5 rounded">.env</code> file</li>
-                <li>Set <code className="bg-red-200 px-1 py-0.5 rounded">GOOGLE_RSA_PUBLIC_KEY</code> and <code className="bg-red-200 px-1 py-0.5 rounded">GOOGLE_RSA_PRIVATE_KEY</code></li>
+                <li>Set <code className="bg-red-200 px-1 py-0.5 rounded">RSA_PUBLIC_KEY</code> and <code className="bg-red-200 px-1 py-0.5 rounded">RSA_PRIVATE_KEY</code></li>
                 <li>Restart the server</li>
               </ol>
               <p className="text-xs text-red-900 mt-2">

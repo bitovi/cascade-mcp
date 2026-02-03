@@ -20,8 +20,8 @@ Add the base64-encoded keys to your `.env` file:
 
 ```bash
 # Copy the ENTIRE line from the script output (including quotes)
-GOOGLE_RSA_PUBLIC_KEY="LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K..."
-GOOGLE_RSA_PRIVATE_KEY="LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1J..."
+RSA_PUBLIC_KEY="LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K..."
+RSA_PRIVATE_KEY="LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1J..."
 ```
 
 **Important:**
@@ -29,7 +29,7 @@ GOOGLE_RSA_PRIVATE_KEY="LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1J..."
 - Copy the entire line including the quotes from the script output
 - The quotes are REQUIRED to preserve special characters
 - Keys should be one continuous base64 string (no line breaks)
-- Never commit `private.pem` or `GOOGLE_RSA_PRIVATE_KEY` to version control!
+- Never commit `private.pem` or `RSA_PRIVATE_KEY` to version control!
 
 ### 3. Encrypt Your Service Account
 
@@ -89,8 +89,8 @@ public.pem   # Used for encryption, safe to publish if needed
 
 Keys are loaded from environment variables:
 
-- `GOOGLE_RSA_PUBLIC_KEY` - Base64-encoded public key
-- `GOOGLE_RSA_PRIVATE_KEY` - Base64-encoded private key (keep secret!)
+- `RSA_PUBLIC_KEY` - Base64-encoded public key
+- `RSA_PRIVATE_KEY` - Base64-encoded private key (keep secret!)
 
 ## 🔄 Key Rotation
 
@@ -128,7 +128,7 @@ See [specs/001-static-encryption-keys/](../specs/001-static-encryption-keys/) fo
 
 ## ⚠️ Important Notes
 
-- **Never commit** `private.pem` or `GOOGLE_RSA_PRIVATE_KEY` to version control
+- **Never commit** `private.pem` or `RSA_PRIVATE_KEY` to version control
 - **Always use HTTPS** in production
 - **Use different keys** for dev, staging, and production environments
 - **Rotate keys** when team members with access to keys leave
@@ -147,29 +147,29 @@ See [specs/001-static-encryption-keys/](../specs/001-static-encryption-keys/) fo
 
    ```bash
    # ✅ CORRECT (with quotes)
-   GOOGLE_RSA_PUBLIC_KEY="LS0tLS1CRUdJTi..."
+   RSA_PUBLIC_KEY="LS0tLS1CRUdJTi..."
    
    # ❌ WRONG (without quotes)
-   GOOGLE_RSA_PUBLIC_KEY=LS0tLS1CRUdJTi...
+   RSA_PUBLIC_KEY=LS0tLS1CRUdJTi...
    ```
 
 2. **Check for line breaks** - Keys must be one continuous string:
 
    ```bash
    # ❌ WRONG (has line breaks)
-   GOOGLE_RSA_PUBLIC_KEY="LS0tLS1CRUdJTi
+   RSA_PUBLIC_KEY="LS0tLS1CRUdJTi
    BQVUJERUZSBLT...
    VLUSURLS0tLS0K"
    
    # ✅ CORRECT (single line)
-   GOOGLE_RSA_PUBLIC_KEY="LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K..."
+   RSA_PUBLIC_KEY="LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K..."
    ```
 
 3. **Regenerate keys** and copy the ENTIRE line from script output:
 
    ```bash
    ./scripts/generate-rsa-keys.sh
-   # Copy: GOOGLE_RSA_PUBLIC_KEY="..." (including quotes)
+   # Copy: RSA_PUBLIC_KEY="..." (including quotes)
    ```
 
 4. **Verify .env file loading**:

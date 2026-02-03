@@ -100,8 +100,8 @@ GOOGLE_OAUTH_SCOPES="https://www.googleapis.com/auth/drive"
 # Store in GitHub Secrets for staging/production deployments
 # Use different keys for each environment (dev/staging/prod)
 # See: docs/google-service-account-encryption.md for complete setup guide
-GOOGLE_RSA_PUBLIC_KEY=LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K...
-GOOGLE_RSA_PRIVATE_KEY=LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1J...
+RSA_PUBLIC_KEY=LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K...
+RSA_PRIVATE_KEY=LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1J...
 
 # Google Service Account (Encrypted) - Alternative to OAuth
 # Generate encrypted credentials locally using http://localhost:3000/google-service-encrypt
@@ -197,18 +197,16 @@ If you're using Google Service Account credentials for Google Drive access, foll
 
 For staging and production, add keys to GitHub Secrets:
 
-- `STAGING_GOOGLE_RSA_PUBLIC_KEY` - Staging public key
-- `STAGING_GOOGLE_RSA_PRIVATE_KEY` - Staging private key
-- `PROD_GOOGLE_RSA_PUBLIC_KEY` - Production public key
-- `PROD_GOOGLE_RSA_PRIVATE_KEY` - Production private key
+- `RSA_PUBLIC_KEY` - RSA public key
+- `RSA_PRIVATE_KEY` - RSA private key
 
 **GitHub Actions Workflow Example:**
 
 ```yaml
 # .github/workflows/deploy-staging.yml
 env:
-  GOOGLE_RSA_PUBLIC_KEY: ${{ secrets.STAGING_GOOGLE_RSA_PUBLIC_KEY }}
-  GOOGLE_RSA_PRIVATE_KEY: ${{ secrets.STAGING_GOOGLE_RSA_PRIVATE_KEY }}
+  RSA_PUBLIC_KEY: ${{ secrets.RSA_PUBLIC_KEY }}
+  RSA_PRIVATE_KEY: ${{ secrets.RSA_PRIVATE_KEY }}
 ```
 
 #### 3. Encrypt Service Account Credentials
@@ -216,9 +214,9 @@ env:
 **For each environment:**
 
 ```bash
-# 1. Start server with environment-specific keys
-export GOOGLE_RSA_PUBLIC_KEY="<base64-key-for-this-env>"
-export GOOGLE_RSA_PRIVATE_KEY="<base64-key-for-this-env>"
+# 1. Start server with RSA keys
+export RSA_PUBLIC_KEY="<base64-key>"
+export RSA_PRIVATE_KEY="<base64-key-for-this-env>"
 npm run start-local
 
 # 2. Visit encryption page
