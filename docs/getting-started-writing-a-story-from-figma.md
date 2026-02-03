@@ -42,6 +42,14 @@ To ensure the AI agent focuses on the right work, include a Note component named
 
 > <img width="1756" height="1068" alt="image" src="https://github.com/user-attachments/assets/39de5041-ab45-40d3-baa4-1777960c7292" />
 
+Additional Note components or comments can also be added to detail the behavior. Notes and comments will be associated with the Figma frame they are closest to.
+
+> SHOW ADDING A COMMENT OR NOTE
+
+
+## Step 2: Have the AI ask clarifying questions
+
+Even the most detailed Figma design, full of notes and comments, will leave a few behaviors under-specified. 
 
 
 
