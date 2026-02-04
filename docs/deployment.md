@@ -170,63 +170,26 @@ docker run -d \
 
 ### Google Service Account Encryption (Optional)
 
-If you want to enable the `/google-service-encrypt` endpoint for users to encrypt their Google Service Account credentials, you need to configure RSA encryption keys:
+If you want to enable the `/google-service-encrypt` endpoint for API users to encrypt their Google Service Account credentials:
 
-#### When to Use This
+**What it enables:**
+- Users can encrypt Google service account credentials via web UI
+- Users pass encrypted credentials in `X-Google-Token` header for REST API calls
+- Enables Google Docs context in API endpoints like `/api/write-shell-stories`
 
-This feature is designed for **API users** who want to:
-- Call REST API endpoints that support Google Docs context (e.g., `/api/write-shell-stories`)
-- Pass encrypted credentials via `X-Google-Token` header in Jira automations or scripts
-- Avoid storing plaintext service account JSON files
+**Deployment Requirements:**
 
-**Note:** Users pass encrypted credentials in API headers, not as deployment environment variables. The server only needs the RSA keys to decrypt incoming requests.
-
-#### Setup RSA Encryption Keys
-
-**1. Generate Keys:**
+Add RSA encryption keys to your environment:
 
 ```bash
-# Run the key generation script
-./scripts/generate-rsa-keys.sh
-
-# This creates private.pem and public.pem
-# And outputs base64-encoded keys for environment variables
-```
-
-**2. Add to Deployment Environment:**
-
-```bash
-# Required for /google-service-encrypt endpoint to work
+# Required for /google-service-encrypt endpoint
 RSA_PUBLIC_KEY=LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K...
 RSA_PRIVATE_KEY=LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1J...
 ```
 
-**For production:**
-- Store keys in GitHub Secrets, AWS Secrets Manager, or your cloud provider's secrets management
-- Use different key pairs for each environment (dev/staging/production)
-- Never commit keys to version control
+**Important:** Users pass encrypted credentials in API request headers, not as deployment environment variables. The server only needs RSA keys to decrypt incoming requests.
 
-**3. Users encrypt their credentials:**
-
-Users visit `https://your-domain.com/google-service-encrypt`, paste their service account JSON, and receive an encrypted token starting with `RSA-ENCRYPTED:...`
-
-**4. Users pass encrypted credentials in API calls:**
-
-```bash
-curl -X POST https://your-domain.com/api/write-shell-stories \
-  -H "X-Atlassian-Token: your-jira-token" \
-  -H "X-Google-Token: RSA-ENCRYPTED:..." \
-  -H "Content-Type: application/json"
-```
-
-#### Security Considerations
-
-- **Never commit** `private.pem`, `public.pem`, or private keys to version control
-- **Use different keys** for dev, staging, and production environments
-- **Rotate keys** when team members with access leave
-- **Graceful degradation** - if keys not configured, the encryption endpoint is disabled
-
-For more details, see: [docs/google-service-account-encryption.md](google-service-account-encryption.md)
+For complete setup instructions including key generation, encryption workflow, and security best practices, see: [docs/google-service-account-encryption.md](google-service-account-encryption.md)
 
 ### Using docker-to-ec2
 
