@@ -2,6 +2,37 @@
 
 This feature allows you to encrypt Google service account credentials using RSA-4096 asymmetric encryption with pre-generated keys, making them safe to store in config files, environment variables, or version control.
 
+## Prerequisites
+
+### Create a Google Service Account
+
+You'll need a Google service account JSON file before encrypting it. Follow these steps:
+
+1. Go to [Google Cloud Console - Service Accounts](https://console.cloud.google.com/iam-admin/serviceaccounts)
+2. Select your project (or create a new one)
+3. Click **Create Service Account**
+4. Fill in details:
+   - **Service account name**: `cascade-mcp-drive` (or your preferred name)
+   - **Description**: "Service account for Cascade MCP Google Drive integration"
+5. Click **Create and Continue**
+6. **(Optional)** Grant permissions - skip this for typical use cases (service accounts access only files explicitly shared with them)
+7. Click **Done**
+8. Find your service account in the list and click on the email
+9. Go to **Keys** tab
+10. Click **Add Key** → **Create new key**
+11. Select **JSON** format and click **Create**
+12. Save the downloaded JSON file securely
+
+### Enable Google Drive API
+
+Before using the service account, enable the Google Drive API:
+
+1. Navigate to [APIs & Services - Library](https://console.cloud.google.com/apis/library)
+2. Search for "Google Drive API"
+3. Click **Enable**
+
+For detailed official documentation, see [Google Cloud Service Accounts Guide](https://cloud.google.com/iam/docs/service-accounts-create).
+
 ## 🚀 Quick Start
 
 ### 1. Generate Encryption Keys
@@ -53,7 +84,73 @@ GOOGLE_SERVICE_ACCOUNT_ENCRYPTED=RSA-ENCRYPTED:eyJh...
 
 Your Google Doc tools throughout the application will automatically use this encrypted credential.
 
-## 📋 Storage Options
+## � Manual Encryption (Advanced)
+
+If you prefer to encrypt credentials on your local machine without using the web form, you can use the public key directly.
+
+### Step 1: Get the Public Key
+
+Visit the encryption page while the server is running and copy the public key:
+
+```bash
+npm run start-local
+# Open http://localhost:3000/google-service-encrypt
+# Click "📋 Copy Public Key" button
+```
+
+Or extract it directly from your `.env`:
+
+```bash
+# Decode the base64-encoded public key
+echo "$RSA_PUBLIC_KEY" | base64 -d > public_key.pem
+```
+
+### Step 2: Encrypt with OpenSSL
+
+Use this one-liner to encrypt your service account:
+
+```bash
+openssl pkeyutl -encrypt -pubin -inkey public_key.pem \
+  -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 \
+  -in google.json | base64 | tr -d '\n' | sed 's/^/RSA-ENCRYPTED:/'
+```
+
+This command:
+- Encrypts `google.json` using RSA-OAEP with SHA-256
+- Base64-encodes the result
+- Removes line breaks
+- Adds the `RSA-ENCRYPTED:` prefix
+
+Save to a file (optional):
+
+```bash
+openssl pkeyutl -encrypt -pubin -inkey public_key.pem \
+  -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 \
+  -in google.json | base64 | tr -d '\n' | sed 's/^/RSA-ENCRYPTED:/' > encrypted.txt
+```
+
+### Step 3: Use the Encrypted Credential
+
+Copy the output (starting with `RSA-ENCRYPTED:`) and use it in API calls:
+
+```bash
+curl -X POST https://your-server.com/api/write-shell-stories \
+  -H "X-Atlassian-Token: your-jira-token" \
+  -H "X-Google-Token: RSA-ENCRYPTED:..." \
+  -H "Content-Type: application/json"
+```
+
+### Step 4: Cleanup
+
+Remove sensitive files after encryption:
+
+```bash
+rm google.json public_key.pem encrypted.txt
+```
+
+**Note:** The encrypted credential can be safely stored in scripts, config files, or version control since it can only be decrypted by the server with the private key.
+
+## �📋 Storage Options
 
 ### Environment Variable (Recommended)
 

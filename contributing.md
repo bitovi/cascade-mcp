@@ -246,82 +246,26 @@ If you want to use Google Drive integration, you'll need to create OAuth credent
      - Click **Create**
 5. Note your `Client ID` and `Client Secret` from the confirmation dialog
 
-### 4. Configure Google Encryption Keys (Optional)
+### 4. Configure Google Encryption Keys (Optional - For REST API Testing)
 
-If you want to use the Google service account encryption feature:
+If you want to test REST API endpoints that accept encrypted Google service account credentials (e.g., testing `/api/write-shell-stories` with Google Docs context):
 
-1. **Generate encryption keys:**
+1. **Generate encryption keys and encrypt credentials:**
 
-   ```bash
-   ./scripts/generate-rsa-keys.sh
-   ```
+   See detailed instructions in [docs/google-service-account-encryption.md](docs/google-service-account-encryption.md)
 
-2. **Add keys to `.env`:**
-
-   Copy the base64-encoded output from the script:
+2. **Add to `.env` for REST API testing:**
 
    ```bash
-   RSA_PUBLIC_KEY=LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K...
-   RSA_PRIVATE_KEY=LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1J...
+   # RSA encryption keys (required to use /google-service-encrypt endpoint)
+   RSA_PUBLIC_KEY="LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K..."
+   RSA_PRIVATE_KEY="LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1J..."
+   
+   # Encrypted service account (optional - only for local testing)
+   GOOGLE_SERVICE_ACCOUNT_ENCRYPTED="RSA-ENCRYPTED:eyJh..."
    ```
 
-3. **Encrypt your service account:**
-
-   - Start the server: `npm run start-local`
-   - Visit: `http://localhost:3000/google-service-encrypt`
-   - Paste your Google service account JSON
-   - Copy the encrypted output
-
-4. **Add encrypted credentials to `.env` (local development):**
-
-   ```bash
-   GOOGLE_SERVICE_ACCOUNT_ENCRYPTED=RSA-ENCRYPTED:eyJh...
-   ```
-
-**Note:** If encryption keys are not configured, Google features will be gracefully disabled. The server will still start normally. For production deployments, use GitHub Secrets or your cloud provider's secrets manager.
-
-### 5. Configure Google Service Account (Alternative to OAuth)
-
-If you prefer to use a Google Service Account instead of OAuth for Google Drive access, you can use encrypted credentials:
-
-**Steps:**
-
-1. Create a Service Account in [Google Cloud Console](https://console.cloud.google.com/):
-   - Go to **IAM & Admin** > **Service Accounts**
-   - Click **Create Service Account**
-   - Fill in the details and grant necessary permissions
-   - Create and download the JSON key file
-2. Encrypt your service account credentials:
-   - Start the server: `npm run start-local`
-   - Visit `http://localhost:3000/google-service-encrypt`
-   - Paste your service account JSON
-   - Click **Encrypt Credentials**
-   - Copy the encrypted output (starts with `RSA-ENCRYPTED:`)
-3. Add the encrypted credentials to your `.env` file (local development):
-
-   ```bash
-   GOOGLE_SERVICE_ACCOUNT_ENCRYPTED="RSA-ENCRYPTED:eyJhbGci..."
-   ```
-
-   **For production:** Use GitHub Secrets or your cloud provider's secrets manager to store `GOOGLE_SERVICE_ACCOUNT_ENCRYPTED`.
-
-**RSA Keys (Pre-Generated):**
-
-- Generate keys manually using `./scripts/generate-rsa-keys.sh`
-- Keys are stored in environment variables: `RSA_PUBLIC_KEY` and `RSA_PRIVATE_KEY`
-- Keys are base64-encoded for easy storage in `.env` or GitHub Secrets
-- Server validates keys at startup, providing clear error messages if invalid
-- If keys are not configured, Google encryption features are gracefully disabled
-
-**Security Notes:**
-
-- Never commit `private.pem`, `public.pem`, or `RSA_PRIVATE_KEY` to version control
-- The private key remains server-side and is never exposed to the client
-- Encrypted credentials are safe to store in `.env`, environment variables, or version control
-- For production, use GitHub Secrets or a secrets manager (AWS Secrets Manager, HashiCorp Vault)
-- Use different key pairs for dev, staging, and production environments
-
-For more details, see: [`docs/google-service-account-encryption.md`](docs/google-service-account-encryption.md)
+**Note:** The `GOOGLE_SERVICE_ACCOUNT_ENCRYPTED` environment variable is used by local development scripts (`scripts/api/`) and E2E test helpers as a convenience. In production, users pass encrypted credentials via `X-Google-Token` header in API requests, not as deployment configuration.
 
 ### 5. Configure Environment Variables
 

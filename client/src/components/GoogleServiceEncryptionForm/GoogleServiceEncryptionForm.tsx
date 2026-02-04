@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { GoogleServiceEncryptionResult } from './GoogleServiceEncryptionResult';
+import { EncryptionNotAvailableWarning } from './EncryptionNotAvailableWarning';
 
 interface EncryptionResult {
   encrypted: string;
@@ -111,67 +113,12 @@ export function GoogleServiceEncryptionForm() {
 
   if (result) {
     return (
-      <div className="space-y-4">
-        {/* Success Card */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="bg-green-50 border-l-4 border-green-500 p-4 mb-4">
-            <h3 className="text-lg font-semibold text-green-900 mb-2">
-              ✅ Encryption Successful!
-            </h3>
-            <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-              <span className="font-semibold text-gray-700">Service Account:</span>
-              <span className="text-gray-600 font-mono">{result.clientEmail}</span>
-              <span className="font-semibold text-gray-700">Project ID:</span>
-              <span className="text-gray-600 font-mono">{result.projectId}</span>
-              <span className="font-semibold text-gray-700">Encryption:</span>
-              <span className="text-gray-600 font-mono">RSA-OAEP with SHA-256 (4096-bit key)</span>
-            </div>
-          </div>
-
-          <h4 className="text-base font-semibold text-gray-800 mb-2">📋 Encrypted Credentials</h4>
-          <p className="text-sm text-gray-600 mb-3">Copy this encrypted string and store it safely:</p>
-          <textarea
-            readOnly
-            value={result.encrypted}
-            rows={4}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-xs bg-gray-50 resize-vertical"
-          />
-          <div className="flex gap-2 mt-3">
-            <button
-              onClick={handleCopy}
-              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
-            >
-              📋 Copy to Clipboard
-            </button>
-            <button
-              onClick={handleReset}
-              className="px-4 py-2 bg-gray-600 text-white text-sm font-medium rounded-md hover:bg-gray-700 transition-colors"
-            >
-              🔒 Encrypt Another
-            </button>
-          </div>
-        </div>
-
-        {/* Usage Instructions */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="bg-gray-50 rounded-md p-5">
-            <h4 className="text-base font-semibold text-gray-800 mb-3">💡 How to Use</h4>
-            
-            <h5 className="font-semibold text-gray-700 text-sm mt-4 mb-2">Store in environment variable</h5>
-            <pre className="bg-gray-900 text-gray-100 p-4 rounded-md overflow-x-auto text-xs">
-{`# .env file
-GOOGLE_SERVICE_ACCOUNT_ENCRYPTED=RSA-ENCRYPTED:...
-
-# Your Google Doc tools will automatically use this encrypted credential`}
-            </pre>
-            
-            <h5 className="font-semibold text-gray-700 text-sm mt-4 mb-2">Pass to Google Doc conversion tools</h5>
-            <p className="text-sm text-gray-600">
-              Use this encrypted string wherever Google service account credentials are needed for converting Google Docs to Markdown.
-            </p>
-          </div>
-        </div>
-      </div>
+      <GoogleServiceEncryptionResult
+        encrypted={result.encrypted}
+        clientEmail={result.clientEmail}
+        projectId={result.projectId}
+        onReset={handleReset}
+      />
     );
   }
 
@@ -179,26 +126,7 @@ GOOGLE_SERVICE_ACCOUNT_ENCRYPTED=RSA-ENCRYPTED:...
     <div className="space-y-4">
       {/* Encryption Status Warning */}
       {!isCheckingStatus && encryptionStatus && !encryptionStatus.enabled && (
-        <div className="bg-white rounded-lg shadow-sm border border-red-300 p-6">
-          <div className="bg-red-50 border-l-4 border-red-500 p-4">
-            <h3 className="font-semibold text-red-900 mb-2">🔒 Encryption Not Available</h3>
-            <p className="text-sm text-red-800 mb-3">
-              {encryptionStatus.message}
-            </p>
-            <div className="bg-red-100 rounded-md p-3 mt-3">
-              <p className="text-xs text-red-900 font-semibold mb-2">To enable encryption:</p>
-              <ol className="text-xs text-red-900 space-y-1 ml-4 list-decimal">
-                <li>Run <code className="bg-red-200 px-1 py-0.5 rounded">./scripts/generate-rsa-keys.sh</code> to generate keys</li>
-                <li>Copy the base64-encoded keys to your <code className="bg-red-200 px-1 py-0.5 rounded">.env</code> file</li>
-                <li>Set <code className="bg-red-200 px-1 py-0.5 rounded">RSA_PUBLIC_KEY</code> and <code className="bg-red-200 px-1 py-0.5 rounded">RSA_PRIVATE_KEY</code></li>
-                <li>Restart the server</li>
-              </ol>
-              <p className="text-xs text-red-900 mt-2">
-                See <code className="bg-red-200 px-1 py-0.5 rounded">docs/google-service-account-encryption.md</code> for detailed instructions.
-              </p>
-            </div>
-          </div>
-        </div>
+        <EncryptionNotAvailableWarning message={encryptionStatus.message} />
       )}
 
       {/* Instructions */}

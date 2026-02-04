@@ -103,13 +103,6 @@ GOOGLE_OAUTH_SCOPES="https://www.googleapis.com/auth/drive"
 RSA_PUBLIC_KEY=LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K...
 RSA_PRIVATE_KEY=LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1J...
 
-# Google Service Account (Encrypted) - Alternative to OAuth
-# Generate encrypted credentials locally using http://localhost:3000/google-service-encrypt
-# Then set this environment variable with the encrypted output
-# Format: RSA-ENCRYPTED:<base64-encoded-encrypted-credentials>
-# See: docs/google-service-account-encryption.md for encryption workflow
-# GOOGLE_SERVICE_ACCOUNT_ENCRYPTED=RSA-ENCRYPTED:eyJhbGci...
-
 # Optional: AWS (for CloudWatch logging)
 AWS_ACCESS_KEY_ID=your-aws-access-key
 AWS_SECRET_ACCESS_KEY=your-aws-secret-key
@@ -175,13 +168,22 @@ docker run -d \
   cascade-mcp:latest
 ```
 
-### Google Service Account Encryption for Production
+### Google Service Account Encryption (Optional)
 
-If you're using Google Service Account credentials for Google Drive access, follow these steps for secure deployment:
+If you want to enable the `/google-service-encrypt` endpoint for users to encrypt their Google Service Account credentials, you need to configure RSA encryption keys:
 
-#### 1. Generate RSA Encryption Keys
+#### When to Use This
 
-**For each environment (dev/staging/production), generate separate keys:**
+This feature is designed for **API users** who want to:
+- Call REST API endpoints that support Google Docs context (e.g., `/api/write-shell-stories`)
+- Pass encrypted credentials via `X-Google-Token` header in Jira automations or scripts
+- Avoid storing plaintext service account JSON files
+
+**Note:** Users pass encrypted credentials in API headers, not as deployment environment variables. The server only needs the RSA keys to decrypt incoming requests.
+
+#### Setup RSA Encryption Keys
+
+**1. Generate Keys:**
 
 ```bash
 # Run the key generation script
@@ -191,77 +193,38 @@ If you're using Google Service Account credentials for Google Drive access, foll
 # And outputs base64-encoded keys for environment variables
 ```
 
-**Important:** Use different key pairs for each environment. This ensures encrypted credentials cannot be decrypted across environments.
-
-#### 2. Store Keys in GitHub Secrets
-
-For staging and production, add keys to GitHub Secrets:
-
-- `RSA_PUBLIC_KEY` - RSA public key
-- `RSA_PRIVATE_KEY` - RSA private key
-
-**GitHub Actions Workflow Example:**
-
-```yaml
-# .github/workflows/deploy-staging.yml
-env:
-  RSA_PUBLIC_KEY: ${{ secrets.RSA_PUBLIC_KEY }}
-  RSA_PRIVATE_KEY: ${{ secrets.RSA_PRIVATE_KEY }}
-```
-
-#### 3. Encrypt Service Account Credentials
-
-**For each environment:**
+**2. Add to Deployment Environment:**
 
 ```bash
-# 1. Start server with RSA keys
-export RSA_PUBLIC_KEY="<base64-key>"
-export RSA_PRIVATE_KEY="<base64-key-for-this-env>"
-npm run start-local
-
-# 2. Visit encryption page
-open http://localhost:3000/google-service-encrypt
-
-# 3. Paste service account JSON and encrypt
-# 4. Copy the output starting with "RSA-ENCRYPTED:"
+# Required for /google-service-encrypt endpoint to work
+RSA_PUBLIC_KEY=LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K...
+RSA_PRIVATE_KEY=LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1J...
 ```
 
-#### 4. Configure Environment Variables
+**For production:**
+- Store keys in GitHub Secrets, AWS Secrets Manager, or your cloud provider's secrets management
+- Use different key pairs for each environment (dev/staging/production)
+- Never commit keys to version control
 
-Add the encrypted credentials to your deployment environment:
+**3. Users encrypt their credentials:**
+
+Users visit `https://your-domain.com/google-service-encrypt`, paste their service account JSON, and receive an encrypted token starting with `RSA-ENCRYPTED:...`
+
+**4. Users pass encrypted credentials in API calls:**
 
 ```bash
-GOOGLE_SERVICE_ACCOUNT_ENCRYPTED=RSA-ENCRYPTED:eyJhbGci...
+curl -X POST https://your-domain.com/api/write-shell-stories \
+  -H "X-Atlassian-Token: your-jira-token" \
+  -H "X-Google-Token: RSA-ENCRYPTED:..." \
+  -H "Content-Type: application/json"
 ```
 
-**Deployment Options:**
-
-- **GitHub Actions**: Add as repository secrets (separate for staging/prod)
-- **AWS**: Store in AWS Secrets Manager or Parameter Store
-- **Docker**: Add to environment-specific `.env` files
-- **Kubernetes**: Store in Secret resources (separate per namespace)
-
-#### 5. Security Considerations
+#### Security Considerations
 
 - **Never commit** `private.pem`, `public.pem`, or private keys to version control
-- **Never commit** plaintext service account JSON files
-- **Use different keys** for dev, staging, and production
-- **Store private keys** only in secure secrets managers (GitHub Secrets, AWS Secrets Manager)
+- **Use different keys** for dev, staging, and production environments
 - **Rotate keys** when team members with access leave
-- **No filesystem dependencies** - keys load from environment variables only
-- **Graceful degradation** - if keys not configured, encryption features are disabled
-
-#### 6. Key Rotation Process
-
-```bash
-# 1. Generate new keys for the environment
-./scripts/generate-rsa-keys.sh
-
-# 2. Update GitHub Secrets with new keys
-# 3. Re-encrypt all service account credentials with new keys
-# 4. Update GOOGLE_SERVICE_ACCOUNT_ENCRYPTED in deployment
-# 5. Deploy with new keys and encrypted credentials
-```
+- **Graceful degradation** - if keys not configured, the encryption endpoint is disabled
 
 For more details, see: [docs/google-service-account-encryption.md](google-service-account-encryption.md)
 

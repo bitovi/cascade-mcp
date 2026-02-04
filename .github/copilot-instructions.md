@@ -16,13 +16,6 @@
 - ✅ ALWAYS decrypt credentials only when needed and never log the decrypted result
 - ✅ ONLY log metadata (like client_email or project_id) if absolutely necessary for debugging
 
-**Google Service Account Credentials:**
-- Server accepts ONLY `X-Google-Token` header with encrypted credentials
-- Users must encrypt their service account JSON at `/google-service-encrypt`
-- Encryption uses RSA-4096 with public/private key pair
-- Private key is stored securely on the server (never exposed)
-- Encrypted credentials are safe to store in config files, environment variables, and version control
-
 ### Code Organization for MCP Tools
 
 **Folder Structure:**
