@@ -39,6 +39,7 @@ The API supports multiple LLM providers for AI-powered operations. Users can cho
 - When set to `true` or `1`, saves fetched Figma comments to cache files for debugging
 - Creates `comments.md` files in the Figma file cache directory
 - Includes full thread details, user summaries, and position data
+- Separates unattached (file-level) comments from screen-attached comments
 - Example: `export SAVE_FIGMA_COMMENTS_TO_CACHE=true`
 
 ### Quick Start

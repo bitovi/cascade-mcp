@@ -214,7 +214,11 @@ export async function analyzeScreens(
   const screenNames = expanded.frames.map(f => f.name).join(', ');
   const matchedComments = annotationResult.stats.matchedCommentThreads;
   const totalComments = annotationResult.stats.totalCommentThreads;
-  await notify(`🤖 Analyzing Figma: ${expanded.frames.length} screen(s) [${screenNames}], ${expanded.notes.length} note(s), ${matchedComments} of ${totalComments} comment thread(s)...`);
+  const unattachedCount = annotationResult.unattachedComments.length;
+  const commentBreakdown = unattachedCount > 0
+    ? `${matchedComments} matched and ${unattachedCount} unattached of ${totalComments}`
+    : `${matchedComments} of ${totalComments}`;
+  await notify(`🤖 Analyzing Figma: ${expanded.frames.length} screen(s) [${screenNames}], ${expanded.notes.length} note(s), ${commentBreakdown} comment thread(s)...`);
   
   // Step 6.5: Check for comment-triggered invalidations
   const cacheMetadata = await loadFigmaMetadata(fileKey);

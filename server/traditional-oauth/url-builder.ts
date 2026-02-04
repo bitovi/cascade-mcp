@@ -61,5 +61,7 @@ export function buildOAuthUrl(
     urlParams.state = params.state;
   }
 
-  return `${config.baseUrl}?${new URLSearchParams(urlParams).toString()}`;
+  // URLSearchParams encodes spaces as '+', but some providers (like Figma) 
+  // require spaces to be encoded as '%20'. Replace '+' with '%20' for compatibility.
+  return `${config.baseUrl}?${new URLSearchParams(urlParams).toString().replace(/\+/g, '%20')}`;
 }

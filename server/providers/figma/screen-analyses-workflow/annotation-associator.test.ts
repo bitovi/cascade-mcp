@@ -322,6 +322,7 @@ describe('annotation-associator', () => {
         contexts: [
           { screenId: 'frame1', screenName: 'Frame 1', markdown: '- **@user1**: Comment 1' },
         ],
+        unattachedComments: [],
         matchedThreadCount: 1,
         unmatchedThreadCount: 0,
       });
@@ -376,6 +377,7 @@ describe('annotation-associator', () => {
       const mockGroupComments = jest.fn().mockReturnValue([]);
       const mockFormatComments = jest.fn().mockReturnValue({
         contexts: [],
+        unattachedComments: [],
         matchedThreadCount: 0,
         unmatchedThreadCount: 0,
       });
@@ -413,6 +415,7 @@ describe('annotation-associator', () => {
       const mockGroupComments = jest.fn().mockReturnValue([]);
       const mockFormatComments = jest.fn().mockReturnValue({
         contexts: [],
+        unattachedComments: [],
         matchedThreadCount: 0,
         unmatchedThreadCount: 0,
       });

@@ -170,9 +170,34 @@ export function sanitizeJwtPayload(payload: any): any {
 export function sanitizeObjectWithJWTs(obj: any, maxTokenLength: number = 30): any {
   const sanitized = { ...obj };
   
+  // Keys that should always be truncated (regardless of value format)
+  const sensitiveKeys = ['access_token', 'refresh_token', 'token', 'api_key', 'apiKey', 'secret'];
+  
   for (const [key, value] of Object.entries(sanitized)) {
+    // Recurse into nested objects
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      sanitized[key] = sanitizeObjectWithJWTs(value, maxTokenLength);
+    }
+    // Check if key is a known sensitive field - always truncate
+    else if (typeof value === 'string' && sensitiveKeys.includes(key)) {
+      // Check if it looks like a JWT (for expiration info)
+      const parts = value.split('.');
+      if (parts.length === 3) {
+        try {
+          parseJWT(value);
+          sanitized[key] = formatTokenWithExpiration(value, maxTokenLength);
+          continue;
+        } catch (err) {
+          // Not a JWT, fall through to simple truncation
+        }
+      }
+      // Simple truncation for non-JWT tokens (e.g., Figma tokens)
+      if (value.length > maxTokenLength) {
+        sanitized[key] = value.substring(0, maxTokenLength) + '...';
+      }
+    }
     // Check if the value looks like a JWT (string with exactly 3 parts separated by dots)
-    if (typeof value === 'string' && value.includes('.')) {
+    else if (typeof value === 'string' && value.includes('.')) {
       const parts = value.split('.');
       if (parts.length === 3) {
         try {

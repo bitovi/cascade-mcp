@@ -9,6 +9,7 @@
  */
 
 import type { ScreenAnnotation } from '../shared/screen-annotation.js';
+import { groupAnnotationsBySource } from '../shared/screen-annotation.js';
 
 /**
  * System prompt for shell story generation
@@ -109,12 +110,17 @@ ${doc.summary || doc.markdown}
     : '';
 
   // Build Figma comments section if provided
-  const figmaCommentsSection = figmaComments && figmaComments.length > 0
+  // Separate attached and unattached comments
+  const { comments: attachedComments, unattachedComments } = figmaComments 
+    ? groupAnnotationsBySource(figmaComments)
+    : { comments: [], unattachedComments: [] };
+  
+  const attachedCommentsSection = attachedComments.length > 0
     ? `**FIGMA COMMENTS (from design review):**
 
 The following comments are from designers, stakeholders, or previous AI analysis on Figma screens. Use these to understand design intent, clarifications, and questions that have been raised.
 
-${figmaComments.map(screenComments => `<figma_screen_comments screen="${screenComments.screenName}">
+${attachedComments.map(screenComments => `<figma_screen_comments screen="${screenComments.screenName}">
 
 ${screenComments.markdown}
 
@@ -133,6 +139,22 @@ ${screenComments.markdown}
 
 `
     : '';
+
+  const unattachedCommentsSection = unattachedComments.length > 0
+    ? `**FILE-LEVEL COMMENTS (not attached to specific screens):**
+
+The following comments are not attached to specific screens in Figma. Only incorporate their context if it clearly pertains to the features and screens you are analyzing. They may relate to other parts of the design.
+
+${unattachedComments.map(c => `<figma_file_comments>
+
+${c.markdown}
+
+</figma_file_comments>`).join('\n\n')}
+
+`
+    : '';
+
+  const figmaCommentsSection = attachedCommentsSection + unattachedCommentsSection;
 
   const epicContextSection = `**SCOPE ANALYSIS (from Epic Description):**
 

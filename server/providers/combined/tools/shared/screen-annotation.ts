@@ -20,7 +20,7 @@ export interface ScreenAnnotation {
   screenName: string;
   
   /** Source of this annotation */
-  source: 'notes' | 'comments';
+  source: 'notes' | 'comments' | 'unattached-comments';
   
   /** Formatted content as markdown, ready for prompt inclusion */
   markdown: string;
@@ -34,10 +34,11 @@ export interface ScreenAnnotation {
  */
 export function groupAnnotationsBySource(
   annotations: ScreenAnnotation[]
-): { notes: ScreenAnnotation[]; comments: ScreenAnnotation[] } {
+): { notes: ScreenAnnotation[]; comments: ScreenAnnotation[]; unattachedComments: ScreenAnnotation[] } {
   return {
     notes: annotations.filter(a => a.source === 'notes'),
     comments: annotations.filter(a => a.source === 'comments'),
+    unattachedComments: annotations.filter(a => a.source === 'unattached-comments'),
   };
 }
 
@@ -72,7 +73,7 @@ export function groupAnnotationsByScreen(
 export function formatAnnotationsForPrompt(annotations: ScreenAnnotation[]): string {
   if (annotations.length === 0) return '';
   
-  const { notes, comments } = groupAnnotationsBySource(annotations);
+  const { notes, comments, unattachedComments } = groupAnnotationsBySource(annotations);
   const sections: string[] = [];
   
   if (notes.length > 0) {
@@ -87,6 +88,13 @@ export function formatAnnotationsForPrompt(annotations: ScreenAnnotation[]): str
       .map(c => `### ${c.screenName}\n\n${c.markdown}`)
       .join('\n\n');
     sections.push(`## Stakeholder Comments\n\n${commentsContent}`);
+  }
+  
+  if (unattachedComments.length > 0) {
+    const unattachedContent = unattachedComments
+      .map(c => c.markdown)
+      .join('\n\n');
+    sections.push(`## File-Level Comments (Unattached)\n\nThese comments are not attached to specific screens in Figma. Only incorporate their context if it clearly pertains to the screens being analyzed.\n\n${unattachedContent}`);
   }
   
   return sections.join('\n\n---\n\n');

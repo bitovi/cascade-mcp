@@ -292,9 +292,11 @@ export async function executeWriteShellStories(
         };
         
         const commentResult = formatCommentsForContext(threads, frameMetadata, documentTree);
-        figmaCommentContexts = commentResult.contexts;
+        figmaCommentContexts = [...commentResult.contexts, ...commentResult.unattachedComments];
         matchedThreadCount = commentResult.matchedThreadCount;
-        console.log(`   💬 Fetched ${comments.length} Figma comments → ${commentResult.matchedThreadCount} threads across ${figmaCommentContexts.length} screens`);
+        const unattachedCount = commentResult.unattachedComments.length;
+        const unattachedNote = unattachedCount > 0 ? ` (${unattachedCount} unattached)` : '';
+        console.log(`   💬 Fetched ${comments.length} Figma comments → ${commentResult.matchedThreadCount} threads across ${commentResult.contexts.length} screens${unattachedNote}`);
       } else {
         console.log('   💬 No Figma comments found');
       }

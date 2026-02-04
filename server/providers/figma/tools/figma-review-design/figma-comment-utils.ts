@@ -89,8 +89,12 @@ export function formatCommentsAsDebugMarkdown(
     .map(([handle, count]) => `- **@${handle}**: ${count} comments`)
     .join('\n');
 
-  // Format each thread
-  const threadSections = threads.map((thread, i) => {
+  // Separate unattached and attached threads
+  const unattachedThreads = threads.filter(isUnattachedComment);
+  const attachedThreads = threads.filter(t => !isUnattachedComment(t));
+  
+  // Format a thread section
+  const formatThread = (thread: CommentThread, i: number): string => {
     const status = thread.isResolved ? '✅ RESOLVED' : '💬 OPEN';
     const position = thread.parent.client_meta;
     
@@ -125,7 +129,16 @@ ${resolvedLine}
 > ${thread.parent.message.split('\n').join('\n> ')}
 
 ${repliesSection}---`;
-  }).join('\n\n');
+  };
+
+  const attachedThreadSections = attachedThreads.map(formatThread).join('\n\n');
+  const unattachedThreadSections = unattachedThreads.length > 0
+    ? `## Unattached Comments (File-Level)
+
+These comments are not attached to specific screens in Figma. They have Vector position (0, 0) with no node_id.
+
+${unattachedThreads.map(formatThread).join('\n\n')}`
+    : '';
 
   return `# Figma Comments Debug Output
 
@@ -133,6 +146,8 @@ ${repliesSection}---`;
 **Fetched At**: ${new Date().toISOString()}
 **Total Comments**: ${comments.length}
 **Total Threads**: ${threads.length}
+**Attached Threads**: ${attachedThreads.length}
+**Unattached Threads**: ${unattachedThreads.length}
 **Open Threads**: ${threads.filter((t) => !t.isResolved).length}
 **Resolved Threads**: ${threads.filter((t) => t.isResolved).length}
 
@@ -146,7 +161,9 @@ ${userSummary}
 
 ## Comment Threads
 
-${threadSections}`;
+${attachedThreadSections}
+
+${unattachedThreadSections}`;
 }
 
 /**
@@ -335,6 +352,34 @@ function findNodeInTree(node: any, targetId: string): any | null {
 }
 
 /**
+ * Check if a comment thread is unattached (file-level comment)
+ * 
+ * A comment is unattached when BOTH conditions are true:
+ * 1. It has no node_id (Vector position type, not FrameOffset)
+ * 2. Its position is exactly (0, 0)
+ * 
+ * This distinguishes:
+ * - Vector at (0, 0) → Unattached (Figma's default fallback for comments without position)
+ * - Vector at (500, 300) → Try proximity matching (user intentionally placed it somewhere)
+ * - FrameOffset with any offset → Attached (has explicit node_id frame association)
+ * 
+ * @param thread - Comment thread to check
+ * @returns true if the thread is unattached
+ */
+export function isUnattachedComment(thread: CommentThread): boolean {
+  const position = thread.parent.client_meta;
+  
+  // No position data at all - treat as unattached
+  if (!position) return true;
+  
+  // FrameOffset comments are never unattached (they have explicit node_id)
+  if (isFrameOffset(position)) return false;
+  
+  // Vector comments at exactly (0, 0) are unattached
+  return position.x === 0 && position.y === 0;
+}
+
+/**
  * Format comment threads as markdown context for AI analysis
  *
  * Associates comments with frames based on:
@@ -342,17 +387,25 @@ function findNodeInTree(node: any, targetId: string): any | null {
  * 2. FrameOffset position on child node (node's bounding box is inside a frame)
  * 3. Vector position proximity (within frame bounds or 50px)
  *
+ * Comments with Vector position at (0, 0) are treated as unattached/file-level comments.
+ *
  * @param threads - Array of comment threads
  * @param frames - Array of frame metadata to associate comments with (must include bounding boxes)
  * @param documentTree - Optional Figma document tree for spatial containment checks on child nodes
- * @returns Object with screen annotations and thread statistics
+ * @returns Object with screen annotations, unattached comments, and thread statistics
  */
 export function formatCommentsForContext(
   threads: CommentThread[],
   frames: FrameMetadata[],
   documentTree?: any
-): { contexts: ScreenAnnotation[]; matchedThreadCount: number; unmatchedThreadCount: number } {
+): { 
+  contexts: ScreenAnnotation[]; 
+  unattachedComments: ScreenAnnotation[];
+  matchedThreadCount: number; 
+  unmatchedThreadCount: number;
+} {
   const contexts: ScreenAnnotation[] = [];
+  const unattachedThreads: CommentThread[] = [];
 
   // Build a quick lookup for frames by nodeId
   const framesByNodeId = new Map<string, FrameMetadata>();
@@ -365,10 +418,17 @@ export function formatCommentsForContext(
   const unassociatedThreads: CommentThread[] = [];
 
   for (const thread of threads) {
+    // Check for unattached comments first
+    if (isUnattachedComment(thread)) {
+      unattachedThreads.push(thread);
+      continue;
+    }
+
     const position = thread.parent.client_meta;
 
+    // Should not happen after isUnattachedComment check, but be safe
     if (!position) {
-      unassociatedThreads.push(thread);
+      unattachedThreads.push(thread);
       continue;
     }
 
@@ -403,7 +463,7 @@ export function formatCommentsForContext(
         }
       }
     } else {
-      // Vector position - check proximity to frames (within bounds or 50px)
+      // Vector position (non-zero) - check proximity to frames (within bounds or 50px)
       const PROXIMITY_THRESHOLD = 50;
 
       for (const frame of frames) {
@@ -457,7 +517,24 @@ export function formatCommentsForContext(
     });
   }
 
-  return { contexts, matchedThreadCount, unmatchedThreadCount: unassociatedThreads.length };
+  // Format unattached comments as a single ScreenAnnotation
+  const unattachedComments: ScreenAnnotation[] = [];
+  if (unattachedThreads.length > 0) {
+    const markdown = formatThreadsAsMarkdown(unattachedThreads);
+    unattachedComments.push({
+      screenId: 'file-level',
+      screenName: 'File-Level',
+      source: 'unattached-comments',
+      markdown,
+    });
+  }
+
+  return { 
+    contexts, 
+    unattachedComments,
+    matchedThreadCount, 
+    unmatchedThreadCount: unassociatedThreads.length,
+  };
 }
 
 /**
@@ -646,9 +723,12 @@ export async function postQuestionsToFigma(
   console.log(`  📤 Posting ${questions.length} questions individually`);
 
   // Group questions by frame to calculate positions
+  // General questions (no frameNodeId) are assigned to the first frame
+  const firstFrame = frames[0];
   const questionsByFrame = new Map<string, GeneratedQuestion[]>();
   for (const question of questions) {
-    const frameId = question.frameNodeId || 'general';
+    // Assign general questions to the first frame
+    const frameId = question.frameNodeId || firstFrame?.nodeId || 'general';
     if (!questionsByFrame.has(frameId)) {
       questionsByFrame.set(frameId, []);
     }
@@ -690,21 +770,22 @@ export async function postQuestionsToFigma(
     const message = `${CASCADE_PREFIX} ${question.text}`;
     const position = questionPositions.get(question);
 
-    // Find frame info for this question
-    const frame = frames.find((f) => f.nodeId === question.frameNodeId);
+    // Find frame info for this question (general questions use first frame)
+    const effectiveFrameId = question.frameNodeId || firstFrame?.nodeId;
+    const frame = frames.find((f) => f.nodeId === effectiveFrameId);
 
     const postResult = await postSingleComment(
       figmaClient,
       fileKey,
       message,
-      question.frameNodeId,
+      effectiveFrameId,
       position
     );
 
     results.push({
       success: postResult.success,
       question: question.text,
-      frameNodeId: question.frameNodeId,
+      frameNodeId: effectiveFrameId,
       frameName: frame?.name,
       error: postResult.error,
       commentId: postResult.commentId,
@@ -734,11 +815,15 @@ async function postConsolidatedQuestions(
 ): Promise<PostCommentResult[]> {
   const results: PostCommentResult[] = [];
 
+  // General questions (no frameNodeId) are assigned to the first frame
+  const firstFrame = frames[0];
+
   // Group questions by frame
   const questionsByFrame = new Map<string | undefined, GeneratedQuestion[]>();
 
   for (const question of questions) {
-    const key = question.frameNodeId || '__unassociated__';
+    // Assign general questions to the first frame
+    const key = question.frameNodeId || firstFrame?.nodeId || '__unassociated__';
     const existing = questionsByFrame.get(key) || [];
     existing.push(question);
     questionsByFrame.set(key, existing);
@@ -763,6 +848,7 @@ async function postConsolidatedQuestions(
 
     console.log(`    📦 Posting consolidated comment ${i + 1}/${frameKeys.length} (${frameQuestions.length} questions)${frame ? ` to "${frame.name}"` : ''}`);
 
+    // Use frame key for posting (already resolved to first frame for general questions)
     const postResult = await postSingleComment(
       figmaClient,
       fileKey,
@@ -772,10 +858,11 @@ async function postConsolidatedQuestions(
 
     // Create results for each question in the consolidated comment
     for (const question of frameQuestions) {
+      const effectiveFrameId = question.frameNodeId || firstFrame?.nodeId;
       results.push({
         success: postResult.success,
         question: question.text,
-        frameNodeId: question.frameNodeId,
+        frameNodeId: effectiveFrameId,
         frameName: frame?.name,
         error: postResult.error,
         commentId: postResult.commentId,
