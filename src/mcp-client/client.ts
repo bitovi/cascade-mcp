@@ -17,7 +17,14 @@ import type {
 import { BrowserOAuthClientProvider } from './oauth/provider.js';
 import type { SamplingProvider } from './sampling/types.js';
 
-/** Default timeout for MCP tool calls (5 minutes) */
+/** 
+ * Default timeout for MCP tool calls (5 minutes).
+ * 
+ * Note: The MCP SDK has a default timeout of 60 seconds if not specified.
+ * We use 5 minutes for long-running operations and enable `resetTimeoutOnProgress`
+ * to automatically extend the timeout when progress notifications are received.
+ * This prevents timeouts during lengthy operations that send regular progress updates.
+ */
 const DEFAULT_TOOL_TIMEOUT_MS = 5 * 60 * 1000;
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'authorizing' | 'connected' | 'error';
@@ -274,7 +281,10 @@ export class BrowserMcpClient {
       throw new Error('Not connected');
     }
     const timeout = options?.timeout ?? DEFAULT_TOOL_TIMEOUT_MS;
-    const result = await this.client.callTool({ name, arguments: args }, undefined, { timeout });
+    const result = await this.client.callTool({ name, arguments: args }, undefined, { 
+      timeout,
+      resetTimeoutOnProgress: true // Reset timeout when progress notifications are received
+    });
     return result as CallToolResult;
   }
 
