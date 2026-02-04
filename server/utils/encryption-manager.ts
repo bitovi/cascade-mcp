@@ -163,7 +163,6 @@ export class EncryptionManager {
         reason: 'keys-not-configured',
         message: 'Environment variables RSA_PUBLIC_KEY and RSA_PRIVATE_KEY are not set',
       };
-      console.log('  Encryption keys not configured (graceful degradation)');
       return;
     }
 

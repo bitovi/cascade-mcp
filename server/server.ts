@@ -280,19 +280,14 @@ app.post('/refresh-token', accessToken);
 // Initialize Google encryption and start server
 (async () => {
   // Initialize Google encryption key manager
-  console.log('\n========== GOOGLE ENCRYPTION INITIALIZATION ==========');
   try {
     await encryptionManager.initialize();
     const state = encryptionManager.getState();
     
     if (state.enabled) {
       console.log('✅ Google encryption enabled');
-      console.log('   Keys loaded successfully from environment variables');
     } else {
-      console.log('ℹ️  Google encryption keys not configured');
-      console.log('   Google Drive/Docs features will be unavailable');
-      console.log('   To enable: Set RSA_PUBLIC_KEY and RSA_PRIVATE_KEY');
-      console.log('   See docs/google-service-account-encryption.md for setup');
+      console.log('ℹ️  Google encryption not configured (Drive/Docs features unavailable)');
     }
   } catch (error) {
     if (error instanceof InvalidKeyFormatError) {
@@ -302,7 +297,6 @@ app.post('/refresh-token', accessToken);
     }
     throw error;
   }
-  console.log('========== GOOGLE ENCRYPTION INITIALIZATION END ==========\n');
 
   // Start server
   app.listen(port, () => console.log(`Server is listening on port ${port}!`));
