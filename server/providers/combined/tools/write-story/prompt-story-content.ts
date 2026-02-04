@@ -9,6 +9,7 @@ import type { JiraIssueHierarchy, IssueComment } from '../review-work-item/jira-
 import type { LoadedContext } from '../review-work-item/context-loader.js';
 import type { ChangeDetectionResult } from './change-detection.js';
 import { convertAdfToMarkdown } from '../../../atlassian/markdown-converter.js';
+import { groupAnnotationsBySource } from '../shared/screen-annotation.js';
 
 /**
  * System prompt for story content generation
@@ -260,16 +261,32 @@ export function generateStoryContentPrompt(params: GenerateStoryContentPromptPar
     
     // Figma comments from design review
     if (loadedContext.figmaComments && loadedContext.figmaComments.length > 0) {
-      sections.push('## Figma Comments (Design Review)');
-      sections.push('');
-      sections.push('The following comments are from designers, stakeholders, or previous analysis on Figma screens. Use these to understand design intent, clarifications, and questions that have been raised.');
-      sections.push('');
-      loadedContext.figmaComments.forEach(screenComment => {
-        sections.push(`### Comments on: ${screenComment.screenName}`);
+      // Separate attached and unattached comments
+      const { comments: attachedComments, unattachedComments } = groupAnnotationsBySource(loadedContext.figmaComments);
+      
+      if (attachedComments.length > 0) {
+        sections.push('## Figma Comments (Design Review)');
         sections.push('');
-        sections.push(screenComment.markdown);
+        sections.push('The following comments are from designers, stakeholders, or previous analysis on Figma screens. Use these to understand design intent, clarifications, and questions that have been raised.');
         sections.push('');
-      });
+        attachedComments.forEach(screenComment => {
+          sections.push(`### Comments on: ${screenComment.screenName}`);
+          sections.push('');
+          sections.push(screenComment.markdown);
+          sections.push('');
+        });
+      }
+      
+      if (unattachedComments.length > 0) {
+        sections.push('## File-Level Comments (Unattached)');
+        sections.push('');
+        sections.push('The following comments are not attached to specific screens in Figma. Only incorporate their context if it clearly pertains to the screens being analyzed. They may relate to other parts of the design.');
+        sections.push('');
+        unattachedComments.forEach(comment => {
+          sections.push(comment.markdown);
+          sections.push('');
+        });
+      }
     }
     
     // Confluence docs

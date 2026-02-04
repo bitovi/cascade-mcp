@@ -5,6 +5,8 @@
  * Fetches comments from Figma and matches them to frames using position data.
  */
 
+import * as fs from 'fs/promises';
+import * as path from 'path';
 import {
   fetchCommentsForFile as defaultFetchCommentsForFile,
   groupCommentsIntoThreads as defaultGroupCommentsIntoThreads,
@@ -17,6 +19,8 @@ import type { FigmaNodeMetadata } from '../figma-helpers.js';
 import { toKebabCase } from '../figma-helpers.js';
 import type { AnalyzedFrame, FrameAnnotation } from './types.js';
 import { buildFigmaUrl } from './url-processor.js';
+import { getFigmaFileCachePath } from './figma-cache.js';
+import type { ScreenAnnotation } from '../../combined/tools/shared/screen-annotation.js';
 
 // ============================================================================
 // Types
@@ -43,6 +47,9 @@ export interface AnnotationResult {
   /** Notes that couldn't be associated with any frame */
   unassociatedNotes: string[];
   
+  /** Unattached comments (file-level comments at Vector (0,0) with no node_id) */
+  unattachedComments: ScreenAnnotation[];
+  
   /** Frame node IDs that were invalidated due to new comments */
   invalidatedFrames?: string[];
   
@@ -53,6 +60,119 @@ export interface AnnotationResult {
     totalNotes: number;
     matchedNotes: number;
   };
+}
+
+// ============================================================================
+// Debug Cache Utilities for Notes
+// ============================================================================
+
+/**
+ * Check if notes debug cache is enabled via environment variable
+ */
+function isNotesCacheEnabled(): boolean {
+  const envValue = process.env.SAVE_FIGMA_NOTES_TO_CACHE;
+  return envValue === 'true' || envValue === '1';
+}
+
+/**
+ * Format notes as a markdown document for debugging
+ *
+ * @param fileKey - Figma file key
+ * @param notes - Raw notes from Figma file
+ * @param frameNotes - Notes associated with frames
+ * @param unassociatedNotes - Notes that couldn't be associated
+ * @returns Markdown string with full note details
+ */
+function formatNotesAsDebugMarkdown(
+  fileKey: string,
+  notes: FigmaNodeMetadata[],
+  frameNotes: Map<string, string[]>,
+  unassociatedNotes: string[]
+): string {
+  const notesByFrame = frameNotes.size > 0
+    ? `## Notes by Frame
+
+${[...frameNotes.entries()].map(([frameId, noteTexts]) => `### Frame: ${frameId}
+
+${noteTexts.map(text => `> ${text.split('\n').join('\n> ')}`).join('\n\n')}`).join('\n\n')}
+
+---
+`
+    : '';
+
+  const unassociatedSection = unassociatedNotes.length > 0
+    ? `## Unassociated Notes
+
+${unassociatedNotes.map(text => `> ${text.split('\n').join('\n> ')}`).join('\n\n')}
+
+---
+`
+    : '';
+
+  const rawNoteDetails = notes.map(note => {
+    const text = extractNoteText(note);
+    const position = note.absoluteBoundingBox
+      ? `(${note.absoluteBoundingBox.x.toFixed(0)}, ${note.absoluteBoundingBox.y.toFixed(0)}) - ${note.absoluteBoundingBox.width.toFixed(0)}x${note.absoluteBoundingBox.height.toFixed(0)}`
+      : 'No position';
+
+    return `### ${note.name} (${note.id})
+
+- **Type**: ${note.type}
+- **Position**: ${position}
+- **Has Children**: ${note.children ? `Yes (${note.children.length})` : 'No'}
+- **Text Content**:
+
+> ${text.split('\n').join('\n> ')}
+
+**Raw Note JSON:**
+\`\`\`json
+${JSON.stringify(note, null, 2)}
+\`\`\`
+`;
+  }).join('\n');
+
+  return `# Figma Notes Debug Output
+
+**File Key**: ${fileKey}
+**Fetched At**: ${new Date().toISOString()}
+**Total Notes Found**: ${notes.length}
+**Associated with Frames**: ${notes.length - unassociatedNotes.length}
+**Unassociated**: ${unassociatedNotes.length}
+
+---
+
+${notesByFrame}${unassociatedSection}## Raw Note Details
+
+${rawNoteDetails}`;
+}
+
+/**
+ * Save notes to debug cache file
+ *
+ * @param fileKey - Figma file key
+ * @param notes - Raw notes from Figma file
+ * @param frameNotes - Notes associated with frames
+ * @param unassociatedNotes - Notes that couldn't be associated
+ */
+async function saveNotesToCache(
+  fileKey: string,
+  notes: FigmaNodeMetadata[],
+  frameNotes: Map<string, string[]>,
+  unassociatedNotes: string[]
+): Promise<void> {
+  try {
+    const cacheDir = getFigmaFileCachePath(fileKey);
+    await fs.mkdir(cacheDir, { recursive: true });
+
+    const markdown = formatNotesAsDebugMarkdown(fileKey, notes, frameNotes, unassociatedNotes);
+    const cachePath = path.join(cacheDir, 'notes.md');
+
+    await fs.writeFile(cachePath, markdown, 'utf-8');
+    console.log(`  📁 Saved notes debug output to ${cachePath}`);
+  } catch (error: any) {
+    console.warn(`  ⚠️ Failed to save notes to cache: ${error.message}`);
+    // Don't throw - this is optional debug functionality
+  }
 }
 
 // ============================================================================
@@ -112,11 +232,19 @@ export async function fetchAndAssociateAnnotations(
   
   // Step 4: Associate comments with frames
   const commentResult = formatCommentsForContext(threads, frameMetadata, documentTree);
-  console.log(`  Associated ${commentResult.matchedThreadCount}/${threads.length} comment threads with frames`);
+  const unattachedCount = commentResult.unattachedComments.length > 0 
+    ? commentResult.unattachedComments.reduce((sum, c) => sum + c.markdown.split('\n').filter(l => l.startsWith('-')).length, 0)
+    : 0;
+  console.log(`  Associated ${commentResult.matchedThreadCount}/${threads.length} comment threads with frames (${unattachedCount} unattached)`);
   
   // Step 5: Associate notes with frames
   const noteResult = associateNotesWithFrames(frames, notes);
   console.log(`  Associated ${noteResult.matchedNotes}/${notes.length} notes with frames`);
+  
+  // Save notes to debug cache if enabled
+  if (isNotesCacheEnabled() && notes.length > 0) {
+    await saveNotesToCache(fileKey, notes, noteResult.frameNotes, noteResult.unassociatedNotes);
+  }
   
   // Step 6: Merge comments and notes into AnalyzedFrame format
   const analyzedFrames = mergeAnnotationsIntoFrames(
@@ -130,6 +258,7 @@ export async function fetchAndAssociateAnnotations(
   return {
     frames: analyzedFrames,
     unassociatedNotes: noteResult.unassociatedNotes,
+    unattachedComments: commentResult.unattachedComments,
     stats: {
       totalCommentThreads: threads.length,
       matchedCommentThreads: commentResult.matchedThreadCount,
@@ -248,33 +377,32 @@ export function associateNotesWithFrames(
 /**
  * Extract text content from a Figma note node
  * 
- * Looks for text in:
- * 1. Node's characters property (if TEXT type)
- * 2. First TEXT child node
- * 3. Falls back to node name
+ * Collects text from all TEXT children and concatenates them.
+ * This handles Figma Note components which typically have:
+ * - A "Title" TEXT child (e.g., "Scope")
+ * - A "bullet" TEXT child with the actual content
  * 
  * @param note - Figma node metadata
- * @returns Extracted text content
+ * @returns Extracted text content (all TEXT children joined by newlines)
  */
 export function extractNoteText(note: FigmaNodeMetadata): string {
-  // If the note has children, look for TEXT nodes
-  if (note.children && Array.isArray(note.children)) {
-    for (const child of note.children) {
-      if (child.type === 'TEXT' && child.characters) {
-        return child.characters;
-      }
-      // Recursively search children
-      if (child.children) {
-        const childText = extractNoteText(child);
-        if (childText !== child.name) {
-          return childText;
-        }
+  const textParts: string[] = [];
+  
+  function collectText(node: any): void {
+    if (node.type === 'TEXT' && node.characters) {
+      textParts.push(node.characters);
+    }
+    if (node.children && Array.isArray(node.children)) {
+      for (const child of node.children) {
+        collectText(child);
       }
     }
   }
   
-  // Fallback to name
-  return note.name || 'Note';
+  collectText(note);
+  
+  // Return all collected text joined by newlines, or fall back to name
+  return textParts.length > 0 ? textParts.join('\n') : (note.name || 'Note');
 }
 
 /**

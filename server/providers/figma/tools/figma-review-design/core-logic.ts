@@ -51,6 +51,7 @@ import {
   type AnalyzedFrame,
   type FrameAnalysisResult,
 } from '../../../figma/screen-analyses-workflow/index.js';
+import { generateScopeAnalysis } from '../../../combined/tools/shared/scope-analysis-helpers.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -194,6 +195,10 @@ export async function executeAnalyzeFigmaScope(
     };
   }
 
+  // ==========================================
+  // STEP 4: Prepare data for analysis
+  // ==========================================
+  
   // Build framesToAnalyze array for comment posting (extract from AnalyzedFrame[])
   const framesToAnalyze: Array<{
     fileKey: string;
@@ -269,6 +274,33 @@ export async function executeAnalyzeFigmaScope(
   }
 
   // ==========================================
+  // STEP 5: Generate scope analysis (cross-screen synthesis)
+  // ==========================================
+  await notify('🔍 Generating scope analysis...');
+
+  let scopeAnalysisContent: string;
+  try {
+    const scopeResult = await generateScopeAnalysis({
+      generateText,
+      analysisData: screenAnalyses.map(s => ({
+        screenName: s.name,
+        content: s.content,
+        url: s.url,
+      })),
+      epicContext: contextDescription,
+      commentContexts,
+      notify,
+    });
+    scopeAnalysisContent = scopeResult.scopeAnalysisContent;
+    console.log(`  ✅ Generated scope analysis (${scopeResult.featureAreasCount} areas, ${scopeResult.questionsCount} questions)`);
+  } catch (error: any) {
+    errors.push(`Scope analysis failed: ${error.message}`);
+    console.error(`  ❌ Scope analysis failed:`, error.message);
+    // Fall back to using raw screen analyses
+    scopeAnalysisContent = '';
+  }
+
+  // ==========================================
   // STEP 6: Generate questions with AI
   // ==========================================
   await notify('📊 Generating questions...');
@@ -284,7 +316,8 @@ export async function executeAnalyzeFigmaScope(
   const questionsPrompt = generateFigmaQuestionsPrompt(
     screenInfos,
     contextDescription,
-    commentContexts
+    commentContexts,
+    scopeAnalysisContent
   );
 
   let analysisMarkdown: string;

@@ -67,6 +67,7 @@ const createMockDeps = (overrides: Partial<OrchestratorDeps> = {}): Orchestrator
   fetchAndAssociateAnnotations: jest.fn().mockResolvedValue({
     frames: [createMockFrame()],
     unassociatedNotes: [],
+    unattachedComments: [],
     stats: { totalCommentThreads: 0, matchedCommentThreads: 0, totalNotes: 0, matchedNotes: 0 },
   }),
   
@@ -254,6 +255,7 @@ describe('analyzeScreens', () => {
           createMockFrame({ name: 'screen-3', nodeId: '3:3' }),
         ],
         unassociatedNotes: [],
+        unattachedComments: [],
         stats: { totalCommentThreads: 0, matchedCommentThreads: 0, totalNotes: 0, matchedNotes: 0 },
       }),
       analyzeFrames: jest.fn().mockResolvedValue([
