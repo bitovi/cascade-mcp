@@ -95,11 +95,12 @@ GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 GOOGLE_OAUTH_SCOPES="https://www.googleapis.com/auth/drive"
 
-# Google Encryption Keys (Required for service account encryption)
+# RSA Encryption Keys (Required - enables /encrypt endpoint)
 # Generate keys locally: ./scripts/generate-rsa-keys.sh
 # Store in GitHub Secrets for staging/production deployments
 # Use different keys for each environment (dev/staging/prod)
-# See: docs/google-service-account-encryption.md for complete setup guide
+# Used for encrypting sensitive data (Google service accounts, API keys, etc.)
+# See: docs/encryption-setup.md for complete setup guide
 RSA_PUBLIC_KEY=LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K...
 RSA_PRIVATE_KEY=LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1J...
 
