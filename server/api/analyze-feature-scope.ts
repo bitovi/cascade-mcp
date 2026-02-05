@@ -18,7 +18,7 @@ import {
   handleApiError,
   validateApiHeaders,
   validateEpicKey,
-  parseOptionalGoogleJson,
+  parseOptionalGoogleToken,
   type ErrorCommentContext
 } from './api-error-helpers.js';
 import {
@@ -36,7 +36,7 @@ import {
  *   X-Figma-Token: figd_...                    (Figma PAT)
  * 
  * Optional Headers:
- *   X-Google-Json: {...}  (Google service account JSON - enables Google Docs context)
+ *   X-Google-Token: RSA-ENCRYPTED:...  (Encrypted Google service account - enables Google Docs context)
  * 
  * Optional LLM Provider Headers (falls back to env vars):
  *   X-LLM-Provider: anthropic|openai|google|bedrock|mistral|deepseek|groq|xai
@@ -87,7 +87,7 @@ export async function handleAnalyzeFeatureScope(req: Request, res: Response) {
     const generateText = createProviderFromHeaders(req.headers as Record<string, string>);
     
     // Create Google client if service account credentials provided (optional)
-    const googleServiceAccount = parseOptionalGoogleJson(req.headers);
+    const googleServiceAccount = await parseOptionalGoogleToken(req.headers);
     const googleClient = googleServiceAccount 
       ? await createGoogleClientWithServiceAccountJSON(googleServiceAccount) 
       : undefined;
