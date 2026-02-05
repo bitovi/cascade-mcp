@@ -79,7 +79,94 @@ npm run start-local
 - **Team Isolation**: Each environment has its own key pair - encrypted credentials cannot be decrypted across environments
 - **Zero Trust**: Encrypted credentials are safe to store in version control (only the server with the private key can decrypt)
 
-## 📚 Full Documentation
+## �️ Manual Terminal Encryption
+
+For advanced users who want to encrypt data from the terminal without using the web interface:
+
+### Step 1: Extract the Public Key
+
+**Option A: From Running Server**
+
+```bash
+# Start server
+npm run start-local
+
+# Visit http://localhost:3000/encrypt
+# Click "📋 Copy Public Key" button
+# Save to file: public_key.pem
+```
+
+**Option B: From Environment Variable**
+
+```bash
+# Decode the base64-encoded public key from .env
+echo "$RSA_PUBLIC_KEY" | base64 -d > public_key.pem
+```
+
+### Step 2: Encrypt Any Text File
+
+Use OpenSSL to encrypt any sensitive data:
+
+```bash
+# Encrypt API keys, tokens, configuration, or any text file
+openssl pkeyutl -encrypt -pubin -inkey public_key.pem \
+  -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 \
+  -in your-sensitive-data.txt | base64 | tr -d '\n' | sed 's/^/RSA-ENCRYPTED:/'
+```
+
+**Examples**:
+
+```bash
+# Encrypt Google service account JSON
+openssl pkeyutl -encrypt -pubin -inkey public_key.pem \
+  -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 \
+  -in google.json | base64 | tr -d '\n' | sed 's/^/RSA-ENCRYPTED:/'
+
+# Encrypt API key file
+echo "sk-ant-api-key-abc123..." | openssl pkeyutl -encrypt -pubin -inkey public_key.pem \
+  -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 | base64 | tr -d '\n' | sed 's/^/RSA-ENCRYPTED:/'
+
+# Encrypt multi-line configuration
+openssl pkeyutl -encrypt -pubin -inkey public_key.pem \
+  -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 \
+  -in config.yaml | base64 | tr -d '\n' | sed 's/^/RSA-ENCRYPTED:/'
+```
+
+### Step 3: Use the Encrypted Output
+
+Copy the encrypted string (starting with `RSA-ENCRYPTED:`) and use it:
+
+```bash
+# In environment variables
+export MY_SECRET="RSA-ENCRYPTED:eyJhbGci..."
+
+# In API requests (provider-specific headers)
+curl -X POST https://your-server.com/api/endpoint \
+  -H "X-Google-Token: RSA-ENCRYPTED:..." \
+  -H "Content-Type: application/json"
+
+# In configuration files
+echo "ENCRYPTED_CONFIG=RSA-ENCRYPTED:..." >> .env.production
+```
+
+### Step 4: Cleanup
+
+Remove sensitive files after encryption:
+
+```bash
+rm your-sensitive-data.txt public_key.pem encrypted.txt
+```
+
+**Security Notes**:
+
+- The encrypted output can be safely stored in version control
+- Only the server with the private key (`RSA_PRIVATE_KEY`) can decrypt it
+- Public key is safe to share - it can only encrypt, not decrypt
+- Use different encryption keys for dev, staging, and production
+
+---
+
+## �📚 Full Documentation
 
 See [specs/001-static-encryption-keys/](../specs/001-static-encryption-keys/) for:
 

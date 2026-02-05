@@ -20,7 +20,7 @@ export function Footer({ baseUrl }: FooterProps) {
           </a>
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <div>
             <h4 className="font-medium mb-2 text-gray-800">Endpoints</h4>
             <ul className="space-y-1">
@@ -57,16 +57,22 @@ export function Footer({ baseUrl }: FooterProps) {
               <li>
                 <code className="bg-gray-100 px-1 py-0.5 rounded text-xs">POST /api/write-next-story</code>
               </li>
-              <li>
-                <Link to="/google-service-encrypt" className="text-blue-600 hover:underline">
-                  🔐 Encrypt Google Service Account
-                </Link>
-              </li>
             </ul>
           </div>
         </div>
 
-        <p className="mt-4 text-xs text-gray-500">
+        <div className="mb-4">
+          <h4 className="font-medium mb-2 text-gray-800">Security</h4>
+          <ul className="space-y-1">
+            <li>
+              <Link to="/encrypt" className="text-blue-600 hover:underline">
+                Encrypt Data
+              </Link>
+            </li>
+          </ul>
+        </div>
+
+        <p className="text-xs text-gray-500">
           Note: Some tools require{' '}
           <a
             href="https://modelcontextprotocol.io/specification/2025-06-18/client/sampling"

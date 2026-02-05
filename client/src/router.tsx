@@ -1,8 +1,8 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Header } from './components/Header/Header';
 import { Footer } from './components/Footer/Footer';
 import { HomePage } from './pages/HomePage';
-import { GoogleServiceEncryptPage } from './pages/GoogleServiceEncryptPage';
+import { EncryptPage } from './pages/EncryptPage';
 import { useConfig } from './hooks/useConfig';
 
 export function Router() {
@@ -17,7 +17,7 @@ export function Router() {
           <div className="max-w-4xl mx-auto">
             <Routes>
               <Route path="/" element={<HomePage />} />
-              <Route path="/google-service-encrypt" element={<GoogleServiceEncryptPage />} />
+              <Route path="/encrypt" element={<EncryptPage />} />
             </Routes>
           </div>
         </main>

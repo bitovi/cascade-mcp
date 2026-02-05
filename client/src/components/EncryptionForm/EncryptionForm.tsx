@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react';
-import { GoogleServiceEncryptionResult } from './GoogleServiceEncryptionResult';
+import { EncryptionResult } from './EncryptionResult';
 import { EncryptionNotAvailableWarning } from './EncryptionNotAvailableWarning';
 
 interface EncryptionResult {
   encrypted: string;
-  clientEmail: string;
-  projectId: string;
 }
 
 interface EncryptionStatus {
@@ -17,7 +15,7 @@ interface PublicKeyResponse {
   publicKey: string;
 }
 
-export function GoogleServiceEncryptionForm() {
+export function EncryptionForm() {
   const [serviceAccountJson, setServiceAccountJson] = useState('');
   const [isEncrypting, setIsEncrypting] = useState(false);
   const [result, setResult] = useState<EncryptionResult | null>(null);
@@ -25,6 +23,8 @@ export function GoogleServiceEncryptionForm() {
   const [encryptionStatus, setEncryptionStatus] = useState<EncryptionStatus | null>(null);
   const [isCheckingStatus, setIsCheckingStatus] = useState(true);
   const [publicKey, setPublicKey] = useState<string | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
+  const [showPublicKey, setShowPublicKey] = useState(false);
 
   useEffect(() => {
     // Check encryption availability via public key endpoint
@@ -57,12 +57,18 @@ export function GoogleServiceEncryptionForm() {
     setResult(null);
 
     try {
-      const response = await fetch('/google-service-encrypt', {
+      // Client-side size validation (50KB = 51200 bytes)
+      const sizeInBytes = new Blob([serviceAccountJson]).size;
+      if (sizeInBytes > 51200) {
+        throw new Error('Data exceeds 50KB size limit. Please reduce the size of your input.');
+      }
+
+      const response = await fetch('/encrypt', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ serviceAccountJson }),
+        body: JSON.stringify({ data: serviceAccountJson }),
       });
 
       if (!response.ok) {
@@ -73,13 +79,8 @@ export function GoogleServiceEncryptionForm() {
       // Parse JSON response
       const data = await response.json();
       
-      // Parse the service account to get email and project
-      const parsed = JSON.parse(serviceAccountJson);
-      
       setResult({
         encrypted: data.encrypted,
-        clientEmail: data.clientEmail,
-        projectId: data.projectId,
       });
       setServiceAccountJson(''); // Clear the form
     } catch (err) {
@@ -119,10 +120,8 @@ export function GoogleServiceEncryptionForm() {
 
   if (result) {
     return (
-      <GoogleServiceEncryptionResult
+      <EncryptionResult
         encrypted={result.encrypted}
-        clientEmail={result.clientEmail}
-        projectId={result.projectId}
         onReset={handleReset}
       />
     );
@@ -135,37 +134,54 @@ export function GoogleServiceEncryptionForm() {
         <EncryptionNotAvailableWarning message={encryptionStatus.message} />
       )}
 
-      {/* Instructions */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-4">
-          <h3 className="font-semibold text-yellow-900 mb-1">⚠️ Security Note</h3>
-          <p className="text-sm text-yellow-800">
-            This page encrypts your credentials using RSA asymmetric encryption. The encrypted output is safe to store in config files, environment variables, or version control.
-          </p>
-        </div>
+      {/* Collapsible Details Section */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <button
+          onClick={() => setShowDetails(!showDetails)}
+          className={`w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50 transition-colors ${showDetails ? 'rounded-t-lg' : 'rounded-lg'}`}
+        >
+          <span className="font-medium text-gray-700">ℹ️ Additional Information</span>
+          <span className="text-gray-500">{showDetails ? '▲' : '▼'}</span>
+        </button>
         
-        <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
-          <p className="text-sm text-blue-900">
-            📝 Paste your Google service account JSON below (typically named <code className="bg-blue-100 px-1 py-0.5 rounded text-xs">google.json</code>). We'll encrypt it and give you a string you can use with Google Doc conversion tools.
-          </p>
-        </div>
+        {showDetails && (
+          <div className="px-4 pb-4 space-y-4 border-t border-gray-200 pt-4">
+            {/* Provider-Specific Requirements */}
+            <div className="bg-blue-50 border-l-4 border-blue-500 p-4">
+              <h3 className="font-semibold text-blue-900 mb-1">Provider Requirements</h3>
+              <p className="text-sm text-blue-800">
+                This tool encrypts any sensitive data (API keys, credentials, configuration files). 
+                Some API endpoints may only accept specific encrypted formats (e.g., <code className="bg-blue-100 px-1 py-0.5 rounded text-xs">X-Google-Token</code> for Google service accounts).
+                Check your endpoint's documentation for requirements.
+              </p>
+            </div>
 
-        {/* Public Key Section - Only show if encryption is enabled */}
-        {publicKey && (
-          <div className="bg-purple-50 border-l-4 border-purple-500 p-4">
-            <h4 className="font-semibold text-purple-900 mb-2">🔑 Manual Encryption</h4>
-            <p className="text-sm text-purple-800 mb-3">
-              Want to encrypt locally without using this form? Copy the public key and use it programmatically with your own encryption script.
-            </p>
-            <button
-              onClick={handleCopyPublicKey}
-              className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-md hover:bg-purple-700 transition-colors"
-            >
-              📋 Copy Public Key
-            </button>
-            <p className="text-xs text-purple-700 mt-2">
-              Public key is safe to share and can only be used for encryption, not decryption.
-            </p>
+            {/* Security Note */}
+            <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4">
+              <h3 className="font-semibold text-yellow-900 mb-1">⚠️ Security Note</h3>
+              <p className="text-sm text-yellow-800">
+                This page encrypts your credentials using RSA asymmetric encryption. The encrypted output is safe to store in config files and environment variables.
+              </p>
+            </div>
+
+            {/* Public Key Section */}
+            {publicKey && (
+              <div className="bg-purple-50 border-l-4 border-purple-500 p-4">
+                <h4 className="font-semibold text-purple-900 mb-2">🔑 Manual Encryption</h4>
+                <p className="text-sm text-purple-800 mb-3">
+                  Want to encrypt locally without using this form? Copy the public key and use it programmatically with your own encryption script.
+                </p>
+                <button
+                  onClick={handleCopyPublicKey}
+                  className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-md hover:bg-purple-700 transition-colors"
+                >
+                  📋 Copy Public Key
+                </button>
+                <p className="text-xs text-purple-700 mt-2">
+                  Public key is safe to share and can only be used for encryption, not decryption.
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -173,24 +189,20 @@ export function GoogleServiceEncryptionForm() {
       {/* Form */}
       <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <label htmlFor="serviceAccountJson" className="block font-medium text-gray-700 mb-2">
-          Service Account JSON:
+          Data to Encrypt:
         </label>
         <textarea
           id="serviceAccountJson"
           value={serviceAccountJson}
           onChange={(e) => setServiceAccountJson(e.target.value)}
           rows={18}
-          placeholder={`Paste your service account JSON here...
+          placeholder={`Paste your sensitive data here (max 50KB)...
 
-Example:
-{
-  "type": "service_account",
-  "project_id": "my-project-123",
-  "private_key_id": "abc123...",
-  "private_key": "-----BEGIN PRIVATE KEY-----\\n...",
-  "client_email": "my-service@my-project.iam.gserviceaccount.com",
-  ...
-}`}
+Examples:
+- API keys: "sk-1234567890abcdefg..."
+- Service account JSON: {"type": "service_account", "project_id": "..."}
+- Configuration: {"db_password": "secret", "api_key": "..."}
+- Any UTF-8 text under 50KB`}
           required
           disabled={isEncrypting || !encryptionStatus?.enabled}
           className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm resize-vertical focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
@@ -207,7 +219,7 @@ Example:
           disabled={isEncrypting || !serviceAccountJson.trim() || !encryptionStatus?.enabled}
           className="mt-4 px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
         >
-          {isEncrypting ? '🔄 Encrypting...' : '🔒 Encrypt Credentials'}
+          {isEncrypting ? '🔄 Encrypting...' : '🔒 Encrypt Data'}
         </button>
       </form>
     </div>

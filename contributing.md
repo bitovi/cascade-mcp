@@ -257,7 +257,7 @@ If you want to test REST API endpoints that accept encrypted Google service acco
 2. **Add to `.env` for REST API testing:**
 
    ```bash
-   # RSA encryption keys (required to use /google-service-encrypt endpoint)
+   # RSA encryption keys (required to use /encrypt endpoint)
    RSA_PUBLIC_KEY="LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K..."
    RSA_PRIVATE_KEY="LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1J..."
    

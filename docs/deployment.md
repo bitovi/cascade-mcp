@@ -168,21 +168,21 @@ docker run -d \
   cascade-mcp:latest
 ```
 
-### Google Service Account Encryption (Optional)
+### Credential Encryption (Optional)
 
-If you want to enable the `/google-service-encrypt` endpoint for API users to encrypt their Google Service Account credentials:
+If you want to enable the `/encrypt` endpoint for API users to encrypt their credentials:
 
 **What it enables:**
-- Users can encrypt Google service account credentials via web UI
-- Users pass encrypted credentials in `X-Google-Token` header for REST API calls
-- Enables Google Docs context in API endpoints like `/api/write-shell-stories`
+- Users can encrypt sensitive credentials via web UI
+- Users pass encrypted credentials in provider-specific headers for REST API calls
+- Enables secure credential handling in API endpoints
 
 **Deployment Requirements:**
 
 Add RSA encryption keys to your environment:
 
 ```bash
-# Required for /google-service-encrypt endpoint
+# Required for /encrypt endpoint
 RSA_PUBLIC_KEY=LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K...
 RSA_PRIVATE_KEY=LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1J...
 ```
