@@ -238,7 +238,9 @@ ${screensYaml}
 
 3. **PRIORITIZE**
    • Reorder stories by:
-     - Customer/User Value (highest first)
+     - **Scaffolding First**: Navigation, routing, and structural elements that enable other features come early
+     - **User Flow Sequence**: Follow natural user journeys (e.g., navigate → list → create → view → edit → delete)
+     - Customer/User Value (highest first within each flow stage)
      - Dependencies (sequence stories so that later ones build on earlier ones)
      - Blockers (unblock future stories early)
      - Risk (tackle high-risk elements earlier)
@@ -273,27 +275,18 @@ ${screensYaml}
 8. **REPEAT**
    • For the next highest-priority story, repeat steps 3–7 until all major flows and incremental user-value slices are represented as shell stories.
 
-9. **CREATE STORIES FOR DEFERRED FEATURES (MANDATORY)**
-   • CRITICAL: This step ensures no ⏬ deferrals are orphaned
-   • For any feature that was deferred with ⏬ bullets:
-     ◦ Verify there's a corresponding implementation story later in the list
-     ◦ Ensure ⏬ bullets reference the correct story ID
-   • **If a feature has ⏬ bullets but NO implementation story, ADD one now**
-   • For each new implementation story:
-     ◦ Create story at end of list with sequential numbering
+9. **HANDLE DEFERRED FEATURES**
+   • For each ⏬ bullet with "(implement in stXXX)":
+     ◦ If out-of-scope ("none for now", etc.) → Change to ❌ and remove story reference
+     ◦ If genuinely deferred → Verify stXXX exists, or create it
+   • To create a deferred story:
+     ◦ Add story at end of list with sequential numbering
      ◦ Use the ⏬ bullet text as the story's main feature
-     ◦ Add SCREENS from the story that deferred it
-     ◦ Set DEPENDENCIES to the story that deferred it (if needed)
-     ◦ Add relevant ☐ bullets for implementation
-   • Update all ⏬ bullets to reference the correct new story IDs
-   • Example transformation:
-     - Original st006 has: ⏬ Request history tracking (implement in st015)
-     - Create: st017 Add Request History Tracking ⟩ Track and display history of information requests
-     - Update st006 to: ⏬ Request history tracking (implement in st017)
+     ◦ Add SCREENS and DEPENDENCIES from the deferring story
+   • **Never reference a story ID that doesn't exist in your output**
 
 10. **REVIEW FOR SCOPE COVERAGE**
    • Verify all ☐ In-Scope features from scope analysis have stories
-   • Verify all ⏬ Low Priority features now have corresponding implementation stories
    • Verify NO ⏬ bullets reference non-existent story IDs
    • Verify NO ❌ Out-of-Scope features have stories
    • Verify NO ✅ Already Done features have stories
@@ -330,7 +323,8 @@ ${screensYaml}
 • Use scope analysis categorizations (☐/⏬/❌/❓) to guide story content and priority.
 • Stories describe WHAT to build (features from scope analysis) not HOW to build them (implementation details).
 • Only create stories for ☐ In-Scope and ⏬ Low Priority features. Skip ❌ Out-of-Scope and ✅ Already Done.
-• **CRITICAL: Every ⏬ bullet with "(implement in stXXX)" MUST have a corresponding stXXX story that implements it**
+• **"NONE FOR NOW" = OUT OF SCOPE**: If scope analysis contains Q&A with responses like "None for now", "Not for now", "No", "Not needed" → that feature is ❌ OUT OF SCOPE, not ⏬ deferred. Use ❌ bullets (no story reference needed).
+• **⏬ requires a real story**: Only use ⏬ with "(implement in stXXX)" if stXXX exists in your output. If no story will implement it, use ❌ instead.
 • **CRITICAL: The final story in the epic MUST have ZERO ⏬ bullets** (all deferred work must be accounted for in subsequent implementation stories)
 • FLEXIBLE STORY COUNT: The review process may reveal the need for additional stories. Feel free to add, split, or reorganize stories to achieve better incremental value delivery. Quality trumps hitting a specific story count.
 • Do not ask clarifying questions; capture unknowns as ❓ bullets.

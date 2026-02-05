@@ -18,10 +18,21 @@ FUNDAMENTAL RULE: EVIDENCE-BASED ONLY
 - If a UI element is visible but its purpose/behavior is unclear, list it as a ❓ question
 
 CATEGORIZATION RULES:
-- ✅ In-Scope: Features explicitly listed as in-scope in epic context, OR features with complete UI and clear implementation path (when epic context doesn't specify)
-- ❌ Out-of-Scope: Features explicitly mentioned in epic context as deferred/excluded, OR features marked as future/optional in analyses
+- ☐ In-Scope: Features explicitly listed as in-scope in epic context, OR features with complete UI and clear implementation path (when epic context doesn't specify)
+- ⏬ Low Priority: Features explicitly marked as "later", "phase 2", "nice to have", or similar - these WILL be built but at end of epic
+- ❌ Out-of-Scope: Features explicitly declined by stakeholders ("None for now", "Not for now", "No", "Not needed"), OR features marked as future/optional in analyses
 - ❓ Questions: Ambiguous behaviors, unclear requirements, missing information, or features that could be either in/out of scope
 - **PRIORITY**: Epic context scope statements are primary source of truth and override screen analysis interpretations
+
+NEGATIVE RESPONSE HANDLING:
+- When a Q&A response declines a feature ("None for now", "Not for now", "No", "Not needed", etc.):
+  → Include BOTH the answered question (💬) AND an explicit ❌ exclusion on the next line
+  → "None for now" / "Not for now" = OUT OF SCOPE (not deferred/low priority)
+
+CRITICAL DISTINCTION:
+- "None for now" / "Not for now" / "No" → ❌ Out of Scope (do NOT build)
+- "Later" / "Phase 2" / "Nice to have" → ⏬ Low Priority (build at end of epic)
+- Unanswered questions → ❓ Questions (needs clarification)
 
 GROUPING RULES:
 - Group features by user workflow and functional areas (e.g., "Authentication Flow", "User Profile Management", "Data Entry Workflow")

@@ -476,6 +476,10 @@ export async function executeWriteShellStories(
   // Decision is PROCEED_WITH_STORIES - continue with Phase 6
   console.log('  ✅ Proceeding with shell story generation');
   
+  // Track the ADF content that will be passed to updateEpicWithShellStories
+  // This needs to include scope analysis if we generate it
+  let epicAdfForShellStories = epicWithoutShellStoriesAdf;
+  
   // If we generated scope analysis this run, write it to Jira before proceeding
   let epicContextWithScope = epicWithoutShellStoriesMarkdown;
   if (scopeAnalysisGeneratedThisRun && scopeAnalysisContent) {
@@ -493,6 +497,14 @@ export async function executeWriteShellStories(
       
       // Update epic context to include the scope analysis we just wrote
       epicContextWithScope = `${epicWithoutShellStoriesMarkdown}\n\n${scopeAnalysisSectionMarkdown}`;
+      
+      // CRITICAL: Also update the ADF so updateEpicWithShellStories doesn't overwrite scope analysis
+      // Convert the scope analysis to ADF and append to epicWithoutShellStoriesAdf
+      const scopeAnalysisAdf = await convertMarkdownToAdf(scopeAnalysisSectionMarkdown);
+      if (validateAdf(scopeAnalysisAdf)) {
+        epicAdfForShellStories = [...epicWithoutShellStoriesAdf, ...scopeAnalysisAdf.content];
+        console.log('  ✅ Updated ADF for shell stories to include scope analysis');
+      }
     } catch (error: any) {
       console.error('  ❌ Failed to update Jira with scope analysis:', error);
       // Continue anyway - Jira update is best effort, but update context for shell story generation
@@ -523,12 +535,13 @@ export async function executeWriteShellStories(
     shellStoriesContent = shellStoriesResult.shellStoriesText;
     
     // Update the epic description with shell stories
+    // Use epicAdfForShellStories which includes scope analysis if we generated it
     await updateEpicWithShellStories({
       epicKey,
       cloudId: resolvedCloudId,
       atlassianClient,
       shellStoriesMarkdown: shellStoriesContent,
-      epicWithoutShellStoriesAdf,
+      epicWithoutShellStoriesAdf: epicAdfForShellStories,
       notify
     });
   } else {

@@ -101,7 +101,6 @@ curl -X POST http://localhost:3000/api/figma-review-design \
 | Variable | Description |
 |----------|-------------|
 | `SAVE_FIGMA_COMMENTS_TO_CACHE` | Set to `true` or `1` to save fetched comments to debug cache files at `cache/figma-files/{fileKey}/comments.md` |
-| `SAVE_FIGMA_NOTES_TO_CACHE` | Set to `true` or `1` to save extracted sticky notes to debug cache files at `cache/figma-files/{fileKey}/notes.md` |
 
 ## Related Tools
 
