@@ -31,20 +31,6 @@ export function registerRestApiRoutes(app: Express): void {
   });
   console.log('  ✓ GET /api/config');
   
-  // Encryption status endpoint for frontend to check if encryption is available
-  app.get('/api/encryption-status', (req, res) => {
-    const state = encryptionManager.getState();
-    res.json({
-      enabled: state.enabled,
-      message: state.enabled 
-        ? 'Encryption is available' 
-        : state.reason === 'keys-not-configured'
-          ? 'Encryption keys not configured. Run ./scripts/generate-rsa-keys.sh to generate keys and add them to your .env file.'
-          : (state as any).message || 'Encryption unavailable'
-    });
-  });
-  console.log('  ✓ GET /api/encryption-status');
-  
   // Get public key for manual encryption (safe to expose)
   app.get('/api/public-key', (req, res) => {
     const publicKey = encryptionManager.getPublicKey();

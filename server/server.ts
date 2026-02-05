@@ -31,7 +31,7 @@ import { googleProvider } from './providers/google/index.js';
 import { logEnvironmentInfo } from './debug-helpers.js';
 import { registerRestApiRoutes } from './api/index.js';
 import { getProjectRoot } from './utils/file-paths.js';
-import { handleEncryptionRequest } from './google-service-encrypt.js';
+import { handleEncryptionRequest } from './encrypt.js';
 import { encryptionManager, InvalidKeyFormatError } from './utils/encryption-manager.js';
 
 // configurations

@@ -97,7 +97,7 @@ export class GoogleKeyManager {
     if (!publicKeyB64 || !privateKeyB64) {
       console.log('ℹ️  Google encryption keys not configured');
       console.log('   Google Drive/Docs features will be unavailable');
-      console.log('   To enable: See docs/google-service-account-encryption.md');
+      console.log('   To enable: See docs/encryption-setup.md');
       this.isEnabled = false;
       return;
     }
@@ -242,7 +242,7 @@ Based on user story priorities from spec.md:
 
 ### P3: Documentation Updates
 1. Update `contributing.md` with local setup instructions
-2. Update `docs/google-service-account-encryption.md` for new workflow
+2. Update `docs/encryption-setup.md` and `docs/google-drive-setup.md` for new workflow
 3. Update `.github/copilot-instructions.md` with security guidelines
 
 ## Technology Stack Decisions

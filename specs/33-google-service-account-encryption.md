@@ -230,7 +230,8 @@ cascade-mcp/
 │           ├── private.pem          # Generated on first use
 │           └── public.pem           # Can be published
 ├── docs/
-│   └── google-service-account-encryption.md  # NEW: User documentation
+│   ├── encryption-setup.md          # NEW: General encryption setup
+│   └── google-drive-setup.md        # NEW: Google-specific setup
 └── specs/
     └── 33-google-service-account-encryption.md  # This file
 ```
@@ -358,7 +359,7 @@ GOOGLE_SERVICE_ACCOUNT_ENCRYPTED="RSA-ENCRYPTED:eyJh..." npm run start-local
 - [x] Add `.gitignore` entry for `cache/keys/` (already covered by /cache/)
 - [x] Set file permissions on private key in key-manager.ts
 - [x] Update Footer.tsx with encryption link
-- [x] Write user documentation (docs/google-service-account-encryption.md)
+- [x] Write user documentation (docs/encryption-setup.md and docs/google-drive-setup.md)
 - [ ] Update contributing.md with RSA key setup
 - [ ] Update .github/copilot-instructions.md with security guidelines
 - [ ] Manual testing: encrypt → store → use

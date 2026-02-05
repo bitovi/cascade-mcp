@@ -27,18 +27,24 @@ export function GoogleServiceEncryptionForm() {
   const [publicKey, setPublicKey] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check encryption status on mount
-    fetch('/api/encryption-status')
-      .then((res) => res.json())
-      .then((data) => {
-        setEncryptionStatus(data);
-        // If enabled, fetch public key
-        if (data.enabled) {
-          return fetch('/api/public-key')
-            .then((res) => res.json())
-            .then((keyData: PublicKeyResponse) => setPublicKey(keyData.publicKey))
-            .catch(() => {});
+    // Check encryption availability via public key endpoint
+    fetch('/api/public-key')
+      .then((res) => {
+        if (!res.ok) {
+          return res.json().then(data => {
+            setEncryptionStatus({ 
+              enabled: false, 
+              message: data.error || 'Encryption is not enabled.' 
+            });
+          });
         }
+        return res.json().then((keyData: PublicKeyResponse) => {
+          setPublicKey(keyData.publicKey);
+          setEncryptionStatus({ 
+            enabled: true, 
+            message: 'Encryption is available' 
+          });
+        });
       })
       .catch(() => setEncryptionStatus({ enabled: false, message: 'Failed to check encryption status' }))
       .finally(() => setIsCheckingStatus(false));

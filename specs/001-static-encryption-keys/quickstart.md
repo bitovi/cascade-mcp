@@ -67,7 +67,7 @@ npm run start-local
 ```
 ℹ️  Google encryption keys not configured
    Google Drive/Docs features will be unavailable
-   See docs/google-service-account-encryption.md for setup
+   See docs/encryption-setup.md for setup
 ```
 
 → Go back to Step 2 and verify `.env` file has both keys.

@@ -1,13 +1,12 @@
 /**
- * RSA Credential Key Manager
+ * RSA Encryption Manager
  *
- * Manages RSA key pair for encrypting/decrypting sensitive credentials.
+ * Manages RSA key pair for encrypting/decrypting sensitive text data.
  * Keys are loaded from environment variables (base64-encoded PEM format).
  */
 
 import { createPublicKey, createPrivateKey } from 'crypto';
 import { encryptWithPublicKey, decryptWithPrivateKey } from './crypto.js';
-import type { GoogleServiceAccountCredentials } from '../providers/google/types.js';
 
 /**
  * Encryption feature state
@@ -221,9 +220,9 @@ export class EncryptionManager {
   }
 
   /**
-   * Encrypt credentials
+   * Encrypt text
    *
-   * @param credentials - Plaintext credentials object
+   * @param text - Plaintext string to encrypt
    * @returns Encrypted string with format "RSA-ENCRYPTED:<base64>"
    *
    * @throws {EncryptionNotEnabledError} if encryption not enabled
@@ -231,22 +230,17 @@ export class EncryptionManager {
    *
    * @example
    * ```typescript
-   * const encrypted = await encryptionManager.encrypt(credentials);
+   * const encrypted = await encryptionManager.encrypt('sensitive data');
    * // Store encrypted string in config/env
    * ```
    */
-  async encrypt(credentials: GoogleServiceAccountCredentials): Promise<string> {
+  async encrypt(text: string): Promise<string> {
     if (!this.isEnabled()) {
       throw new EncryptionNotEnabledError('encrypt');
     }
 
-    console.log('Encrypting credentials...');
-    console.log(`  Client Email: ${credentials.client_email}`);
-    console.log(`  Project ID: ${credentials.project_id}`);
-
-    const plaintext = JSON.stringify(credentials);
-    const encrypted = await encryptWithPublicKey(plaintext, this.publicKey!);
-
+    console.log('Encrypting text...');
+    const encrypted = await encryptWithPublicKey(text, this.publicKey!);
     console.log('  Encryption successful');
 
     return encrypted;
@@ -275,52 +269,35 @@ export class EncryptionManager {
   }
 
   /**
-   * Decrypt encrypted credentials
+   * Decrypt encrypted text
    *
    * @param encryptedData - Encrypted string in format "RSA-ENCRYPTED:<base64>"
-   * @returns Decrypted credentials
+   * @returns Decrypted plaintext string
    *
    * @throws {EncryptionNotEnabledError} if encryption not enabled
-   * @throws {Error} if decryption operation fails or data is invalid
+   * @throws {Error} if decryption operation fails
    *
    * @example
    * ```typescript
    * const decrypted = await encryptionManager.decrypt(encryptedString);
-   * // Use decrypted credentials to create client
+   * // Use decrypted data
    * ```
    */
-  async decrypt(encryptedData: string): Promise<GoogleServiceAccountCredentials> {
+  async decrypt(encryptedData: string): Promise<string> {
     if (!this.isEnabled()) {
       throw new EncryptionNotEnabledError('decrypt');
     }
 
-    console.log('Decrypting credentials...');
-
+    console.log('Decrypting text...');
     const decrypted = await decryptWithPrivateKey(encryptedData, this.privateKey!);
-
-    // Parse and validate JSON
-    let credentials: GoogleServiceAccountCredentials;
-    try {
-      credentials = JSON.parse(decrypted);
-    } catch (error) {
-      throw new Error('Decrypted data is not valid JSON');
-    }
-
-    // Validate it's a service account
-    if (credentials.type !== 'service_account') {
-      throw new Error('Decrypted data is not a valid service account JSON');
-    }
-
     console.log('  Decryption successful');
-    console.log(`  Client Email: ${credentials.client_email}`);
-    console.log(`  Project ID: ${credentials.project_id}`);
 
-    return credentials;
+    return decrypted;
   }
 }
 
 /**
- * Singleton instance for encryption management
+ * Singleton instance for generic text encryption/decryption
  * Keys loaded from environment variables (RSA_PUBLIC_KEY, RSA_PRIVATE_KEY)
  */
 export const encryptionManager = new EncryptionManager();

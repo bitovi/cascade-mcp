@@ -124,7 +124,7 @@ export class EncryptionNotEnabledError extends Error {
     super(
       `Google encryption not enabled. Cannot perform ${operation}.\n` +
       'Configure encryption keys in environment variables (GOOGLE_RSA_PUBLIC_KEY, GOOGLE_RSA_PRIVATE_KEY).\n' +
-      'See docs/google-service-account-encryption.md for setup instructions.'
+      'See docs/encryption-setup.md for setup instructions.'
     );
     this.name = 'EncryptionNotEnabledError';
     this.operation = operation;

@@ -19,7 +19,7 @@ export function EncryptionNotAvailableWarning({ message }: EncryptionNotAvailabl
             <li>Restart the server</li>
           </ol>
           <p className="text-xs text-red-900 mt-2">
-            See <code className="bg-red-200 px-1 py-0.5 rounded">docs/google-service-account-encryption.md</code> for detailed instructions.
+            See <code className="bg-red-200 px-1 py-0.5 rounded">docs/encryption-setup.md</code> for key setup and <code className="bg-red-200 px-1 py-0.5 rounded">docs/google-drive-setup.md</code> for Google credentials.
           </p>
         </div>
       </div>

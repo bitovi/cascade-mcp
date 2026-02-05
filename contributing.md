@@ -252,7 +252,7 @@ If you want to test REST API endpoints that accept encrypted Google service acco
 
 1. **Generate encryption keys and encrypt credentials:**
 
-   See detailed instructions in [docs/google-service-account-encryption.md](docs/google-service-account-encryption.md)
+   See detailed instructions in [docs/encryption-setup.md](docs/encryption-setup.md) and [docs/google-drive-setup.md](docs/google-drive-setup.md)
 
 2. **Add to `.env` for REST API testing:**
 

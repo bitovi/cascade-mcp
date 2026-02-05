@@ -55,7 +55,7 @@ X-Google-Token: RSA-ENCRYPTED:fx/3go4xa4K/...
 
 **Google Service Account Encrypted Credentials:**
 
-See the [Google Service Account Encryption Guide](./google-service-account-encryption.md) for detailed instructions.
+See the [Encryption Setup Guide](./encryption-setup.md) and [Google Drive Setup Guide](./google-drive-setup.md) for detailed instructions.
 
 
 Quick setup:

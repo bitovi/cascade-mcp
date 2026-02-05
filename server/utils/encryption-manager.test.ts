@@ -276,7 +276,7 @@ describe('GoogleKeyManager.encrypt() - Disabled State (T034)', () => {
     const keyManager = new EncryptionManager();
     await keyManager.initialize();
     
-    await expect(keyManager.encrypt(TEST_SERVICE_ACCOUNT))
+    await expect(keyManager.encrypt(JSON.stringify(TEST_SERVICE_ACCOUNT)))
       .rejects.toThrow(EncryptionNotEnabledError);
   });
 });
@@ -325,11 +325,12 @@ describe('Full Encryption/Decryption Cycle (T036)', () => {
     await keyManager.initialize();
     
     // Encrypt
-    const encrypted = await keyManager.encrypt(TEST_SERVICE_ACCOUNT);
+    const encrypted = await keyManager.encrypt(JSON.stringify(TEST_SERVICE_ACCOUNT));
     expect(encrypted).toMatch(/^RSA-ENCRYPTED:/);
     
     // Decrypt
-    const decrypted = await keyManager.decrypt(encrypted);
+    const decryptedStr = await keyManager.decrypt(encrypted);
+    const decrypted = JSON.parse(decryptedStr);
     
     // Verify content matches
     expect(decrypted).toEqual(TEST_SERVICE_ACCOUNT);
@@ -343,15 +344,15 @@ describe('Full Encryption/Decryption Cycle (T036)', () => {
     await keyManager.initialize();
     
     // First cycle
-    const encrypted1 = await keyManager.encrypt(TEST_SERVICE_ACCOUNT);
+    const encrypted1 = await keyManager.encrypt(JSON.stringify(TEST_SERVICE_ACCOUNT));
     const decrypted1 = await keyManager.decrypt(encrypted1);
     
     // Second cycle
     const encrypted2 = await keyManager.encrypt(decrypted1);
     const decrypted2 = await keyManager.decrypt(encrypted2);
     
-    expect(decrypted1).toEqual(TEST_SERVICE_ACCOUNT);
-    expect(decrypted2).toEqual(TEST_SERVICE_ACCOUNT);
+    expect(JSON.parse(decrypted1)).toEqual(TEST_SERVICE_ACCOUNT);
+    expect(JSON.parse(decrypted2)).toEqual(TEST_SERVICE_ACCOUNT);
   });
 });
 
@@ -375,7 +376,7 @@ describe('Backward Compatibility (T037)', () => {
     await keyManager.initialize();
     
     // Create an encrypted credential using current implementation
-    const encrypted = await keyManager.encrypt(TEST_SERVICE_ACCOUNT);
+    const encrypted = await keyManager.encrypt(JSON.stringify(TEST_SERVICE_ACCOUNT));
     
     // Verify format matches expected pattern
     expect(encrypted).toMatch(/^RSA-ENCRYPTED:/);
@@ -385,7 +386,8 @@ describe('Backward Compatibility (T037)', () => {
     await keyManager2.initialize();
     
     // Should decrypt successfully
-    const decrypted = await keyManager2.decrypt(encrypted);
+    const decryptedStr = await keyManager2.decrypt(encrypted);
+    const decrypted = JSON.parse(decryptedStr);
     expect(decrypted).toEqual(TEST_SERVICE_ACCOUNT);
   });
 });

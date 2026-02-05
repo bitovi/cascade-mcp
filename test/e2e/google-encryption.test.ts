@@ -46,17 +46,6 @@ if (shouldSkip) {
 }
 
 describe('Google Service Account Encryption', () => {
-  test('GET /api/encryption-status', async () => {
-    if (shouldSkip) return;
-
-    const response = await fetch(`${SERVER_URL}/api/encryption-status`);
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data.enabled).toBe(true);
-    expect(data.message).toContain('available');
-  });
-
   test('GET /api/public-key', async () => {
     if (shouldSkip) return;
 

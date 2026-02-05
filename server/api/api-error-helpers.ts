@@ -170,7 +170,8 @@ export async function validateGoogleTokenApiHeaders(
   // Decrypt the token
   let serviceAccountJson: GoogleServiceAccountCredentials;
   try {
-    serviceAccountJson = await encryptionManager.decrypt(encryptedToken);
+    const decrypted = await encryptionManager.decrypt(encryptedToken);
+    serviceAccountJson = JSON.parse(decrypted);
   } catch (error: any) {
     res.status(401).json({ 
       success: false, 
@@ -224,7 +225,8 @@ export async function parseOptionalGoogleToken(
   // Decrypt the token
   let serviceAccountJson: GoogleServiceAccountCredentials;
   try {
-    serviceAccountJson = await encryptionManager.decrypt(encryptedToken);
+    const decrypted = await encryptionManager.decrypt(encryptedToken);
+    serviceAccountJson = JSON.parse(decrypted);
     console.log('  ✅ Successfully decrypted token');
     console.log('  Service account keys:', Object.keys(serviceAccountJson));
   } catch (error) {

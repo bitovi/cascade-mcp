@@ -113,9 +113,9 @@
 - [ ] T047 [P] [US4] Update `contributing.md` section "Configure Google Service Account" to replace auto-generation instructions with manual key generation workflow
 - [ ] T048 [P] [US4] Add to `contributing.md`: Step-by-step instructions for running `./scripts/generate-rsa-keys.sh` and adding output to `.env` file
 - [ ] T049 [P] [US4] Add to `contributing.md`: Explanation that encryption setup is optional and what features require it
-- [ ] T050 [P] [US4] Update `docs/google-service-account-encryption.md` to remove references to auto-generation and add manual key generation workflow
-- [ ] T051 [P] [US4] Add to `docs/google-service-account-encryption.md`: Base64 encoding explanation for multi-line PEM files
-- [ ] T052 [P] [US4] Add to `docs/google-service-account-encryption.md`: Key rotation process with new manual workflow
+- [ ] T050 [P] [US4] Update `docs/encryption-setup.md` to remove references to auto-generation and add manual key generation workflow
+- [ ] T051 [P] [US4] Add to `docs/encryption-setup.md`: Base64 encoding explanation for multi-line PEM files
+- [ ] T052 [P] [US4] Add to `docs/encryption-setup.md`: Key rotation process with new manual workflow
 - [ ] T053 [P] [US4] Update `docs/deployment.md` section on Google encryption to document GitHub Secrets setup for staging and production
 - [ ] T054 [P] [US4] Add to `docs/deployment.md`: Environment-specific secret naming convention (`STAGING_*`, `PROD_*`)
 - [ ] T055 [P] [US4] Add to `docs/deployment.md`: Instructions for key rotation in production without downtime
@@ -131,7 +131,7 @@
 ### Tasks
 
 - [ ] T060 [P] Remove unused `cache/keys/google-rsa/` directory references from documentation (keys no longer stored in filesystem)
-- [ ] T061 [P] Add informational log when decryption is attempted on tools without encryption enabled: "Google encryption not configured - see docs/google-service-account-encryption.md"
+- [ ] T061 [P] Add informational log when decryption is attempted on tools without encryption enabled: "Google encryption not configured - see docs/encryption-setup.md"
 - [ ] T062 Verify private key never logged: Audit all console.log statements in `key-manager.ts` and `crypto.ts` to ensure private key content never appears in logs
 - [ ] T063 Security audit: Review all API endpoints that use encryption to confirm private key is never included in responses
 - [ ] T064 Performance benchmark: Measure initialization time with environment-based loading vs. old filesystem approach, document 50-98% improvement
