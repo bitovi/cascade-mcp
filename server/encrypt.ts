@@ -9,7 +9,7 @@ import type { Request, Response } from 'express';
 import { encryptionManager } from './utils/encryption-manager.js';
 
 /**
- * Handle encryption request (POST /google-service-encrypt)
+ * Handle encryption request (POST /encrypt)
  */
 export async function handleEncryptionRequest(req: Request, res: Response): Promise<void> {
   try {
@@ -24,20 +24,27 @@ export async function handleEncryptionRequest(req: Request, res: Response): Prom
       return;
     }
 
-    const { text } = req.body;
+    const { data } = req.body;
 
-    if (!text) {
-      res.status(400).json({ error: 'Missing text in request body' });
+    if (!data) {
+      res.status(400).json({ error: 'Missing data in request body' });
       return;
     }
 
-    if (typeof text !== 'string') {
-      res.status(400).json({ error: 'Text must be a string' });
+    if (typeof data !== 'string') {
+      res.status(400).json({ error: 'Data must be a string' });
       return;
     }
 
-    // Encrypt the text using the encryption manager
-    const encrypted = await encryptionManager.encrypt(text);
+    // Server-side size validation (50KB = 51200 bytes)
+    const sizeInBytes = Buffer.byteLength(data, 'utf8');
+    if (sizeInBytes > 51200) {
+      res.status(400).json({ error: 'Data exceeds 50KB size limit' });
+      return;
+    }
+
+    // Encrypt the data using the encryption manager
+    const encrypted = await encryptionManager.encrypt(data);
 
     // Return encrypted result
     res.json({ encrypted });

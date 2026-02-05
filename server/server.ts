@@ -191,13 +191,13 @@ if (hasClientBuild) {
   // Serve static assets from Vite build (JS, CSS, etc.)
   app.use('/assets', express.static(path.join(clientDistPath, 'assets')));
 
-  // Serve the React app for both / and /google-service-encrypt routes
+  // Serve the React app for both / and /encrypt routes
   // React will handle routing internally based on window.location.pathname
   app.get('/', (req, res) => {
     res.sendFile(clientIndexPath);
   });
   
-  app.get('/google-service-encrypt', (req, res) => {
+  app.get('/encrypt', (req, res) => {
     res.sendFile(clientIndexPath);
   });
 } else {
@@ -222,9 +222,9 @@ if (hasClientBuild) {
         <li><strong>POST /api/write-shell-stories</strong> - Generate shell stories from Figma designs</li>
         <li><strong>POST /api/write-next-story</strong> - Write next Jira story from shell stories</li>
       </ul>
-      <h2>Google Service Account Tools</h2>
+      <h2>Encryption Tools</h2>
       <ul>
-        <li><a href="/google-service-encrypt">🔐 Encrypt Google Service Account</a> - Securely encrypt your Google service account credentials</li>
+        <li><a href="/encrypt">🔐 Encrypt Credentials</a> - Securely encrypt sensitive credentials</li>
       </ul>
     `);
   });
@@ -260,8 +260,8 @@ app.delete('/mcp', handleSessionRequest);
 // --- REST API Endpoints (PAT Authentication) ---
 registerRestApiRoutes(app);
 
-// --- Google Service Account Encryption (POST only, GET handled by React) ---
-app.post('/google-service-encrypt', express.urlencoded({ extended: true }), handleEncryptionRequest);
+// --- Encryption Endpoint (POST only, GET handled by React) ---
+app.post('/encrypt', express.urlencoded({ extended: true }), handleEncryptionRequest);
 
 app.post('/domain', async (req: Request, res: Response) => {
   logger.info(`[domain] - ${req.body.domain}`);

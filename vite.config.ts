@@ -39,7 +39,7 @@ export default defineConfig({
       '/access-token': proxyConfig,
       '/authorize': proxyConfig,
       '/callback': proxyConfig,
-      '/google-service-encrypt': proxyConfig,
+      '/encrypt': proxyConfig,
     },
   },
 });

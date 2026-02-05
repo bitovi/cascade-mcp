@@ -37,16 +37,18 @@ For detailed official documentation, see [Google Cloud Service Accounts Guide](h
 
 Before encrypting credentials, ensure you have [set up encryption keys](./encryption-setup.md).
 
+> **Note**: For terminal-based encryption or encrypting other types of sensitive data (API keys, config files, etc.), see the [Generic Encryption Guide](./encryption-setup.md#%EF%B8%8F-manual-terminal-encryption).
+
 ### Option 1: Web-Based Encryption (Recommended)
 
 Start the server and visit the encryption page:
 
 ```bash
 npm run start-local
-# Open http://localhost:3000/google-service-encrypt
+# Open http://localhost:3000/encrypt
 ```
 
-Paste your `google.json` content and click "🔒 Encrypt Credentials"
+Paste your `google.json` content and click "🔒 Encrypt Data"
 
 ### Option 2: Manual Encryption (Advanced)
 
@@ -58,7 +60,7 @@ Visit the encryption page while the server is running and copy the public key:
 
 ```bash
 npm run start-local
-# Open http://localhost:3000/google-service-encrypt
+# Open http://localhost:3000/encrypt
 # Click "📋 Copy Public Key" button
 ```
 

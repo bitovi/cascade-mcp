@@ -283,12 +283,12 @@ try {
 **Purpose:** Provides a simple way to test MCP tools without setting up an external MCP client (VS Code Copilot, Claude Desktop, etc.).
 
 ### Structure
-- `src/` - React frontend (Vite + TypeScript)
+- `client/src/` - React frontend (Vite + TypeScript)
   - `main.tsx` - Entry point
-  - `react/App.tsx` - Main component, MCP connection logic
-  - `react/components/` - UI (ConnectionPanel, ToolSelector, ToolForm, ProgressLog, ResultDisplay)
-  - `react/hooks/` - `useConfig`, `useMcpClient`
-  - `mcp-client/` - Browser MCP client implementation
+  - `App.tsx` - Main component, MCP connection logic
+  - `components/` - UI (ConnectionPanel, ToolSelector, ToolForm, ProgressLog, ResultDisplay)
+  - `hooks/` - `useConfig`, `useMcpClient`
+  - `lib/` - Browser MCP client implementation
 
 ### Commands
 - `npm run dev` - Run server (3000) + Vite client (5173) concurrently

@@ -162,7 +162,7 @@ export async function validateGoogleTokenApiHeaders(
     res.status(401).json({ 
       success: false, 
       error: 'Missing required header: X-Google-Token',
-      details: 'Please provide encrypted credentials via X-Google-Token header. Visit /google-service-encrypt to encrypt your service account JSON.'
+      details: 'Please provide encrypted credentials via X-Google-Token header. Visit /encrypt to encrypt your service account JSON.'
     });
     return null;
   }
@@ -176,7 +176,7 @@ export async function validateGoogleTokenApiHeaders(
     res.status(401).json({ 
       success: false, 
       error: 'Invalid or corrupted encrypted token',
-      details: `Failed to decrypt X-Google-Token: ${error.message}. Please re-encrypt your credentials at /google-service-encrypt`
+      details: `Failed to decrypt X-Google-Token: ${error.message}. Please re-encrypt your credentials at /encrypt`
     });
     return null;
   }

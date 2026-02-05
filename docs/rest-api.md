@@ -63,7 +63,7 @@ Quick setup:
 2. Enable Google Drive API
 3. Create and download JSON key
 4. Share Google Drive files with the service account email
-5. Encrypt your credentials at `/google-service-encrypt`
+5. Encrypt your credentials at `/encrypt`
 6. Use the encrypted string in the `X-Google-Token` header
 
 **Anthropic API Key:**
