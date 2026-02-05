@@ -1,12 +1,27 @@
 # RSA Encryption Setup
 
-This guide covers setting up RSA-4096 asymmetric encryption for sensitive credentials in Cascade MCP. Encrypted credentials can be safely stored in config files, environment variables, or version control.
+**Using hosted service?** Visit `/encrypt` page (no setup needed)  
+**Self-hosting?** [Generate keys](#generate-encryption-keys)  
+**Deploying?** Store keys in GitHub Secrets or cloud secret managers
 
-## 🚀 Quick Start
+---
 
-### 1. Generate Encryption Keys
+## Using the Encryption Page
 
-First-time setup requires generating RSA encryption keys:
+Start the server and visit the encryption page:
+
+```bash
+npm run start-local
+# Open http://localhost:3000/encrypt
+```
+
+Paste your credentials and click "🔒 Encrypt Data". Copy the encrypted output (starts with `RSA-ENCRYPTED:`).
+
+---
+
+## Generate Encryption Keys
+
+For self-hosting, generate RSA encryption keys:
 
 ```bash
 ./scripts/generate-rsa-keys.sh
@@ -14,7 +29,7 @@ First-time setup requires generating RSA encryption keys:
 
 This creates `private.pem` and `public.pem` and outputs base64-encoded keys for your `.env` file.
 
-### 2. Configure Environment Variables
+### Configure Environment Variables
 
 Add the base64-encoded keys to your `.env` file:
 
@@ -24,145 +39,52 @@ RSA_PUBLIC_KEY="LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K..."
 RSA_PRIVATE_KEY="LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1J..."
 ```
 
-**Important:**
-
-- Copy the entire line including the quotes from the script output
-- The quotes are REQUIRED to preserve special characters
-- Keys should be one continuous base64 string (no line breaks)
-- Never commit `private.pem` or `RSA_PRIVATE_KEY` to version control!
+**Important:** Copy the entire line including quotes. Keys must be one continuous base64 string (no line breaks). Never commit `private.pem` or `RSA_PRIVATE_KEY` to version control.
 
 ## 🔐 Security
 
 - **RSA-4096 encryption** (industry standard)
 - **Pre-generated keys** loaded from environment variables (not auto-generated)
 - **Private key** must remain server-side only (never expose to client)
-- **Public key** used for encryption on the server
-- **Server-side only** - encryption/decryption happens on the server
-
-## 📦 Key Files
-
-When you run `./scripts/generate-rsa-keys.sh`, it creates:
-
-```text
-private.pem  # Server-side only, never commit (git-ignored)
-public.pem   # Used for encryption, safe to publish if needed
-```
-
-Keys are loaded from environment variables:
-
-- `RSA_PUBLIC_KEY` - Base64-encoded public key
-- `RSA_PRIVATE_KEY` - Base64-encoded private key (keep secret!)
 
 ## 🔄 Key Rotation
 
 To rotate encryption keys:
 
 ```bash
-# 1. Generate new keys
-./scripts/generate-rsa-keys.sh
-
-# 2. Update .env with new base64-encoded keys
-
-# 3. Restart server
-npm run start-local
-
-# 4. Re-encrypt all credentials that use encryption
+./scripts/generate-rsa-keys.sh  # Generate new keys
+# Update .env with new base64-encoded keys
+npm run start-local             # Restart server
+# Re-encrypt all credentials
 ```
-
-**Important:** After key rotation, you'll need to re-encrypt all credentials and update any stored encrypted values.
 
 ## 🎯 Use Cases
 
 - **Development**: Generate keys locally, store in `.env` (git-ignored)
-- **Staging**: Generate separate keys, store in GitHub Secrets with `STAGING_` prefix
-- **Production**: Generate separate keys, store in GitHub Secrets with `PROD_` prefix
-- **Team Isolation**: Each environment has its own key pair - encrypted credentials cannot be decrypted across environments
-- **Zero Trust**: Encrypted credentials are safe to store in version control (only the server with the private key can decrypt)
+- **Staging/Production**: Store keys in GitHub Secrets or cloud secret managers
+- **Team Isolation**: Each environment has its own key pair
 
-## �️ Manual Terminal Encryption
+## Manual Terminal Encryption
 
-For advanced users who want to encrypt data from the terminal without using the web interface:
+For advanced users who want to encrypt locally:
 
-### Step 1: Extract the Public Key
-
-**Option A: From Running Server**
+### Get the Public Key
 
 ```bash
-# Start server
-npm run start-local
-
-# Visit http://localhost:3000/encrypt
-# Click "📋 Copy Public Key" button
-# Save to file: public_key.pem
-```
-
-**Option B: From Environment Variable**
-
-```bash
-# Decode the base64-encoded public key from .env
+# Option A: From running server at http://localhost:3000/encrypt (click "📋 Copy Public Key")
+# Option B: From environment variable
 echo "$RSA_PUBLIC_KEY" | base64 -d > public_key.pem
 ```
 
-### Step 2: Encrypt Any Text File
-
-Use OpenSSL to encrypt any sensitive data:
+### Encrypt Your Data
 
 ```bash
-# Encrypt API keys, tokens, configuration, or any text file
 openssl pkeyutl -encrypt -pubin -inkey public_key.pem \
   -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 \
-  -in your-sensitive-data.txt | base64 | tr -d '\n' | sed 's/^/RSA-ENCRYPTED:/'
+  -in your-file.json | base64 | tr -d '\n' | sed 's/^/RSA-ENCRYPTED:/'
 ```
 
-**Examples**:
-
-```bash
-# Encrypt Google service account JSON
-openssl pkeyutl -encrypt -pubin -inkey public_key.pem \
-  -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 \
-  -in google.json | base64 | tr -d '\n' | sed 's/^/RSA-ENCRYPTED:/'
-
-# Encrypt API key file
-echo "sk-ant-api-key-abc123..." | openssl pkeyutl -encrypt -pubin -inkey public_key.pem \
-  -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 | base64 | tr -d '\n' | sed 's/^/RSA-ENCRYPTED:/'
-
-# Encrypt multi-line configuration
-openssl pkeyutl -encrypt -pubin -inkey public_key.pem \
-  -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 \
-  -in config.yaml | base64 | tr -d '\n' | sed 's/^/RSA-ENCRYPTED:/'
-```
-
-### Step 3: Use the Encrypted Output
-
-Copy the encrypted string (starting with `RSA-ENCRYPTED:`) and use it:
-
-```bash
-# In environment variables
-export MY_SECRET="RSA-ENCRYPTED:eyJhbGci..."
-
-# In API requests (provider-specific headers)
-curl -X POST https://your-server.com/api/endpoint \
-  -H "X-Google-Token: RSA-ENCRYPTED:..." \
-  -H "Content-Type: application/json"
-
-# In configuration files
-echo "ENCRYPTED_CONFIG=RSA-ENCRYPTED:..." >> .env.production
-```
-
-### Step 4: Cleanup
-
-Remove sensitive files after encryption:
-
-```bash
-rm your-sensitive-data.txt public_key.pem encrypted.txt
-```
-
-**Security Notes**:
-
-- The encrypted output can be safely stored in version control
-- Only the server with the private key (`RSA_PRIVATE_KEY`) can decrypt it
-- Public key is safe to share - it can only encrypt, not decrypt
-- Use different encryption keys for dev, staging, and production
+Use the encrypted output in API headers (e.g., `X-Google-Token: RSA-ENCRYPTED:...`) or environment variables.
 
 ---
 
@@ -186,56 +108,12 @@ See [specs/001-static-encryption-keys/](../specs/001-static-encryption-keys/) fo
 
 ## 🔧 Troubleshooting
 
-### Error: "Invalid PEM format: error:1E08010C:DECODER routines::unsupported"
+**Error: "Invalid PEM format"**
+- Verify quotes are present in `.env`: `RSA_PUBLIC_KEY="..."`
+- Ensure keys are one continuous line (no line breaks)
+- Regenerate keys: `./scripts/generate-rsa-keys.sh`
 
-**Problem**: The base64-encoded key cannot be decoded or contains invalid characters.
-
-**Solutions**:
-
-1. **Verify quotes are present** in your `.env` file:
-
-   ```bash
-   # ✅ CORRECT (with quotes)
-   RSA_PUBLIC_KEY="LS0tLS1CRUdJTi..."
-   
-   # ❌ WRONG (without quotes)
-   RSA_PUBLIC_KEY=LS0tLS1CRUdJTi...
-   ```
-
-2. **Check for line breaks** - Keys must be one continuous string:
-
-   ```bash
-   # ❌ WRONG (has line breaks)
-   RSA_PUBLIC_KEY="LS0tLS1CRUdJTi
-   BQVUJERUZSBLT...
-   VLUSURLS0tLS0K"
-   
-   # ✅ CORRECT (single line)
-   RSA_PUBLIC_KEY="LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K..."
-   ```
-
-3. **Regenerate keys** and copy the ENTIRE line from script output:
-
-   ```bash
-   ./scripts/generate-rsa-keys.sh
-   # Copy: RSA_PUBLIC_KEY="..." (including quotes)
-   ```
-
-4. **Verify .env file loading**:
-
-   ```bash
-   # Check if environment variables are set correctly
-   npm run start-local
-   # Look for: "✅ Encryption keys loaded" or similar messages
-   ```
-
-### Error: "Encryption keys not configured"
-
-**Problem**: Environment variables are not being loaded.
-
-**Solutions**:
-
-1. Verify `.env` file is in the project root directory
-2. Check `.env` syntax (no extra spaces around `=`)
-3. Restart the server after modifying `.env`
-4. Verify file is not named `.env.txt` or similar
+**Error: "Encryption keys not configured"**
+- Verify `.env` file is in project root
+- Check `.env` syntax (no spaces around `=`)
+- Restart server after modifying `.env`
