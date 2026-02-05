@@ -60,6 +60,7 @@ QUESTION ASSIGNMENT:
 - If a question spans multiple screens, assign to the screen where the issue first appears
 - Every question MUST be assigned to a specific screen - do NOT use a "General" category
 - If no screen is a perfect fit, pick the closest match - it's okay to assign cross-cutting questions to the most relevant screen
+- Questions that would have the SAME answer regardless of which screen they're on should only appear once
 
 OUTPUT REQUIREMENT:
 - Output ONLY the markdown in the specified format
