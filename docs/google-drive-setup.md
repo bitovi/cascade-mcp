@@ -41,7 +41,9 @@ Before encrypting, ensure you have [set up encryption keys](./encryption-setup.m
 
 ### Web-Based Encryption (Recommended)
 
-Start the server and visit:
+**If using a hosted service:** Visit the hosted server's encryption page (e.g., `https://your-server.com/encrypt`)
+
+**If self-hosting:** Start your local server and visit:
 
 ```bash
 npm run start-local

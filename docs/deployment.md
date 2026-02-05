@@ -169,28 +169,18 @@ docker run -d \
   cascade-mcp:latest
 ```
 
-### Credential Encryption (Optional)
+### RSA Encryption Keys
 
-If you want to enable the `/encrypt` endpoint for API users to encrypt their credentials:
-
-**What it enables:**
-- Users can encrypt sensitive credentials via web UI
-- Users pass encrypted credentials in provider-specific headers for REST API calls
-- Enables secure credential handling in API endpoints
-
-**Deployment Requirements:**
-
-Add RSA encryption keys to your environment:
+Add RSA encryption keys to enable the `/encrypt` endpoint:
 
 ```bash
-# Required for /encrypt endpoint
 RSA_PUBLIC_KEY=LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K...
 RSA_PRIVATE_KEY=LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1J...
 ```
 
-**Important:** Users pass encrypted credentials in API request headers, not as deployment environment variables. The server only needs RSA keys to decrypt incoming requests.
+This enables users to encrypt sensitive data (service accounts, API keys, etc.) via web UI and pass encrypted credentials in API headers.
 
-For complete setup instructions including key generation, encryption workflow, and security best practices, see: [docs/google-service-account-encryption.md](google-service-account-encryption.md)
+For key generation and setup, see: [docs/encryption-setup.md](encryption-setup.md)
 
 ### Using docker-to-ec2
 
