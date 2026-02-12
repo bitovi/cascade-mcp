@@ -5,7 +5,7 @@
  */
 
 import { useState } from 'react';
-import type { ConnectionStatus } from '../../../mcp-client/index.js';
+import type { ConnectionStatus } from '../../lib/mcp-client/index.js';
 
 interface ConnectionPanelProps {
   status: ConnectionStatus;
