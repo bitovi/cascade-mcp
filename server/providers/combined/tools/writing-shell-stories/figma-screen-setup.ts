@@ -345,6 +345,7 @@ export interface FigmaScreenSetupResult {
   figmaUrls: string[];           // Extracted Figma URLs
   cloudId: string;               // Resolved cloud ID
   siteName: string;              // Resolved site name
+  siteUrl: string;               // Site URL (e.g., https://mycompany.atlassian.net)
   projectKey: string;            // Project key from epic
   epicKey: string;               // Epic key
   epicUrl: string;               // Epic URL
@@ -474,6 +475,7 @@ export async function setupFigmaScreens(
     figmaUrls,
     cloudId: siteInfo.cloudId,
     siteName: siteInfo.siteName,
+    siteUrl: siteInfo.siteUrl,
     projectKey,
     epicKey,
     epicUrl

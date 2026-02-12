@@ -850,8 +850,8 @@ export async function updateEpicWithCompletion(
   await notify('Updating epic with completion marker...');
   console.log('Adding completion marker to shell story...');
   
-  // Construct Jira URL
-  const jiraUrl = `https://bitovi.atlassian.net/browse/${createdIssue.key}`;
+  // Construct Jira URL from setupResult.siteUrl
+  const jiraUrl = `${setupResult.siteUrl}/browse/${createdIssue.key}`;
   
   // Add completion marker to shell stories ADF
   let updatedShellStories;

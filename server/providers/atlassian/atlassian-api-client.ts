@@ -97,13 +97,14 @@ export function createAtlassianClient(accessToken: string): AtlassianClient {
  * See: https://bitovi.atlassian.net/wiki/spaces/agiletraining/pages/1302462817/How+to+create+a+Jira+Request+token
  * 
  * @param base64Credentials - Base64-encoded string of "email:api_token"
+ * @param siteName - Optional site name (e.g., "mycompany" from mycompany.atlassian.net). If not provided, will be set to empty and must be passed via siteUrl parameter in getJiraBaseUrl calls.
  * @returns AtlassianClient with credentials captured in closure
  * 
  * @example
  * ```typescript
  * // Create base64 credentials: echo -n "user@example.com:ATATT..." | base64
  * const credentials = "dXNlckBleGFtcGxlLmNvbTpBVEFUVC4uLg==";
- * const client = createAtlassianClientWithPAT(credentials);
+ * const client = createAtlassianClientWithPAT(credentials, "mycompany");
  * 
  * // Fetch with Basic Auth automatically included
  * const response = await client.fetch(
@@ -112,11 +113,12 @@ export function createAtlassianClient(accessToken: string): AtlassianClient {
  * );
  * ```
  */
-export function createAtlassianClientWithPAT(base64Credentials: string): AtlassianClient {
+export function createAtlassianClientWithPAT(base64Credentials: string, siteName?: string): AtlassianClient {
   console.log('Creating Atlassian client with PAT (Basic Auth):', {
     hasCredentials: !!base64Credentials,
     credentialsLength: base64Credentials?.length,
     credentialsPrefix: base64Credentials?.substring(0, 20) + '...',
+    siteName: siteName || 'not-provided',
   });
   
   return {
@@ -143,13 +145,19 @@ export function createAtlassianClientWithPAT(base64Credentials: string): Atlassi
     },
     
     getJiraBaseUrl: (cloudId: string) => {
-      // For Basic Auth, use the direct site URL
-      return `https://bitovi.atlassian.net/rest/api/3`;
+      // For Basic Auth (PAT), use the direct site URL instead of api.atlassian.com
+      if (!siteName) {
+        throw new Error('siteName is required when using createAtlassianClientWithPAT. Pass siteName as second parameter.');
+      }
+      return `https://${siteName}.atlassian.net/rest/api/3`;
     },
     
     getConfluenceBaseUrl: (cloudId: string) => {
-      // For Basic Auth, use the direct site URL
-      return `https://bitovi.atlassian.net/wiki/api/v2`;
+      // For Basic Auth (PAT), use the direct site URL instead of api.atlassian.com
+      if (!siteName) {
+        throw new Error('siteName is required when using createAtlassianClientWithPAT. Pass siteName as second parameter.');
+      }
+      return `https://${siteName}.atlassian.net/wiki/api/v2`;
     },
   };
 }

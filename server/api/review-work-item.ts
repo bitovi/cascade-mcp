@@ -92,13 +92,22 @@ export async function handleReviewWorkItem(req: Request, res: Response, deps: Re
       });
     }
     
+    // Validate siteName for PAT authentication (required - cannot use cloudId alone with PAT)
+    if (!siteName) {
+      res.status(400).json({
+        success: false,
+        error: 'siteName is required for PAT authentication. Provide siteName (e.g., "mycompany" from mycompany.atlassian.net)'
+      });
+      return;
+    }
+    
     console.log(`  Processing issue: ${issueKey}`);
     console.log(`  Site name: ${siteName || 'auto-detect'}`);
     console.log(`  Cloud ID: ${cloudId || 'auto-detect'}`);
-    console.log(`  Max depth: ${maxDepth ?? 5}`);
+    console.log(`  Max depth: ${maxDepth || 'default (3)'}`);
     
-    // Create pre-configured API clients with tokens
-    const atlassianClient = createAtlassianClientFn(atlassianToken);
+    // Create pre-configured API clients with tokens (pass siteName for PAT client)
+    const atlassianClient = createAtlassianClientFn(atlassianToken, siteName);
     const figmaClient = figmaToken ? createFigmaClientFn(figmaToken) : createFigmaClientFn('');
     const generateText = createProviderFromHeaders(req.headers as Record<string, string>);
     

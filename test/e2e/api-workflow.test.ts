@@ -78,8 +78,8 @@ describe('REST API: Write Shell Stories E2E', () => {
       headers: ANTHROPIC_API_KEY ? { 'X-LLMClient-Anthropic-Api-Key': ANTHROPIC_API_KEY } : undefined,
     });
 
-    // Create Atlassian client and resolve cloudId
-    atlassianClient = createAtlassianClientWithPAT(ATLASSIAN_PAT!);
+    // Create Atlassian client and resolve cloudId (pass siteName for PAT client)
+    atlassianClient = createAtlassianClientWithPAT(ATLASSIAN_PAT!, JIRA_SITE_NAME);
     const siteInfo = await resolveCloudId(atlassianClient, undefined, JIRA_SITE_NAME);
     cloudId = siteInfo.cloudId;
     console.log(`✅ Resolved cloudId: ${cloudId}`);
