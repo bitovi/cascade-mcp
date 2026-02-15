@@ -299,11 +299,11 @@ describe('analyzeScreens', () => {
     
     // First call: screen count notification (should include comment threads matched/total)
     expect(mockNotify).toHaveBeenNthCalledWith(1, expect.stringContaining('🤖 Analyzing Figma:'));
-    expect(mockNotify).toHaveBeenNthCalledWith(1, expect.stringContaining('1 screen(s)'));
+    expect(mockNotify).toHaveBeenNthCalledWith(1, expect.stringContaining('1 frame(s)'));
     expect(mockNotify).toHaveBeenNthCalledWith(1, expect.stringMatching(/\d+ of \d+ comment thread\(s\)/));
     
     // Second call: analysis complete notification
-    expect(mockNotify).toHaveBeenNthCalledWith(2, expect.stringContaining('Screen analysis complete:'));
+    expect(mockNotify).toHaveBeenNthCalledWith(2, expect.stringContaining('Frame analysis complete:'));
   });
   
   it('should work without notify callback', async () => {
