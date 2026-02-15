@@ -91,19 +91,19 @@ export async function handleWriteShellStories(req: Request, res: Response, deps:
     // Validate request body
     const { siteName, cloudId } = req.body;
     const epicKey = validateEpicKey(req.body, res);
-    if (!epicKey) return; // Response already sent
+    if (!epicKey) return;
     
-    // Validate siteName for PAT authentication (required - cannot use cloudId alone with PAT)
+    // Validate siteName is provided (required for REST API)
     if (!siteName) {
       res.status(400).json({
         success: false,
-        error: 'siteName is required for PAT authentication. Provide siteName (e.g., "mycompany" from mycompany.atlassian.net)'
+        error: 'siteName is required. Provide siteName (e.g., "mycompany" from mycompany.atlassian.net) in the request body.'
       });
       return;
     }
     
     console.log(`  Processing epic: ${epicKey}`);
-    console.log(`  Site name: ${siteName || 'auto-detect'}`);
+    console.log(`  Site name: ${siteName}`);
     console.log(`  Cloud ID: ${cloudId || 'auto-detect'}`);
     
     // Create pre-configured API clients with tokens (pass siteName for PAT client)

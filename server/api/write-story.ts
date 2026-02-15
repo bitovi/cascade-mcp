@@ -126,17 +126,17 @@ export async function handleWriteStory(req: Request, res: Response, deps: WriteS
     const issueKey = validateIssueKey(req.body, res);
     if (!issueKey) return;
     
-    // Validate siteName for PAT authentication (required - cannot use cloudId alone with PAT)
+    // Validate siteName is provided (required for REST API)
     if (!siteName) {
       res.status(400).json({
         success: false,
-        error: 'siteName is required for PAT authentication. Provide siteName (e.g., "mycompany" from mycompany.atlassian.net)'
+        error: 'siteName is required. Provide siteName (e.g., "mycompany" from mycompany.atlassian.net) in the request body.'
       });
       return;
     }
     
     console.log(`  Processing issue: ${issueKey}`);
-    console.log(`  Site name: ${siteName || 'auto-detect'}`);
+    console.log(`  Site name: ${siteName}`);
     console.log(`  Cloud ID: ${cloudId || 'auto-detect'}`);
     console.log(`  Max depth: ${maxDepth || 'default (3)'}`);
     

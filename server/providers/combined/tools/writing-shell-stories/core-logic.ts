@@ -322,7 +322,7 @@ export async function executeWriteShellStories(
   
   // Improved progress message: Figma context summary (per spec 040)
   const screenNames = screens.map(s => s.name).join(', ');
-  await notify(`🤖 Analyzing Figma: ${screens.length} screen(s) [${screenNames}], ${allNotes.length} note(s), ${commentsCount} comment(s)...`);
+  await notify(`🤖 Analyzing Figma: ${screens.length} frame(s) [${screenNames}], ${allNotes.length} note(s), ${commentsCount} comment(s)...`);
   
   // Use consolidated screen-analyses-workflow
   const figmaUrlsForAnalysis = screens.map(s => s.url);
@@ -346,7 +346,7 @@ export async function executeWriteShellStories(
   
   // Improved cache status message (per spec 040)
   const cacheExplanation = cachedScreens > 0 && analyzedScreens === 0 ? ' (Figma file unchanged)' : '';
-  await notify(`Screen analysis complete: ${cachedScreens} cached, ${analyzedScreens} new${cacheExplanation}`);
+  await notify(`Frame analysis complete: ${cachedScreens} cached, ${analyzedScreens} new${cacheExplanation}`);
 
   // ==========================================
   // PHASE 5: Check Scope Analysis and Questions

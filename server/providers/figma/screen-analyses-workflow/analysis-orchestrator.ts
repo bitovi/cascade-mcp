@@ -218,7 +218,7 @@ export async function analyzeScreens(
   const commentBreakdown = unattachedCount > 0
     ? `${matchedComments} matched and ${unattachedCount} unattached of ${totalComments}`
     : `${matchedComments} of ${totalComments}`;
-  await notify(`🤖 Analyzing Figma: ${expanded.frames.length} screen(s) [${screenNames}], ${expanded.notes.length} note(s), ${commentBreakdown} comment thread(s)...`);
+  await notify(`🤖 Analyzing Figma: ${expanded.frames.length} frame(s) [${screenNames}], ${expanded.notes.length} note(s), ${commentBreakdown} comment thread(s)...`);
   
   // Step 6.5: Check for comment-triggered invalidations
   const cacheMetadata = await loadFigmaMetadata(fileKey);
@@ -287,7 +287,7 @@ export async function analyzeScreens(
   
   // Notify about analysis completion
   const cacheExplanation = cachedCount > 0 && newCount === 0 ? ' (Figma file unchanged)' : '';
-  await notify(`Screen analysis complete: ${cachedCount} cached, ${newCount} new${cacheExplanation}`);
+  await notify(`Frame analysis complete: ${cachedCount} cached, ${newCount} new${cacheExplanation}`);
   
   // Step 8: Calculate ordering and build result
   console.log(`\n📊 Step 8: Building final result...`);

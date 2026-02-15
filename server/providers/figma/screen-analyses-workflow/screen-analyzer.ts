@@ -338,6 +338,7 @@ ${hasFeatureContext ? contextMarkdown : 'No feature context provided for this an
   - ✅ Already Done: Existing functionality mentioned as already implemented (provides context but not new work)
   - ❌ Out-of-Scope: Features explicitly excluded or marked for future work (will NOT be implemented in this feature)
   - ❓ Questions: Unclear behavior, ambiguous requirements, or features that could be either in/out of scope
+  - 💬 Answered: Questions answered by design notes, comments, or feature context
 - Flag contradictions and priorities:
   - ⚠️ SCOPE MISMATCH: When UI shows features marked as out of scope in the feature context (these will NOT be implemented)
   - ⏬ Low Priority: When features are marked to "delay until end" (these WILL be implemented in later stories)
@@ -347,6 +348,7 @@ ${hasFeatureContext ? contextMarkdown : 'No feature context provided for this an
 - Example 4: "⚠️ SCOPE MISMATCH: Admin panel visible but feature context marks as out of scope"
 - Example 5: "⏬ Low Priority: Pagination controls visible but feature context explicitly delays until end"
 - Example 6: "❓ Should filters persist across sessions? Not specified in feature context or design notes"
+- Example 7: "💬 How are errors displayed? → Toast notifications (per design note)"
 - Note discrepancies between screen designs and feature priorities
 - Reference feature constraints when documenting features
 - Feature priorities take precedence over screen designs when there are contradictions
@@ -500,6 +502,7 @@ Document the actual content shown:
   - ⏬ Low Priority: Implement later in feature (keep brief with timing note)
   - ❌ Out-of-Scope: Excluded or future epic features (keep brief)
   - ❓ Questions: Unclear behavior or ambiguous requirements
+  - 💬 Answered: Questions clarified by notes, comments, or context
 - Flag contradictions and priorities:
   - ⚠️ SCOPE MISMATCH: When visible features contradict feature scope
   - ⏬ Low Priority: When features are marked to delay until end

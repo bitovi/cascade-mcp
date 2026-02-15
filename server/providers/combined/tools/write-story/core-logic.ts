@@ -276,7 +276,7 @@ export async function executeWriteStory(
   let scopeAnalysisContent: string | undefined;
   
   if (loadedContext?.analyzedScreens && loadedContext.analyzedScreens.length > 0) {
-    await notify('🤖 Generating scope analysis from Figma screens...');
+    await notify('🤖 Generating scope analysis from Figma frames...');
     
     // Convert AnalyzedScreen[] to ScreenAnalysisData[] format
     const analysisData: ScreenAnalysisData[] = loadedContext.analyzedScreens.map(screen => ({

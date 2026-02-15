@@ -92,17 +92,17 @@ export async function handleReviewWorkItem(req: Request, res: Response, deps: Re
       });
     }
     
-    // Validate siteName for PAT authentication (required - cannot use cloudId alone with PAT)
+    // Validate siteName is provided (required for REST API)
     if (!siteName) {
       res.status(400).json({
         success: false,
-        error: 'siteName is required for PAT authentication. Provide siteName (e.g., "mycompany" from mycompany.atlassian.net)'
+        error: 'siteName is required. Provide siteName (e.g., "mycompany" from mycompany.atlassian.net) in the request body.'
       });
       return;
     }
     
     console.log(`  Processing issue: ${issueKey}`);
-    console.log(`  Site name: ${siteName || 'auto-detect'}`);
+    console.log(`  Site name: ${siteName}`);
     console.log(`  Cloud ID: ${cloudId || 'auto-detect'}`);
     console.log(`  Max depth: ${maxDepth || 'default (3)'}`);
     
