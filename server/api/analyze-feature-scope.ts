@@ -81,15 +81,6 @@ export async function handleAnalyzeFeatureScope(req: Request, res: Response) {
     
     const { atlassianToken, figmaToken } = tokens;
     
-    // Validate siteName for PAT authentication (required - cannot use cloudId alone with PAT)
-    if (!siteName) {
-      res.status(400).json({
-        success: false,
-        error: 'siteName is required for PAT authentication. Provide siteName (e.g., "mycompany" from mycompany.atlassian.net)'
-      });
-      return;
-    }
-    
     // Create pre-configured API clients with tokens (pass siteName for PAT client)
     const atlassianClient = createAtlassianClientWithPAT(atlassianToken, siteName);
     const figmaClient = createFigmaClient(figmaToken);

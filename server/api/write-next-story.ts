@@ -108,15 +108,6 @@ export async function handleWriteNextStory(req: Request, res: Response, deps: Wr
     const epicKey = validateEpicKey(req.body, res);
     if (!epicKey) return;
     
-    // Validate siteName for PAT authentication (required - cannot use cloudId alone with PAT)
-    if (!siteName) {
-      res.status(400).json({
-        success: false,
-        error: 'siteName is required for PAT authentication. Provide siteName (e.g., "mycompany" from mycompany.atlassian.net)'
-      });
-      return;
-    }
-    
     console.log(`  Processing epic: ${epicKey}`);
     console.log(`  Site name: ${siteName || 'auto-detect'}`);
     console.log(`  Cloud ID: ${cloudId || 'auto-detect'}`);
