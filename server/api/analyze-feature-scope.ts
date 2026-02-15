@@ -81,6 +81,15 @@ export async function handleAnalyzeFeatureScope(req: Request, res: Response) {
     
     const { atlassianToken, figmaToken } = tokens;
     
+    // Validate siteName is provided (required for REST API)
+    if (!siteName) {
+      res.status(400).json({
+        success: false,
+        error: 'siteName is required. Provide siteName (e.g., "mycompany" from mycompany.atlassian.net) in the request body.'
+      });
+      return;
+    }
+    
     // Create pre-configured API clients with tokens (pass siteName for PAT client)
     const atlassianClient = createAtlassianClientWithPAT(atlassianToken, siteName);
     const figmaClient = createFigmaClient(figmaToken);

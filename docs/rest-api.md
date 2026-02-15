@@ -99,8 +99,8 @@ Generates prioritized shell stories from Figma designs linked in a Jira epic.
 
 **Parameters:**
 - `epicKey` (required) - The Jira epic key (e.g., "PROJ-123")
-- `siteName` (recommended) - Name of your Jira site (e.g., "mycompany" from mycompany.atlassian.net). Works with both PAT and OAuth authentication.
-- `cloudId` (optional) - Atlassian cloud ID. If provided with OAuth, skips the site lookup for faster performance. Not used with PAT authentication.
+- `siteName` (required) - Name of your Jira site (e.g., "mycompany" from mycompany.atlassian.net)
+- `cloudId` (optional) - Atlassian cloud ID. If provided, skips the site lookup for faster performance.
 
 **Success Response (200 OK):**
 ```json
@@ -190,8 +190,8 @@ Writes the next Jira story from shell stories in an epic. Validates dependencies
 
 **Parameters:**
 - `epicKey` (required) - The Jira epic key (e.g., "PROJ-123")
-- `siteName` (recommended) - Name of your Jira site (e.g., "mycompany" from mycompany.atlassian.net). Works with both PAT and OAuth authentication.
-- `cloudId` (optional) - Atlassian cloud ID. If provided with OAuth, skips the site lookup for faster performance. Not used with PAT authentication.
+- `siteName` (required) - Name of your Jira site (e.g., "mycompany" from mycompany.atlassian.net)
+- `cloudId` (optional) - Atlassian cloud ID. If provided, skips the site lookup for faster performance.
 
 **Success Response (200 OK):**
 ```json
