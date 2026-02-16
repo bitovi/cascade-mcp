@@ -16,13 +16,15 @@ This guide covers deploying the Cascade MCP service on various infrastructure pl
 ## Prerequisites
 
 ### System Requirements
-- **Node.js**: 18.x 
+
+- **Node.js**: 18.x
 
 ### OAuth Application Setup
 
 Before deploying, you need to create OAuth applications for the services you want to integrate:
 
 #### Atlassian/Jira OAuth App
+
 1. Go to [Atlassian Developer Console](https://developer.atlassian.com/console/myapps/)
 2. Create a new OAuth 2.0 integration
 3. Configure settings:
@@ -31,6 +33,7 @@ Before deploying, you need to create OAuth applications for the services you wan
 4. Note your `Client ID` and `Client Secret`
 
 #### Figma OAuth App
+
 1. Go to [Figma Developer Settings](https://www.figma.com/developers/apps)
 2. Create a new app
 3. Configure settings:
@@ -39,6 +42,7 @@ Before deploying, you need to create OAuth applications for the services you wan
 4. Note your `Client ID` and `Client Secret`
 
 #### Google Drive OAuth App
+
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project or select an existing one
 3. Enable the Google Drive API:
@@ -91,6 +95,15 @@ GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 GOOGLE_OAUTH_SCOPES="https://www.googleapis.com/auth/drive"
 
+# RSA Encryption Keys (Required - enables /encrypt endpoint)
+# Generate keys locally: ./scripts/generate-rsa-keys.sh
+# Store in GitHub Secrets for staging/production deployments
+# Use different keys for each environment (dev/staging/prod)
+# Used for encrypting sensitive data (Google service accounts, API keys, etc.)
+# See: docs/encryption-setup.md for complete setup guide
+RSA_PUBLIC_KEY=LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K...
+RSA_PRIVATE_KEY=LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1J...
+
 # Optional: AWS (for CloudWatch logging)
 AWS_ACCESS_KEY_ID=your-aws-access-key
 AWS_SECRET_ACCESS_KEY=your-aws-secret-key
@@ -124,16 +137,19 @@ The simplest way to deploy is using Docker. The provided `Dockerfile` and `docke
 1. **Create `.env` file** with your environment variables (see above)
 
 2. **Build and run:**
+
    ```bash
    docker-compose up --build -d
    ```
 
 3. **View logs:**
+
    ```bash
    docker-compose logs -f
    ```
 
 4. **Stop the service:**
+
    ```bash
    docker-compose down
    ```
@@ -153,6 +169,19 @@ docker run -d \
   cascade-mcp:latest
 ```
 
+### RSA Encryption Keys
+
+Add RSA encryption keys to enable the `/encrypt` endpoint:
+
+```bash
+RSA_PUBLIC_KEY=LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K...
+RSA_PRIVATE_KEY=LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1J...
+```
+
+This enables users to encrypt sensitive data (service accounts, API keys, etc.) via web UI and pass encrypted credentials in API headers.
+
+For key generation and setup, see: [docs/encryption-setup.md](encryption-setup.md)
+
 ### Using docker-to-ec2
 
 TBD:
@@ -163,7 +192,7 @@ The following are incremental verification steps you can use to ensure the app i
 
 ### Visit the homepage
 
-The homepage should load properly.  You should see the right url for the MCP service:
+The homepage should load properly. You should see the right url for the MCP service:
 
 > <img width="568" height="424" alt="image" src="https://github.com/user-attachments/assets/39034d87-a872-4da3-9003-30a3200d8967" />
 
@@ -175,4 +204,4 @@ The homepage has links to the metadata endpoints. Check that these also have the
 
 ### Connect with an MCP client
 
-The final step is to connect with an MCP client. The homepage has instructions on how to do this. 
+The final step is to connect with an MCP client. The homepage has instructions on how to do this.

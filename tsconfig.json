@@ -23,6 +23,6 @@
     "sourceMap": true,
     "types": ["node", "jest"]
   },
-  "include": ["server/**/*", "specs/**/*", "test/**/*", "scripts/**/*", "src/**/*"],
+  "include": ["server/**/*", "specs/**/*", "test/**/*", "scripts/**/*", "client/src/**/*"],
   "exclude": ["node_modules", "dist"]
 }

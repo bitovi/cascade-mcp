@@ -47,6 +47,9 @@ jobs:
           echo "GOOGLE_OAUTH_SCOPES=${{ vars.GOOGLE_OAUTH_SCOPES }}" >> repo_env
           echo "GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}" >> repo_env
           ####
+          echo "RSA_PUBLIC_KEY=${{ secrets.RSA_PUBLIC_KEY }}" >> repo_env
+          echo "RSA_PRIVATE_KEY=${{ secrets.RSA_PRIVATE_KEY }}" >> repo_env
+          ####
           echo "SESSION_SECRET=${{ secrets.SESSION_SECRET }}" >> repo_env
           echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> repo_env
           ####

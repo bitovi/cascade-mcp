@@ -5,6 +5,17 @@
 
 - With all api changes or file changes, keep the documentation in `server/readme.md` up to date.
 
+### Security Guidelines - CRITICAL
+
+**NEVER log or expose sensitive credentials:**
+- ❌ NEVER log RSA private keys (`GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`)
+- ❌ NEVER log unencrypted Google service account JSON
+- ❌ NEVER log decrypted service account credentials in console output
+- ❌ NEVER include private keys or unencrypted credentials in error messages
+- ✅ ALWAYS use encrypted credentials (`X-Google-Token` header with `RSA-ENCRYPTED:` prefix)
+- ✅ ALWAYS decrypt credentials only when needed and never log the decrypted result
+- ✅ ONLY log metadata (like client_email or project_id) if absolutely necessary for debugging
+
 ### Code Organization for MCP Tools
 
 **Folder Structure:**
@@ -272,12 +283,12 @@ try {
 **Purpose:** Provides a simple way to test MCP tools without setting up an external MCP client (VS Code Copilot, Claude Desktop, etc.).
 
 ### Structure
-- `src/` - React frontend (Vite + TypeScript)
+- `client/src/` - React frontend (Vite + TypeScript)
   - `main.tsx` - Entry point
-  - `react/App.tsx` - Main component, MCP connection logic
-  - `react/components/` - UI (ConnectionPanel, ToolSelector, ToolForm, ProgressLog, ResultDisplay)
-  - `react/hooks/` - `useConfig`, `useMcpClient`
-  - `mcp-client/` - Browser MCP client implementation
+  - `App.tsx` - Main component, MCP connection logic
+  - `components/` - UI (ConnectionPanel, ToolSelector, ToolForm, ProgressLog, ResultDisplay)
+  - `hooks/` - `useConfig`, `useMcpClient`
+  - `lib/` - Browser MCP client implementation
 
 ### Commands
 - `npm run dev` - Run server (3000) + Vite client (5173) concurrently

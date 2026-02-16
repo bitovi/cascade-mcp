@@ -10,7 +10,7 @@ import {
   AnthropicSamplingProvider,
   type ConnectionState,
   type ConnectionStatus,
-} from '../../mcp-client/index.js';
+} from '../lib/mcp-client/index.js';
 import type { Tool, ServerNotification } from '@modelcontextprotocol/sdk/types.js';
 
 export interface UseMcpClientOptions {
