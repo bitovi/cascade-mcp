@@ -22,8 +22,6 @@ export function registerDriveAboutUserTool(mcp: McpServer): void {
       inputSchema: {},
     },
     async (_, context) => {
-      console.log('drive-about-user called');
-
       try {
         // Get auth info with proper error handling - uses nested access pattern
         const authInfo = getAuthInfoSafe(context, 'drive-about-user');
@@ -40,14 +38,11 @@ export function registerDriveAboutUserTool(mcp: McpServer): void {
           };
         }
 
-        console.log('  Calling Google Drive API /about endpoint...');
-
         // Create Google client and fetch user info using helper
         const googleClient = createGoogleClient(token);
         const userData = await getGoogleDriveUser(googleClient);
         const user = userData.user;
 
-        console.log(`  Google Drive user info retrieved successfully: ${user.emailAddress}`);
         logger.info('drive-about-user completed', {
           email: user.emailAddress,
           displayName: user.displayName,
@@ -76,7 +71,6 @@ export function registerDriveAboutUserTool(mcp: McpServer): void {
         };
       } catch (error: any) {
         logger.error('drive-about-user error', { error: error.message });
-        console.error('  Error in drive-about-user:', error);
         return {
           content: [
             {

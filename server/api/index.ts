@@ -13,6 +13,7 @@ import { handleIdentifyFeatures } from './identify-features.js';
 import { handleAnalyzeFeatureScope } from './analyze-feature-scope.js';
 import { handleFigmaReviewDesign } from './figma-review-design.js';
 import { handleReviewWorkItem } from './review-work-item.js';
+import { debounce } from './debounce-middleware.js';
 
 /**
  * Register all REST API routes with the Express app
@@ -31,9 +32,11 @@ export function registerRestApiRoutes(app: Express): void {
   console.log('  ✓ GET /api/config');
   
   // Generate shell stories from Figma designs in a Jira epic
-  // Wrap handler to match Express signature (req, res) => void
-  app.post('/api/write-shell-stories', (req, res) => handleWriteShellStories(req, res));
-  console.log('  ✓ POST /api/write-shell-stories');
+  app.post('/api/write-shell-stories',
+    debounce(req => `write-shell-stories:${req.body.siteName}:${req.body.epicKey}`),
+    (req, res) => handleWriteShellStories(req, res)
+  );
+  console.log('  ✓ POST /api/write-shell-stories (with debounce)');
   
   // Write the next Jira story from shell stories in an epic
   // Wrap handler to match Express signature (req, res) => void

@@ -26,8 +26,6 @@ export function generateSemanticXml(nodeData: any): string {
     throw new Error('Invalid node data: expected object with node information');
   }
   
-  console.log(`Generating semantic XML for Figma node: ${nodeData.name}`);
-  
   // Convert node tree to XML
   const childrenXml = nodeData.children
     ? nodeData.children
@@ -41,9 +39,6 @@ export function generateSemanticXml(nodeData: any): string {
     `<Screen name="${escapeXml(nodeData.name)}" type="${nodeData.type}">\n` +
     childrenXml + '\n' +
     `</Screen>`;
-  
-  const sizeKB = Math.round(xml.length / 1024);
-  console.log(`  Generated semantic XML (${sizeKB} KB)`);
   
   return xml;
 }

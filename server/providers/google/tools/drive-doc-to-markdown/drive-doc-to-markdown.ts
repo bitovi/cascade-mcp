@@ -38,9 +38,6 @@ export function registerDriveDocToMarkdownTool(mcp: McpServer): void {
       },
     },
     async ({ url }: DriveDocToMarkdownParams, context: any) => {
-      console.log(`🔄 MCP Tool: google-drive-doc-to-markdown`);
-      console.log(`  URL: ${url}`);
-      
       try {
         // Get authentication context
         const authInfo = getAuthInfoSafe(context, 'google-drive-doc-to-markdown');
@@ -66,8 +63,6 @@ export function registerDriveDocToMarkdownTool(mcp: McpServer): void {
         // Execute conversion
         const result = await executeDriveDocToMarkdown(request, googleClient);
         
-        console.log(`  ✅ Conversion successful (${result.markdown.length} characters)`);
-        
         return {
           content: [{
             type: 'text',
@@ -76,8 +71,7 @@ export function registerDriveDocToMarkdownTool(mcp: McpServer): void {
         };
         
       } catch (error) {
-        console.error(`  ❌ Conversion failed:`, error);
-        
+
         const errorMessage = error instanceof Error ? error.message : String(error);
         
         return {
@@ -89,6 +83,4 @@ export function registerDriveDocToMarkdownTool(mcp: McpServer): void {
       }
     }
   );
-  
-  console.log('✅ Registered MCP tool: google-drive-doc-to-markdown');
 }

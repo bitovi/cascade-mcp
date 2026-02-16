@@ -22,7 +22,9 @@ const cloudWatchConfig: CloudWatchConfig = {
 };
 
 const transports: winston.transport[] = [
-  new winston.transports.Console(),
+  new winston.transports.Console({
+    silent: process.env.NODE_ENV === 'test' || process.env.TEST_MODE === 'true'
+  }),
 ];
 
 if (process.env.AWS_ACCESS_KEY_ID) {

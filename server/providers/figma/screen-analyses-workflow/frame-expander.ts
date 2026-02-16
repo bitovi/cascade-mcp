@@ -73,14 +73,11 @@ export function expandNode(
   const emptyNodesDataMap = new Map<string, any>();
   
   if (!nodeData) {
-    console.log(`  Node ${nodeId} has no data`);
     return { frames: [], notes: [], nodesDataMap: emptyNodesDataMap };
   }
   
   const nodeType = nodeData.type;
   const nodeName = nodeData.name || 'Unnamed';
-  
-  console.log(`  Expanding node: ${nodeName} (${nodeType})`);
   
   // Handle CANVAS (page level)
   if (nodeType === 'CANVAS') {
@@ -106,7 +103,6 @@ export function expandNode(
     return { frames: [], notes: [metadata], nodesDataMap: nodesMap };
   }
   
-  console.log(`  Node type ${nodeType} is not expandable - returning empty`);
   return { frames: [], notes: [], nodesDataMap: emptyNodesDataMap };
 }
 
@@ -162,8 +158,6 @@ export function expandNodes(
     }
   }
   
-  console.log(`  Expansion complete: ${allFrames.length} frames, ${allNotes.length} notes`);
-  
   return { frames: allFrames, notes: allNotes, nodesDataMap: updatedNodesDataMap };
 }
 
@@ -202,7 +196,6 @@ function expandCanvasNode(
     }
     // Expand SECTIONs automatically
     else if (child.type === 'SECTION') {
-      console.log(`    Found SECTION: "${child.name}" - expanding child frames`);
       const sectionResult = expandSectionNode(child, extractNodeMetadata);
       frames.push(...sectionResult.frames);
       notes.push(...sectionResult.notes);
@@ -213,7 +206,6 @@ function expandCanvasNode(
     }
   }
   
-  console.log(`    Expanded CANVAS to ${frames.length} frames, ${notes.length} notes`);
   return { frames, notes, nodesDataMap: nodesMap };
 }
 
@@ -256,7 +248,6 @@ function expandSectionNode(
     }
   }
   
-  console.log(`    Expanded SECTION "${sectionContext.sectionName}" to ${frames.length} frames, ${notes.length} notes`);
   return { frames, notes, nodesDataMap: nodesMap, sectionContext };
 }
 

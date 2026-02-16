@@ -450,8 +450,6 @@ describe('semantic-xml-generator', () => {
 
       // Should achieve at least 50% reduction (realistic with small sample)
       expect(reduction).toBeGreaterThan(50);
-      
-      console.log(`Size reduction: ${Math.round(reduction)}% (${jsonSize} → ${xmlSize} bytes)`);
     });
   });
 });

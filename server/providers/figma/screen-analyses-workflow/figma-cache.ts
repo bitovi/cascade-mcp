@@ -78,7 +78,6 @@ export async function ensureValidCacheForFigmaFile(
       
       if (!cacheValid) {
         // Cache invalid - delete entire folder and fetch fresh
-        console.log('  🗑️  Deleting stale cache folder');
         await clearFigmaCache(figmaFileKey);
       }
       // If valid, cache is ready to use
@@ -89,8 +88,6 @@ export async function ensureValidCacheForFigmaFile(
         throw error;
       }
       // Other errors - clear cache and rebuild
-      console.log(`    ⚠️  Error validating cache: ${error.message}`);
-      console.log('  🗑️  Clearing cache folder due to error');
       await clearFigmaCache(figmaFileKey);
     }
   } else {
@@ -120,7 +117,6 @@ export async function isCacheValid(
     
     // Validate file key matches
     if (metadata.fileKey !== figmaFileKey) {
-      console.log('    ⚠️  Cache file key mismatch - treating cache as invalid');
       return false;
     }
     
@@ -129,7 +125,6 @@ export async function isCacheValid(
     const currentTimestamp = new Date(currentLastTouchedAt).getTime();
     
     if (currentTimestamp > cachedTimestamp) {
-      console.log(`    ♻️  Figma file updated: ${metadata.lastTouchedAt} → ${currentLastTouchedAt}`);
       return false;
     }
     
@@ -137,11 +132,6 @@ export async function isCacheValid(
     
   } catch (error: any) {
     // Metadata file doesn't exist or is corrupt - treat as invalid
-    if (error.code === 'ENOENT') {
-      // No log needed - this is normal on first run
-    } else {
-      console.log(`    ⚠️  Error reading cache metadata: ${error.message}`);
-    }
     return false;
   }
 }
@@ -184,9 +174,6 @@ export async function loadFigmaMetadata(
     const metadata: FigmaMetadata = JSON.parse(metadataContent);
     return metadata;
   } catch (error: any) {
-    if (error.code !== 'ENOENT') {
-      console.log(`    ⚠️  Error reading cache metadata: ${error.message}`);
-    }
     return null;
   }
 }

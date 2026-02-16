@@ -84,17 +84,13 @@ export async function validateCache(
   const cachePath = getFigmaFileCachePath(fileKey);
   
   // Fetch current metadata from Figma (Tier 3 - lightweight)
-  console.log(`  Validating cache for file ${fileKey}...`);
   const fileMetadata = await fetchFigmaFileMetadata(figmaClient, fileKey);
   
   // Check if cache is valid
   const isValid = await isCacheValid(fileKey, fileMetadata.lastTouchedAt);
   
   if (!isValid) {
-    console.log(`  Cache invalid - clearing...`);
     await clearFigmaCache(fileKey);
-  } else {
-    console.log(`  Cache valid`);
   }
   
   return {
@@ -123,7 +119,6 @@ export async function saveCacheMetadata(
   }: Pick<CacheValidatorDeps, 'saveFigmaMetadata'> = {}
 ): Promise<void> {
   await saveFigmaMetadata(fileKey, fileMetadata);
-  console.log(`  Cache metadata saved for ${fileKey}`);
 }
 
 /**

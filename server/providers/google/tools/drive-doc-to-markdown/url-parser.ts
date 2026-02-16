@@ -47,18 +47,13 @@ export const GOOGLE_DOCS_PLAIN_TEXT_REGEX = /https?:\/\/docs\.google\.com\/docum
  * // Returns: { documentId: "1a2b3c4d5e6f7g8h9i0j" }
  */
 export function parseGoogleDriveUrl(input: string): { documentId: string } {
-  console.log('Parsing Google Drive URL');
-  
   // Remove whitespace
   const trimmed = input.trim();
-  
-  console.log('  Trimmed input:', trimmed.substring(0, 100));
   
   // Pattern 1: Standard sharing URL - https://docs.google.com/document/d/{id}/...
   let match = trimmed.match(/\/document\/d\/([a-zA-Z0-9_-]+)/);
   if (match) {
     const documentId = match[1];
-    console.log('  Matched standard URL format, extracted ID:', documentId);
     return { documentId };
   }
   
@@ -66,18 +61,15 @@ export function parseGoogleDriveUrl(input: string): { documentId: string } {
   match = trimmed.match(/\/document\/u\/\d+\/d\/([a-zA-Z0-9_-]+)/);
   if (match) {
     const documentId = match[1];
-    console.log('  Matched mobile URL format, extracted ID:', documentId);
     return { documentId };
   }
   
   // Pattern 3: Bare document ID (25-44 characters, alphanumeric + underscore + hyphen)
   if (/^[a-zA-Z0-9_-]{25,}$/.test(trimmed)) {
-    console.log('  Matched bare document ID format');
     return { documentId: trimmed };
   }
   
   // No patterns matched - provide helpful error message
-  console.log('  No patterns matched, input invalid');
   throw new Error(
     `Invalid Google Drive URL format. Expected formats:\n` +
     `  - https://docs.google.com/document/d/{id}/edit\n` +

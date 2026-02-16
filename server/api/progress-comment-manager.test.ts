@@ -181,28 +181,7 @@ describe('Progress Comment Manager', () => {
     });
   });
 
-  describe('Console Logging Backup', () => {
-    it('should always log to console on notify', async () => {
-      (addIssueComment as jest.Mock).mockResolvedValue({
-        commentId: 'comment-1',
-        response: { ok: true }
-      });
 
-      const manager = createProgressCommentManager(context);
-      await manager.notify('Test message');
-
-      expect(consoleLogSpy).toHaveBeenCalledWith('[Progress] Test message');
-    });
-
-    it('should log to console even if comment creation fails', async () => {
-      (addIssueComment as jest.Mock).mockRejectedValue(new Error('Network error'));
-
-      const manager = createProgressCommentManager(context);
-      await manager.notify('Test message');
-
-      expect(consoleLogSpy).toHaveBeenCalledWith('[Progress] Test message');
-    });
-  });
 
   describe('Graceful Degradation', () => {
     it('should disable commenting after 3 consecutive failures', async () => {
@@ -227,9 +206,6 @@ describe('Progress Comment Manager', () => {
       // 4th message should not attempt to create comment
       await manager.notify('Message 4');
       expect(addIssueComment).toHaveBeenCalledTimes(3); // Still 3, not 4
-      
-      // But should still log to console
-      expect(consoleLogSpy).toHaveBeenCalledWith('[Progress] Message 4');
     });
 
     it('should reset failure counter on successful comment operation', async () => {

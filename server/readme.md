@@ -431,6 +431,29 @@ Cache structure with override:
 - **Token Expiration**: Tools throw `InvalidTokenError` for automatic refresh
 - **Session Management**: Proper cleanup prevents memory leaks
 
+### Request Debouncing
+
+**Purpose**: Prevents duplicate requests from fat-finger double-clicks on Jira automation buttons.
+
+**Implementation**:
+- 5-second debounce window per tool + site + issue/epic combination
+- Dedup key format: `toolName:siteName:issueKey` (e.g., `write-shell-stories:bitovi:PROJ-123`)
+- Different tools can run concurrently on the same issue
+- Different Jira sites with same issue key are treated independently
+
+**Protected Endpoints**:
+- `POST /api/write-shell-stories` (REST) and `write-shell-stories` (MCP)
+- Can be extended to other long-running tools as needed
+
+**Response on Duplicate**:
+- REST API: `409 Conflict` with message indicating retry time
+- MCP: Text content with user-friendly message
+- Example: `"A write-shell-stories operation was already requested for PROJ-123 within the last 3 seconds. Please wait 3 more seconds before retrying."`
+
+**Automatic Cleanup**: Entries older than 5 seconds are lazily removed on subsequent requests.
+
+**Testing**: See `server/utils/__tests__/request-debounce.test.ts` for unit tests covering edge cases.
+
 ### Content Size Limits
 
 Jira Cloud has a **43,838 character limit** for description fields (applies to the entire JSON representation of the ADF document).

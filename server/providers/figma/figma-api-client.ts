@@ -91,25 +91,7 @@ export function createFigmaClient(accessToken: string): FigmaClient {
         ),
       };
       
-      // For 403 debugging - log full token temporarily
-      if (process.env.DEBUG_FIGMA_TOKEN === 'true') {
-        console.log('🔐 FULL FIGMA TOKEN (DEBUG MODE):', accessToken);
-      }
-      
-      // Debug: Log request details for 403 troubleshooting
-      const authHeaderValue = isOAuthToken 
-        ? `Bearer ${accessToken.substring(0, 20)}...`
-        : accessToken.substring(0, 20) + '...';
-      
-      console.log('🌐 Figma API Request:', {
-        url: url.substring(0, 100) + (url.length > 100 ? '...' : ''),
-        tokenType: isOAuthToken ? 'OAuth (figu_)' : 'PAT (figd_)',
-        tokenPrefix: accessToken.substring(0, 10),
-        tokenLength: accessToken.length,
-        headers: Object.keys(headers),
-        authHeader: isOAuthToken ? 'Authorization: Bearer' : 'X-Figma-Token',
-        authHeaderPreview: authHeaderValue
-      });
+
       
       return fetch(url, {
         ...options,
@@ -124,8 +106,6 @@ export function createFigmaClient(accessToken: string): FigmaClient {
     fetchComments: async (fileKey: string): Promise<FigmaComment[]> => {
       const baseUrl = 'https://api.figma.com/v1';
       const url = `${baseUrl}/files/${fileKey}/comments`;
-      
-      console.log('💬 Fetching Figma comments:', { fileKey });
 
       const isOAuthToken = accessToken.startsWith('figu_');
       const headers = {
@@ -148,19 +128,12 @@ export function createFigmaClient(accessToken: string): FigmaClient {
       }
 
       const data = (await response.json()) as FigmaCommentsResponse;
-      console.log('  ✅ Fetched', data.comments.length, 'comments');
       return data.comments;
     },
 
     postComment: async (fileKey: string, request: PostCommentRequest): Promise<FigmaComment> => {
       const baseUrl = 'https://api.figma.com/v1';
       const url = `${baseUrl}/files/${fileKey}/comments`;
-      
-      console.log('📝 Posting Figma comment:', { 
-        fileKey, 
-        messagePreview: request.message.substring(0, 50) + (request.message.length > 50 ? '...' : ''),
-        hasPosition: !!request.client_meta 
-      });
 
       const isOAuthToken = accessToken.startsWith('figu_');
       const headers = {
@@ -191,7 +164,6 @@ export function createFigmaClient(accessToken: string): FigmaClient {
       }
 
       const data = (await response.json()) as { id: string; message: string; user: { handle: string; img_url: string }; created_at: string };
-      console.log('  ✅ Posted comment:', data.id);
       
       // Return the created comment
       return {

@@ -39,16 +39,6 @@ jest.setTimeout(30000);
 
 // Global test setup
 beforeAll(() => {
-  console.log('🧪 Starting E2E test suite...');
-  
-  if (process.env.TEST_USE_MOCK_ATLASSIAN === 'true') {
-    console.log('   Test mode: Mock Atlassian OAuth (full OAuth flow with mock endpoints)');
-  } else if (process.env.TEST_USE_PAT_BYPASS === 'true') {
-    console.log('   Test mode: PAT Bypass (skips OAuth flow entirely)');
-  } else {
-    console.log('   Test mode: Manual OAuth (requires browser interaction)');
-  }
-  
   if (process.env.TEST_USE_MOCK_ATLASSIAN === 'true' && !process.env.ATLASSIAN_TEST_PAT) {
     console.warn('⚠️  WARNING: Mock OAuth mode enabled but ATLASSIAN_TEST_PAT not set');
     console.warn('   Mock endpoints need PAT token for internal Jira API calls');
@@ -57,5 +47,5 @@ beforeAll(() => {
 
 // Global test cleanup
 afterAll(() => {
-  console.log('✅ E2E test suite completed');
+  // Test suite complete
 });

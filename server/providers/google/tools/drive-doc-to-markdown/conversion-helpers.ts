@@ -64,8 +64,6 @@ function preprocessHtml(html: string): PreprocessResult {
  * Convert HTML content to Markdown using Turndown library
  */
 export function htmlToMarkdown(html: string): { markdown: string; warnings: string[] } {
-  console.log('Converting HTML to Markdown');
-  
   // Preprocess HTML to remove non-content elements and detect unsupported features
   const { cleanedHtml, warnings } = preprocessHtml(html);
   
@@ -204,13 +202,8 @@ export function htmlToMarkdown(html: string): { markdown: string; warnings: stri
   // Clean up excessive newlines (max 2 consecutive)
   const cleaned = normalized.replace(/\n{3,}/g, '\n\n').trim();
   
-  console.log(`  Conversion complete: ${cleaned.length} characters`);
-  if (warnings.length > 0) {
-    console.log(`  Warnings: ${warnings.join(', ')}`);
-  }
   return { markdown: cleaned, warnings };
   } catch (error: any) {
-    console.error('  HTML to Markdown conversion failed:', error.message);
     throw new Error(
       `Failed to convert HTML to Markdown: ${error.message}\\n` +
       `This may indicate invalid HTML structure or unsupported formatting.`

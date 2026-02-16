@@ -92,8 +92,6 @@ export async function downloadImages(
   
   const { cacheFilenames } = options;
   
-  console.log(`  Downloading ${nodeIds.length} images...`);
-  
   // Check cache first if filenames provided
   const images = new Map<string, DownloadedImage>();
   const failed: string[] = [];
@@ -125,10 +123,8 @@ export async function downloadImages(
           byteSize: imageBuffer.length,
         });
         totalBytes += imageBuffer.length;
-        console.log(`    ♻️  Cache hit: ${filename}.png`);
       } catch {
         // Cache miss - need to download
-        console.log(`    ✗ Cache miss: ${filename}.png`);
         nodeIdsToDownload.push(nodeId);
       }
     }
@@ -139,8 +135,6 @@ export async function downloadImages(
   
   // Download any images not in cache
   if (nodeIdsToDownload.length > 0) {
-    console.log(`  Downloading batch of ${nodeIdsToDownload.length} images (${options.format || 'png'}, ${options.scale || 1}x)...`);
-    
     const rawResults = await downloadFigmaImagesBatch(
       figmaClient,
       fileKey,
@@ -178,14 +172,6 @@ export async function downloadImages(
         failed.push(nodeId);
       }
     }
-  }
-  
-  const successCount = images.size;
-  const totalKB = Math.round(totalBytes / 1024);
-  console.log(`  ✅ Downloaded ${successCount}/${nodeIds.length} images (${totalKB}KB total)`);
-  
-  if (failed.length > 0) {
-    console.log(`  ⚠️ Failed to download: ${failed.join(', ')}`);
   }
   
   return { images, failed, totalBytes };
