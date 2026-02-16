@@ -48,18 +48,13 @@ export async function getDocumentMetadata(
   client: GoogleClient,
   documentId: string
 ): Promise<GoogleDocMetadata> {
-  console.log('Fetching document metadata from Drive API');
-  
   const fields = 'id,name,mimeType,modifiedTime,size';
   const url = `https://www.googleapis.com/drive/v3/files/${documentId}?fields=${fields}`;
-  
-  console.log('  Document ID:', documentId);
   
   const response = await client.fetch(url);
   
   if (!response.ok) {
     const errorText = await response.text();
-    console.log('  Drive API error:', response.status, errorText);
     
     // Get user's email for helpful error messages
     let userEmail: string | undefined;
@@ -68,7 +63,6 @@ export async function getDocumentMetadata(
       userEmail = userData.user.emailAddress;
     } catch (error) {
       // If we can't get user email, continue without it
-      console.log('  Could not fetch user email for error message:', error);
     }
     
     // Provide user-friendly error messages
@@ -101,7 +95,6 @@ export async function getDocumentMetadata(
   }
   
   const metadata = await response.json() as GoogleDocMetadata;
-  console.log('  Document metadata retrieved:', metadata.name);
   
   return metadata;
 }
@@ -127,17 +120,12 @@ export async function exportDocumentAsHTML(
   client: GoogleClient,
   documentId: string
 ): Promise<string> {
-  console.log('Exporting document as HTML');
-  
   const url = `https://www.googleapis.com/drive/v3/files/${documentId}/export?mimeType=text/html`;
-  
-  console.log('  Document ID:', documentId);
   
   const response = await client.fetch(url);
   
   if (!response.ok) {
     const errorText = await response.text();
-    console.log('  Drive API export error:', response.status, errorText);
     
     // Provide user-friendly error messages
     if (response.status === 404) {

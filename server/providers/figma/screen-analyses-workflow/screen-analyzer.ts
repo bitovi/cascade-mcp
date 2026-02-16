@@ -205,8 +205,6 @@ export async function analyzeFrames(
     totalFrames: options.totalFrames ?? inputs.length,
   };
   
-  console.log(`Analyzing ${inputs.length} frames...`);
-  
   // Check cache for each frame
   const results: FrameAnalysisOutput[] = [];
   const framesToAnalyze: FrameAnalysisInput[] = [];
@@ -223,7 +221,6 @@ export async function analyzeFrames(
         const cachedAnalysis = await loadAnalysisFromCache(cachePath, filename);
         
         if (cachedAnalysis) {
-          console.log(`  ♻️  Cache hit: ${filename}`);
           results.push({
             frame: {
               ...input.frame,
@@ -238,15 +235,12 @@ export async function analyzeFrames(
       }
       
       // Cache miss or invalidated - need to analyze
-      console.log(`  ✗ Cache miss: ${filename}`);
       framesToAnalyze.push(input);
     }
   } else {
     // No fileKey provided, analyze all frames
     framesToAnalyze.push(...inputs);
   }
-  
-  console.log(`  📊 Analysis needed: ${framesToAnalyze.length} frames, Cached: ${results.length} frames`);
   
   // Analyze frames that need it
   if (framesToAnalyze.length > 0) {
@@ -255,9 +249,6 @@ export async function analyzeFrames(
     );
     results.push(...freshResults);
   }
-  
-  const successCount = results.filter(r => r.success).length;
-  console.log(`  ✅ Analyzed ${successCount}/${inputs.length} frames`);
   
   return results;
 }

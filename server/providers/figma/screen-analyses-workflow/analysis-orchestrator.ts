@@ -200,7 +200,6 @@ export async function analyzeScreens(
   );
   
   // Step 6: Associate annotations
-  console.log(`\n💬 Step 6: Fetching and associating annotations...`);
   const annotationResult = await d.fetchAndAssociateAnnotations(
     figmaClient,
     fileKey,
@@ -232,7 +231,6 @@ export async function analyzeScreens(
   }
   
   // Step 7: Prepare inputs and run AI analysis
-  console.log(`\n🤖 Step 7: Running AI analysis...`);
   
   // Build analysis inputs
   const analysisInputs: FrameAnalysisInput[] = framesToAnalyze.map(frame => ({
@@ -290,16 +288,12 @@ export async function analyzeScreens(
   await notify(`Frame analysis complete: ${cachedCount} cached, ${newCount} new${cacheExplanation}`);
   
   // Step 8: Calculate ordering and build result
-  console.log(`\n📊 Step 8: Building final result...`);
   const orderedFrames = d.calculateFrameOrder(analyzedFrames);
   
   // Save cache metadata if it was invalidated
   if (cacheResult.wasInvalidated) {
     await d.saveCacheMetadata(fileKey, cacheResult.fileMetadata);
   }
-  
-  console.log(`\n✅ Analysis complete!`);
-  console.log(`  Total frames: ${orderedFrames.length}`);
   
   return {
     frames: orderedFrames,

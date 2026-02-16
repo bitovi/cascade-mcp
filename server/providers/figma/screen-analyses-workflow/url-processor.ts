@@ -318,7 +318,6 @@ export async function loadCachedNodes(
     const allPresent = nodeIds.every(id => cachedNodeIds.has(id));
     
     if (!allPresent) {
-      console.log(`  ⚠️  Node cache incomplete (need ${nodeIds.length}, have ${cachedNodeIds.size})`);
       return null;
     }
     
@@ -328,16 +327,10 @@ export async function loadCachedNodes(
       nodesMap.set(nodeId, cached.nodesDataMap[nodeId]);
     }
     
-    console.log(`  ✅ Loaded ${nodeIds.length} nodes from cache`);
     return nodesMap;
     
   } catch (error) {
     // Cache file doesn't exist or is corrupted
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      console.log(`  ℹ️  No node cache found`);
-    } else {
-      console.log(`  ⚠️  Failed to read node cache: ${(error as Error).message}`);
-    }
     return null;
   }
 }
@@ -372,8 +365,7 @@ export async function saveNodesToCache(
   
   try {
     await fs.writeFile(cachePath, JSON.stringify(cacheData, null, 2), 'utf-8');
-    console.log(`  💾 Saved ${nodeIds.length} nodes to cache`);
   } catch (error) {
-    console.log(`  ⚠️  Failed to save node cache: ${(error as Error).message}`);
+    // Silently fail - cache is optional
   }
 }

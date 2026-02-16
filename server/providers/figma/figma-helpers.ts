@@ -257,8 +257,6 @@ export async function fetchFigmaFileMetadata(
 ): Promise<FigmaFileMetadata> {
   const figmaApiUrl = `${client.getBaseUrl()}/files/${fileKey}/meta`;
   
-  console.log(`  🎨 ${figmaApiUrl}`);
-  
   try {
     const response = await client.fetch(figmaApiUrl);
     
@@ -279,8 +277,6 @@ export async function fetchFigmaFileMetadata(
       
       throw new Error(`Figma API error: ${response.status} ${response.statusText} - ${errorText}`);
     }
-    
-    console.log(`  🎨 ${figmaApiUrl} (${response.status})`);
     
     const data = await response.json() as any;
     
@@ -377,7 +373,6 @@ export async function fetchFigmaFile(
     }
     
     const data = await response.json();
-    console.log(`    🎨 ${figmaApiUrl} (${response.status})`);
     return data;
     
   } catch (error: any) {
@@ -472,7 +467,6 @@ export async function fetchFigmaNode(
       throw new Error(`Node ${nodeId} not found in file ${fileKey}`);
     }
     
-    console.log(`    🎨 ${figmaApiUrl} (${response.status})`);
     return nodeData.document;
     
   } catch (error: any) {
@@ -635,9 +629,7 @@ function extractFramesAndNotesFromChildren(
       }
       // SECTION nodes should be automatically expanded to get their child frames
       else if (child.type === 'SECTION') {
-        console.log(`  Found SECTION: "${child.name}" - expanding to get child frames`);
         const sectionResults = extractFramesAndNotesFromChildren(child);
-        console.log(`    Collected ${sectionResults.length} frames/notes from SECTION`);
         results.push(...sectionResults);
       }
     }
@@ -663,41 +655,31 @@ export function getFramesAndNotesForNode(
   const targetNode = findNodeInDocument(documentRoot, nodeId);
   
   if (!targetNode) {
-    console.log(`  Node ${nodeId} not found in document`);
     return [];
   }
   
-  console.log(`  Found node type: ${targetNode.type}, name: ${targetNode.name}`);
-  
   // Check if this is a CANVAS (page)
   if (targetNode.type === 'CANVAS') {
-    console.log('  Node is CANVAS - collecting first-level frames and notes');
     const results = extractFramesAndNotesFromChildren(targetNode);
-    console.log(`  Collected ${results.length} first-level frames/notes from CANVAS`);
     return results;
   }
   
   // Check if this is a SECTION
   if (targetNode.type === 'SECTION') {
-    console.log(`  Node is SECTION: "${targetNode.name}" - expanding to child frames`);
     const results = extractFramesAndNotesFromChildren(targetNode);
-    console.log(`  Collected ${results.length} frames/notes from SECTION`);
     return results;
   }
   
   // Check if this is a FRAME
   if (targetNode.type === 'FRAME') {
-    console.log('  Node is FRAME - returning single node');
     return [extractNodeMetadata(targetNode)];
   }
   
   // Check if this is a note (INSTANCE with name "Note")
   if (targetNode.type === 'INSTANCE' && targetNode.name === 'Note') {
-    console.log('  Node is Note (INSTANCE) - returning single node');
     return [extractNodeMetadata(targetNode)];
   }
   
-  console.log(`  Node type ${targetNode.type} is not a CANVAS, SECTION, FRAME, or Note - returning empty`);
   return [];
 }
 
@@ -851,7 +833,6 @@ export async function downloadFigmaImage(
       }
       
       const imageBlob = await imageResponse.blob();
-      console.log(`    Downloaded image: ${Math.round(imageBlob.size / 1024)}KB`);
       
       // Step 3: Convert to base64
       const arrayBuffer = await imageBlob.arrayBuffer();
@@ -935,8 +916,6 @@ export async function fetchFigmaNodesBatch(
   
   // Chunk large requests (iterative, not recursive)
   if (nodeIds.length > maxBatchSize) {
-    console.log(`  📦 Chunking ${nodeIds.length} nodes into batches of ${maxBatchSize}...`);
-    
     const allResults = new Map<string, any>();
     const chunks: string[][] = [];
     
@@ -945,12 +924,9 @@ export async function fetchFigmaNodesBatch(
       chunks.push(nodeIds.slice(i, i + maxBatchSize));
     }
     
-    console.log(`    Processing ${chunks.length} chunks...`);
-    
     // Fetch each chunk sequentially (to avoid overwhelming API)
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
-      console.log(`    Fetching chunk ${i + 1}/${chunks.length} (${chunk.length} nodes)...`);
       
       // Make single batch request for this chunk
       const chunkResults = await fetchFigmaNodesBatchSingle(client, fileKey, chunk, timeoutMs);
@@ -961,7 +937,6 @@ export async function fetchFigmaNodesBatch(
       }
     }
     
-    console.log(`    ✅ Fetched ${allResults.size}/${nodeIds.length} nodes across ${chunks.length} chunks`);
     return allResults;
   }
   
@@ -985,8 +960,6 @@ async function fetchFigmaNodesBatchSingle(
   timeoutMs: number
 ): Promise<Map<string, any>> {
   const figmaApiUrl = `${client.getBaseUrl()}/files/${fileKey}/nodes?ids=${encodeURIComponent(nodeIds.join(','))}`;
-  
-  console.log(`  Fetching batch of ${nodeIds.length} nodes from ${fileKey}...`);
   
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -1059,7 +1032,6 @@ async function fetchFigmaNodesBatchSingle(
       }
     }
     
-    console.log(`  ✅ Batch fetch complete: ${nodesMap.size}/${nodeIds.length} nodes retrieved`);
     return nodesMap;
     
   } catch (error: any) {
@@ -1117,8 +1089,6 @@ export async function downloadFigmaImagesBatch(
   
   // Chunk large requests (iterative, not recursive)
   if (nodeIds.length > MAX_BATCH_SIZE) {
-    console.log(`  📦 Chunking ${nodeIds.length} image requests into batches of ${MAX_BATCH_SIZE}...`);
-    
     const allResults = new Map<string, FigmaImageDownloadResult | null>();
     const chunks: string[][] = [];
     
@@ -1127,12 +1097,9 @@ export async function downloadFigmaImagesBatch(
       chunks.push(nodeIds.slice(i, i + MAX_BATCH_SIZE));
     }
     
-    console.log(`    Processing ${chunks.length} chunks...`);
-    
     // Fetch each chunk sequentially
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
-      console.log(`    Fetching chunk ${i + 1}/${chunks.length} (${chunk.length} images)...`);
       
       const chunkResults = await downloadFigmaImagesBatchSingle(client, fileKey, chunk, { format, scale });
       
@@ -1142,7 +1109,6 @@ export async function downloadFigmaImagesBatch(
       }
     }
     
-    console.log(`    ✅ Downloaded ${allResults.size}/${nodeIds.length} images across ${chunks.length} chunks`);
     return allResults;
   }
   
@@ -1160,8 +1126,6 @@ async function downloadFigmaImagesBatchSingle(
   options: FigmaImageDownloadOptions
 ): Promise<Map<string, FigmaImageDownloadResult | null>> {
   const { format = 'png', scale = 1 } = options;
-  
-  console.log(`  Downloading batch of ${nodeIds.length} images (${format}, ${scale}x)...`);
   
   // Step 1: Get image URLs from Figma API
   const figmaApiUrl = `${client.getBaseUrl()}/images/${fileKey}`;
@@ -1222,14 +1186,11 @@ async function downloadFigmaImagesBatchSingle(
       throw new Error('No images field in Figma API response');
     }
     
-    console.log(`    🎨 Batch downloading ${nodeIds.length} images (${response.status})`);
-    
     // Step 2: Download images from CDN in parallel
     const downloadPromises = nodeIds.map(async (nodeId): Promise<[string, FigmaImageDownloadResult | null]> => {
       const imageUrl = data.images[nodeId];
       
       if (!imageUrl) {
-        console.log(`    ⚠️  No image URL for node ${nodeId} (couldn't be rendered)`);
         return [nodeId, null];
       }
       
@@ -1244,7 +1205,6 @@ async function downloadFigmaImagesBatchSingle(
         clearTimeout(imageTimeoutId);
         
         if (!imageResponse.ok) {
-          console.log(`    ⚠️  Failed to download image for ${nodeId}: ${imageResponse.status}`);
           return [nodeId, null];
         }
         
@@ -1263,24 +1223,12 @@ async function downloadFigmaImagesBatchSingle(
         }];
         
       } catch (error: any) {
-        if (error.name === 'AbortError') {
-          console.log(`    ⚠️  Image download timed out for ${nodeId}`);
-        } else {
-          console.log(`    ⚠️  Error downloading image for ${nodeId}: ${error.message}`);
-        }
         return [nodeId, null];
       }
     });
     
     const results = await Promise.all(downloadPromises);
     const imagesMap = new Map(results);
-    
-    const successCount = Array.from(imagesMap.values()).filter(v => v !== null).length;
-    const totalSize = Array.from(imagesMap.values())
-      .filter(v => v !== null)
-      .reduce((sum, v) => sum + v!.byteSize, 0);
-    
-    console.log(`  ✅ Downloaded ${successCount}/${nodeIds.length} images (${Math.round(totalSize / 1024)}KB total)`);
     
     return imagesMap;
     

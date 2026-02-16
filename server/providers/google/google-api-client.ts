@@ -100,18 +100,7 @@ export function createGoogleClient(accessToken: string): GoogleClient {
 export async function createGoogleClientWithServiceAccountJSON(
   serviceAccountJson: GoogleServiceAccountCredentials
 ): Promise<GoogleClient> {
-  console.log('🔐 createGoogleClientWithServiceAccountJSON called');
-  console.log('  Client email:', serviceAccountJson.client_email);
-  console.log('  Project ID:', serviceAccountJson.project_id);
-  console.log('  Private key ID:', serviceAccountJson.private_key_id);
-  console.log('  Private key length:', serviceAccountJson.private_key?.length);
-  console.log('  Private key preview:', serviceAccountJson.private_key?.substring(0, 80));
-  console.log('  Private key has escaped newlines:', serviceAccountJson.private_key?.includes('\\n'));
-  console.log('  Private key has actual newlines:', serviceAccountJson.private_key?.includes('\n'));
-  
   const SCOPES = ['https://www.googleapis.com/auth/drive.readonly'];
-  
-  console.log('  Creating JWT auth client...');
   
   // Create JWT auth client
   const auth = new JWT({
@@ -119,8 +108,6 @@ export async function createGoogleClientWithServiceAccountJSON(
     key: serviceAccountJson.private_key,
     scopes: SCOPES,
   });
-  
-  console.log('  JWT client created, requesting access token...');
   
   // Get access token from JWT
   try {
@@ -130,12 +117,6 @@ export async function createGoogleClientWithServiceAccountJSON(
     if (!accessToken) {
       throw new Error('Failed to obtain access token from service account');
     }
-    
-    console.log('✅ Created Google client with service account:', {
-      clientEmail: serviceAccountJson.client_email,
-      projectId: serviceAccountJson.project_id,
-      tokenPrefix: accessToken.substring(0, 20) + '...',
-    });
     
     return {
       authType: 'service-account',
@@ -153,15 +134,6 @@ export async function createGoogleClientWithServiceAccountJSON(
       },
     };
   } catch (error) {
-    console.error('❌ Failed to get access token:');
-    if (error instanceof Error) {
-      console.error('  Error name:', error.constructor.name);
-      console.error('  Error message:', error.message);
-      console.error('  Error code:', (error as any).code);
-      console.error('  Full error:', error);
-    } else {
-      console.error('  Unknown error:', error);
-    }
     throw error;
   }
 }

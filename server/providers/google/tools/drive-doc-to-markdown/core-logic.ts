@@ -45,14 +45,10 @@ export async function executeDriveDocToMarkdown(
   request: ConversionRequest,
   client: GoogleClient
 ): Promise<ConversionResult> {
-  console.log('Starting Drive document to Markdown conversion');
-  
   // Step 1: Parse URL and extract document ID
-  console.log('Step 1: Parsing URL');
   const { documentId } = parseGoogleDriveUrl(request.url);
   
   // Step 2: Fetch document metadata
-  console.log('Step 2: Fetching document metadata');
   const metadata = await getDocumentMetadata(client, documentId);
   
   // Validate document type
@@ -77,14 +73,10 @@ export async function executeDriveDocToMarkdown(
   }
   
   // Step 3: Export document as HTML
-  console.log('Step 3: Exporting document as HTML');
   const html = await exportDocumentAsHTML(client, documentId);
 
   // Step 4: Convert HTML to Markdown
-  console.log('Step 4: Converting HTML to Markdown');
   const { markdown, warnings } = htmlToMarkdown(html);
-  
-  console.log('Conversion complete');
   
   return {
     markdown,

@@ -168,9 +168,7 @@ async function saveNotesToCache(
     const cachePath = path.join(cacheDir, 'notes.md');
 
     await fs.writeFile(cachePath, markdown, 'utf-8');
-    console.log(`  📁 Saved notes debug output to ${cachePath}`);
   } catch (error: any) {
-    console.warn(`  ⚠️ Failed to save notes to cache: ${error.message}`);
     // Don't throw - this is optional debug functionality
   }
 }
@@ -209,14 +207,11 @@ export async function fetchAndAssociateAnnotations(
     formatCommentsForContext = defaultFormatCommentsForContext,
   }: AnnotationAssociatorDeps = {}
 ): Promise<AnnotationResult> {
-  console.log(`  Fetching comments for file ${fileKey}...`);
-  
   // Step 1: Fetch comments from Figma
   const comments = await fetchCommentsForFile(figmaClient, fileKey);
   
   // Step 2: Group comments into threads
   const threads = groupCommentsIntoThreads(comments);
-  console.log(`  Grouped ${comments.length} comments into ${threads.length} threads`);
   
   // Step 3: Convert FigmaNodeMetadata to FrameMetadata for comment association
   const frameMetadata: FrameMetadata[] = frames.map(frame => ({
@@ -232,14 +227,9 @@ export async function fetchAndAssociateAnnotations(
   
   // Step 4: Associate comments with frames
   const commentResult = formatCommentsForContext(threads, frameMetadata, documentTree);
-  const unattachedCount = commentResult.unattachedComments.length > 0 
-    ? commentResult.unattachedComments.reduce((sum, c) => sum + c.markdown.split('\n').filter(l => l.startsWith('-')).length, 0)
-    : 0;
-  console.log(`  Associated ${commentResult.matchedThreadCount}/${threads.length} comment threads with frames (${unattachedCount} unattached)`);
   
   // Step 5: Associate notes with frames
   const noteResult = associateNotesWithFrames(frames, notes);
-  console.log(`  Associated ${noteResult.matchedNotes}/${notes.length} notes with frames`);
   
   // Save notes to debug cache if enabled
   if (isNotesCacheEnabled() && notes.length > 0) {
@@ -436,14 +426,7 @@ export function checkCommentsForInvalidation(
     }
   }
   
-  if (invalidatedFrames.length > 0) {
-    console.log(`  💬 Checking comments for cache invalidation...`);
-    for (const [nodeId, reasonText] of reason.entries()) {
-      console.log(`     Frame "${nodeId}": ${reasonText}`);
-    }
-    console.log(`  🗑️  Invalidated ${invalidatedFrames.length} frame analysis (will re-analyze)`);
-  }
-  
+
   return { invalidatedFrames, reason };
 }
 

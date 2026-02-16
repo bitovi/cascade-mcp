@@ -57,8 +57,6 @@ describe('REST API: Write Shell Stories E2E', () => {
       return; // Skip setup if missing env vars
     }
 
-    console.log('🚀 Starting test server...');
-    
     // This test uses REST API with PAT tokens, not OAuth flow
     // Clear mock OAuth flag that jest-setup.js sets by default
     delete process.env.TEST_USE_MOCK_ATLASSIAN;
@@ -68,7 +66,6 @@ describe('REST API: Write Shell Stories E2E', () => {
       logLevel: 'error', // Quiet logs
       port: 3000 
     });
-    console.log(`✅ Test server running at ${serverUrl}`);
 
     // Create API client for test use
     apiClient = createApiClient({
@@ -82,7 +79,6 @@ describe('REST API: Write Shell Stories E2E', () => {
     atlassianClient = createAtlassianClientWithPAT(ATLASSIAN_PAT!, JIRA_SITE_NAME);
     const siteInfo = await resolveCloudId(atlassianClient, undefined, JIRA_SITE_NAME);
     cloudId = siteInfo.cloudId;
-    console.log(`✅ Resolved cloudId: ${cloudId}`);
   }, 60000); // 60 second timeout for server startup + cloud ID resolution
 
   afterAll(async () => {
@@ -93,28 +89,21 @@ describe('REST API: Write Shell Stories E2E', () => {
     // Clean up: delete the created epic
     if (createdEpicKey) {
       try {
-        console.log(`🧹 Cleaning up epic ${createdEpicKey}...`);
         await deleteJiraIssue(atlassianClient, cloudId, createdEpicKey);
-        console.log(`✅ Deleted epic ${createdEpicKey}`);
       } catch (error: any) {
-        console.warn(`⚠️  Error during cleanup: ${error.message}`);
+        // Ignore cleanup errors
       }
     }
 
     await stopTestServer();
-    console.log('✅ Test server stopped');
   }, 30000);
 
   test('should create shell stories from Figma design via REST API', async () => {
     if (shouldSkip) {
-      console.log('⏭️  Skipping test - missing environment variables');
       return;
     }
 
     // Step 1: Create a Jira epic with Figma link
-    console.log('📝 Step 1: Creating test epic in Jira...');
-    console.log(`   Cloud ID: ${cloudId}`);
-    console.log(`   Site Name: ${JIRA_SITE_NAME}`);
     
     const epicSummary = `E2E Test Epic - ${new Date().toISOString()}`;
     const epicDescriptionMarkdown = `Test epic for REST API validation.\n\nFigma Design: ${FIGMA_DESIGN_URL}`;
@@ -132,12 +121,8 @@ describe('REST API: Write Shell Stories E2E', () => {
     expect(createEpicResponse.ok).toBe(true);
     const epicData = await createEpicResponse.json() as { key: string };
     createdEpicKey = epicData.key;
-    
-    console.log(`✅ Created epic: ${createdEpicKey}`);
-    console.log(`   URL: https://bitovi.atlassian.net/browse/${createdEpicKey}`);
 
     // Step 2: Call REST API to analyze feature scope
-    console.log('🔍 Step 2: Calling analyze-feature-scope API...');
     
     const analysisResult = await analyzeFeatureScope(apiClient, {
       epicKey: createdEpicKey!,
@@ -145,26 +130,19 @@ describe('REST API: Write Shell Stories E2E', () => {
       sessionId: `e2e-test-${Date.now()}`
     });
 
-    console.log('📋 Analysis Response:', JSON.stringify(analysisResult, null, 2));
-
     // Verify analysis was successful
     expect(analysisResult.success).toBe(true);
     expect(analysisResult.epicKey).toBe(createdEpicKey);
     expect(analysisResult.featureAreasCount).toBeGreaterThan(0);
     // Note: screensAnalyzed may be 0 if using cached analysis
 
-    console.log(`✅ Analysis complete: ${analysisResult.featureAreasCount} feature areas, ${analysisResult.questionsCount} questions`);
-
     // Step 3: Call REST API to generate shell stories using helper
-    console.log('🤖 Step 3: Calling write-shell-stories API...');
     
     const apiResult = await writeShellStories(apiClient, {
       epicKey: createdEpicKey!,
       siteName: JIRA_SITE_NAME,
       sessionId: `e2e-test-${Date.now()}`
     });
-
-    console.log('📋 Shell Stories Response:', JSON.stringify(apiResult, null, 2));
 
     // Verify API call was successful
     expect(apiResult.success).toBe(true);
@@ -176,16 +154,13 @@ describe('REST API: Write Shell Stories E2E', () => {
     if (apiResult.action === 'proceed') {
       expect(apiResult.storyCount).toBeGreaterThan(0);
       expect(apiResult.shellStoriesContent).toBeDefined();
-      console.log(`✅ API created ${apiResult.storyCount} shell stories from ${apiResult.screensAnalyzed} screens`);
     } else if (apiResult.action === 'clarify' || apiResult.action === 'regenerate') {
       expect(apiResult.storyCount).toBe(0);
       expect(apiResult.scopeAnalysisContent).toBeDefined();
       expect(apiResult.questionCount).toBeGreaterThan(0);
-      console.log(`⚠️ API generated scope analysis with ${apiResult.questionCount} unanswered questions - needs clarification`);
     }
 
     // Step 4: Fetch the epic and verify content was added
-    console.log('🔍 Step 4: Verifying epic was updated...');
     
     const getEpicResponse = await getJiraIssue(
       atlassianClient,
@@ -221,28 +196,21 @@ describe('REST API: Write Shell Stories E2E', () => {
       epicText += extractText(node) + '\n';
     }
 
-    console.log('📄 Epic description length:', epicText.length);
-    console.log('📄 First 500 chars:', epicText.substring(0, 500));
-
     // Verify appropriate section exists based on action type
     if (apiResult.action === 'proceed') {
       // Verify Shell Stories section exists (ADF converts ## to plain text)
       expect(epicText).toContain('Shell Stories');
-      console.log('✅ Shell Stories section found in epic');
       
       // Extract shell stories (look for st001 pattern since ADF loses markdown heading markers)
       const shellStoriesMatch = epicText.match(/(Shell Stories[\s\S]+)/);
       expect(shellStoriesMatch).toBeTruthy();
       
       const shellStoriesContent = shellStoriesMatch![1];
-      console.log('📋 Shell Stories section length:', shellStoriesContent.length);
 
       // Verify shell stories were created by checking for story IDs
       // Note: We check the API response directly since ADF-to-text conversion loses markdown formatting
       const storyIdMatches = apiResult.shellStoriesContent!.match(/`st\d+`/g);
       const storyCount = storyIdMatches ? storyIdMatches.length : 0;
-      
-      console.log(`✅ Found ${storyCount} shell stories in API response`);
       
       // Verify multiple stories were created
       expect(storyCount).toBeGreaterThan(1);
@@ -254,28 +222,20 @@ describe('REST API: Write Shell Stories E2E', () => {
     } else if (apiResult.action === 'clarify' || apiResult.action === 'regenerate') {
       // Verify Scope Analysis section exists
       expect(epicText).toContain('Scope Analysis');
-      console.log('✅ Scope Analysis section found in epic');
       
       // Verify scope analysis has questions
       expect(apiResult.scopeAnalysisContent).toBeDefined();
       expect(apiResult.scopeAnalysisContent).toContain('❓');
-      console.log('✅ Scope Analysis contains unanswered questions');
     }
-    
-    console.log('✅ Write shell stories test completed successfully!');
     
     // ==========================================
     // Step 5: Call write-next-story API to write st001 (only if we have shell stories)
     // ==========================================
     if (apiResult.action === 'proceed') {
-      console.log('\n📝 Step 5: Calling write-next-story API to write st001...');
-      
       const writeNextStoryResult = await writeNextStory(apiClient, {
         epicKey: createdEpicKey!,
         siteName: JIRA_SITE_NAME
       });
-      
-      console.log('📋 Write-next-story API Response:', JSON.stringify(writeNextStoryResult, null, 2));
       
       expect(writeNextStoryResult.success).toBe(true);
       
@@ -289,14 +249,7 @@ describe('REST API: Write Shell Stories E2E', () => {
         const titleLower = successResult.storyTitle.toLowerCase();
         const hasExpectedWord = expectedWords.some(word => titleLower.includes(word.toLowerCase()));
         expect(hasExpectedWord).toBe(true);
-        
-        console.log(`✅ Created story ${successResult.issueKey}: ${successResult.storyTitle}`);
-        console.log(`   View at: https://bitovi.atlassian.net/browse/${successResult.issueKey}`);
       }
-    } else {
-      console.log('\n⏭️ Step 5: Skipped write-next-story (need clarification first)');
     }
-    
-    console.log('\n🎉 E2E test completed successfully!');
   }, 600000); // 10 minute timeout for API call with LLM generation (Claude can be slow for large requests)
 });

@@ -163,9 +163,6 @@ export function createProgressCommentManager(
    * Implementation of notify() - append progress message
    */
   async function notify(message: string): Promise<void> {
-    // Always log to console as backup
-    console.log(`[Progress] ${message}`);
-    
     // If commenting is disabled, return early
     if (isCommentingDisabled) {
       return;
