@@ -127,6 +127,7 @@ npm run dev:client
 - **mcp-service.ts** - MCP Transport Layer  
   Manages MCP HTTP transport, authentication extraction, session lifecycle, and session reconnection.  
   Sessions store transport, McpServer, EventStore, and lastActivityAt. EventStore lives on the session (not per-transport) to survive transport recreation during reconnection. A session reaper cleans up idle sessions after 10 minutes (SESSION_IDLE_THRESHOLD_MS).  
+  Uses `cleanupStaleStreamMappings()` from `mcp-core/sdk-stream-mapping-fix.ts` to work around an MCP SDK bug (see that file for details).  
   *Example*: `handleMcpPost()` handles: reconnect (initialize + existing session ID → new transport, reuse McpServer + EventStore), reuse existing session, new session creation, or invalid request
 
 - **pkce/** - OAuth 2.0 Server Implementation (Modular)  
@@ -148,6 +149,10 @@ npm run dev:client
 - **jira-mcp/index.ts** - MCP Server Core  
   Initializes MCP server with tools and manages authentication context per session.  
   *Example*: `setAuthContext()` - Store auth info per session
+
+- **mcp-core/sdk-stream-mapping-fix.ts** - MCP SDK Bug Workaround  
+  Workaround for an MCP SDK bug in `WebStandardStreamableHTTPServerTransport.replayEvents()` where the ReadableStream's `cancel()` callback doesn't clean up `_streamMapping` entries. This causes 409 Conflict on repeated browser refreshes. Should be removed when the SDK fixes the bug upstream.  
+  *Example*: `cleanupStaleStreamMappings(transport, lastEventId)` called before GET /mcp requests
 
 - **mcp-core/event-store.ts** - SSE Event Store  
   In-memory `EventStore` implementation for SSE event ID generation and resumability support.  

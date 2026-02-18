@@ -288,6 +288,119 @@ describe('MCP Session Reconnection', () => {
     console.log('\n=== Test Complete ===');
   }, 60000);
 
+  /**
+   * Double-refresh test — validates the specific MCP SDK bug fix.
+   * 
+   * The bug: WebStandardStreamableHTTPServerTransport.replayEvents() creates a
+   * ReadableStream whose cancel() callback doesn't clean up _streamMapping entries.
+   * After the first refresh, the replay stream's entry lingers as a ghost.
+   * On the second refresh, the SDK sees the stale entry and returns 409 Conflict.
+   * 
+   * Without the fix (cleanupStaleStreamMappings), the second resumeStream() fails.
+   * With the fix, both refreshes succeed.
+   */
+  test('survives double refresh (reconnect → disconnect → reconnect again)', async () => {
+    console.log('\n=== Double Refresh Test ===');
+    const token = await fetchToken(serverUrl);
+
+    // ─── Initial connect + start long-running tool ───
+    console.log('Phase 1: Initial connection');
+    const transport1 = createTransport(serverUrl, token);
+    const client1 = createClient();
+    const phase1Notifications: any[] = [];
+    let lastEventId: string | undefined;
+
+    (client1 as any).fallbackNotificationHandler = (n: any) => { phase1Notifications.push(n); };
+
+    await client1.connect(transport1);
+    const sessionId = transport1.sessionId!;
+    expect(sessionId).toBeTruthy();
+    console.log(`  sessionId: ${sessionId}`);
+
+    // Start a tool that runs long enough to survive two refreshes
+    const toolDuration = 20; // seconds
+    client1.callTool({
+      name: 'utility-notifications',
+      arguments: { durationSeconds: toolDuration, intervalMs: 1000, messagePrefix: 'double-refresh' },
+    }, undefined, {
+      onresumptiontoken: (t: string) => { lastEventId = t; },
+    }).catch(() => {}); // Fire-and-forget; we'll destroy the client
+
+    await waitFor(() => phase1Notifications.length >= 3, 15000);
+    console.log(`  Phase 1: ${phase1Notifications.length} notifications, lastEventId: ${lastEventId}`);
+    expect(lastEventId).toBeTruthy();
+
+    // ─── First refresh ───
+    console.log('\nRefresh 1: Destroying client...');
+    try { await transport1.close(); } catch {}
+    const savedEventId1 = lastEventId!;
+    await sleep(1500);
+
+    console.log('Refresh 1: Reconnecting...');
+    const transport2 = createTransport(serverUrl, token, sessionId);
+    const client2 = createClient();
+    const phase2Notifications: any[] = [];
+
+    (client2 as any).fallbackNotificationHandler = (n: any) => { phase2Notifications.push(n); };
+
+    await client2.connect(transport2);
+    console.log(`  Reconnected. sessionId: ${transport2.sessionId}`);
+
+    // Resume stream — this should work (first refresh always worked)
+    await transport2.resumeStream(savedEventId1, {
+      onresumptiontoken: (t: string) => { lastEventId = t; },
+    });
+    console.log('  Refresh 1: resumeStream() succeeded ✅');
+
+    // Wait for a few more notifications on the reconnected stream
+    await waitFor(() => phase2Notifications.length >= 2, 10000);
+    console.log(`  Phase 2: ${phase2Notifications.length} notifications, lastEventId: ${lastEventId}`);
+    expect(lastEventId).toBeTruthy();
+
+    // ─── Second refresh (this is the one that fails without the fix) ───
+    console.log('\nRefresh 2: Destroying client...');
+    try { await transport2.close(); } catch {}
+    const savedEventId2 = lastEventId!;
+    await sleep(1500);
+
+    console.log('Refresh 2: Reconnecting...');
+    const transport3 = createTransport(serverUrl, token, sessionId);
+    const client3 = createClient();
+    const phase3Notifications: any[] = [];
+
+    (client3 as any).fallbackNotificationHandler = (n: any) => { phase3Notifications.push(n); };
+
+    await client3.connect(transport3);
+    console.log(`  Reconnected. sessionId: ${transport3.sessionId}`);
+
+    // Resume stream — WITHOUT the fix, this returns 409 and throws
+    let secondResumeSucceeded = false;
+    try {
+      await transport3.resumeStream(savedEventId2, {
+        onresumptiontoken: (t: string) => { lastEventId = t; },
+      });
+      secondResumeSucceeded = true;
+      console.log('  Refresh 2: resumeStream() succeeded ✅');
+    } catch (err) {
+      console.error('  Refresh 2: resumeStream() FAILED ❌:', (err as Error).message);
+    }
+
+    // The core assertion: second refresh must succeed
+    expect(secondResumeSucceeded).toBe(true);
+
+    // Also verify we get live notifications on the third stream
+    if (secondResumeSucceeded) {
+      await waitFor(() => phase3Notifications.length >= 1, 10000).catch(() => {});
+      console.log(`  Phase 3: ${phase3Notifications.length} notifications`);
+    }
+
+    // Clean up
+    try { await transport3.close(); } catch {}
+
+    console.log(`\n  Total notifications: Phase1=${phase1Notifications.length}, Phase2=${phase2Notifications.length}, Phase3=${phase3Notifications.length}`);
+    console.log('=== Double Refresh Test Complete ===');
+  }, 60000);
+
   test('fresh connect works when session is expired/invalid', async () => {
     // This test verifies the fallback path: when the stored sessionId
     // doesn't match any server session, the server creates a new one

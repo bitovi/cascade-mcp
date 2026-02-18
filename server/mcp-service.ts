@@ -22,6 +22,7 @@
 import { Request, Response } from 'express';
 import { setAuthContext, clearAuthContext } from './mcp-core/index.ts';
 import { createMcpServer } from './mcp-core/server-factory.ts';
+import { cleanupStaleStreamMappings } from './mcp-core/sdk-stream-mapping-fix.ts';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { InvalidTokenError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 import { randomUUID } from 'node:crypto';
@@ -265,8 +266,20 @@ export async function handleSessionRequest(req: Request, res: Response): Promise
   const session = sessions[sessionId];
   session.lastActivityAt = Date.now();
   const { transport } = session;
+
+  // For GET requests, clean up stale SSE stream mappings before handling.
+  // This works around an MCP SDK bug where replayEvents() ReadableStream's cancel()
+  // callback doesn't remove entries from _streamMapping (unlike standalone GET and POST
+  // handlers which properly clean up). When a browser refreshes, the SSE connection drops
+  // but the stale mapping persists, causing 409 Conflict on the next reconnection attempt.
+  if (req.method === 'GET') {
+    cleanupStaleStreamMappings(transport, req.headers['last-event-id'] as string | undefined);
+  }
+
   await transport.handleRequest(req, res);
 }
+
+
 
 // === Helper Functions ===
 
