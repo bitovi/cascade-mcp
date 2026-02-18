@@ -11,7 +11,7 @@ import fs from 'fs';
 import {
   oauthMetadata,
   oauthProtectedResourceMetadata,
-  dynamicClientRegistration as clientRegistration
+  dynamicClientRegistration as clientRegistration,
 } from './pkce/discovery.ts';
 import { authorize } from './pkce/authorize.ts';
 import { accessToken } from './pkce/access-token.ts';
@@ -23,7 +23,7 @@ import {
   makeCallback,
   hubCallbackHandler,
   renderConnectionHub,
-  handleConnectionDone
+  handleConnectionDone,
 } from './traditional-oauth/route-handlers/index.js';
 import { atlassianProvider } from './providers/atlassian/index.js';
 import { figmaProvider } from './providers/figma/index.js';
@@ -31,6 +31,8 @@ import { googleProvider } from './providers/google/index.js';
 import { logEnvironmentInfo } from './debug-helpers.js';
 import { registerRestApiRoutes } from './api/index.js';
 import { getProjectRoot } from './utils/file-paths.js';
+import { handleEncryptionRequest } from './encrypt.js';
+import { encryptionManager, InvalidKeyFormatError } from './utils/encryption-manager.js';
 
 // configurations
 dotenv.config();
@@ -58,7 +60,9 @@ Sentry.setupExpressErrorHandler(app);
 // But if ELB doesn't send X-Forwarded-Proto, we can't set secure: true
 console.log(`\n========== SESSION CONFIGURATION ==========`);
 console.log(`VITE_AUTH_SERVER_URL: ${process.env.VITE_AUTH_SERVER_URL}`);
-console.log(`SESSION_SECRET: ${process.env.SESSION_SECRET ? 'present (length: ' + process.env.SESSION_SECRET.length + ')' : 'using default "changeme"'}`);
+console.log(
+  `SESSION_SECRET: ${process.env.SESSION_SECRET ? 'present (length: ' + process.env.SESSION_SECRET.length + ')' : 'using default "changeme"'}`,
+);
 console.log(`Cookie settings: secure=auto, httpOnly=true, sameSite=lax, maxAge=24h`);
 console.log(`Trust proxy: enabled (level 1)`);
 console.log(`WARNING: Using in-memory session store - sessions will be lost on restart`);
@@ -102,24 +106,30 @@ app.use('/auth', (req, res, next) => {
   console.log(`[SESSION]   - Cookie header present: ${!!req.headers.cookie}`);
   console.log(`[SESSION]   - req.secure: ${req.secure}`);
   console.log(`[SESSION]   - X-Forwarded-Proto: ${req.headers['x-forwarded-proto']}`);
-  console.log(`[SESSION]   - Session cookie will be secure: ${req.secure || req.headers['x-forwarded-proto'] === 'https'}`);
+  console.log(
+    `[SESSION]   - Session cookie will be secure: ${req.secure || req.headers['x-forwarded-proto'] === 'https'}`,
+  );
   next();
 });
 
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'OPTIONS', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'mcp-session-id', 'Authorization', 'mcp-protocol-version'],
-  exposedHeaders: ['mcp-session-id'],
-  maxAge: 86400
-}));
+app.use(
+  cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'OPTIONS', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'mcp-session-id', 'Authorization', 'mcp-protocol-version'],
+    exposedHeaders: ['mcp-session-id'],
+    maxAge: 86400,
+  }),
+);
 
 // HTTP request logging middleware
-app.use(morgan('common', {
-  stream: {
-    write: (message: string) => logger.info(message.trim())
-  }
-}));
+app.use(
+  morgan('common', {
+    stream: {
+      write: (message: string) => logger.info(message.trim()),
+    },
+  }),
+);
 
 // middlewares
 app.use(express.json());
@@ -175,7 +185,7 @@ app.get('/debug/config', (req, res) => {
     server: {
       trustProxy: app.get('trust proxy'),
       port: process.env.PORT || 3000,
-    }
+    },
   });
 });
 
@@ -192,17 +202,22 @@ const hasClientBuild = fs.existsSync(clientIndexPath);
 
 if (hasClientBuild) {
   console.log(`Serving React app from: ${clientDistPath}`);
-  
+
   // Serve static assets from Vite build (JS, CSS, etc.)
   app.use('/assets', express.static(path.join(clientDistPath, 'assets')));
-  
-  // Serve the React app at the homepage
+
+  // Serve the React app for both / and /encrypt routes
+  // React will handle routing internally based on window.location.pathname
   app.get('/', (req, res) => {
+    res.sendFile(clientIndexPath);
+  });
+  
+  app.get('/encrypt', (req, res) => {
     res.sendFile(clientIndexPath);
   });
 } else {
   console.log(`React client not built. Using fallback HTML homepage.`);
-  
+
   // Fallback: Root endpoint for service discovery (original HTML)
   app.get('/', (req, res) => {
     const baseUrl = process.env.VITE_AUTH_SERVER_URL!;
@@ -221,6 +236,10 @@ if (hasClientBuild) {
       <ul>
         <li><strong>POST /api/write-shell-stories</strong> - Generate shell stories from Figma designs</li>
         <li><strong>POST /api/write-next-story</strong> - Write next Jira story from shell stories</li>
+      </ul>
+      <h2>Encryption Tools</h2>
+      <ul>
+        <li><a href="/encrypt">🔐 Encrypt Credentials</a> - Securely encrypt sensitive credentials</li>
       </ul>
     `);
   });
@@ -256,6 +275,9 @@ app.delete('/mcp', handleSessionRequest);
 // --- REST API Endpoints (PAT Authentication) ---
 registerRestApiRoutes(app);
 
+// --- Encryption Endpoint (POST only, GET handled by React) ---
+app.post('/encrypt', express.urlencoded({ extended: true }), handleEncryptionRequest);
+
 app.post('/domain', async (req: Request, res: Response) => {
   logger.info(`[domain] - ${req.body.domain}`);
   res.status(204).send();
@@ -270,8 +292,30 @@ app.post('/token', accessToken);
 // OAuth refresh token endpoint (kept for backwards compatibility)
 app.post('/refresh-token', accessToken);
 
-// Start server
-app.listen(port, () => console.log(`Server is listening on port ${port}!`));
+// Initialize Google encryption and start server
+(async () => {
+  // Initialize Google encryption key manager
+  try {
+    await encryptionManager.initialize();
+    const state = encryptionManager.getState();
+    
+    if (state.enabled) {
+      console.log('✅ Google encryption enabled');
+    } else {
+      console.log('ℹ️  Google encryption not configured (Drive/Docs features unavailable)');
+    }
+  } catch (error) {
+    if (error instanceof InvalidKeyFormatError) {
+      console.error('❌ FATAL: Invalid Google encryption key format');
+      console.error(`   ${error.message}`);
+      process.exit(1);
+    }
+    throw error;
+  }
+
+  // Start server
+  app.listen(port, () => console.log(`Server is listening on port ${port}!`));
+})();
 
 // Handle unhandled promise rejections and exceptions
 process.on('unhandledRejection', (err: Error) => {
