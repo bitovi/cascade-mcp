@@ -195,13 +195,10 @@ export function renderConnectionHub(req: Request, res: Response): void {
         </div>
         
         <div class="done-section">
-          <button class="done-button" onclick="location.href='/auth/done'" ${connectedProviders.length === 0 ? 'disabled' : ''}>
+          <button class="done-button" onclick="location.href='/auth/done'">
             Done - Create Session
           </button>
-          ${connectedProviders.length === 0 
-            ? '<p style="color: #999; font-size: 12px; margin-top: 10px;">Connect at least one service to continue</p>' 
-            : ''
-          }
+          <p style="color: #999; font-size: 12px; margin-top: 10px;">You can connect services later or skip if not needed</p>
         </div>
       </body>
     </html>

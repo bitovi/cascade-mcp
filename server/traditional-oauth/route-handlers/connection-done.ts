@@ -46,20 +46,11 @@ export async function handleConnectionDone(req: Request, res: Response): Promise
   const connectedProviders = req.session.connectedProviders || [];
   const providerTokens = req.session.providerTokens || {};
   
-  if (connectedProviders.length === 0) {
-    res.status(400).send('No providers connected. Please connect at least one service.');
-    return;
-  }
-  
   try {
     // Build multi-provider tokens structure for JWT creation
     const atlassianTokens = providerTokens['atlassian'];
     const figmaTokens = providerTokens['figma'];
     const googleTokens = providerTokens['google'];
-    
-    if (!atlassianTokens && !figmaTokens && !googleTokens) {
-      throw new Error('No provider tokens found - please connect at least one service');
-    }
     
     // Build MultiProviderTokens structure
     const multiProviderTokens: MultiProviderTokens = {};
@@ -158,7 +149,10 @@ export async function handleConnectionDone(req: Request, res: Response): Promise
             <h1>✓ Authentication Complete</h1>
             <p>Your access token:</p>
             <div class="token">${jwt}</div>
-            <p>Connected providers: ${connectedProviders.join(', ')}</p>
+            ${connectedProviders.length > 0 
+              ? `<p>Connected providers: ${connectedProviders.join(', ')}</p>`
+              : '<p>No providers connected. You can connect them later or use tools that don\'t require authentication.</p>'
+            }
           </body>
         </html>
       `);

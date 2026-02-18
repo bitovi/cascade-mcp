@@ -22,9 +22,11 @@
 import { Request, Response } from 'express';
 import { setAuthContext, clearAuthContext } from './mcp-core/index.ts';
 import { createMcpServer } from './mcp-core/server-factory.ts';
+import { cleanupStaleStreamMappings } from './mcp-core/sdk-stream-mapping-fix.ts';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { InvalidTokenError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 import { randomUUID } from 'node:crypto';
+import { InMemoryEventStore } from './mcp-core/event-store.js';
 import { logger } from './observability/logger.ts';
 import { sanitizeJwtPayload, formatTokenWithExpiration, parseJWT, type JWTPayload } from './tokens.ts';
 import { type AuthContext } from './mcp-core/auth-context-store.ts';
@@ -41,10 +43,37 @@ interface ValidationResult {
 interface SessionData {
   transport: StreamableHTTPServerTransport;
   mcpServer: McpServer;
+  eventStore: InMemoryEventStore;  // Survives transport recreation
+  lastActivityAt: number;
 }
 
 // Map to store session data (transport + MCP server) by session ID
 const sessions: Record<string, SessionData> = {};
+
+// Session reaper configuration
+const SESSION_IDLE_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
+const SESSION_REAPER_INTERVAL_MS = 60 * 1000;     // check every minute
+
+/**
+ * Session reaper: cleans up idle sessions that haven't had activity.
+ * Replaces onclose-triggered cleanup (which rarely fires for browser disconnects).
+ */
+setInterval(() => {
+  const now = Date.now();
+  for (const [sessionId, session] of Object.entries(sessions)) {
+    const idleMs = now - session.lastActivityAt;
+    if (idleMs > SESSION_IDLE_THRESHOLD_MS) {
+      console.log(`🧹 Reaping idle session ${sessionId} (idle ${Math.round(idleMs / 1000)}s)`);
+      try {
+        session.transport.close();
+      } catch (e) {
+        // Transport may already be closed
+      }
+      delete sessions[sessionId];
+      clearAuthContext(sessionId);
+    }
+  }
+}, SESSION_REAPER_INTERVAL_MS);
 
 /**
  * Handle POST requests for client-to-server communication
@@ -63,11 +92,51 @@ export async function handleMcpPost(req: Request, res: Response): Promise<void> 
   let transport: StreamableHTTPServerTransport;
   let mcpServer: McpServer;
 
-  if (sessionId && sessions[sessionId]) {
+  if (sessionId && sessions[sessionId] && req.body?.method === 'initialize') {
+    // Reconnection: client sends initialize with existing session ID
+    // Create new transport (old one has stale streams) but keep existing McpServer + EventStore
+    console.log(`  🔄 Session reconnection for: ${sessionId}`);
+    const session = sessions[sessionId];
+    session.lastActivityAt = Date.now();
+
+    // Validate authentication
+    const { authInfo, errored } = await validateAuthFromRequest(req, res);
+    if (errored) { return; }
+
+    // Close old transport (stale stream references)
+    try {
+      await session.transport.close();
+    } catch (e) {
+      console.log('    Old transport close error (expected):', e);
+    }
+
+    // Create new transport with same sessionId, reuse EventStore and McpServer from session
+    transport = setupTransportAndSession(sessionId, session.eventStore, session.mcpServer, authInfo!);
+    mcpServer = session.mcpServer;
+    await mcpServer.connect(transport);
+    console.log('    MCP server reconnected to new transport');
+  } else if (sessionId && sessions[sessionId]) {
     // Reuse existing transport and MCP server
     const session = sessions[sessionId];
+    session.lastActivityAt = Date.now();
+    
+    // Validate and update auth context for this request
+    // This ensures tools have access to the latest credentials (e.g., after token refresh)
+    const { authInfo, errored } = await validateAuthFromRequest(req, res);
+    if (errored) { return; }
+    
     transport = session.transport;
     mcpServer = session.mcpServer;
+    
+    // Update auth context using the transport's internal session ID (not the header's sessionId)
+    // The transport.sessionId is what the MCP SDK uses when it calls tool handlers
+    if (transport.sessionId) {
+      setAuthContext(transport.sessionId, authInfo!);
+    } else {
+      // Fallback to header session ID if transport doesn't have one yet
+      setAuthContext(sessionId, authInfo!);
+    }
+    
     console.log(`  ♻️ Reusing existing transport for session: ${sessionId}`);
   }
   // Preferring to not use isInitializeRequest here due to returning false negatives on malformed requests
@@ -76,45 +145,19 @@ export async function handleMcpPost(req: Request, res: Response): Promise<void> 
     // New initialization request (includes both well-formed and malformed initialize attempts)
     console.log('  🥚 New MCP initialization request.');
 
-    // Extract and validate auth info
-    let { authInfo, errored } = await getAuthInfoFromBearer(req, res);
+    // Validate authentication
+    const { authInfo, errored } = await validateAuthFromRequest(req, res);
     if (errored) { return; }
-
-    if (!authInfo) {
-      ({ authInfo, errored } = await getAuthInfoFromQueryToken(req, res));
-    }
-    if (errored) { return; }
-    
-    if (!authInfo) {
-      sendMissingAtlassianAccessToken(res, req, 'anywhere');
-      return;
-    }
     
     console.log('    Has valid token, creating per-session MCP server');
     
     // Create fresh MCP server instance with dynamic tool registration
-    mcpServer = createMcpServer(authInfo);
+    mcpServer = createMcpServer(authInfo!);
     
     console.log('    Creating streamable transport');
-    transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => randomUUID(),
-      onsessioninitialized: (newSessionId: string) => {
-        // Store the session data (transport + MCP server)
-        console.log(`    Storing session data for: ${newSessionId}`);
-        sessions[newSessionId] = { transport, mcpServer };
-        // Store auth context for this session
-        setAuthContext(newSessionId, authInfo!);
-      },
-    });
-
-    // Clean up session when transport closed
-    transport.onclose = () => {
-      if (transport.sessionId) {
-        console.log(`.   Cleaning up session: ${transport.sessionId}`);
-        delete sessions[transport.sessionId];
-        clearAuthContext(transport.sessionId);
-      }
-    };
+    const newSessionId = randomUUID();
+    const eventStore = new InMemoryEventStore();
+    transport = setupTransportAndSession(newSessionId, eventStore, mcpServer, authInfo!);
 
     // Connect the per-session MCP server to this transport
     await mcpServer.connect(transport);
@@ -154,6 +197,11 @@ export async function handleMcpPost(req: Request, res: Response): Promise<void> 
     // Re-throw other errors
     throw error;
   }
+
+  // Log response details to verify SSE streaming (Phase 1 - spec 778)
+  const contentType = res.getHeader('content-type');
+  const statusCode = res.statusCode;
+  console.log(`  📤 POST response Content-Type: ${contentType}, status: ${statusCode}`);
   console.log('  ✅ MCP POST request handled successfully');
 }
 
@@ -215,11 +263,88 @@ export async function handleSessionRequest(req: Request, res: Response): Promise
     setAuthContext(sessionId, authInfo);
   }
 
-  const { transport } = sessions[sessionId];
+  const session = sessions[sessionId];
+  session.lastActivityAt = Date.now();
+  const { transport } = session;
+
+  // For GET requests, clean up stale SSE stream mappings before handling.
+  // This works around an MCP SDK bug where replayEvents() ReadableStream's cancel()
+  // callback doesn't remove entries from _streamMapping (unlike standalone GET and POST
+  // handlers which properly clean up). When a browser refreshes, the SSE connection drops
+  // but the stale mapping persists, causing 409 Conflict on the next reconnection attempt.
+  if (req.method === 'GET') {
+    cleanupStaleStreamMappings(transport, req.headers['last-event-id'] as string | undefined);
+  }
+
   await transport.handleRequest(req, res);
 }
 
+
+
 // === Helper Functions ===
+
+/**
+ * Validate authentication from request headers (Bearer token or query param)
+ * Sends 401 response if validation fails
+ * 
+ * @returns {authInfo, errored} where authInfo is the parsed JWT payload or null, errored indicates if response was sent
+ */
+async function validateAuthFromRequest(req: Request, res: Response): Promise<ValidationResult> {
+  // Try bearer token first
+  let { authInfo, errored } = await getAuthInfoFromBearer(req, res);
+  if (errored) { return { authInfo: null, errored: true }; }
+  
+  // Fall back to query param
+  if (!authInfo) {
+    ({ authInfo, errored } = await getAuthInfoFromQueryToken(req, res));
+    if (errored) { return { authInfo: null, errored: true }; }
+  }
+  
+  // No auth found anywhere
+  if (!authInfo) {
+    sendMissingAtlassianAccessToken(res, req, 'anywhere');
+    return { authInfo: null, errored: true };
+  }
+  
+  return { authInfo, errored: false };
+}
+
+/**
+ * Setup transport with session management and cleanup handlers
+ * 
+ * @param sessionId - Session ID to use (existing or new)
+ * @param eventStore - EventStore to use (existing or new)
+ * @param mcpServer - MCP server instance to store in session
+ * @param authInfo - Auth context to store for this session
+ * @returns Configured StreamableHTTPServerTransport
+ */
+function setupTransportAndSession(
+  sessionId: string,
+  eventStore: InMemoryEventStore,
+  mcpServer: McpServer,
+  authInfo: AuthContext
+): StreamableHTTPServerTransport {
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: () => sessionId,
+    eventStore,
+    onsessioninitialized: (newSessionId: string) => {
+      console.log(`    Session initialized: ${newSessionId}`);
+      sessions[newSessionId] = { transport, mcpServer, eventStore, lastActivityAt: Date.now() };
+      setAuthContext(newSessionId, authInfo);
+    },
+  });
+
+  // Clean up session when transport closed
+  transport.onclose = () => {
+    if (transport.sessionId) {
+      console.log(`.   Cleaning up session: ${transport.sessionId}`);
+      delete sessions[transport.sessionId];
+      clearAuthContext(transport.sessionId);
+    }
+  };
+  
+  return transport;
+}
 
 /**
  * Detect if the client is VS Code based on User-Agent and MCP client info
@@ -325,11 +450,9 @@ function validateAndExtractJwt(token: string, req: Request, res: Response, sourc
     const payload = parseJWT(token) as JWTPayload & Partial<AuthContext>;
     console.log(`Successfully parsed JWT payload from ${source}:`, JSON.stringify(sanitizeJwtPayload(payload), null, 2));
 
-    // Validate that we have at least one provider's credentials (nested structure per Q21)
+    // Log which providers are present (no longer require at least one)
     if (!payload.atlassian && !payload.figma && !payload.google) {
-      console.log(`JWT payload missing provider credentials (${source}) - expected 'atlassian', 'figma', or 'google' nested structure`);
-      sendMissingAtlassianAccessToken(res, req, source);
-      return { authInfo: null, errored: true };
+      console.log(`JWT payload has no provider credentials (${source}) - only utility tools will be available`);
     }
 
     // Only enforce JWT expiration if CHECK_JWT_EXPIRATION is set to 'true'.

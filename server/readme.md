@@ -125,8 +125,10 @@ npm run dev:client
   *Example*: Route registration for `/mcp` endpoints and direct imports from PKCE modules
 
 - **mcp-service.ts** - MCP Transport Layer  
-  Manages MCP HTTP transport, authentication extraction, and session lifecycle.  
-  *Example*: `handleMcpPost()` - Main MCP request handler
+  Manages MCP HTTP transport, authentication extraction, session lifecycle, and session reconnection.  
+  Sessions store transport, McpServer, EventStore, and lastActivityAt. EventStore lives on the session (not per-transport) to survive transport recreation during reconnection. A session reaper cleans up idle sessions after 10 minutes (SESSION_IDLE_THRESHOLD_MS).  
+  Uses `cleanupStaleStreamMappings()` from `mcp-core/sdk-stream-mapping-fix.ts` to work around an MCP SDK bug (see that file for details).  
+  *Example*: `handleMcpPost()` handles: reconnect (initialize + existing session ID → new transport, reuse McpServer + EventStore), reuse existing session, new session creation, or invalid request
 
 - **pkce/** - OAuth 2.0 Server Implementation (Modular)  
   Modular OAuth 2.0 authorization server with PKCE support split across specialized modules:
@@ -147,6 +149,16 @@ npm run dev:client
 - **jira-mcp/index.ts** - MCP Server Core  
   Initializes MCP server with tools and manages authentication context per session.  
   *Example*: `setAuthContext()` - Store auth info per session
+
+- **mcp-core/sdk-stream-mapping-fix.ts** - MCP SDK Bug Workaround  
+  Workaround for an MCP SDK bug in `WebStandardStreamableHTTPServerTransport.replayEvents()` where the ReadableStream's `cancel()` callback doesn't clean up `_streamMapping` entries. This causes 409 Conflict on repeated browser refreshes. Should be removed when the SDK fixes the bug upstream.  
+  *Example*: `cleanupStaleStreamMappings(transport, lastEventId)` called before GET /mcp requests
+
+- **mcp-core/event-store.ts** - SSE Event Store  
+  In-memory `EventStore` implementation for SSE event ID generation and resumability support.  
+  Generates sequential event IDs (`{streamId}_{seq}`) and stores events for replay on reconnection.  
+  EventStore is stored on `SessionData` (not per-transport) so it survives transport recreation during browser reconnection.  
+  *Example*: `new InMemoryEventStore()` stored on session, passed to `StreamableHTTPServerTransport({ eventStore })` in `mcp-service.ts`
 
 - **jira-mcp/auth-helpers.ts** - Tool Authentication  
   Provides safe authentication retrieval for tools with automatic re-auth on token expiration.  
@@ -420,16 +432,46 @@ Cache structure with override:
 ```
 
 ### Session Flow Pattern
-1. **Transport Creation**: `StreamableHTTPServerTransport` with unique session ID
+1. **Transport Creation**: `StreamableHTTPServerTransport` with unique session ID and `InMemoryEventStore`
 2. **Auth Storage**: `setAuthContext(sessionId, authInfo)` stores JWT payload
 3. **Tool Access**: `getAuthInfoSafe(context)` retrieves via session ID
-4. **Error Handling**: `InvalidTokenError` triggers OAuth re-authentication
-5. **Cleanup**: `clearAuthContext(sessionId)` on transport close
+4. **SSE Streaming**: POST responses use `text/event-stream` with event IDs (format: `{streamId}_{seq}`)
+5. **Error Handling**: `InvalidTokenError` triggers OAuth re-authentication
+6. **Cleanup**: Grace period → reaper → `clearAuthContext(sessionId)` (see below)
+
+### Session Reconnection (Phase 1)
+
+Supports reconnecting to an existing server session after a browser page refresh.
+
+**Server side (`mcp-service.ts`):**
+- Sessions have a `lastActivityAt` timestamp, updated on every POST/GET.
+- On transport close, a **grace period** (10 minutes) keeps the session alive instead of deleting it immediately.
+- A **session reaper** runs every 60 seconds. If a session has been idle for >2 minutes without a grace timer, one is started.
+- `handleMcpPost` is refactored into four helper functions:
+  1. `handleSessionReconnect()` — `mcp-session-id` + existing session + `initialize` method. Cancels grace timer, updates auth context, returns a synthetic init response.
+  2. `handleExistingSession()` — existing session, non-initialize request (normal reuse).
+  3. `handleNewSession()` — no session ID + `initialize` (fresh connection).
+  4. `handleInvalidRequest()` — everything else → 400.
+- `MCP_SERVER_INFO` and `MCP_SERVER_CAPABILITIES` are exported from `server-factory.ts` so the synthetic init response stays in sync with `createMcpServer()`.
+
+**Client side (`BrowserMcpClient`):**
+- `connect()` persists `mcp_session_id` to `localStorage` after successful connection.
+- `reconnect(serverUrl)` reads the stored session ID, creates an `OAuthClientProvider` on demand, reads tokens from `localStorage` (no `auth()` redirect), pre-sets the session ID on the transport, and calls `client.connect()`. Server returns synthetic init response.
+- `disconnect()` and `clearTokens()` clear `mcp_session_id` from `localStorage`.
+- `setupClientAndHandlers()` is a shared helper used by both `connect()` and `reconnect()`.
+
+**React hook (`useMcpClient`):**
+- On mount, the auto-reconnect path tries `reconnect()` first, falls back to `connect()`.
+- `'reconnecting'` added to `ConnectionStatus` type.
+
+**UI (`App.tsx`):**
+- `result` and selected tool name are persisted to `localStorage` and restored on mount.
+- Cleared on explicit disconnect.
 
 ### Error Recovery
 - **401 Responses**: Include `WWW-Authenticate` header with OAuth metadata
 - **Token Expiration**: Tools throw `InvalidTokenError` for automatic refresh
-- **Session Management**: Proper cleanup prevents memory leaks
+- **Session Management**: Grace period + reaper prevent both premature cleanup and memory leaks
 
 ### Request Debouncing
 
@@ -483,6 +525,32 @@ This ensures both sections are preserved while keeping the description within Ji
 ### VS Code Client Compatibility
 - **Client Detection**: User-Agent `"node"` and MCP clientInfo `"Visual Studio Code"` ([VS Code Copilot Agent Spec](../specs/vs-code-copilot/readme.md))
 - **OAuth Parameters**: Conditional `resource_metadata_url` vs `resource_metadata` ([RFC 9728 Section 5.1](https://tools.ietf.org/html/rfc9728#section-5.1))
+
+### Browser Session Reconnection
+
+Supports browser reconnection after page refresh during long-running tool execution (spec 778c).
+
+**Server-side (`mcp-service.ts`):**
+- `SessionData` stores `transport`, `mcpServer`, `eventStore`, and `lastActivityAt`
+- `EventStore` lives on the session, not the transport — survives transport recreation during reconnection
+- Session reaper cleans up idle sessions after 10 minutes (`SESSION_IDLE_THRESHOLD_MS`)
+- When a client sends `initialize` with an existing `mcp-session-id`, the server creates a **new transport** while keeping the existing `McpServer` and `EventStore`
+- `lastActivityAt` is updated on every POST/GET request
+
+**Client-side (`src/mcp-client/client.ts`):**
+- `persistReconnectionState()` saves `mcp_session_id`, `mcp_server_url`, and `mcp_last_event_id` to `localStorage` continuously via `onresumptiontoken` callback
+- `reconnect(serverUrl)` creates a new transport with the stored `sessionId`, connects, and calls `resumeStream(lastEventId)` to replay missed SSE events
+- `clearReconnectionState()` removes all persisted state on explicit disconnect
+- `callTool()` automatically injects `onresumptiontoken` to persist event IDs during tool execution
+- `reconnect()` wraps `transport.onmessage` to intercept replayed JSON-RPC responses (tool results) that the SDK would otherwise drop (since the new client has no response handler for the original request ID)
+- New `reconnecting` connection status for UI feedback (blue pulsing indicator)
+
+**React hook (`src/react/hooks/useMcpClient.ts`):**
+- On page load: tries MCP session reconnection first, falls back to OAuth auto-reconnect
+- Automatically fetches tools after successful reconnection
+
+**E2E test (`test/e2e/reconnection.test.ts`):**
+- Validates the full flow: connect → start tool → destroy client → reconnect → receive remaining events
 
 ## References
 

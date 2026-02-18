@@ -70,7 +70,7 @@ export function ConnectionPanel({
   };
 
   const isConnected = status === 'connected';
-  const isLoading = status === 'connecting' || status === 'authorizing' || isConnecting;
+  const isLoading = status === 'connecting' || status === 'authorizing' || status === 'reconnecting' || isConnecting;
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6 mb-6">
@@ -107,6 +107,8 @@ export function ConnectionPanel({
                 ? 'bg-red-500'
                 : status === 'connecting' || status === 'authorizing'
                 ? 'bg-yellow-500 animate-pulse'
+                : status === 'reconnecting'
+                ? 'bg-blue-500 animate-pulse'
                 : 'bg-gray-300'
             }`}
           />
@@ -114,6 +116,7 @@ export function ConnectionPanel({
             {status === 'connected' && 'Connected'}
             {status === 'connecting' && 'Connecting...'}
             {status === 'authorizing' && 'Authorizing...'}
+            {status === 'reconnecting' && 'Reconnecting to session...'}
             {status === 'disconnected' && 'Disconnected'}
             {status === 'error' && 'Error connecting'}
           </span>
