@@ -66,6 +66,17 @@ export function isTokenExpired(authInfo: AuthContext | null): boolean {
     return true;
   }
 
+  // Check if there are any provider credentials at all
+  const hasAnyProviderCredentials = PROVIDER_KEYS.some(
+    provider => authInfo[provider] !== undefined && authInfo[provider] !== null
+  );
+
+  // If no provider credentials exist, there's nothing to expire
+  // (e.g., utility-only JWT tokens with just metadata)
+  if (!hasAnyProviderCredentials) {
+    return false;
+  }
+
   const now = Math.floor(Date.now() / 1000);
 
   // Check if at least one provider has a valid (non-expired) token

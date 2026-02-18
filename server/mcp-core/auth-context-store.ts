@@ -171,6 +171,11 @@ export function getAuthInfo(context: any): AuthContext | null {
     if (authInfo && (authInfo.atlassian || authInfo.figma || authInfo.google)) {
       return authInfo;
     }
+    
+    // Return authInfo even without provider credentials (for utility tools)
+    if (authInfo) {
+      return authInfo;
+    }
   }
 
   // No auth found in context
