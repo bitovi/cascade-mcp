@@ -141,6 +141,21 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Test endpoint: create a no-provider JWT for testing MCP tools that don't require auth
+// Mirrors the "Done - Create Session" flow with no providers connected
+app.get('/test/token', async (req, res) => {
+  try {
+    const { createMultiProviderAccessToken } = await import('./pkce/token-helpers.js');
+    const jwt = await createMultiProviderAccessToken({}, {
+      resource: process.env.VITE_AUTH_SERVER_URL,
+      scope: '',
+    });
+    res.json({ token: jwt });
+  } catch (error) {
+    res.status(500).json({ error: String(error) });
+  }
+});
+
 // Debug endpoint to check environment configuration (remove in production!)
 app.get('/debug/config', (req, res) => {
   res.json({

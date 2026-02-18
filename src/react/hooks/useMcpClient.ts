@@ -130,33 +130,82 @@ export function useMcpClient(options: UseMcpClientOptions = {}): UseMcpClientRet
     } else {
       console.log('[useMcpClient] ℹ️ No OAuth callback detected');
       
-      // Check if we have stored tokens and can auto-reconnect
-      const storedUrl = localStorage.getItem('mcp_last_server_url');
-      if (storedUrl && !oauthHandledRef.current) {
+      // Priority 1: Try reconnecting to an existing MCP session (browser refresh recovery)
+      const reconnectionState = BrowserMcpClient.getSavedReconnectionState();
+      if (reconnectionState && !oauthHandledRef.current) {
         oauthHandledRef.current = true;
-        console.log('[useMcpClient] 🔑 Found stored server URL, attempting auto-reconnect:', storedUrl);
+        console.log('[useMcpClient] 🔄 Found reconnection state, attempting session reconnect:', {
+          sessionId: reconnectionState.sessionId,
+          lastEventId: reconnectionState.lastEventId,
+          serverUrl: reconnectionState.serverUrl,
+        });
         setTimeout(() => {
           if (clientRef.current) {
-            clientRef.current.connect(storedUrl).then(() => {
-              console.log('[useMcpClient] 🎉 Auto-reconnect succeeded!');
-              return clientRef.current!.listTools();
+            // Pass sessionId/lastEventId directly to avoid localStorage race
+            // with React Strict Mode cleanup (which may clear localStorage
+            // between when we read state and when reconnect() runs)
+            clientRef.current.reconnect(reconnectionState.serverUrl, {
+              sessionId: reconnectionState.sessionId,
+              lastEventId: reconnectionState.lastEventId,
+            }).then(success => {
+              if (success) {
+                console.log('[useMcpClient] 🎉 Session reconnected!');
+                addLog('info', 'Reconnected to existing session — recovering missed events...');
+                return clientRef.current!.listTools();
+              } else {
+                // Session is gone (server restarted?) — try fresh connect with OAuth tokens
+                console.log('[useMcpClient] ⚠️ Session reconnect failed, trying fresh connect...');
+                addLog('info', 'Session expired — reconnecting...');
+                BrowserMcpClient.clearReconnectionState();
+                return clientRef.current!.connect(reconnectionState.serverUrl).then(() => {
+                  // connect() may return after OAuth redirect — check if actually connected
+                  if (clientRef.current?.getState().status === 'connected') {
+                    return clientRef.current!.listTools();
+                  }
+                  return undefined;
+                });
+              }
             }).then((toolList) => {
-              console.log('[useMcpClient] 📋 Got tools:', toolList.length);
-              setTools(toolList);
+              if (toolList) {
+                console.log('[useMcpClient] 📋 Got tools:', toolList.length);
+                setTools(toolList);
+              }
             }).catch((err) => {
-              console.error('[useMcpClient] ❌ Auto-reconnect failed:', err);
-              // Clear stored URL if reconnect fails (likely token expired)
-              // localStorage.removeItem('mcp_last_server_url');
+              console.error('[useMcpClient] ❌ Reconnect flow failed:', err);
+              BrowserMcpClient.clearReconnectionState();
             });
           }
         }, 100);
+      } else {
+        // Priority 2: Auto-reconnect using stored OAuth tokens (no active session to resume)
+        const storedUrl = localStorage.getItem('mcp_last_server_url');
+        if (storedUrl && !oauthHandledRef.current) {
+          oauthHandledRef.current = true;
+          console.log('[useMcpClient] 🔑 Found stored server URL, attempting auto-reconnect:', storedUrl);
+          setTimeout(() => {
+            if (clientRef.current) {
+              clientRef.current.connect(storedUrl).then(() => {
+                console.log('[useMcpClient] 🎉 Auto-reconnect succeeded!');
+                return clientRef.current!.listTools();
+              }).then((toolList) => {
+                console.log('[useMcpClient] 📋 Got tools:', toolList.length);
+                setTools(toolList);
+              }).catch((err) => {
+                console.error('[useMcpClient] ❌ Auto-reconnect failed:', err);
+              });
+            }
+          }, 100);
+        }
       }
     }
 
     return () => {
       unsubscribe();
       unsubNotif();
-      clientRef.current?.disconnect();
+      // Use close() instead of disconnect() — close() does NOT clear
+      // reconnection state from localStorage (needed to survive React
+      // Strict Mode remounts and actual browser refresh)
+      clientRef.current?.close();
     };
   }, []);
 
@@ -251,6 +300,7 @@ export function useMcpClient(options: UseMcpClientOptions = {}): UseMcpClientRet
     clientRef.current.clearTokens();
     localStorage.removeItem('mcp_last_server_url');
     localStorage.removeItem('mcp_pending_server_url');
+    // disconnect() in BrowserMcpClient already clears mcp_session_id + mcp_last_event_id
     
     addLog('info', 'Disconnected');
   }, [addLog]);
