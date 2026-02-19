@@ -17,8 +17,8 @@ import type {
 import { BrowserOAuthClientProvider } from './oauth/provider.js';
 import type { SamplingProvider } from './sampling/types.js';
 
-/** Default timeout for MCP tool calls (5 minutes) */
-const DEFAULT_TOOL_TIMEOUT_MS = 5 * 60 * 1000;
+/** Default timeout for MCP tool calls (10 minutes for large Figma files) */
+const DEFAULT_TOOL_TIMEOUT_MS = 10 * 60 * 1000;
 
 /** localStorage keys for reconnection state */
 const LS_SESSION_ID = 'mcp_session_id';
