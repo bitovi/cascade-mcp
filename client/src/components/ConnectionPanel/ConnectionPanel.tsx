@@ -6,6 +6,7 @@
 
 import { useState } from 'react';
 import type { ConnectionStatus } from '../../lib/mcp-client/index.js';
+import { readUrlParams } from '../../lib/url-params';
 
 interface ConnectionPanelProps {
   status: ConnectionStatus;
@@ -20,9 +21,14 @@ export function ConnectionPanel({
   onDisconnect,
   onRefreshTokens,
 }: ConnectionPanelProps) {
-  const [anthropicKey, setAnthropicKey] = useState(
-    () => localStorage.getItem('mcp_anthropic_key') || ''
-  );
+  const [anthropicKey, setAnthropicKey] = useState(() => {
+    // US1: Check URL params first, then fallback to localStorage
+    const urlParams = readUrlParams();
+    console.log('[ConnectionPanel] Initializing with URL params:', urlParams);
+    const key = urlParams.anthropicKey || localStorage.getItem('mcp_anthropic_key') || '';
+    console.log('[ConnectionPanel] Initial anthropicKey:', key ? '***' : '(empty)');
+    return key;
+  });
   const [isConnecting, setIsConnecting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshResult, setRefreshResult] = useState<{ success: boolean; providers: string[]; error?: string } | null>(null);

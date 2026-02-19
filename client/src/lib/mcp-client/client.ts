@@ -220,7 +220,24 @@ export class BrowserMcpClient {
       
       if (authorizationCode) {
         console.log('[BrowserMcpClient] 🎟️ Found authorization code in URL:', authorizationCode.substring(0, 10) + '...');
-        window.history.replaceState({}, '', window.location.pathname);
+        
+        // Restore preserved URL parameters (like ?tool=...) before clearing OAuth params
+        const preservedParams = this.oauthProvider.restorePreservedParams();
+        if (preservedParams && Object.keys(preservedParams).length > 0) {
+          const newUrl = new URL(window.location.href);
+          newUrl.search = ''; // Clear OAuth params
+          
+          // Restore preserved parameters
+          for (const [key, value] of Object.entries(preservedParams)) {
+            newUrl.searchParams.set(key, value);
+          }
+          
+          console.log('[BrowserMcpClient] 🔄 Restoring URL with preserved params:', newUrl.toString());
+          window.history.replaceState({}, '', newUrl.toString());
+        } else {
+          // No preserved params, just clear OAuth params
+          window.history.replaceState({}, '', window.location.pathname);
+        }
       }
       
       // Attempt OAuth authentication

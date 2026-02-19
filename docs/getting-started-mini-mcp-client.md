@@ -6,6 +6,53 @@ In this example, you'll use the mini MCP client hosted at [https://cascade.bitov
 - Verify the Jira connection works
 - Analyze the scope of an epic with Figma links (needs an anthropic API key)
 
+## URL Parameters for Quick Access
+
+The Mini MCP Client supports URL parameters to streamline your workflow by pre-filling form state. This enables you to:
+
+- **Share direct links to specific tools** with colleagues
+- **Bookmark frequently used tool configurations**
+- **Resume your work after page reload or reconnection**
+
+### Supported Parameters
+
+- **`anthropicKey`**: Pre-fills the Anthropic API key input field (optional)
+  - Example: `?anthropicKey=sk-ant-api03-...`
+  - Note: Manual key changes are stored locally but never written to the URL for security
+  
+- **`tool`**: Automatically selects a tool after connection (optional)
+  - Format: Kebab-case version of the tool display name
+  - Example: `?tool=figma-get-user` selects the "Figma Get User" tool
+  - Invalid tool names are ignored silently, with the parameter remaining in the URL for debugging
+
+### Usage Examples
+
+**Share a link to the Figma Get User tool:**
+```
+https://cascade.bitovi.com/?tool=figma-get-user
+```
+
+**Pre-fill API key and select a specific tool:**
+```
+https://cascade.bitovi.com/?anthropicKey=sk-ant-api03-xxxxx&tool=atlassian-get-sites
+```
+
+**Resume work after reload:**
+Simply reload the page - the URL preserves your tool selection and API key (if provided via URL).
+
+### Tool Name Conversion Reference
+
+Tool display names are converted to kebab-case for URLs:
+- "Figma Get User" → `figma-get-user`
+- "Atlassian Get Sites" → `atlassian-get-sites`
+- "Write Shell Stories" → `write-shell-stories`
+- "Write Next Story" → `write-next-story`
+- "Get Jira Issue" → `get-jira-issue`
+
+When you manually select a tool from the tool selector, the URL automatically updates to reflect your choice, making it easy to bookmark or share your current view.
+
+---
+
 ## Verify the Figma connection works
 
 1. Go to [https://cascade.bitovi.com/](https://cascade.bitovi.com/)

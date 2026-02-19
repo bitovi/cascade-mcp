@@ -92,6 +92,11 @@ In order to use the mini MCP client, you'll need an Anthropic SDK API token.
 3. Click connect
 4. Authorize Jira and Figma
 
+**💡 Tip**: You can share direct links to specific tools using URL parameters:
+- Example: `https://cascade.bitovi.com/?tool=write-shell-stories`
+- Supports pre-filling API key and auto-selecting tools
+- See the [Mini MCP Client guide](./docs/getting-started-mini-mcp-client.md) for full URL parameter documentation
+
 
 
 ### VSCode Copilot

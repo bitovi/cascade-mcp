@@ -135,9 +135,28 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
 
   /**
    * Redirect to authorization URL
+   * Preserves current URL query parameters (like ?tool=...) for restoration after OAuth
    */
   redirectToAuthorization(authorizationUrl: URL): void {
     console.log('[OAuth Provider] ↪️ redirectToAuthorization() called:', authorizationUrl.toString());
+    
+    // Save current URL query parameters before OAuth redirect (excluding OAuth params)
+    const currentParams = new URLSearchParams(window.location.search);
+    const paramsToPreserve: Record<string, string> = {};
+    
+    // Preserve non-OAuth parameters (like tool, anthropicKey, etc.)
+    for (const [key, value] of currentParams.entries()) {
+      if (!['code', 'state', 'error', 'error_description'].includes(key)) {
+        paramsToPreserve[key] = value;
+      }
+    }
+    
+    if (Object.keys(paramsToPreserve).length > 0) {
+      const preserveKey = getStorageKey(this.serverUrl, 'preserved_params');
+      console.log('[OAuth Provider] 💾 Preserving URL parameters:', paramsToPreserve);
+      sessionStorage.setItem(preserveKey, JSON.stringify(paramsToPreserve));
+    }
+    
     window.location.href = authorizationUrl.toString();
   }
 
@@ -191,5 +210,33 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
    */
   clearAll(): void {
     this.invalidateCredentials('all');
+  }
+
+  /**
+   * Restore URL parameters that were preserved before OAuth redirect
+   * Returns the preserved parameters for the caller to apply to the URL
+   */
+  restorePreservedParams(): Record<string, string> | null {
+    const preserveKey = getStorageKey(this.serverUrl, 'preserved_params');
+    const stored = sessionStorage.getItem(preserveKey);
+    
+    if (!stored) {
+      console.log('[OAuth Provider] ℹ️ No preserved parameters found');
+      return null;
+    }
+    
+    try {
+      const params = JSON.parse(stored) as Record<string, string>;
+      console.log('[OAuth Provider] 📦 Restoring preserved parameters:', params);
+      
+      // Clear the stored params so they're only restored once
+      sessionStorage.removeItem(preserveKey);
+      
+      return params;
+    } catch {
+      console.log('[OAuth Provider] ❌ Failed to parse preserved parameters');
+      sessionStorage.removeItem(preserveKey);
+      return null;
+    }
   }
 }
