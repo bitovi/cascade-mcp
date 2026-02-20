@@ -22,12 +22,9 @@ export function ConnectionPanel({
   onRefreshTokens,
 }: ConnectionPanelProps) {
   const [anthropicKey, setAnthropicKey] = useState(() => {
-    // US1: Check URL params first, then fallback to localStorage
+    // Only restore from URL params (key management handled by useMcpClient)
     const urlParams = readUrlParams();
-    console.log('[ConnectionPanel] Initializing with URL params:', urlParams);
-    const key = urlParams.anthropicKey || localStorage.getItem('mcp_anthropic_key') || '';
-    console.log('[ConnectionPanel] Initial anthropicKey:', key ? '***' : '(empty)');
-    return key;
+    return urlParams.anthropicKey || '';
   });
   const [isConnecting, setIsConnecting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);

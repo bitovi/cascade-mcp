@@ -26,7 +26,6 @@ export function HomePage() {
       const urlParams = readUrlParams();
       // Only set pending if URL tool is different from what we last attempted
       if (urlParams.tool && urlParams.tool !== lastUrlTool) {
-        console.log('[HomePage] New tool in URL:', urlParams.tool);
         setPendingToolSelection(urlParams.tool);
         setLastUrlTool(urlParams.tool);
       }
@@ -36,14 +35,9 @@ export function HomePage() {
   // Auto-select tool after connection if pending tool name exists (US1)
   useEffect(() => {
     if (state.status === 'connected' && pendingToolSelection && tools.length > 0) {
-      console.log('[HomePage] Attempting to auto-select tool:', pendingToolSelection);
-      console.log('[HomePage] Available tools:', tools.map(t => t.name));
       const tool = findToolByKebabName(pendingToolSelection, tools);
       if (tool) {
-        console.log('[HomePage] Tool found, selecting:', tool.name);
         setSelectedTool(tool);
-      } else {
-        console.log('[HomePage] Tool not found - may require OAuth authentication');
       }
       // Clear pending selection whether found or not (single attempt)
       setPendingToolSelection(null);
@@ -54,7 +48,6 @@ export function HomePage() {
   useEffect(() => {
     // Only update URL after connection is established and a tool is selected
     if (state.status === 'connected' && selectedTool) {
-      console.log('[HomePage] Updating URL with tool:', selectedTool.name);
       updateUrlWithTool(selectedTool.name);
     }
     // Note: We NEVER remove the tool parameter from the URL
