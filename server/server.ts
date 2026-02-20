@@ -99,19 +99,6 @@ const sessionMiddleware = session({
 
 app.use(sessionMiddleware);
 
-// Debug middleware to log session info on OAuth routes
-app.use('/auth', (req, res, next) => {
-  console.log(`[SESSION] ${req.method} ${req.url}`);
-  console.log(`[SESSION]   - Session ID: ${req.sessionID}`);
-  console.log(`[SESSION]   - Cookie header present: ${!!req.headers.cookie}`);
-  console.log(`[SESSION]   - req.secure: ${req.secure}`);
-  console.log(`[SESSION]   - X-Forwarded-Proto: ${req.headers['x-forwarded-proto']}`);
-  console.log(
-    `[SESSION]   - Session cookie will be secure: ${req.secure || req.headers['x-forwarded-proto'] === 'https'}`,
-  );
-  next();
-});
-
 app.use(
   cors({
     origin: '*',

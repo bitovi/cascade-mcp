@@ -54,37 +54,11 @@ export function registerFigmaReviewDesignTool(mcp: McpServer): void {
       },
     },
     async ({ figmaUrls, contextDescription }: FigmaReviewDesignParams, context) => {
-      console.log('figma-review-design called', {
-        figmaUrls,
-        hasContextDescription: !!contextDescription,
-      });
-
       // Get auth info for Figma
       const authInfo = getAuthInfoSafe(context, 'figma-review-design');
 
       // Extract Figma token
       const figmaToken = authInfo?.figma?.access_token;
-
-      console.log('  Extracted tokens:', {
-        hasFigmaToken: !!figmaToken,
-      });
-
-      // Debug Figma token details
-      if (figmaToken) {
-        console.log('  Figma token details:', {
-          length: figmaToken.length,
-          prefix: figmaToken.substring(0, 10),
-          type: figmaToken.startsWith('figu_')
-            ? 'OAuth'
-            : figmaToken.startsWith('figd_')
-              ? 'PAT'
-              : 'Unknown',
-          scope: authInfo?.figma?.scope,
-          expiresAt: authInfo?.figma?.expires_at
-            ? new Date(authInfo.figma.expires_at * 1000).toISOString()
-            : 'no expiry',
-        });
-      }
 
       if (!figmaToken) {
         return {

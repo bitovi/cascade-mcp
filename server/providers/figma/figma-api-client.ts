@@ -54,6 +54,15 @@ export interface FigmaClient {
    * @throws Error if API request fails (e.g., missing file_comments:write scope)
    */
   postComment: (fileKey: string, request: PostCommentRequest) => Promise<FigmaComment>;
+
+  /**
+   * Delete a comment from a Figma file
+   * @param fileKey - The Figma file key
+   * @param commentId - The ID of the comment to delete
+   * @returns Promise resolving when comment is deleted
+   * @throws Error if API request fails (e.g., missing file_comments:write scope)
+   */
+  deleteComment: (fileKey: string, commentId: string) => Promise<void>;
 }
 
 /**
@@ -77,7 +86,7 @@ export interface FigmaClient {
  * @see https://www.figma.com/developers/api#authentication
  */
 export function createFigmaClient(accessToken: string): FigmaClient {
-  return {
+  const apiClient: FigmaClient = {
     fetch: async (url: string, options: RequestInit = {}) => {
       // Token is captured in this closure!
       // OAuth tokens use Authorization Bearer header (figu_ prefix)
@@ -90,8 +99,6 @@ export function createFigmaClient(accessToken: string): FigmaClient {
           : { 'X-Figma-Token': accessToken }
         ),
       };
-      
-
       
       return fetch(url, {
         ...options,
@@ -107,15 +114,7 @@ export function createFigmaClient(accessToken: string): FigmaClient {
       const baseUrl = 'https://api.figma.com/v1';
       const url = `${baseUrl}/files/${fileKey}/comments`;
 
-      const isOAuthToken = accessToken.startsWith('figu_');
-      const headers = {
-        ...(isOAuthToken 
-          ? { 'Authorization': `Bearer ${accessToken}` }
-          : { 'X-Figma-Token': accessToken }
-        ),
-      };
-
-      const response = await fetch(url, { headers });
+      const response = await apiClient.fetch(url);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -135,18 +134,11 @@ export function createFigmaClient(accessToken: string): FigmaClient {
       const baseUrl = 'https://api.figma.com/v1';
       const url = `${baseUrl}/files/${fileKey}/comments`;
 
-      const isOAuthToken = accessToken.startsWith('figu_');
-      const headers = {
-        'Content-Type': 'application/json',
-        ...(isOAuthToken 
-          ? { 'Authorization': `Bearer ${accessToken}` }
-          : { 'X-Figma-Token': accessToken }
-        ),
-      };
-
-      const response = await fetch(url, {
+      const response = await apiClient.fetch(url, {
         method: 'POST',
-        headers,
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(request),
       });
 
@@ -174,5 +166,32 @@ export function createFigmaClient(accessToken: string): FigmaClient {
         client_meta: request.client_meta,
       };
     },
+
+    deleteComment: async (fileKey: string, commentId: string): Promise<void> => {
+      const baseUrl = 'https://api.figma.com/v1';
+      const url = `${baseUrl}/files/${fileKey}/comments/${commentId}`;
+
+      const response = await apiClient.fetch(url, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        if (response.status === 403) {
+          throw new Error(`Missing Figma scope: file_comments:write. Please re-authorize with the required scope to delete comments.`);
+        }
+        if (response.status === 404) {
+          throw new Error(`Comment not found: ${commentId}`);
+        }
+        if (response.status === 429) {
+          // Rate limit - include Retry-After header info if available
+          const retryAfter = response.headers.get('Retry-After');
+          throw new Error(`Rate limit exceeded. ${retryAfter ? `Retry after ${retryAfter} seconds.` : ''} Status: 429`);
+        }
+        throw new Error(`Failed to delete Figma comment: ${response.status} ${errorText}`);
+      }
+    },
   };
+
+  return apiClient;
 }

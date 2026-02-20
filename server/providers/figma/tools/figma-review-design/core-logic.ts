@@ -21,7 +21,6 @@ import type {
   AnalyzeFigmaScopeOutput,
   GeneratedQuestion,
   PostCommentResult,
-  FigmaComment,
   CommentThread,
 } from '../../../figma/figma-comment-types.js';
 import { parseFigmaUrls, getUniqueFileKeys, type ParsedFigmaUrl } from './url-parser.js';
@@ -41,8 +40,6 @@ import {
   postQuestionsToFigma,
 } from './figma-comment-utils.js';
 import {
-  fetchFigmaFile,
-  downloadFigmaImagesBatch,
   type FigmaNodeMetadata,
   type FigmaImageDownloadResult,
 } from '../../../figma/figma-helpers.js';
@@ -118,46 +115,7 @@ export async function executeAnalyzeFigmaScope(
   console.log(`  📁 Unique file keys: ${fileKeys.join(', ')}`);
 
   // ==========================================
-  // STEP 2: Fetch file data and comments
-  // ==========================================
-  await notify('📥 Fetching Figma file data and comments...');
-
-  const fileDataMap = new Map<string, any>();
-  const commentsMap = new Map<string, FigmaComment[]>();
-
-  for (const fileKey of fileKeys) {
-    try {
-      // Fetch file structure
-      const fileData = await fetchFigmaFile(figmaClient, fileKey);
-      fileDataMap.set(fileKey, fileData);
-      console.log(`  ✅ Fetched file: ${fileData.name}`);
-
-      // Fetch comments (fresh - no caching per FR-007)
-      try {
-        const comments = await figmaClient.fetchComments(fileKey);
-        commentsMap.set(fileKey, comments);
-        console.log(`  💬 Fetched ${comments.length} comments`);
-      } catch (commentError: any) {
-        // Graceful degradation - continue without comments if scope missing
-        console.warn(`  ⚠️ Could not fetch comments: ${commentError.message}`);
-        commentsMap.set(fileKey, []);
-      }
-    } catch (error: any) {
-      errors.push(`Failed to fetch Figma file ${fileKey}: ${error.message}`);
-      console.error(`  ❌ Failed to fetch file ${fileKey}:`, error.message);
-    }
-  }
-
-  if (fileDataMap.size === 0) {
-    return {
-      analysis: '',
-      questions: [],
-      errors,
-    };
-  }
-
-  // ==========================================
-  // STEP 3: Analyze screens using consolidated workflow
+  // STEP 2: Analyze screens using consolidated workflow
   // ==========================================
   await notify('🖼️ Analyzing Figma screens...');
 
@@ -196,7 +154,7 @@ export async function executeAnalyzeFigmaScope(
   }
 
   // ==========================================
-  // STEP 4: Prepare data for analysis
+  // STEP 3: Prepare data for analysis
   // ==========================================
   
   // Build framesToAnalyze array for comment posting (extract from AnalyzedFrame[])

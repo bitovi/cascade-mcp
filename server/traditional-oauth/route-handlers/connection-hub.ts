@@ -30,10 +30,7 @@ const REQUIRED_PROVIDERS = ['atlassian', 'figma', 'google'] as const;
  * Shows available providers with connection status
  */
 export function renderConnectionHub(req: Request, res: Response): void {
-  console.log('Rendering connection hub');
-  
   const connectedProviders = req.session.connectedProviders || [];
-  console.log(`  Currently connected providers: ${connectedProviders.join(', ') || 'none'}`);
   
   // Auto-redirect ONLY when ALL providers are connected
   // This saves the user from clicking "Done" when they've connected everything
@@ -71,13 +68,6 @@ export function renderConnectionHub(req: Request, res: Response): void {
     req.session.codeVerifier = codeVerifier;
     req.session.usingMcpPkce = false;
     console.log('  Generated server-side PKCE code_verifier');
-  } else {
-    // Returning to connection hub after provider OAuth - preserve existing session
-    console.log('  Preserving existing session configuration:', {
-      usingMcpPkce: req.session.usingMcpPkce,
-      hasMcpRedirectUri: !!req.session.mcpRedirectUri,
-      hasCodeVerifier: !!req.session.codeVerifier,
-    });
   }
   
   const html = `
