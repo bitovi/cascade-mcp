@@ -197,12 +197,6 @@ export async function handleMcpPost(req: Request, res: Response): Promise<void> 
     // Re-throw other errors
     throw error;
   }
-
-  // Log response details to verify SSE streaming (Phase 1 - spec 778)
-  const contentType = res.getHeader('content-type');
-  const statusCode = res.statusCode;
-  console.log(`  📤 POST response Content-Type: ${contentType}, status: ${statusCode}`);
-  console.log('  ✅ MCP POST request handled successfully');
 }
 
 /**
@@ -448,7 +442,6 @@ async function getAuthInfoFromQueryToken(req: Request, res: Response): Promise<V
 function validateAndExtractJwt(token: string, req: Request, res: Response, source: string, strictLabel: string): ValidationResult {
   try {
     const payload = parseJWT(token) as JWTPayload & Partial<AuthContext>;
-    console.log(`Successfully parsed JWT payload from ${source}:`, JSON.stringify(sanitizeJwtPayload(payload), null, 2));
 
     // Log which providers are present (no longer require at least one)
     if (!payload.atlassian && !payload.figma && !payload.google) {

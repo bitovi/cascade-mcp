@@ -35,8 +35,19 @@ import { getFigmaFileCachePath } from '../../screen-analyses-workflow/figma-cach
 /** Rate limit for Figma comment API - 25 requests per minute */
 const RATE_LIMIT_PER_MINUTE = 25;
 
-/** Delay between comment posts to stay within rate limits (ms) */
-const POST_DELAY_MS = 2500; // ~24 per minute, leaves buffer
+/** 
+ * Delay between comment posts to stay within rate limits (ms)
+ * 
+ * Two modes:
+ * - Default (Dev/Full seats): 2500ms (~24/min, leaves buffer for 25/min limit)
+ * - View/Collab seat mode: 12000ms (5/min, within "up to 5/min" limit)
+ * 
+ * Enable View/Collab seat mode by setting ATTEMPT_TO_STAY_WITHIN_VIEW_SEAT_LIMIT=true
+ */
+const getPostDelayMs = (): number => {
+  const useViewSeatLimit = process.env.ATTEMPT_TO_STAY_WITHIN_VIEW_SEAT_LIMIT === 'true';
+  return useViewSeatLimit ? 12000 : 2500; // 5/min vs 24/min
+};
 
 /** Left edge offset from frame boundary (pixels) */
 const LEFT_EDGE_OFFSET = -50;
@@ -720,7 +731,13 @@ export async function postQuestionsToFigma(
   }
 
   // Post individual questions with rate limiting delays
-  console.log(`  📤 Posting ${questions.length} questions individually`);
+  const postDelayMs = getPostDelayMs();
+  const useViewSeatLimit = process.env.ATTEMPT_TO_STAY_WITHIN_VIEW_SEAT_LIMIT === 'true';
+  const rateDescription = useViewSeatLimit 
+    ? '5/min (View/Collab seat mode)' 
+    : '24/min (Dev/Full seat mode)';
+  
+  console.log(`  📤 Posting ${questions.length} questions individually (rate: ${rateDescription})`);
 
   // Group questions by frame to calculate positions
   // General questions (no frameNodeId) are assigned to the first frame
@@ -790,6 +807,11 @@ export async function postQuestionsToFigma(
       error: postResult.error,
       commentId: postResult.commentId,
     });
+
+    // Add delay between posts (except after the last one)
+    if (i < questions.length - 1) {
+      await sleep(postDelayMs);
+    }
   }
 
   return results;

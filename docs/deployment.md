@@ -89,6 +89,8 @@ VITE_JIRA_API_URL=https://api.atlassian.com/ex/jira
 FIGMA_CLIENT_ID=your-figma-client-id
 FIGMA_CLIENT_SECRET=your-figma-client-secret
 FIGMA_OAUTH_SCOPES="file_content:read file_comments:read file_comments:write current_user:read"
+# Optional: Enable View/Collab seat rate limiting (5/min vs 24/min)
+# ATTEMPT_TO_STAY_WITHIN_VIEW_SEAT_LIMIT=false
 
 # Google Drive OAuth
 GOOGLE_CLIENT_ID=your-google-client-id

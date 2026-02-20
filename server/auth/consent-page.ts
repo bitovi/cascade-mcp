@@ -17,10 +17,7 @@ import { generateAuthorizationCode, storeAuthorizationCode } from '../pkce/autho
  * Per Q9: User clicks connection buttons in any order they prefer
  */
 export function renderConnectionHub(req: Request, res: Response): void {
-  console.log('Rendering connection hub');
-  
   const connectedProviders = req.session.connectedProviders || [];
-  console.log(`  Currently connected providers: ${connectedProviders.join(', ') || 'none'}`);
   
   // Store MCP client's PKCE parameters from query string (only on first visit)
   // These were sent by the MCP client when initiating the OAuth flow
@@ -47,13 +44,6 @@ export function renderConnectionHub(req: Request, res: Response): void {
     req.session.codeVerifier = codeVerifier;
     req.session.usingMcpPkce = false;
     console.log('  Generated server-side PKCE code_verifier');
-  } else {
-    // Returning to connection hub after provider OAuth - preserve existing session
-    console.log('  Preserving existing session configuration:', {
-      usingMcpPkce: req.session.usingMcpPkce,
-      hasMcpRedirectUri: !!req.session.mcpRedirectUri,
-      hasCodeVerifier: !!req.session.codeVerifier,
-    });
   }
   
   const html = `
