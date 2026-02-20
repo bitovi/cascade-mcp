@@ -21,9 +21,10 @@ The Mini MCP Client supports URL parameters to streamline your workflow by pre-f
   - Note: Manual key changes are stored locally but never written to the URL for security
   
 - **`tool`**: Automatically selects a tool after connection (optional)
-  - Format: Kebab-case version of the tool display name
+  - Format: Kebab-case tool name (matches dropdown names)
   - Example: `?tool=figma-get-user` selects the "Figma Get User" tool
-  - Invalid tool names are ignored silently, with the parameter remaining in the URL for debugging
+  - Invalid tools or tools requiring OAuth you're not logged into are skipped silently
+  - Parameter remains in URL for debugging and transparency
 
 ### Usage Examples
 
@@ -40,14 +41,14 @@ https://cascade.bitovi.com/?anthropicKey=sk-ant-api03-xxxxx&tool=atlassian-get-s
 **Resume work after reload:**
 Simply reload the page - the URL preserves your tool selection and API key (if provided via URL).
 
-### Tool Name Conversion Reference
+### Tool Names in URLs
 
-Tool display names are converted to kebab-case for URLs:
-- "Figma Get User" → `figma-get-user`
-- "Atlassian Get Sites" → `atlassian-get-sites`
-- "Write Shell Stories" → `write-shell-stories`
-- "Write Next Story" → `write-next-story`
-- "Get Jira Issue" → `get-jira-issue`
+Tools are registered with kebab-case names, which is what you'll see in both the dropdown and URLs:
+- `figma-get-user`
+- `atlassian-get-sites`
+- `write-shell-stories`
+- `write-next-story`
+- `atlassian-get-issue`
 
 When you manually select a tool from the tool selector, the URL automatically updates to reflect your choice, making it easy to bookmark or share your current view.
 
