@@ -42,6 +42,7 @@ jobs:
           echo "FIGMA_CLIENT_ID=${{ vars.FIGMA_CLIENT_ID }}" >> repo_env
           echo "FIGMA_OAUTH_SCOPES=${{ vars.FIGMA_OAUTH_SCOPES }}" >> repo_env
           echo "FIGMA_CLIENT_SECRET=${{ secrets.FIGMA_CLIENT_SECRET }}" >> repo_env
+          echo "ATTEMPT_TO_STAY_WITHIN_VIEW_SEAT_LIMIT=${{ vars.ATTEMPT_TO_STAY_WITHIN_VIEW_SEAT_LIMIT || 'false' }}" >> repo_env
           ####
           echo "GOOGLE_CLIENT_ID=${{ vars.GOOGLE_CLIENT_ID }}" >> repo_env
           echo "GOOGLE_OAUTH_SCOPES=${{ vars.GOOGLE_OAUTH_SCOPES }}" >> repo_env
