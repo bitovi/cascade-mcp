@@ -6,6 +6,7 @@
 
 import { useState } from 'react';
 import type { ConnectionStatus } from '../../lib/mcp-client/index.js';
+import { readUrlParams } from '../../lib/url-params';
 
 interface ConnectionPanelProps {
   status: ConnectionStatus;
@@ -20,9 +21,15 @@ export function ConnectionPanel({
   onDisconnect,
   onRefreshTokens,
 }: ConnectionPanelProps) {
-  const [anthropicKey, setAnthropicKey] = useState(
-    () => localStorage.getItem('mcp_anthropic_key') || ''
-  );
+  const [anthropicKey, setAnthropicKey] = useState(() => {
+    // Priority 1: URL param (for shareable links)
+    const urlParams = readUrlParams();
+    if (urlParams.anthropicKey) {
+      return urlParams.anthropicKey;
+    }
+    // Priority 2: localStorage (persists across refreshes)
+    return localStorage.getItem('mcp_anthropic_key') || '';
+  });
   const [isConnecting, setIsConnecting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshResult, setRefreshResult] = useState<{ success: boolean; providers: string[]; error?: string } | null>(null);

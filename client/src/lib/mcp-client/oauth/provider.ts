@@ -44,10 +44,11 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   }
 
   /**
-   * Redirect URL for OAuth callback - uses current origin
+   * Redirect URL for OAuth callback - uses root path only
+   * The specific return location is encoded in the state parameter
    */
   get redirectUrl(): string {
-    return window.location.origin + window.location.pathname;
+    return window.location.origin + '/';
   }
 
   /**
@@ -65,12 +66,46 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   }
 
   /**
-   * Generate a random state parameter for CSRF protection
+   * Generate OAuth state parameter with CSRF token AND return URL
+   * This allows us to restore the user's exact location after OAuth completes
+   * 
+   * Per RFC 6749 Section 10.12: State parameter prevents CSRF attacks
+   * Extended pattern: Encode additional data (returnUrl) alongside CSRF nonce
    */
   state(): string {
+    // Generate CSRF token
     const array = new Uint8Array(32);
     crypto.getRandomValues(array);
-    return Array.from(array, b => b.toString(16).padStart(2, '0')).join('');
+    const csrfToken = Array.from(array, b => b.toString(16).padStart(2, '0')).join('');
+    
+    // Encode current location (full URL including path, hash, query)
+    const returnUrl = window.location.href;
+    
+    // Create state object and base64 encode it
+    const stateObj = {
+      csrf: csrfToken,
+      returnUrl: returnUrl
+    };
+    
+    return btoa(JSON.stringify(stateObj));
+  }
+
+  /**
+   * Decode state parameter to extract return URL
+   * @param state - Base64 encoded state from OAuth callback
+   * @returns Decoded state with csrf and returnUrl
+   */
+  static decodeState(state: string): { csrf: string; returnUrl: string } | null {
+    try {
+      const decoded = JSON.parse(atob(state));
+      if (decoded.csrf && decoded.returnUrl) {
+        return decoded;
+      }
+      return null;
+    } catch {
+      console.error('[OAuth Provider] Failed to decode state parameter');
+      return null;
+    }
   }
 
   /**

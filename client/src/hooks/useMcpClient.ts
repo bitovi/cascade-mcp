@@ -8,6 +8,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   BrowserMcpClient, 
   AnthropicSamplingProvider,
+  BrowserOAuthClientProvider,
   type ConnectionState,
   type ConnectionStatus,
 } from '../lib/mcp-client/index.js';
@@ -96,13 +97,26 @@ export function useMcpClient(options: UseMcpClientOptions = {}): UseMcpClientRet
     if (hasCallback) {
       oauthHandledRef.current = true;
       
-      // Get stored server URL and reconnect
+      // Extract state parameter from OAuth callback (contains return URL)
+      const urlParams = new URLSearchParams(window.location.search);
+      const stateParam = urlParams.get('state');
+      
+      // Get stored server URL from localStorage (fallback)
       const storedUrl = localStorage.getItem('mcp_pending_server_url');
       console.log('[useMcpClient] 📦 Stored server URL:', storedUrl);
       
+      // Parse state to get return URL and server URL
+      let returnUrl: string | null = null;
+      if (stateParam) {
+        const stateData = BrowserOAuthClientProvider.decodeState(stateParam);
+        if (stateData) {
+          returnUrl = stateData.returnUrl;
+          console.log('[useMcpClient] 📍 Return URL from state:', returnUrl);
+        }
+      }
+      
       if (storedUrl) {
         console.log('[useMcpClient] ✅ Found stored URL, will auto-connect');
-        // Don't remove until after successful connection
         // Auto-reconnect after OAuth callback
         console.log('[useMcpClient] ⏳ Will auto-connect in 100ms...');
         setTimeout(() => {
@@ -111,6 +125,19 @@ export function useMcpClient(options: UseMcpClientOptions = {}): UseMcpClientRet
             clientRef.current.connect(storedUrl).then(() => {
               console.log('[useMcpClient] 🎉 Auto-connect succeeded!');
               localStorage.removeItem('mcp_pending_server_url');
+              
+              // Navigate to original location if we have it from state
+              if (returnUrl) {
+                console.log('[useMcpClient] 🧭 Navigating to return URL:', returnUrl);
+                // Use window.location to preserve hash and query params
+                const returnUrlObj = new URL(returnUrl);
+                const currentOrigin = window.location.origin;
+                if (returnUrlObj.origin === currentOrigin) {
+                  // Same origin - safe to navigate
+                  window.history.replaceState({}, '', returnUrlObj.pathname + returnUrlObj.search + returnUrlObj.hash);
+                }
+              }
+              
               // Fetch tools after successful connection
               return clientRef.current!.listTools();
             }).then((toolList) => {
