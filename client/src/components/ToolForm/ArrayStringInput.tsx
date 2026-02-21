@@ -42,7 +42,7 @@ export function ArrayStringInput({
   useEffect(() => {
     // Use functional update to access current items without including in deps
     setItems(currentItems => {
-      // Skip update if both parent value and local items are empty (initial state)
+      // Skip update if both parent value and current items are empty (initial state)
       const valueIsEmpty = value.length === 0;
       const itemsIsEmpty = currentItems.length === 1 && currentItems[0] === '';
       
