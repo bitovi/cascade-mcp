@@ -16,7 +16,6 @@ interface ArrayStringInputProps {
   error?: string;
   description?: string;
   minLength?: number;
-  maxLength?: number;
   validateUrl?: boolean;
   disabled?: boolean;
   label?: string;

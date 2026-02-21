@@ -291,7 +291,6 @@ export function ToolForm({ tool, onExecute, isExecuting }: ToolFormProps) {
               error={error}
               description={propSchema.description}
               minLength={propSchema.minItems}
-              maxLength={propSchema.maxItems}
               validateUrl={propSchema.items?.format === 'uri'}
             />
           );
