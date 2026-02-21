@@ -5,7 +5,7 @@
  * Replaces error-prone JSON textarea with individual text inputs and add/remove buttons.
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 
 interface ArrayStringInputProps {
   id: string;
@@ -37,31 +37,23 @@ export function ArrayStringInput({
 }: ArrayStringInputProps) {
   // Ensure we always have at least one input field
   const [items, setItems] = useState<string[]>(value.length > 0 ? value : ['']);
-  const prevValueRef = useRef<string[]>(value);
 
   // Sync with parent value changes
   useEffect(() => {
-    // Only sync if value actually changed (not just on re-render)
-    const valueChanged = JSON.stringify(prevValueRef.current) !== JSON.stringify(value);
-    
-    if (valueChanged) {
-      prevValueRef.current = value;
-      
-      // Skip if both parent value and local items are empty (initial state)
+    // Always sync items to match the parent value prop
+    // Use functional update to access current items without including in deps
+    setItems(currentItems => {
+      // Skip update if both parent value and local items are empty (initial state)
       const valueIsEmpty = value.length === 0;
-      const itemsIsEmpty = items.length === 1 && items[0] === '';
+      const itemsIsEmpty = currentItems.length === 1 && currentItems[0] === '';
       
       if (valueIsEmpty && itemsIsEmpty) {
         // Don't update if we just have an empty initial state
-        return;
+        return currentItems;
       }
       
-      setItems(value.length > 0 ? value : ['']);
-    }
-    // Note: items is intentionally not in the dependency array.
-    // We only want to sync when the parent value prop changes, not when items changes internally.
-    // The ref-based change detection for value ensures we don't have stale closures.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      return value.length > 0 ? value : [''];
+    });
   }, [value]);
 
   const handleItemChange = (index: number, newValue: string) => {
