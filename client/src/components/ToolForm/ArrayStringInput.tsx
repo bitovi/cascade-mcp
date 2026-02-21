@@ -58,7 +58,11 @@ export function ArrayStringInput({
       
       setItems(value.length > 0 ? value : ['']);
     }
-  }, [value, items]);
+    // Note: items is intentionally not in the dependency array.
+    // We only want to sync when the parent value prop changes, not when items changes internally.
+    // The ref-based change detection for value ensures we don't have stale closures.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
 
   const handleItemChange = (index: number, newValue: string) => {
     const newItems = [...items];
