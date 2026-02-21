@@ -40,7 +40,6 @@ export function ArrayStringInput({
 
   // Sync with parent value changes
   useEffect(() => {
-    // Always sync items to match the parent value prop
     // Use functional update to access current items without including in deps
     setItems(currentItems => {
       // Skip update if both parent value and local items are empty (initial state)
@@ -48,7 +47,6 @@ export function ArrayStringInput({
       const itemsIsEmpty = currentItems.length === 1 && currentItems[0] === '';
       
       if (valueIsEmpty && itemsIsEmpty) {
-        // Don't update if we just have an empty initial state
         return currentItems;
       }
       
