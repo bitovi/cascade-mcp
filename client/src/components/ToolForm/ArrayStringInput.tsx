@@ -5,7 +5,7 @@
  * Replaces error-prone JSON textarea with individual text inputs and add/remove buttons.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface ArrayStringInputProps {
   id: string;
@@ -37,15 +37,28 @@ export function ArrayStringInput({
 }: ArrayStringInputProps) {
   // Ensure we always have at least one input field
   const [items, setItems] = useState<string[]>(value.length > 0 ? value : ['']);
+  const prevValueRef = useRef<string[]>(value);
 
   // Sync with parent value changes
   useEffect(() => {
-    if (value.length === 0 && items.length === 1 && items[0] === '') {
-      // Don't update if we just have an empty initial state
-      return;
+    // Only sync if value actually changed (not just on re-render)
+    const valueChanged = JSON.stringify(prevValueRef.current) !== JSON.stringify(value);
+    
+    if (valueChanged) {
+      prevValueRef.current = value;
+      
+      // Skip if both parent value and local items are empty (initial state)
+      const valueIsEmpty = value.length === 0;
+      const itemsIsEmpty = items.length === 1 && items[0] === '';
+      
+      if (valueIsEmpty && itemsIsEmpty) {
+        // Don't update if we just have an empty initial state
+        return;
+      }
+      
+      setItems(value.length > 0 ? value : ['']);
     }
-    setItems(value.length > 0 ? value : ['']);
-  }, [value]);
+  }, [value, items]);
 
   const handleItemChange = (index: number, newValue: string) => {
     const newItems = [...items];
