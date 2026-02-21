@@ -7,6 +7,7 @@
 import { marked } from 'marked';
 import { markdownToAdf } from 'marklassian';
 import { logger } from '../../observability/logger.ts';
+import { INLINE_CARD_URL_PATTERNS, FIGMA_URL_PATTERN, transformADF } from './adf-utils.js';
 
 // ADF (Atlassian Document Format) type definitions
 // Based on @atlaskit/adf-schema structure but defined locally for Node.js compatibility
@@ -68,7 +69,10 @@ export async function convertMarkdownToAdf(markdown: string): Promise<ADFDocumen
       contentBlocks: adf.content?.length || 0
     });
 
-    return adf;
+    // Post-process: Enhance resource links (inlineCards for Confluence/Google Docs, emoji for Figma)
+    const enhancedAdf = enhanceResourceLinks(adf);
+
+    return enhancedAdf;
   } catch (error: any) {
     logger.error('Marklassian conversion failed, using fallback', { 
       error: error.message,
@@ -77,6 +81,113 @@ export async function convertMarkdownToAdf(markdown: string): Promise<ADFDocumen
     
     return createFallbackAdf(markdown);
   }
+}
+
+/**
+ * Check if a URL should be converted to an inlineCard for rich preview
+ * 
+ * Converts links to:
+ * - Confluence pages (atlassian.net/wiki)
+ * - Google Docs (docs.google.com/document)
+ * 
+ * @param url - URL to check
+ * @returns True if URL should be an inlineCard
+ */
+function shouldConvertToInlineCard(url: string): boolean {
+  if (!url || typeof url !== 'string') {
+    return false;
+  }
+
+  const lowerUrl = url.toLowerCase();
+  
+  // Check if URL matches any inlineCard pattern (Confluence, Google Docs)
+  return INLINE_CARD_URL_PATTERNS.some(pattern => lowerUrl.includes(pattern));
+}
+
+/**
+ * Check if a URL is a Figma design link
+ * 
+ * @param url - URL to check
+ * @returns True if URL is a Figma link
+ */
+function isFigmaLink(url: string): boolean {
+  if (!url || typeof url !== 'string') {
+    return false;
+  }
+  return url.toLowerCase().includes(FIGMA_URL_PATTERN);
+}
+
+/**
+ * Enhance resource links with rich formatting
+ * 
+ * Traverses the ADF document and enhances links to external resources:
+ * - Confluence/Google Docs → inlineCard nodes (rich previews)
+ * - Figma → Prepends 🎨 emoji to link text
+ * 
+ * @param adf - ADF document to enhance
+ * @returns Enhanced ADF document
+ */
+function enhanceResourceLinks(adf: ADFDocument): ADFDocument {
+  let inlineCardCount = 0;
+  let figmaEmojiCount = 0;
+
+  const enhanced = transformADF(adf, (node) => {
+    // Process paragraph content for link enhancements
+    if (node.type === 'paragraph' && node.content) {
+      const newContent: ADFNode[] = [];
+      
+      for (const child of node.content) {
+        // Check if this is a text node with a link mark
+        if (child.type === 'text' && child.marks) {
+          const linkMark = child.marks.find(m => m.type === 'link');
+          
+          if (linkMark && linkMark.attrs?.href) {
+            // Convert Confluence/Google Docs to inlineCard
+            if (shouldConvertToInlineCard(linkMark.attrs.href)) {
+              inlineCardCount++;
+              newContent.push({
+                type: 'inlineCard',
+                attrs: {
+                  url: linkMark.attrs.href
+                }
+              });
+              continue;
+            }
+            
+            // Prepend emoji to Figma link text
+            if (isFigmaLink(linkMark.attrs.href) && child.text) {
+              figmaEmojiCount++;
+              newContent.push({
+                ...child,
+                text: `🎨 ${child.text}`
+              });
+              continue;
+            }
+          }
+        }
+        
+        // Keep node as-is
+        newContent.push(child);
+      }
+      
+      return {
+        ...node,
+        content: newContent
+      };
+    }
+    
+    // Return node unchanged (transformADF handles recursion)
+    return node;
+  });
+
+  if (inlineCardCount > 0) {
+    logger.info(`Converted ${inlineCardCount} link(s) to inlineCard(s) for rich preview`);
+  }
+  if (figmaEmojiCount > 0) {
+    logger.info(`Added 🎨 emoji to ${figmaEmojiCount} Figma link(s)`);
+  }
+
+  return enhanced;
 }
 
 /**
@@ -142,6 +253,68 @@ export function validateAdf(adf: any): adf is ADFDocument {
 }
 
 /**
+ * Find section boundaries by heading text
+ * 
+ * Helper function to locate a section's start and end indices.
+ * 
+ * @param content - Array of ADF nodes to search
+ * @param headingText - Text to search for in headings (case-insensitive)
+ * @returns Section boundaries { startIndex, endIndex, level } or null if not found
+ */
+function findSectionBoundaries(
+  content: ADFNode[],
+  headingText: string
+): { startIndex: number; endIndex: number; level: number } | null {
+  // Find the heading node with matching text
+  let sectionStartIndex = -1;
+  let sectionLevel = -1;
+
+  for (let i = 0; i < content.length; i++) {
+    const node = content[i];
+
+    if (node.type === 'heading') {
+      const hasMatchingText = node.content?.some(
+        (contentNode: ADFNode) =>
+          contentNode.type === 'text' &&
+          contentNode.text?.toLowerCase().includes(headingText.toLowerCase())
+      );
+
+      if (hasMatchingText) {
+        sectionStartIndex = i;
+        sectionLevel = node.attrs?.level || 2;
+        break;
+      }
+    }
+  }
+
+  if (sectionStartIndex === -1) {
+    return null;
+  }
+
+  // Find where the section ends (next heading of same or higher level)
+  let sectionEndIndex = content.length;
+
+  for (let i = sectionStartIndex + 1; i < content.length; i++) {
+    const node = content[i];
+
+    if (node.type === 'heading') {
+      const headingLevel = node.attrs?.level || 2;
+
+      if (headingLevel <= sectionLevel) {
+        sectionEndIndex = i;
+        break;
+      }
+    }
+  }
+
+  return {
+    startIndex: sectionStartIndex,
+    endIndex: sectionEndIndex,
+    level: sectionLevel,
+  };
+}
+
+/**
  * Remove a section from ADF content by heading text
  * 
  * Finds a heading containing the specified text and removes all content
@@ -152,73 +325,16 @@ export function validateAdf(adf: any): adf is ADFDocument {
  * @returns New content array with the section removed
  */
 export function removeADFSectionByHeading(content: ADFNode[], headingText: string): ADFNode[] {
-  // Look for heading node with matching text
-  let sectionStartIndex = -1;
-  let sectionLevel = -1;
-  
-  for (let i = 0; i < content.length; i++) {
-    const node = content[i];
-    
-    // Check if this is a heading node
-    if (node.type === 'heading') {
-      // Check if it contains the target text
-      const hasMatchingText = node.content?.some((contentNode: ADFNode) => 
-        contentNode.type === 'text' && 
-        contentNode.text?.toLowerCase().includes(headingText.toLowerCase())
-      );
-      
-      if (hasMatchingText) {
-        sectionStartIndex = i;
-        sectionLevel = node.attrs?.level || 2;
-        logger.info(`Found existing "${headingText}" section`, { 
-          index: i, 
-          level: sectionLevel 
-        });
-        break;
-      }
-    }
-  }
-  
-  // If section not found, return original content
-  if (sectionStartIndex === -1) {
+  const boundaries = findSectionBoundaries(content, headingText);
+
+  if (!boundaries) {
     return content;
   }
-  
-  // Find where the section ends (next heading of same or higher level)
-  let sectionEndIndex = content.length;
-  
-  // Search for next heading of same or higher level (lower number = higher level)
-  for (let i = sectionStartIndex + 1; i < content.length; i++) {
-    const node = content[i];
-    
-    if (node.type === 'heading') {
-      const headingLevel = node.attrs?.level || 2;
-      
-      // If we hit a heading of same or higher level, this is where the section ends
-      if (headingLevel <= sectionLevel) {
-        sectionEndIndex = i;
-        logger.info(`"${headingText}" section ends`, { 
-          endIndex: i, 
-          nextHeadingLevel: headingLevel 
-        });
-        break;
-      }
-    }
-  }
-  
-  // Remove only the content between start and end
-  const newContent = [
-    ...content.slice(0, sectionStartIndex),
-    ...content.slice(sectionEndIndex)
+
+  return [
+    ...content.slice(0, boundaries.startIndex),
+    ...content.slice(boundaries.endIndex),
   ];
-  
-  logger.info(`Removed existing "${headingText}" section`, { 
-    startIndex: sectionStartIndex, 
-    endIndex: sectionEndIndex - 1,
-    removedNodes: sectionEndIndex - sectionStartIndex
-  });
-  
-  return newContent;
 }
 
 /**
@@ -233,32 +349,30 @@ export function removeADFSectionByHeading(content: ADFNode[], headingText: strin
  */
 export function countADFSectionsByHeading(content: ADFNode[], headingText: string): number {
   let count = 0;
-  
+
   for (const node of content) {
-    // Check if this is a heading node
     if (node.type === 'heading') {
-      // Check if it contains the target text
-      const hasMatchingText = node.content?.some((contentNode: ADFNode) => 
-        contentNode.type === 'text' && 
-        contentNode.text?.toLowerCase().includes(headingText.toLowerCase())
+      const hasMatchingText = node.content?.some(
+        (contentNode: ADFNode) =>
+          contentNode.type === 'text' &&
+          contentNode.text?.toLowerCase().includes(headingText.toLowerCase())
       );
-      
+
       if (hasMatchingText) {
         count++;
       }
     }
   }
-  
-  logger.info(`Found ${count} section(s) with heading "${headingText}"`);
+
   return count;
 }
 
 /**
  * Extract a section from ADF content by heading text
- * 
+ *
  * Returns both the extracted section and the remaining content.
  * Similar to removeADFSectionByHeading() but preserves the section for use elsewhere.
- * 
+ *
  * @param content - Array of ADF nodes to search
  * @param headingText - Text to search for in headings (case-insensitive)
  * @returns Object with section nodes and remaining content
@@ -270,72 +384,84 @@ export function extractADFSection(
   section: ADFNode[];
   remainingContent: ADFNode[];
 } {
-  // Look for heading node with matching text (reuse logic from removeADFSectionByHeading)
-  let sectionStartIndex = -1;
-  let sectionLevel = -1;
-  
-  for (let i = 0; i < content.length; i++) {
-    const node = content[i];
-    
-    if (node.type === 'heading') {
-      const hasMatchingText = node.content?.some((contentNode: ADFNode) => 
-        contentNode.type === 'text' && 
-        contentNode.text?.toLowerCase().includes(headingText.toLowerCase())
-      );
-      
-      if (hasMatchingText) {
-        sectionStartIndex = i;
-        sectionLevel = node.attrs?.level || 2;
-        logger.info(`Found "${headingText}" section for extraction`, { 
-          index: i, 
-          level: sectionLevel 
-        });
-        break;
-      }
-    }
-  }
-  
-  // If section not found, return empty section and all content as remaining
-  if (sectionStartIndex === -1) {
-    logger.info(`Section "${headingText}" not found, returning all as remaining content`);
+  const boundaries = findSectionBoundaries(content, headingText);
+
+  if (!boundaries) {
     return {
       section: [],
-      remainingContent: content
+      remainingContent: content,
     };
   }
-  
-  // Find where the section ends
-  let sectionEndIndex = content.length;
-  
-  for (let i = sectionStartIndex + 1; i < content.length; i++) {
-    const node = content[i];
-    
-    if (node.type === 'heading') {
-      const headingLevel = node.attrs?.level || 2;
-      
-      if (headingLevel <= sectionLevel) {
-        sectionEndIndex = i;
-        logger.info(`"${headingText}" section ends at index ${i}`);
-        break;
-      }
-    }
-  }
-  
-  // Extract section and remaining content
-  const section = content.slice(sectionStartIndex, sectionEndIndex);
+
+  const section = content.slice(boundaries.startIndex, boundaries.endIndex);
   const remainingContent = [
-    ...content.slice(0, sectionStartIndex),
-    ...content.slice(sectionEndIndex)
+    ...content.slice(0, boundaries.startIndex),
+    ...content.slice(boundaries.endIndex),
   ];
-  
-  logger.info(`Extracted "${headingText}" section`, {
-    sectionNodes: section.length,
-    remainingNodes: remainingContent.length
-  });
-  
+
   return {
     section,
-    remainingContent
+    remainingContent,
+  };
+}
+
+/**
+ * Wrap a section in an ADF expand (collapsible) node
+ *
+ * Finds a section by heading text and wraps its content in an expand node,
+ * similar to HTML's <details>/<summary> elements. The section heading is
+ * removed and replaced with the expand node.
+ *
+ * @param adf - ADF document to modify
+ * @param sectionHeading - Text to search for in headings (case-insensitive)
+ * @param expandTitle - Optional title to show in the expand/collapse control (defaults to sectionHeading)
+ * @returns Modified ADF document with section wrapped in expand node
+ *
+ * @example
+ * // Wrap "Scope Analysis" section in a collapsible expand node
+ * const modified = wrapSectionInExpand(adf, 'Scope Analysis');
+ */
+export function wrapSectionInExpand(
+  adf: ADFDocument,
+  sectionHeading: string,
+  expandTitle?: string
+): ADFDocument {
+  const boundaries = findSectionBoundaries(adf.content, sectionHeading);
+
+  if (!boundaries) {
+    return adf;
+  }
+
+  // Extract section content (excluding the heading itself)
+  const sectionContent = adf.content.slice(
+    boundaries.startIndex + 1,
+    boundaries.endIndex
+  );
+
+  // Skip wrapping if section is empty
+  if (sectionContent.length === 0) {
+    return adf;
+  }
+
+  // Create expand node with the section content
+  const expandNode: ADFNode = {
+    type: 'expand',
+    attrs: {
+      title: expandTitle || sectionHeading,
+    },
+    content: sectionContent,
+  };
+
+  // Rebuild document: everything before section + expand node + everything after section
+  const newContent = [
+    ...adf.content.slice(0, boundaries.startIndex),
+    expandNode,
+    ...adf.content.slice(boundaries.endIndex),
+  ];
+
+  return {
+    ...adf,
+    content: newContent,
   };
 }
 

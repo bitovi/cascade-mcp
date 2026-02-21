@@ -101,6 +101,132 @@ describe('Markdown to ADF Converter', () => {
       expect(validateAdf(adf)).toBe(true);
       expect(getMaxListDepth(adf.content)).toBeLessThanOrEqual(2);
     });
+
+    describe('resource link enhancement', () => {
+      test('should add emoji to Figma links', async () => {
+        const markdown = 'Check out this design: [Figma Design](https://www.figma.com/file/abc123/My-Design)';
+        const adf = await convertMarkdownToAdf(markdown);
+        
+        expect(validateAdf(adf)).toBe(true);
+        
+        // Find paragraph content
+        const paragraph = adf.content.find(n => n.type === 'paragraph');
+        const content = paragraph?.content || [];
+        
+        // Should have text node with emoji prepended and link mark
+        const textWithLink = content.find((n: any) => 
+          n.type === 'text' && n.marks?.some((m: any) => m.type === 'link')
+        );
+        
+        expect(textWithLink).toBeDefined();
+        expect(textWithLink?.text).toBe('🎨 Figma Design');
+        expect(textWithLink?.marks?.find((m: any) => m.type === 'link')?.attrs?.href)
+          .toBe('https://www.figma.com/file/abc123/My-Design');
+      });
+
+      test('should convert Confluence links to inlineCards', async () => {
+        const markdown = 'See [this page](https://mycompany.atlassian.net/wiki/spaces/PROJ/pages/123456/Requirements)';
+        const adf = await convertMarkdownToAdf(markdown);
+        
+        expect(validateAdf(adf)).toBe(true);
+        
+        const paragraph = adf.content.find(n => n.type === 'paragraph');
+        const inlineCard = paragraph?.content?.find((n: any) => n.type === 'inlineCard');
+        
+        expect(inlineCard).toBeDefined();
+        expect(inlineCard?.attrs?.url).toBe('https://mycompany.atlassian.net/wiki/spaces/PROJ/pages/123456/Requirements');
+      });
+
+      test('should convert Google Docs links to inlineCards', async () => {
+        const markdown = 'Read the [specification](https://docs.google.com/document/d/1a2b3c4d5e6f7/edit)';
+        const adf = await convertMarkdownToAdf(markdown);
+        
+        expect(validateAdf(adf)).toBe(true);
+        
+        const paragraph = adf.content.find(n => n.type === 'paragraph');
+        const inlineCard = paragraph?.content?.find((n: any) => n.type === 'inlineCard');
+        
+        expect(inlineCard).toBeDefined();
+        expect(inlineCard?.attrs?.url).toBe('https://docs.google.com/document/d/1a2b3c4d5e6f7/edit');
+      });
+
+      test('should NOT convert Google Sheets/Slides links', async () => {
+        const markdown = 'See [spreadsheet](https://docs.google.com/spreadsheets/d/abc123/edit)';
+        const adf = await convertMarkdownToAdf(markdown);
+        
+        expect(validateAdf(adf)).toBe(true);
+        
+        // Should remain as text with link mark, not inlineCard
+        const paragraph = adf.content.find(n => n.type === 'paragraph');
+        const inlineCard = paragraph?.content?.find((n: any) => n.type === 'inlineCard');
+        
+        expect(inlineCard).toBeUndefined();
+        
+        // The paragraph should contain text nodes with link marks
+        const hasLinkMarks = paragraph?.content?.some((n: any) => 
+          n.type === 'text' && n.marks?.some((m: any) => m.type === 'link')
+        );
+        expect(hasLinkMarks).toBe(true);
+      });
+
+      test('should NOT convert regular external links', async () => {
+        const markdown = 'Visit [our website](https://example.com)';
+        const adf = await convertMarkdownToAdf(markdown);
+        
+        expect(validateAdf(adf)).toBe(true);
+        
+        // Should remain as text with link mark
+        const paragraph = adf.content.find(n => n.type === 'paragraph');
+        const inlineCard = paragraph?.content?.find((n: any) => n.type === 'inlineCard');
+        const textNode = paragraph?.content?.find((n: any) => n.type === 'text');
+        
+        expect(inlineCard).toBeUndefined();
+        expect(textNode).toBeDefined();
+      });
+
+      test('should convert multiple resource links in same paragraph', async () => {
+        const markdown = 'See [design](https://figma.com/file/abc) and [docs](https://docs.google.com/document/d/xyz/edit)';
+        const adf = await convertMarkdownToAdf(markdown);
+        
+        expect(validateAdf(adf)).toBe(true);
+        
+        const paragraph = adf.content.find(n => n.type === 'paragraph');
+        const content = paragraph?.content || [];
+        
+        // Should have 1 inlineCard (Google Docs) and 1 text node with emoji (Figma)
+        const inlineCards = content.filter((n: any) => n.type === 'inlineCard');
+        const figmaLink = content.find((n: any) => 
+          n.type === 'text' && n.text?.startsWith('🎨') && n.marks?.some((m: any) => m.type === 'link')
+        );
+        
+        expect(inlineCards).toHaveLength(1);
+        expect(inlineCards?.[0]?.attrs?.url).toContain('docs.google.com');
+        expect(figmaLink).toBeDefined();
+        expect(figmaLink?.text).toBe('🎨 design');
+      });
+
+      test('should handle mixed resource and regular links', async () => {
+        const markdown = 'Check [Figma](https://figma.com/file/abc) and [example](https://example.com)';
+        const adf = await convertMarkdownToAdf(markdown);
+        
+        expect(validateAdf(adf)).toBe(true);
+        
+        const paragraph = adf.content.find(n => n.type === 'paragraph');
+        const content = paragraph?.content || [];
+        
+        // Should have text nodes with link marks
+        const textNodes = content.filter((n: any) => n.type === 'text');
+        const figmaLink = textNodes.find((n: any) => n.text?.startsWith('🎨'));
+        const regularLink = textNodes.find((n: any) => 
+          n.marks?.some((m: any) => m.type === 'link' && m.attrs?.href === 'https://example.com')
+        );
+        
+        expect(figmaLink).toBeDefined();
+        expect(figmaLink?.text).toBe('🎨 Figma');
+        expect(regularLink).toBeDefined();
+        expect(regularLink?.text).toBe('example');
+      });
+    });
   });
 
   describe('validateAdf', () => {

@@ -26,6 +26,7 @@ import { loadLinkedResources, type LoadedContext, type LoadContextOptions } from
 import { 
   convertMarkdownToAdf, 
   convertAdfToMarkdown,
+  wrapSectionInExpand,
   type ADFDocument 
 } from '../../../atlassian/markdown-converter.js';
 import { handleJiraAuthError, resolveCloudId, fetchAllComments } from '../../../atlassian/atlassian-helpers.js';
@@ -352,8 +353,11 @@ export async function executeWriteStory(
   // Convert LLM-generated markdown to ADF
   const generatedAdf = await convertMarkdownToAdf(generatedContent);
   
+  // Wrap Scope Analysis section in a collapsible expand node
+  const wrappedAdf = wrapSectionInExpand(generatedAdf, 'Scope Analysis');
+  
   // Append timestamp marker directly to ADF (avoids lossy round-trip)
-  const adfWithTimestamp = appendTimestampMarkerToAdf(generatedAdf, new Date());
+  const adfWithTimestamp = appendTimestampMarkerToAdf(wrappedAdf, new Date());
   
   // Update Jira issue description
   const updateUrl = `${atlassianClient.getJiraBaseUrl(resolvedCloudId)}/issue/${issueKey}`;
