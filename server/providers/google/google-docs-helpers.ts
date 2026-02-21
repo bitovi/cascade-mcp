@@ -7,7 +7,7 @@
  * Pattern: Mirrors confluence-helpers.ts for consistency.
  */
 
-import { extractUrlsFromADF } from '../atlassian/adf-utils.js';
+import { extractGoogleDocsUrlsFromADF } from '../atlassian/adf-utils.js';
 import type { ADFDocument } from '../atlassian/markdown-converter.js';
 import {
   parseGoogleDriveUrl,
@@ -19,28 +19,9 @@ import {
 // URL Extraction
 // ============================================================================
 
-/**
- * Extract Google Docs URLs from an ADF document
- * 
- * Only matches Google Docs URLs (docs.google.com/document/...), 
- * not Sheets, Slides, or other Drive files.
- * 
- * @param adf - ADF document to search
- * @returns Array of unique Google Docs URLs found in the document
- * 
- * @example
- * ```typescript
- * const adf = epicDescription; // From Jira API
- * const googleDocsUrls = extractGoogleDocsUrlsFromADF(adf);
- * // ['https://docs.google.com/document/d/abc123/edit', ...]
- * ```
- */
-export function extractGoogleDocsUrlsFromADF(adf: ADFDocument): string[] {
-  return extractUrlsFromADF(adf, {
-    urlPattern: GOOGLE_DOCS_URL_PATTERN,
-    plainTextRegex: GOOGLE_DOCS_PLAIN_TEXT_REGEX,
-  });
-}
+// Re-export extractGoogleDocsUrlsFromADF for backwards compatibility
+// Implementation is now in adf-utils.ts alongside other extraction functions
+export { extractGoogleDocsUrlsFromADF } from '../atlassian/adf-utils.js';
 
 // ============================================================================
 // URL Parsing

@@ -64,7 +64,7 @@ As a shopper,
 
 A refined user story includes the following sections in order:
 
-### 1. User Story Statement
+**1. User Story Statement**
 
 A short description of a feature from the user's perspective:
 
@@ -74,7 +74,7 @@ A short description of a feature from the user's perspective:
 - "As a shopper, __I want__ to add items to a wishlist, __so that__ I can purchase them later."
 - "As a job seeker, __I want__ to upload my resume, __so that__ I can apply for multiple jobs quickly."
 
-### 2. Supporting Artifacts
+**2. Supporting Artifacts**
 
 Links to other resources related to the user story.
 
@@ -94,7 +94,7 @@ Links to other resources related to the user story.
 
 **Note**: Figma allows direct linking to specific nodes. Use Figma plugins to embed images in Jira when helpful.
 
-### 3. Out-of-Scope Requirements
+**3. Out-of-Scope Requirements**
 
 Explicitly state what is NOT included in this story to prevent scope creep.
 
@@ -105,7 +105,7 @@ Explicitly state what is NOT included in this story to prevent scope creep.
 
 **Purpose**: Particularly important when partially implementing designs.
 
-### 4. Remaining Questions (if applicable)
+**4. Remaining Questions (if applicable)**
 
 Any unresolved questions or ambiguities from the shell story that need clarification.
 
@@ -125,7 +125,7 @@ Any unresolved questions or ambiguities from the shell story that need clarifica
 - Should users receive a notification when a wishlisted item goes on sale?
 ```
 
-### 5. Non-Functional Requirements
+**5. Non-Functional Requirements**
 
 Requirements a user would not directly see (performance, security, technical constraints).
 
@@ -135,7 +135,7 @@ Requirements a user would not directly see (performance, security, technical con
 - Keep it relevant to the specific story
 - Avoid repeating team-wide standards (those belong in Definition of Done)
 
-### 6. Developer Notes
+**6. Developer Notes**
 
 Information useful during implementation.
 
@@ -145,7 +145,7 @@ Information useful during implementation.
 - Detail data structures/interactions if critical to implementation
 - Include technical dependencies from other stories
 
-### 6. Acceptance Criteria
+**7. Acceptance Criteria**
 
 Concise, specific statements describing minimum requirements for the story to be "done."
 
@@ -227,7 +227,7 @@ Good stories follow I.N.V.E.S.T. criteria:
 
 Every story must include all 6 sections in this exact format:
 
-1. **User Story Statement** (no heading, just the text)
+1. **## User Story Statement**
 2. **## Supporting Artifacts**
 3. **## Out of Scope**
 4. **## Non-Functional Requirements**
@@ -238,8 +238,7 @@ Every story must include all 6 sections in this exact format:
 - Do NOT include the story title in the description (it's already in the Jira summary field)
 - Do NOT number the sections (1., 2., etc.)
 - Do NOT use horizontal rules (---) between sections
-- Do NOT use ## heading for the User Story Statement (it's plain text at the top)
-- All other sections use ## heading format
+- All sections use ## heading format
 - Use regular markdown links `[text](url)` for Figma references, NOT images
 
 Keep stories focused on evidence from designs and analysis files. Avoid speculation and unnecessary detail about visual styling.

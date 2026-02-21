@@ -189,19 +189,42 @@ npm run dev:client
   - *Note*: OAuth tokens **must** route through `api.atlassian.com/ex/{product}/{cloudId}/` gateway
   - *Example*: `const client = createAtlassianClient(token); await client.fetch(client.getJiraBaseUrl(cloudId) + '/issue/PROJ-123')`
 
+- **providers/atlassian/markdown-converter.ts** - Markdown ↔ ADF Conversion  
+  Converts between Markdown and ADF (Atlassian Document Format) for Jira descriptions.
+  - `convertMarkdownToAdf(markdown)` - Converts markdown to ADF with automatic resource link enhancement
+  - `convertAdfToMarkdown(adf)` - Converts ADF to markdown for AI processing
+  - `validateAdf(adf)` - Validates ADF document structure
+  - **Resource Link Enhancement**: Automatically enhances resource links for better visual distinction
+    - Uses `INLINE_CARD_URL_PATTERNS` array imported from adf-utils.ts
+    - Confluence pages (`atlassian.net/wiki`) → inlineCard nodes (rich preview cards)
+    - Google Docs (`docs.google.com/document`) → inlineCard nodes (rich preview cards)
+    - Figma designs (`figma.com`) → Prepends 🎨 emoji to link text (inside the link)
+    - Regular URLs remain as standard hyperlinks
+  - *Example*: `await convertMarkdownToAdf('[Design](https://figma.com/file/abc)')` creates text "🎨 Design" with link mark
+  - *Note*: ⚠️ NEVER use for round-trip conversions - use ADF operations directly for existing content
+
 - **providers/atlassian/adf-utils.ts** - ADF Traversal Utilities  
   Generic traversal and manipulation utilities for ADF (Atlassian Document Format) documents.
-  - `traverseADF(adf, visitor)` - Depth-first traversal with visitor callback
+  - **URL Pattern Constants** (single source of truth):
+    - `FIGMA_URL_PATTERN` - Pattern for Figma designs (used for emoji decoration)
+    - `CONFLUENCE_URL_PATTERN` - Pattern for Confluence pages (used for inlineCard conversion)
+    - `GOOGLE_DOCS_URL_PATTERN` - Pattern for Google Docs (used for inlineCard conversion)
+    - `INLINE_CARD_URL_PATTERNS` - Array of patterns for inlineCard conversion (Confluence + Google Docs only)
+  - `traverseADF(adf, visitor)` - Depth-first traversal with visitor callback (read-only)
+  - `transformADF(adf, transformer)` - Recursive transformation returning new ADF document
+  - `transformADFNodes(nodes, transformer)` - Transform array of nodes (used by transformADF)
   - `extractUrlsFromADF(adf, { urlPattern })` - Extract URLs matching a pattern
-  - `extractFigmaUrlsFromADF(adf)` / `extractConfluenceUrlsFromADF(adf)` - Convenience functions
+  - `extractFigmaUrlsFromADF(adf)` / `extractConfluenceUrlsFromADF(adf)` / `extractGoogleDocsUrlsFromADF(adf)` - Convenience functions
   - `findNodesByType(adf, nodeType)` / `collectTextFromADF(adf)` - Query helpers
 
 - **providers/google/google-docs-helpers.ts** - Google Docs URL Utilities  
   Utilities for extracting and parsing Google Docs URLs from Jira ADF content.
-  - `extractGoogleDocsUrlsFromADF(adf)` - Extract Google Docs URLs from ADF (uses patterns from url-parser.ts)
+  - **URL Pattern Constant**: `GOOGLE_DOCS_URL_PATTERN` (exported from `tools/drive-doc-to-markdown/url-parser.ts`)
+  - `extractGoogleDocsUrlsFromADF(adf)` - Re-exported from adf-utils.ts for backwards compatibility
   - `parseGoogleDocUrl(url)` - Parse URL and extract document ID (returns null on error)
   - `isGoogleDoc(mimeType)` - Validate MIME type is a Google Doc (not Sheets/Slides)
   - `deduplicateByDocumentId(urls)` - Remove duplicate URLs pointing to same document
+  - *Note*: All URL extraction functions are now consolidated in adf-utils.ts
   - *Example*: `extractGoogleDocsUrlsFromADF(epicAdf)` returns array of Google Docs URLs
 
 - **providers/atlassian/confluence-*.ts** - Confluence Integration  

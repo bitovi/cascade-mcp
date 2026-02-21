@@ -8,6 +8,39 @@
 import type { ADFDocument, ADFNode } from './markdown-converter.js';
 
 // ============================================================================
+// URL Pattern Constants (Single Source of Truth)
+// ============================================================================
+
+/**
+ * URL pattern for matching Figma design URLs
+ * Used for URL extraction and inlineCard conversion
+ */
+export const FIGMA_URL_PATTERN = 'figma.com';
+
+/**
+ * URL pattern for matching Confluence page URLs
+ * Used for URL extraction and inlineCard conversion
+ */
+export const CONFLUENCE_URL_PATTERN = 'atlassian.net/wiki';
+
+/**
+ * URL pattern for matching Google Docs URLs
+ * Used for URL extraction and inlineCard conversion
+ * Note: Does NOT match Google Sheets or Google Slides
+ */
+export const GOOGLE_DOCS_URL_PATTERN = 'docs.google.com/document';
+
+/**
+ * Array of resource URL patterns for inlineCard conversion
+ * Used by markdown-converter.ts to determine which links should be rich previews
+ * Note: Figma is intentionally excluded - it uses emoji decoration instead
+ */
+export const INLINE_CARD_URL_PATTERNS = [
+  CONFLUENCE_URL_PATTERN,
+  GOOGLE_DOCS_URL_PATTERN,
+] as const;
+
+// ============================================================================
 // Types
 // ============================================================================
 
@@ -24,6 +57,16 @@ export type ADFVisitor = (
   parent: ADFNode | undefined,
   depth: number
 ) => boolean | void;
+
+/**
+ * Transformer function that returns a modified node or nodes
+ * 
+ * @param node - The current ADF node to transform
+ * @returns Transformed node, array of nodes, or null to remove the node
+ */
+export type ADFTransformer = (
+  node: ADFNode
+) => ADFNode | ADFNode[] | null;
 
 /**
  * Options for URL extraction
@@ -104,6 +147,73 @@ export function traverseADFNodes(nodes: ADFNode[], visitor: ADFVisitor): void {
   for (const node of nodes) {
     traverse(node, undefined, 0);
   }
+}
+
+/**
+ * Transform an ADF document by applying a transformer function to each node
+ * 
+ * Performs depth-first transformation of the ADF tree, creating a new document.
+ * The transformer can return:
+ * - A modified node (transformation applied)
+ * - An array of nodes (splits one node into multiple)
+ * - null (removes the node)
+ * 
+ * Children are recursively transformed before the parent transformer is called.
+ * 
+ * @param adf - ADF document to transform
+ * @param transformer - Function that transforms each node
+ * @returns New transformed ADF document
+ * 
+ * @example
+ * ```typescript
+ * // Convert all text to uppercase
+ * const transformed = transformADF(doc, (node) => {
+ *   if (node.type === 'text' && node.text) {
+ *     return { ...node, text: node.text.toUpperCase() };
+ *   }
+ *   return node;
+ * });
+ * ```
+ */
+export function transformADF(adf: ADFDocument, transformer: ADFTransformer): ADFDocument {
+  return {
+    ...adf,
+    content: transformADFNodes(adf.content || [], transformer)
+  };
+}
+
+/**
+ * Transform an array of ADF nodes
+ * 
+ * @param nodes - Array of ADF nodes to transform
+ * @param transformer - Function that transforms each node
+ * @returns New transformed array of nodes
+ */
+export function transformADFNodes(nodes: ADFNode[], transformer: ADFTransformer): ADFNode[] {
+  const result: ADFNode[] = [];
+
+  for (const node of nodes) {
+    // First, recursively transform children if they exist
+    const nodeWithTransformedChildren = node.content
+      ? { ...node, content: transformADFNodes(node.content, transformer) }
+      : node;
+
+    // Then apply transformer to the node itself
+    const transformed = transformer(nodeWithTransformedChildren);
+
+    if (transformed === null) {
+      // Remove node
+      continue;
+    } else if (Array.isArray(transformed)) {
+      // Replace with multiple nodes
+      result.push(...transformed);
+    } else {
+      // Replace with single node
+      result.push(transformed);
+    }
+  }
+
+  return result;
 }
 
 // ============================================================================
@@ -262,7 +372,7 @@ export function extractUrlsFromADF(
  */
 export function extractFigmaUrlsFromADF(adf: ADFDocument): string[] {
   return extractUrlsFromADF(adf, {
-    urlPattern: 'figma.com',
+    urlPattern: FIGMA_URL_PATTERN,
     plainTextRegex: /https?:\/\/[^\s]+figma\.com[^\s]*/g,
   });
 }
@@ -275,8 +385,24 @@ export function extractFigmaUrlsFromADF(adf: ADFDocument): string[] {
  */
 export function extractConfluenceUrlsFromADF(adf: ADFDocument): string[] {
   return extractUrlsFromADF(adf, {
-    urlPattern: 'atlassian.net/wiki',
+    urlPattern: CONFLUENCE_URL_PATTERN,
     plainTextRegex: /https?:\/\/[^\s]+atlassian\.net\/wiki[^\s]*/g,
+  });
+}
+
+/**
+ * Extract Google Docs URLs from an ADF document
+ * 
+ * Only matches Google Docs URLs (docs.google.com/document/...), 
+ * not Sheets, Slides, or other Drive files.
+ * 
+ * @param adf - ADF document to search
+ * @returns Array of unique Google Docs URLs
+ */
+export function extractGoogleDocsUrlsFromADF(adf: ADFDocument): string[] {
+  return extractUrlsFromADF(adf, {
+    urlPattern: GOOGLE_DOCS_URL_PATTERN,
+    plainTextRegex: /https?:\/\/docs\.google\.com\/document\/[^\s)>\]"']+/g,
   });
 }
 
