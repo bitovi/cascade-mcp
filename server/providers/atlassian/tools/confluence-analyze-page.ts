@@ -441,7 +441,7 @@ export function registerConfluenceAnalyzePageTool(mcp: McpServer): void {
       title: 'Analyze Confluence Page',
       description: 'Debug tool that performs the full Confluence integration workflow: fetches page, converts to markdown, scores relevance with LLM, and caches everything. Returns all data for debugging.',
       inputSchema: {
-        pageUrl: z.string().optional().describe('Full Confluence page URL (e.g., https://site.atlassian.net/wiki/spaces/SPACE/pages/123456/Title)'),
+        pageUrl: z.string().url().optional().describe('Full Confluence page URL (e.g., https://site.atlassian.net/wiki/spaces/SPACE/pages/123456/Title)'),
         pageId: z.string().optional().describe('Confluence page ID (use with siteName)'),
         siteName: z.string().optional().describe('Atlassian site name (e.g., "mycompany" for mycompany.atlassian.net)'),
       },
