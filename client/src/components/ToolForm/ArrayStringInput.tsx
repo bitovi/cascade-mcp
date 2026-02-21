@@ -40,11 +40,18 @@ export function ArrayStringInput({
 
   // Sync with parent value changes
   useEffect(() => {
-    if (value.length === 0 && items.length === 1 && items[0] === '') {
-      // Don't update if we just have an empty initial state
-      return;
-    }
-    setItems(value.length > 0 ? value : ['']);
+    // Use functional update to access current items without including in deps
+    setItems(currentItems => {
+      // Skip update if both parent value and current items are empty (initial state)
+      const valueIsEmpty = value.length === 0;
+      const itemsIsEmpty = currentItems.length === 1 && currentItems[0] === '';
+      
+      if (valueIsEmpty && itemsIsEmpty) {
+        return currentItems;
+      }
+      
+      return value.length > 0 ? value : [''];
+    });
   }, [value]);
 
   const handleItemChange = (index: number, newValue: string) => {
