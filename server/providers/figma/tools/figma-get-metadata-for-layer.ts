@@ -78,7 +78,7 @@ export function registerFigmaGetMetadataForLayerTool(mcp: McpServer): void {
       title: 'Get Metadata for Figma Layer',
       description: 'Get detailed metadata for a specific Figma layer including positioning and visual properties',
       inputSchema: {
-        url: z.string().describe('The Figma file or page URL (supports both /design/ and /file/ formats)'),
+        url: z.string().url().describe('The Figma file or page URL (supports both /design/ and /file/ formats)'),
         nodeId: z.string().describe('The target layer node ID (in URL format: "60-55")'),
       },
     },

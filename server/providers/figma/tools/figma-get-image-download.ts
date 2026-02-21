@@ -30,7 +30,7 @@ export function registerFigmaGetImageDownloadTool(mcp: McpServer): void {
       title: 'Download Figma Image',
       description: 'Download an image from a Figma file by providing the file URL and node ID. Returns both base64-encoded image and metadata.',
       inputSchema: {
-        url: z.string().describe('The Figma file URL (supports both /design/ and /file/ formats)'),
+        url: z.string().url().describe('The Figma file URL (supports both /design/ and /file/ formats)'),
         nodeId: z.string().describe('The specific node ID to download (from node-id parameter in URL, e.g., "60-55")'),
         format: z.string().optional().default('png').describe('The image format (png, jpg, svg, pdf)'),
         scale: z.number().optional().default(1).describe('The scale factor for the image (0.1-4)'),

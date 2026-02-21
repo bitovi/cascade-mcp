@@ -8,6 +8,7 @@
 import { useState, useMemo } from 'react';
 import Ajv from 'ajv';
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import { ArrayStringInput } from './ArrayStringInput';
 
 interface ToolFormProps {
   tool: Tool;
@@ -28,9 +29,16 @@ interface JsonSchema {
   maximum?: number;
   minLength?: number;
   maxLength?: number;
+  minItems?: number;
+  maxItems?: number;
 }
 
-const ajv = new Ajv({ allErrors: true, verbose: true });
+const ajv = new Ajv({ 
+  allErrors: true, 
+  verbose: true,
+  strictSchema: false,  // Don't throw errors for unknown formats
+  validateFormats: false  // Disable format validation (browser handles URL validation)
+});
 
 export function ToolForm({ tool, onExecute, isExecuting }: ToolFormProps) {
   const schema = tool.inputSchema as JsonSchema;
@@ -48,7 +56,12 @@ export function ToolForm({ tool, onExecute, isExecuting }: ToolFormProps) {
       } else if (propSchema.type === 'number' || propSchema.type === 'integer') {
         values[key] = '';
       } else if (propSchema.type === 'array') {
-        values[key] = '[]';
+        // Check if it's an array of strings - use native array, otherwise JSON string
+        if (propSchema.items?.type === 'string') {
+          values[key] = [];
+        } else {
+          values[key] = '[]';
+        }
       } else if (propSchema.type === 'object') {
         values[key] = '{}';
       } else {
@@ -90,7 +103,21 @@ export function ToolForm({ tool, onExecute, isExecuting }: ToolFormProps) {
         }
       } else if (propSchema.type === 'boolean') {
         actualValues[key] = Boolean(value);
-      } else if (propSchema.type === 'array' || propSchema.type === 'object') {
+      } else if (propSchema.type === 'array') {
+        // Handle array of strings (native array) vs complex arrays (JSON string)
+        if (propSchema.items?.type === 'string' && Array.isArray(value)) {
+          actualValues[key] = value;
+        } else {
+          try {
+            if (typeof value === 'string' && value.trim()) {
+              actualValues[key] = JSON.parse(value);
+            }
+          } catch {
+            setErrors((prev) => ({ ...prev, [key]: 'Invalid JSON' }));
+            return false;
+          }
+        }
+      } else if (propSchema.type === 'object') {
         try {
           if (typeof value === 'string' && value.trim()) {
             actualValues[key] = JSON.parse(value);
@@ -142,7 +169,14 @@ export function ToolForm({ tool, onExecute, isExecuting }: ToolFormProps) {
         }
       } else if (propSchema.type === 'boolean') {
         args[key] = Boolean(value);
-      } else if (propSchema.type === 'array' || propSchema.type === 'object') {
+      } else if (propSchema.type === 'array') {
+        // Handle array of strings (native array) vs complex arrays (JSON string)
+        if (propSchema.items?.type === 'string' && Array.isArray(value)) {
+          args[key] = value;
+        } else if (typeof value === 'string' && value.trim()) {
+          args[key] = JSON.parse(value);
+        }
+      } else if (propSchema.type === 'object') {
         if (typeof value === 'string' && value.trim()) {
           args[key] = JSON.parse(value);
         }
@@ -243,13 +277,31 @@ export function ToolForm({ tool, onExecute, isExecuting }: ToolFormProps) {
         );
 
       case 'array':
-      case 'object':
+        // Check if it's an array of strings - use ArrayStringInput
+        if (propSchema.items?.type === 'string') {
+          return (
+            <ArrayStringInput
+              key={key}
+              id={key}
+              label={key}
+              value={Array.isArray(value) ? value : []}
+              onChange={(newValue) => handleChange(key, newValue)}
+              placeholder={propSchema.items?.format === 'uri' ? 'https://...' : ''}
+              required={isRequired}
+              error={error}
+              description={propSchema.description}
+              minLength={propSchema.minItems}
+              validateUrl={propSchema.items?.format === 'uri'}
+            />
+          );
+        }
+        // Fall through to textarea for complex arrays
         return (
           <div key={key} className="mb-4">
             <label htmlFor={key} className={labelClasses}>
               {key}
               {isRequired && <span className="text-red-500 ml-1">*</span>}
-              <span className="text-gray-400 font-normal ml-1">({propSchema.type})</span>
+              <span className="text-gray-400 font-normal ml-1">(array)</span>
             </label>
             {propSchema.description && (
               <p className="text-xs text-gray-500 mb-1">{propSchema.description}</p>
@@ -259,7 +311,30 @@ export function ToolForm({ tool, onExecute, isExecuting }: ToolFormProps) {
               value={String(value || '')}
               onChange={(e) => handleChange(key, e.target.value)}
               rows={3}
-              placeholder={propSchema.type === 'array' ? '[]' : '{}'}
+              placeholder={'[]'}
+              className={`${inputClasses} font-mono text-sm`}
+            />
+            {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
+          </div>
+        );
+
+      case 'object':
+        return (
+          <div key={key} className="mb-4">
+            <label htmlFor={key} className={labelClasses}>
+              {key}
+              {isRequired && <span className="text-red-500 ml-1">*</span>}
+              <span className="text-gray-400 font-normal ml-1">(object)</span>
+            </label>
+            {propSchema.description && (
+              <p className="text-xs text-gray-500 mb-1">{propSchema.description}</p>
+            )}
+            <textarea
+              id={key}
+              value={String(value || '')}
+              onChange={(e) => handleChange(key, e.target.value)}
+              rows={3}
+              placeholder={'{}'}
               className={`${inputClasses} font-mono text-sm`}
             />
             {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
@@ -282,6 +357,7 @@ export function ToolForm({ tool, onExecute, isExecuting }: ToolFormProps) {
               type={propSchema.format === 'email' ? 'email' : propSchema.format === 'uri' ? 'url' : 'text'}
               value={String(value || '')}
               onChange={(e) => handleChange(key, e.target.value)}
+              placeholder={propSchema.format === 'uri' ? 'https://...' : ''}
               minLength={propSchema.minLength}
               maxLength={propSchema.maxLength}
               className={inputClasses}
@@ -293,6 +369,30 @@ export function ToolForm({ tool, onExecute, isExecuting }: ToolFormProps) {
   };
 
   const propertyKeys = Object.keys(properties);
+
+  // Check if required fields are filled (for visual styling only)
+  const areRequiredFieldsFilled = () => {
+    return required.every((key) => {
+      const value = values[key];
+      const propSchema = properties[key];
+      
+      // For arrays
+      if (Array.isArray(value)) {
+        return value.length > 0 && value.some(item => item.trim() !== '');
+      }
+      
+      // For strings
+      if (typeof value === 'string') {
+        return value.trim() !== '' && value !== '[]' && value !== '{}';
+      }
+      
+      // For boolean and other types
+      return value !== undefined && value !== '';
+    });
+  };
+
+  const hasRequiredFields = required.length > 0;
+  const requiredFieldsFilled = areRequiredFieldsFilled();
 
   if (propertyKeys.length === 0) {
     return (
@@ -320,7 +420,13 @@ export function ToolForm({ tool, onExecute, isExecuting }: ToolFormProps) {
         <button
           type="submit"
           disabled={isExecuting}
-          className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-green-300 disabled:cursor-not-allowed transition-colors"
+          className={`px-4 py-2 text-white rounded-md transition-colors ${
+            isExecuting
+              ? 'bg-green-300 cursor-not-allowed'
+              : hasRequiredFields && !requiredFieldsFilled
+              ? 'bg-green-300 cursor-not-allowed opacity-60'
+              : 'bg-green-600 hover:bg-green-700'
+          }`}
         >
           {isExecuting ? 'Executing...' : 'Execute'}
         </button>

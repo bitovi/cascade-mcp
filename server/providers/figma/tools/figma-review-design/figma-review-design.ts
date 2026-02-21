@@ -40,7 +40,7 @@ export function registerFigmaReviewDesignTool(mcp: McpServer): void {
         'to the Figma file as comments on relevant frames.',
       inputSchema: {
         figmaUrls: z
-          .array(z.string())
+          .array(z.string().url())
           .min(1)
           .describe(
             'One or more Figma URLs to analyze. Supports file URLs, specific frame URLs, or node URLs.'

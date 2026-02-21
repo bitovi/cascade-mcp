@@ -102,7 +102,7 @@ export function registerFigmaGetLayersForPageTool(mcp: McpServer): void {
       title: 'Get Layers for Figma Page',
       description: 'List all top-level layers from a Figma page to discover available content before downloading. Returns layer IDs, names, types, and download URLs.',
       inputSchema: {
-        url: z.string().describe('The Figma file or page URL (supports both /design/ and /file/ formats with optional page parameters)'),
+        url: z.string().url().describe('The Figma file or page URL (supports both /design/ and /file/ formats with optional page parameters)'),
       },
     },
     async ({ url }: FigmaGetLayersForPageParams, context) => {
