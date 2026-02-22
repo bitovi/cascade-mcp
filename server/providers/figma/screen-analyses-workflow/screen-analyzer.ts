@@ -464,11 +464,13 @@ Document the actual content shown:
 
 ## Technical Considerations
 
-- **Responsive Indicators:** Any mobile/tablet view indicators or responsive design elements visible
-- **Performance Implications:** Large data sets, infinite scroll, lazy loading indicators
-- **Accessibility:** Visible accessibility features (alt text indicators, ARIA labels, focus states)
-- **Loading States:** Spinners, skeletons, progress indicators
-- **Error States:** Error messages, validation indicators, warning states
+Document **visible** technical UI elements only. DO NOT speculate about implementation, backend systems, or data storage.
+
+- **Responsive Design:** Mobile/tablet view indicators, breakpoint-specific layouts (if screen name shows breakpoint)
+- **Performance UI Elements:** Visible loading indicators, skeleton screens, progress bars, pagination controls, "Load more" buttons
+- **Accessibility Features:** Visible focus states, screen reader text indicators, keyboard navigation cues, ARIA label hints
+- **Loading States:** Spinners, skeletons, progress indicators shown in the UI
+- **Error States:** Error messages, validation indicators, warning banners visible on screen
 
 ## Analysis Guidelines
 
