@@ -223,8 +223,10 @@ export function transformADFNodes(nodes: ADFNode[], transformer: ADFTransformer)
 /**
  * Extract ALL URLs from an ADF document
  * 
+ * Convenience wrapper around extractUrlsFromADF that matches all HTTP/HTTPS URLs.
+ * 
  * Searches through:
- * - inlineCard nodes (embedded links)
+ * - inlineCard and blockCard nodes (embedded links and Jira smart cards)
  * - text nodes with link marks
  * - plain text URLs (optional, via regex)
  * 
@@ -236,36 +238,15 @@ export function extractAllUrlsFromADF(
   adf: ADFDocument,
   searchPlainText = true
 ): string[] {
-  const urls = new Set<string>();
-  const plainTextRegex = /https?:\/\/[^\s)>\]"']+/g;
-
-  traverseADF(adf, (node) => {
-    // Check inlineCard nodes
-    if (node.type === 'inlineCard' && node.attrs?.url) {
-      urls.add(cleanUrl(node.attrs.url));
-    }
-
-    // Check text nodes with link marks
-    if (node.type === 'text' && node.marks) {
-      for (const mark of node.marks) {
-        if (mark.type === 'link' && mark.attrs?.href) {
-          urls.add(cleanUrl(mark.attrs.href));
-        }
-      }
-    }
-
-    // Check plain text for URLs
-    if (searchPlainText && node.type === 'text' && node.text) {
-      const matches = node.text.match(plainTextRegex);
-      if (matches) {
-        for (const match of matches) {
-          urls.add(cleanUrl(match));
-        }
-      }
-    }
+  // Delegate to extractUrlsFromADF with a pattern that matches all URLs
+  const urls = extractUrlsFromADF(adf, {
+    urlPattern: /^https?:\/\//i,  // Match any URL starting with http:// or https://
+    searchPlainText,
+    plainTextRegex: /https?:\/\/[^\s)>\]"']+/g,
   });
-
-  return Array.from(urls);
+  
+  // Apply consistent URL cleanup
+  return urls.map(url => cleanUrl(url));
 }
 
 /**
@@ -289,7 +270,7 @@ function urlMatchesPattern(url: string, pattern: string | RegExp): boolean {
  * Extract URLs from an ADF document that match a specific pattern
  * 
  * Searches through:
- * - inlineCard nodes (embedded links)
+ * - inlineCard and blockCard nodes (embedded links and Jira smart cards)
  * - text nodes with link marks
  * - plain text URLs (optional, via regex)
  * 
@@ -322,8 +303,8 @@ export function extractUrlsFromADF(
   const urls = new Set<string>();
 
   traverseADF(adf, (node) => {
-    // Check inlineCard nodes
-    if (node.type === 'inlineCard' && node.attrs?.url) {
+    // Check inlineCard and blockCard nodes (Jira smart cards use blockCard)
+    if ((node.type === 'inlineCard' || node.type === 'blockCard') && node.attrs?.url) {
       const url = node.attrs.url;
       if (urlMatchesPattern(url, urlPattern)) {
         urls.add(url);
@@ -367,13 +348,34 @@ export function extractUrlsFromADF(
 /**
  * Extract Figma URLs from an ADF document
  * 
+ * Handles various formats:
+ * - blockCard/inlineCard nodes (Jira smart cards)
+ * - Text with link marks
+ * - Plain text URLs in descriptions/comments
+ * - Jira smart card format: [url|url] or [url%7Curl%7Csmart-card]
+ * 
  * @param adf - ADF document to search
  * @returns Array of unique Figma URLs
  */
 export function extractFigmaUrlsFromADF(adf: ADFDocument): string[] {
-  return extractUrlsFromADF(adf, {
+  const urls = extractUrlsFromADF(adf, {
     urlPattern: FIGMA_URL_PATTERN,
-    plainTextRegex: /https?:\/\/[^\s]+figma\.com[^\s]*/g,
+    // Match Figma URLs - stops at whitespace, pipes, or brackets
+    // Allows URLs like https://figma.com or https://www.figma.com
+    plainTextRegex: /https?:\/\/[^\s|\[\]]*figma\.com[^\s|\[\]]*/gi,
+  });
+  
+  // Clean up URLs:
+  // 1. Remove leading brackets from smart card format: [url...
+  // 2. Remove %7C (URL-encoded pipe) and everything after it from smart card format: url%7Curl
+  return urls.map(url => {
+    let cleaned = url.replace(/^\[+/, ''); // Remove leading brackets
+    // Remove %7C and everything after it (case-insensitive)
+    const pipeIndex = cleaned.search(/%7C/i);
+    if (pipeIndex !== -1) {
+      cleaned = cleaned.substring(0, pipeIndex);
+    }
+    return cleaned;
   });
 }
 
