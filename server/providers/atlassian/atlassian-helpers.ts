@@ -251,10 +251,18 @@ export async function resolveCloudId(
   if (siteName) {
     logger.info('Searching for site by name', { siteName, availableSites: sites.length });
     
-    const matchingSite = sites.find(site => 
-      site.name.toLowerCase().includes(siteName.toLowerCase()) ||
-      siteName.toLowerCase().includes(site.name.toLowerCase())
+    // First try exact match (case-insensitive)
+    let matchingSite = sites.find(site => 
+      site.name.toLowerCase() === siteName.toLowerCase()
     );
+    
+    // Fall back to substring match if no exact match
+    if (!matchingSite) {
+      matchingSite = sites.find(site => 
+        site.name.toLowerCase().includes(siteName.toLowerCase()) ||
+        siteName.toLowerCase().includes(site.name.toLowerCase())
+      );
+    }
     
     if (matchingSite) {
       logger.info('Found matching site by name', { 
