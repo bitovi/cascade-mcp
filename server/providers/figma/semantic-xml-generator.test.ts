@@ -452,4 +452,104 @@ describe('semantic-xml-generator', () => {
       expect(reduction).toBeGreaterThan(50);
     });
   });
+
+  describe('fixture: real Figma frame data', () => {
+    const fixturePath = '../../../test/fixtures/figma/yd8P9fxv1hkn84ZaFEV03n_1106-9259.json';
+    let fixtureData: any;
+
+    beforeAll(() => {
+      // Load real Figma node data captured from:
+      // https://www.figma.com/design/yd8P9fxv1hkn84ZaFEV03n/?node-id=1106-9259
+      // Frame: "Case Details - View - Small Updates - Mobile"
+      const fs = require('fs');
+      const path = require('path');
+      const fullPath = path.resolve(__dirname, fixturePath);
+      if (!fs.existsSync(fullPath)) {
+        throw new Error(
+          `Fixture not found: ${fullPath}\n` +
+          `Run: node --import ./loader.mjs scripts/load-figma-node.ts "https://www.figma.com/design/yd8P9fxv1hkn84ZaFEV03n/?node-id=1106-9259"`
+        );
+      }
+      fixtureData = JSON.parse(fs.readFileSync(fullPath, 'utf-8'));
+    });
+
+    it('should generate valid XML without errors', () => {
+      const xml = generateSemanticXml(fixtureData);
+
+      expect(xml).toContain('<?xml version="1.0" encoding="UTF-8"?>');
+      expect(xml).toContain('<Screen name=');
+      expect(xml).toContain('</Screen>');
+    });
+
+    it('should include the frame name in the output', () => {
+      const xml = generateSemanticXml(fixtureData);
+
+      expect(xml).toContain('Case Details');
+    });
+
+    it('should contain text content from the design', () => {
+      const xml = generateSemanticXml(fixtureData);
+
+      // Real designs have visible text nodes — XML should preserve them
+      // Check that at least some TEXT node content made it through
+      const textContentMatches = xml.match(/>([^<]+)</g);
+      expect(textContentMatches).not.toBeNull();
+      expect(textContentMatches!.length).toBeGreaterThan(5);
+    });
+
+    it('should contain component instances', () => {
+      const xml = generateSemanticXml(fixtureData);
+
+      // Real designs have INSTANCE nodes — they should appear as type="instance"
+      expect(xml).toContain('type="instance"');
+    });
+
+    it('should achieve significant size reduction vs raw JSON', () => {
+      const xml = generateSemanticXml(fixtureData);
+      const jsonSize = JSON.stringify(fixtureData).length;
+      const xmlSize = xml.length;
+      const reduction = (1 - xmlSize / jsonSize) * 100;
+
+      // Real Figma data has lots of metadata (bounding boxes, fills, constraints, etc.)
+      // that gets stripped — expect substantial reduction
+      expect(reduction).toBeGreaterThan(80);
+    });
+
+    it('should produce well-formed XML (no unclosed tags)', () => {
+      const xml = generateSemanticXml(fixtureData);
+
+      // Extract tag names from the XML and verify each opening tag has a matching close
+      const tagStack: string[] = [];
+      // Match opening tags, closing tags, and self-closing tags
+      const tagRegex = /<(\/?)([-\w.]+)([^>]*?)(\/?)>/g;
+      let match;
+      const errors: string[] = [];
+
+      while ((match = tagRegex.exec(xml)) !== null) {
+        const isClosing = match[1] === '/';
+        const tagName = match[2];
+        const isSelfClosing = match[4] === '/';
+
+        // Skip XML declaration and comments
+        if (tagName === '?xml') continue;
+
+        if (isSelfClosing) {
+          // Self-closing, no stack change
+        } else if (isClosing) {
+          const expected = tagStack.pop();
+          if (expected !== tagName) {
+            errors.push(`Mismatched tag: expected </${expected}> but found </${tagName}>`);
+          }
+        } else {
+          tagStack.push(tagName);
+        }
+      }
+
+      if (tagStack.length > 0) {
+        errors.push(`Unclosed tags: ${tagStack.join(', ')}`);
+      }
+
+      expect(errors).toEqual([]);
+    });
+  });
 });
