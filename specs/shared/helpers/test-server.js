@@ -13,6 +13,7 @@ import { startMockAtlassianServer, stopMockAtlassianServer } from '../test-serve
 let serverProcess = null;
 let serverUrl = null;
 let mockAtlassianPort = null;
+let intentionalShutdown = false;
 
 /**
  * Start the test server with specified configuration
@@ -32,7 +33,8 @@ export async function startTestServer(options = {}) {
     testMode = true,
     logLevel = 'error',
     port = 3000,
-    shortTokenExp = null
+    shortTokenExp = null,
+    registerUtilityTools = false,
   } = options;
 
   console.log('🚀 Starting test server...');
@@ -42,7 +44,8 @@ export async function startTestServer(options = {}) {
     ...process.env,
     TEST_MODE: testMode.toString(),
     PORT: port.toString(),
-    LOG_LEVEL: logLevel
+    LOG_LEVEL: logLevel,
+    ...(registerUtilityTools && { REGISTER_UTILITY_TOOLS: 'true' }),
   };
 
   // Start mock Atlassian server if needed
@@ -101,7 +104,7 @@ export async function startTestServer(options = {}) {
   });
 
   serverProcess.on('exit', (code, signal) => {
-    if (code !== 0 || signal) {
+    if (!intentionalShutdown && (code !== 0 || signal)) {
       console.error(`\n❌ Server exited unexpectedly (code=${code}, signal=${signal})`);
       if (serverOutput) {
         console.error('--- Server output ---');
@@ -153,6 +156,7 @@ export async function stopTestServer() {
     return;
   }
 
+  intentionalShutdown = true;
   console.log('🛑 Stopping test server...');
   
   // Stop mock Atlassian server first
@@ -172,6 +176,7 @@ export async function stopTestServer() {
       clearTimeout(timeout);
       serverProcess = null;
       serverUrl = null;
+      intentionalShutdown = false;
       console.log('✅ Test server stopped');
       resolve();
     });
