@@ -30,18 +30,23 @@ describe('debounce-middleware', () => {
       expect(second.retryAfterMs).toBeLessThanOrEqual(5000);
     });
 
-    it('should allow request after debounce window expires', async () => {
-      // First request
-      const first = checkDebounce('write-shell-stories:bitovi:PROJ-123');
-      expect(first.allowed).toBe(true);
-      
-      // Wait for debounce window to expire (5 seconds + buffer)
-      await new Promise(resolve => setTimeout(resolve, 5100));
-      
-      // Second request after window
-      const second = checkDebounce('write-shell-stories:bitovi:PROJ-123');
-      expect(second.allowed).toBe(true);
-      expect(second.retryAfterMs).toBeUndefined();
+    it('should allow request after debounce window expires', () => {
+      jest.useFakeTimers();
+      try {
+        // First request
+        const first = checkDebounce('write-shell-stories:bitovi:PROJ-123');
+        expect(first.allowed).toBe(true);
+
+        // Advance time past debounce window
+        jest.advanceTimersByTime(5100);
+
+        // Second request after window
+        const second = checkDebounce('write-shell-stories:bitovi:PROJ-123');
+        expect(second.allowed).toBe(true);
+        expect(second.retryAfterMs).toBeUndefined();
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it('should handle different keys independently', () => {

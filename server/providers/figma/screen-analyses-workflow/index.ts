@@ -43,6 +43,17 @@ export {
 } from './analysis-orchestrator.js';
 
 // ============================================================================
+// Shared Frame Data Fetching Pipeline
+// ============================================================================
+
+export {
+  fetchFrameData,
+  type FetchFrameDataOptions,
+  type FetchFrameDataResult,
+  type FrameDataFetcherDeps,
+} from './frame-data-fetcher.js';
+
+// ============================================================================
 // Types
 // ============================================================================
 

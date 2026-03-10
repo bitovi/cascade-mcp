@@ -18,19 +18,66 @@ interface FigmaGetLayersForPageParams {
 }
 
 /**
- * Helper function for page ID extraction from URL
- * Extracts page ID from node-id parameter (e.g., node-id=22-3056 → "22")
+ * Helper function for node ID extraction from URL
+ * Extracts node ID from node-id parameter and converts to Figma format
+ * (e.g., node-id=4186-6611 → "4186:6611")
  */
-function extractPageIdFromUrl(url: string): string | null {
-  const nodeIdMatch = url.match(/[?&]node-id=([0-9]+)/);
-  return nodeIdMatch ? nodeIdMatch[1] : null;
+function extractNodeIdFromUrl(url: string): string | null {
+  const nodeIdMatch = url.match(/[?&]node-id=([0-9]+-[0-9]+)/);
+  if (nodeIdMatch) {
+    // Convert URL format (123-456) to Figma API format (123:456)
+    return nodeIdMatch[1].replace('-', ':');
+  }
+  return null;
+}
+
+/**
+ * Helper function to find which page contains a specific node
+ * Traverses the document tree to locate the node, then finds its parent page
+ */
+function findPageContainingNode(apiResponse: any, targetNodeId: string): any | null {
+  const pages = apiResponse.document?.children || [];
+  
+  // Search each page for the target node
+  for (const page of pages) {
+    if (page.id === targetNodeId) {
+      // The node itself is a page
+      return page;
+    }
+    
+    // Search within this page's children recursively
+    if (findNodeInPage(page, targetNodeId)) {
+      return page;
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Recursive helper to check if a node exists within a page's tree
+ */
+function findNodeInPage(node: any, targetNodeId: string): boolean {
+  if (node.id === targetNodeId) {
+    return true;
+  }
+  
+  if (node.children && Array.isArray(node.children)) {
+    for (const child of node.children) {
+      if (findNodeInPage(child, targetNodeId)) {
+        return true;
+      }
+    }
+  }
+  
+  return false;
 }
 
 /**
  * Helper function for processing page layers
  * Extracts top-level layers from Figma API response
  */
-function processPageLayers(apiResponse: any, fileKey: string, requestedPageId: string | null) {
+function processPageLayers(apiResponse: any, fileKey: string, requestedNodeId: string | null) {
   const fileName = apiResponse.name || 'Unnamed File';
   const pages = apiResponse.document?.children || [];
 
@@ -38,11 +85,11 @@ function processPageLayers(apiResponse: any, fileKey: string, requestedPageId: s
 
   // Find target page
   let targetPage = null;
-  if (requestedPageId) {
-    // Find page matching requested ID
-    targetPage = pages.find((page: any) => page.id === requestedPageId);
-    console.log('  Looking for page ID:', requestedPageId);
-    console.log('  Found target page:', targetPage ? targetPage.name : 'NOT FOUND');
+  if (requestedNodeId) {
+    // Find the page that contains the requested node
+    targetPage = findPageContainingNode(apiResponse, requestedNodeId);
+    console.log('  Looking for node ID:', requestedNodeId);
+    console.log('  Found target page:', targetPage ? `${targetPage.name} (${targetPage.id})` : 'NOT FOUND');
   }
 
   // Fallback to first page if not found or not specified
@@ -158,9 +205,9 @@ export function registerFigmaGetLayersForPageTool(mcp: McpServer): void {
 
         console.log('  Extracted file key:', fileKey);
 
-        // 3. Extract page ID from URL (optional)
-        const pageId: string | null = extractPageIdFromUrl(url);
-        console.log('  Extracted page ID:', pageId || 'none (will use first page)');
+        // 3. Extract node ID from URL (optional) - will be used to find the containing page
+        const nodeId: string | null = extractNodeIdFromUrl(url);
+        console.log('  Extracted node ID:', nodeId || 'none (will use first page)');
 
         // 4. Create Figma client and fetch file data using helper (includes enhanced 403 logging)
         const figmaClient = createFigmaClient(token);
@@ -184,7 +231,7 @@ export function registerFigmaGetLayersForPageTool(mcp: McpServer): void {
 
         // 5. Process layers from the response
         console.log('  Processing layers...');
-        const layersResult = processPageLayers(data, fileKey, pageId);
+        const layersResult = processPageLayers(data, fileKey, nodeId);
 
         console.log('  ✅ Layers processed successfully');
         console.log('  Total layers:', layersResult.layers.length);

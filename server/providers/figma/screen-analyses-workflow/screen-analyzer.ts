@@ -87,7 +87,7 @@ export interface ScreenAnalyzerDeps {
 
 const DEFAULT_MAX_TOKENS = 8000;
 
-const DEFAULT_SYSTEM_PROMPT = `You are a UX analyst creating detailed documentation of screen designs. Be exhaustive in documenting every visible element, include exact labels and text, note all visual states, and clearly distinguish between visual observations and design note specifications.`;
+export const SCREEN_ANALYSIS_SYSTEM_PROMPT = `You are a UX analyst creating detailed documentation of screen designs. Be exhaustive in documenting every visible element, include exact labels and text, note all visual states, and clearly distinguish between visual observations and design note specifications.`;
 
 // ============================================================================
 // Main Functions
@@ -116,7 +116,7 @@ export async function analyzeFrame(
   const { frame, nodeData, image } = input;
   const {
     includeImage = true,
-    systemPrompt = DEFAULT_SYSTEM_PROMPT,
+    systemPrompt = SCREEN_ANALYSIS_SYSTEM_PROMPT,
     maxTokens = DEFAULT_MAX_TOKENS,
     contextMarkdown,
     totalFrames,

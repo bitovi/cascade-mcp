@@ -34,9 +34,6 @@ if (!process.env.VITE_JIRA_SCOPE) {
   process.env.VITE_JIRA_SCOPE = 'read:jira-work write:jira-work offline_access';
 }
 
-// Increase default timeout for E2E tests
-jest.setTimeout(30000);
-
 // Global test setup
 beforeAll(() => {
   if (process.env.TEST_USE_MOCK_ATLASSIAN === 'true' && !process.env.ATLASSIAN_TEST_PAT) {

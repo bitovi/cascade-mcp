@@ -294,16 +294,19 @@ describe('analyzeScreens', () => {
       deps
     );
     
-    // Should be called at least twice: once after expansion, once after analysis
-    expect(mockNotify).toHaveBeenCalledTimes(2);
+    // fetchFrameData sends 4 notifications (fetch, images, annotations, summary)
+    // analyzeScreens adds 2 (analyzing start, analysis complete)
+    expect(mockNotify).toHaveBeenCalledTimes(6);
     
-    // First call: screen count notification (should include comment threads matched/total)
-    expect(mockNotify).toHaveBeenNthCalledWith(1, expect.stringContaining('🤖 Analyzing Figma:'));
-    expect(mockNotify).toHaveBeenNthCalledWith(1, expect.stringContaining('1 frame(s)'));
-    expect(mockNotify).toHaveBeenNthCalledWith(1, expect.stringMatching(/\d+ of \d+ comment thread\(s\)/));
+    // fetchFrameData notifications
+    expect(mockNotify).toHaveBeenCalledWith(expect.stringContaining('🔗 Fetching Figma page data'));
+    expect(mockNotify).toHaveBeenCalledWith(expect.stringContaining('🖼️ Downloading'));
+    expect(mockNotify).toHaveBeenCalledWith(expect.stringContaining('💬 Associating'));
+    expect(mockNotify).toHaveBeenCalledWith(expect.stringContaining('📊 Found'));
     
-    // Second call: analysis complete notification
-    expect(mockNotify).toHaveBeenNthCalledWith(2, expect.stringContaining('Frame analysis complete:'));
+    // analyzeScreens notifications
+    expect(mockNotify).toHaveBeenCalledWith(expect.stringContaining('🤖 Analyzing'));
+    expect(mockNotify).toHaveBeenCalledWith(expect.stringContaining('Frame analysis complete:'));
   });
   
   it('should work without notify callback', async () => {

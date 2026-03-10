@@ -4,6 +4,8 @@ import { registerFigmaGetMetadataForLayerTool } from './figma-get-metadata-for-l
 import { registerFigmaGetImageDownloadTool } from './figma-get-image-download.js';
 import { registerFigmaGetLayersForPageTool } from './figma-get-layers-for-page.js';
 import { registerFigmaReviewDesignTool } from './figma-review-design/index.js';
+import { registerFigmaAskScopeQuestionsForPageTool } from './figma-ask-scope-questions-for-page/index.js';
+import { registerFigmaFrameAnalysisTool } from './figma-frame-analysis/index.js';
 
 /**
  * Register all Figma-specific tools with the MCP server
@@ -25,8 +27,14 @@ export function registerFigmaTools(mcp: McpServer, authContext: any): void {
   // Page layers discovery tool (ported from figma-downloadable-image-mcp)
   registerFigmaGetLayersForPageTool(mcp);
   
-  // Figma design analysis and question posting tool
+  // Figma design analysis and question posting tool (monolithic)
   registerFigmaReviewDesignTool(mcp);
   
-  console.log('  All Figma tools registered (5 tools)');
+  // Self-contained design review scope questions tool (spec 061/063)
+  registerFigmaAskScopeQuestionsForPageTool(mcp);
+  
+  // Per-frame analysis retrieval tool (spec 067 — server-side cache approach)
+  registerFigmaFrameAnalysisTool(mcp);
+  
+  console.log('  All Figma tools registered (7 tools)');
 }

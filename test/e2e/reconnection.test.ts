@@ -77,7 +77,7 @@ describe('MCP Session Reconnection', () => {
   let serverUrl: string;
 
   beforeAll(async () => {
-    serverUrl = await startTestServer({ port: 3000 } as any);
+    serverUrl = await startTestServer({ port: 3000, registerUtilityTools: true } as any);
   }, 60000);
 
   afterAll(async () => {

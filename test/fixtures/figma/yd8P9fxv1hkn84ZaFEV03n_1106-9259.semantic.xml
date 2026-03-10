@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Semantic structure for Figma screen: Case Details - View - Small Updates - Mobile -->
+<Screen name="Case Details - View - Small Updates - Mobile" type="FRAME">
+  <Main-Nav type="instance" Device="Mobile">
+    <Carton-CM-Logo>
+      <Logomark>
+        <Egg-Carton type="instance" />
+      </Logomark>
+      <Wordmark>Carton</Wordmark>
+    </Carton-CM-Logo>
+    <Account-Avatar type="instance" State="Rest" Device="Mobile">
+      <Avatar type="instance" Picture="Off" Size="Small" RoundnessType="Round">
+        <CN>AM</CN>
+      </Avatar>
+    </Account-Avatar>
+  </Main-Nav>
+  <SideNav type="instance" Device="Mobile">
+    <Main>
+      <Sidebar-Item-Expanded-1st-Level type="instance" Icon470="3786:401114" State="Active" Type="Base">
+        <AL>
+          <Icon-wrapper />
+          <Label>Cases</Label>
+        </AL>
+      </Sidebar-Item-Expanded-1st-Level>
+      <Sidebar-Item-Expanded-1st-Level type="instance" Icon470="3786:403618" State="Default" Type="Base">
+        <AL>
+          <Icon-wrapper />
+          <Label>Customers</Label>
+        </AL>
+      </Sidebar-Item-Expanded-1st-Level>
+    </Main>
+  </SideNav>
+  <Claim-Details type="instance" Device="Mobile">
+    <Case-Details>
+      <Header>
+        <Top>
+          <Case-List-Button type="instance" interactive="true" Lefticon130="3227:7962" Roundness="Default" Variant="Outline" Size="Regular" State="Hover &amp; Active">
+            <Icon-wrapper />
+          </Case-List-Button>
+          <Title>
+            Insurance Claim Dispute
+            <CAS-242314-2124>#CAS-242314-2124</CAS-242314-2124>
+          </Title>
+        </Top>
+        <Status type="instance" Righticon1150="3227:8013" Lefticon1134="3227:8069" Showrighticon1116="true" Showlefticon110="false" Roundness="Round" Variant="Secondary" Size="Small" State="Default">
+          <Label>To Do</Label>
+          <Right-icon-wrapper />
+        </Status>
+        <More-Options type="instance" State="Rest">
+          <Icon-Button type="instance" interactive="true" Lefticon130="3227:8017" Roundness="Default" Variant="Ghost" Size="Regular" State="Default" />
+        </More-Options>
+      </Header>
+      <InlineEditTextarea type="instance" State="View">
+        Case Description
+        <Sarah-Johnson-is-a-single-mother-of-two-children-seeking-housing-assistance-after-losing-her-apartment-due-to-job-loss-She-currently-has-temporary-housing-but-needs-permanent-housing-within-60-days-Her-income-is-below-the-threshold-for-the-Housing-First-program>Sarah Johnson is a single mother of two children seeking housing assistance after losing her apartment due to job loss. She currently has temporary housing but needs permanent housing within 60 days. Her income is below the threshold for the Housing First program.</Sarah-Johnson-is-a-single-mother-of-two-children-seeking-housing-assistance-after-losing-her-apartment-due-to-job-loss-She-currently-has-temporary-housing-but-needs-permanent-housing-within-60-days-Her-income-is-below-the-threshold-for-the-Housing-First-program>
+      </InlineEditTextarea>
+      <Separator type="instance" Spacing="Regular" Direction="Default" />
+      <Case-Tasks type="instance">
+        Case Tasks
+        <Case-Listing-SmallDefault type="instance">
+          <Insurance-Claim-Dispute>Coverage Questions</Insurance-Claim-Dispute>
+          <CAS-242314-2124>#TSK-242315-2125</CAS-242314-2124>
+        </Case-Listing-SmallDefault>
+        <Badge type="instance" Iconleft1134="3226:7764" Showiconright1116="false" Iconright1150="3226:7764" Showiconleft110="false" Roundness="Round" Variant="Primary" State="Default">
+          <Label>To Do</Label>
+        </Badge>
+        <Case-Listing-SmallDefault type="instance">
+          <Insurance-Claim-Dispute>Billing Inquiry</Insurance-Claim-Dispute>
+          <CAS-242314-2124>#TSK-242315-2126</CAS-242314-2124>
+        </Case-Listing-SmallDefault>
+        <Badge type="instance" Iconleft1134="3226:7764" Showiconright1116="false" Iconright1150="3226:7764" Showiconleft110="false" Roundness="Round" Variant="Primary" State="Default">
+          <Label>In-Progress</Label>
+        </Badge>
+        <Button type="instance" interactive="true" Righticon1150="3226:7764" Lefticon1134="3227:8063" Showrighticon1116="false" Showlefticon110="true" Roundness="Default" Variant="Secondary" Size="Regular" State="Default">
+          <Left-icon-wrapper />
+          <Label>Add Task</Label>
+        </Button>
+      </Case-Tasks>
+      <Essential-Details type="instance">
+        <Accordion-Trigger type="instance" State="Open">
+          <Label>Essential Details</Label>
+          <Icon-chevron-up type="instance" />
+        </Accordion-Trigger>
+        <InlineEditDropdown type="instance" State="View" Type="Dropdown">
+          <EditableField type="instance" State="View">
+            <Label type="instance">
+              <Label>Customer</Label>
+            </Label>
+            <Content-area>
+              <Content>Sarah Johnson</Content>
+            </Content-area>
+          </EditableField>
+        </InlineEditDropdown>
+        <InlineEditDropdown type="instance" State="View" Type="Dropdown">
+          <EditableField type="instance" State="View">
+            <Label type="instance">
+              <Label>Priority</Label>
+            </Label>
+            <Content-area>
+              <Content>High</Content>
+            </Content-area>
+          </EditableField>
+        </InlineEditDropdown>
+        <InlineEditDropdown type="instance" State="View" Type="Dropdown">
+          <EditableField type="instance" State="View">
+            <Label type="instance">
+              <Label>Assigned To</Label>
+            </Label>
+            <Content-area>
+              <Content>Alex Morgan</Content>
+            </Content-area>
+          </EditableField>
+        </InlineEditDropdown>
+        <InlineEditDate type="instance" State="View" Type="Date Picker">
+          <EditableField type="instance" State="View">
+            <Label type="instance">
+              <Label>Date Opened</Label>
+            </Label>
+            <Content-area>
+              <Content>Oct 24, 2025</Content>
+            </Content-area>
+          </EditableField>
+        </InlineEditDate>
+        <InlineEditDropdown type="instance" State="View" Type="Dropdown">
+          <EditableField type="instance" State="View">
+            <Label type="instance">
+              <Label>Created By</Label>
+            </Label>
+            <Content-area>
+              <Content>Alex Morgan</Content>
+            </Content-area>
+          </EditableField>
+        </InlineEditDropdown>
+        <InlineEditDate type="instance" State="View" Type="Date Picker">
+          <EditableField type="instance" State="View">
+            <Label type="instance">
+              <Label>Last Updated</Label>
+            </Label>
+            <Content-area>
+              <Content>Dec 12, 2025</Content>
+            </Content-area>
+          </EditableField>
+        </InlineEditDate>
+      </Essential-Details>
+      <Relationship-Manager-Accordion type="instance" State="Open">
+        <Accordion-Trigger type="instance" State="Open">
+          <Label>Related Cases</Label>
+          <Icon-chevron-up type="instance" />
+        </Accordion-Trigger>
+        <Case-Listing-SmallDefault type="instance">
+          <Insurance-Claim-Dispute>Policy Coverage Inquiry</Insurance-Claim-Dispute>
+          <CAS-242314-2124>#CAS-242315-2125</CAS-242314-2124>
+        </Case-Listing-SmallDefault>
+        <Button type="instance" interactive="true" Righticon1150="3226:7764" Lefticon1134="3227:8063" Showrighticon1116="false" Showlefticon110="true" Roundness="Default" Variant="Secondary" Size="Regular" State="Default">
+          <Left-icon-wrapper />
+          <Label>Add</Label>
+        </Button>
+      </Relationship-Manager-Accordion>
+      <Separator type="instance" Spacing="Regular" Direction="Default" />
+      <Comments type="instance">
+        Comments
+        <Textarea type="instance" Showresizable7610="true" State="Placeholder" Roundness="Default">
+          <Value>Add a comment...</Value>
+        </Textarea>
+        <Comment1 type="instance" Property1="Original">
+          <User>
+            <Avatar type="instance" Picture="Off" Size="Regular" RoundnessType="Round">
+              <CN>AM</CN>
+            </Avatar>
+            Alex Morgan
+            <November-29-2025-at-1155am>November 29, 2025 at 11:55am</November-29-2025-at-1155am>
+          </User>
+          <Sarah-Johnson-is-a-single-mother-of-two-children-seeking-housing-assistance-after-losing-her-apartment-due-to-job-loss-She-currently-has-temporary-housing-but-needs-permanent-housing-within-60-days-Her-income-is-below-the-threshold-for-the-Housing-First-program>Sarah Johnson is a single mother of two children seeking housing assistance after losing her apartment due to job loss. She currently has temporary housing but needs permanent housing within 60 days. Her income is below the threshold for the Housing First program.</Sarah-Johnson-is-a-single-mother-of-two-children-seeking-housing-assistance-after-losing-her-apartment-due-to-job-loss-She-currently-has-temporary-housing-but-needs-permanent-housing-within-60-days-Her-income-is-below-the-threshold-for-the-Housing-First-program>
+          <Reaction-Statistics type="instance" interactive="true" UserVote="None">
+            <VoteButton type="instance" interactive="true" Type="Up" State="Default" Count="Visible" Tooltip="Hidden">
+              <Icon-thumbs-up type="instance" />
+              1
+            </VoteButton>
+            <VoteButton type="instance" interactive="true" Type="Down" State="Default" Count="Visible" Tooltip="Hidden">
+              <Icon-thumbs-down type="instance" />
+              1
+            </VoteButton>
+          </Reaction-Statistics>
+        </Comment1>
+        <Comment2 type="instance" Property1="Original">
+          <User>
+            <Avatar type="instance" Picture="Off" Size="Regular" RoundnessType="Round">
+              <CN>AM</CN>
+            </Avatar>
+            Alex Morgan
+            <November-29-2025-at-1155am>November 29, 2025 at 11:55am</November-29-2025-at-1155am>
+          </User>
+          <Sarah-Johnson-is-a-single-mother-of-two-children-seeking-housing-assistance-after-losing-her-apartment-due-to-job-loss-She-currently-has-temporary-housing-but-needs-permanent-housing-within-60-days-Her-income-is-below-the-threshold-for-the-Housing-First-program>Sarah Johnson is a single mother of two children seeking housing assistance after losing her apartment due to job loss. She currently has temporary housing but needs permanent housing within 60 days. Her income is below the threshold for the Housing First program.</Sarah-Johnson-is-a-single-mother-of-two-children-seeking-housing-assistance-after-losing-her-apartment-due-to-job-loss-She-currently-has-temporary-housing-but-needs-permanent-housing-within-60-days-Her-income-is-below-the-threshold-for-the-Housing-First-program>
+          <Reaction-Statistics type="instance" interactive="true" UserVote="Up">
+            <VoteButton type="instance" interactive="true" Type="Up" State="Active" Count="Visible" Tooltip="Hidden">
+              <Icon-thumbs-up type="instance" />
+              1
+            </VoteButton>
+            <VoteButton type="instance" interactive="true" Type="Down" State="Default" Count="Visible" Tooltip="Hidden">
+              <Icon-thumbs-down type="instance" />
+              1
+            </VoteButton>
+          </Reaction-Statistics>
+        </Comment2>
+        <Comment3 type="instance" Property1="Original">
+          <User>
+            <Avatar type="instance" Picture="Off" Size="Regular" RoundnessType="Round">
+              <CN>AM</CN>
+            </Avatar>
+            Alex Morgan
+            <November-29-2025-at-1155am>November 29, 2025 at 11:55am</November-29-2025-at-1155am>
+          </User>
+          <Sarah-Johnson-is-a-single-mother-of-two-children-seeking-housing-assistance-after-losing-her-apartment-due-to-job-loss-She-currently-has-temporary-housing-but-needs-permanent-housing-within-60-days-Her-income-is-below-the-threshold-for-the-Housing-First-program>Sarah Johnson is a single mother of two children seeking housing assistance after losing her apartment due to job loss. She currently has temporary housing but needs permanent housing within 60 days. Her income is below the threshold for the Housing First program.</Sarah-Johnson-is-a-single-mother-of-two-children-seeking-housing-assistance-after-losing-her-apartment-due-to-job-loss-She-currently-has-temporary-housing-but-needs-permanent-housing-within-60-days-Her-income-is-below-the-threshold-for-the-Housing-First-program>
+          <Reaction-Statistics type="instance" interactive="true" UserVote="Down">
+            <VoteButton type="instance" interactive="true" Type="Up" State="Default" Count="Visible" Tooltip="Hidden">
+              <Icon-thumbs-up type="instance" />
+              1
+            </VoteButton>
+            <VoteButton type="instance" interactive="true" Type="Down" State="Active" Count="Visible" Tooltip="Hidden">
+              <Icon-thumbs-down type="instance" />
+              1
+            </VoteButton>
+          </Reaction-Statistics>
+        </Comment3>
+      </Comments>
+    </Case-Details>
+  </Claim-Details>
+</Screen>

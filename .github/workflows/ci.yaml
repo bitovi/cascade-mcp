@@ -45,6 +45,7 @@ jobs:
           echo "ATLASSIAN_TEST_PAT=${{ secrets.ATLASSIAN_TEST_PAT }}" >> .env
           echo "FIGMA_TEST_PAT=${{ secrets.FIGMA_TEST_PAT }}" >> .env
           echo "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}" >> .env
+          echo "FIGMA_TEST_URL=${{ vars.FIGMA_TEST_URL }}" >> .env
           echo ".env file created"
 
       - name: Install Dependencies
