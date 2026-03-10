@@ -74,20 +74,24 @@ export async function startTestServer(options = {}) {
   // Start server process
   serverProcess = spawn('node', ['--import', './loader.mjs', 'server/server.ts'], {
     env,
-    stdio: ['inherit', 'inherit', 'pipe'], // Allow stdout/stdin to stream, capture stderr
+    stdio: ['inherit', 'pipe', 'pipe'], // Capture stdout+stderr so we can show them on failure
     cwd: process.cwd()
   });
 
   serverUrl = `http://localhost:${port}`;
 
-  // Capture server output for debugging (only when needed)
+  // Buffer output so we can dump it if the server crashes
   let serverOutput = '';
-  // Note: stdout is now inherited, so we won't capture it unless there's an error
+
+  serverProcess.stdout.on('data', (data) => {
+    serverOutput += data.toString();
+  });
 
   serverProcess.stderr.on('data', (data) => {
-    const error = data.toString();
-    if (!error.includes('DeprecationWarning')) {
-      console.error('Server error:', error);
+    const text = data.toString();
+    serverOutput += text;
+    if (!text.includes('DeprecationWarning') && !text.includes('ExperimentalWarning')) {
+      process.stderr.write(text);
     }
   });
 
@@ -96,10 +100,14 @@ export async function startTestServer(options = {}) {
     throw error;
   });
 
-  serverProcess.on('exit', (code) => {
-    if (code !== 0) {
-      console.error('Server exited with code:', code);
-      // Note: stdout is now inherited, so no captured output to display
+  serverProcess.on('exit', (code, signal) => {
+    if (code !== 0 || signal) {
+      console.error(`\n❌ Server exited unexpectedly (code=${code}, signal=${signal})`);
+      if (serverOutput) {
+        console.error('--- Server output ---');
+        console.error(serverOutput.slice(-4000)); // last 4000 chars to avoid flooding
+        console.error('--- End server output ---');
+      }
     }
     serverProcess = null;
     serverUrl = null;
@@ -112,7 +120,8 @@ export async function startTestServer(options = {}) {
   while (retries > 0) {
     // Fast-fail: if the process already exited, don't keep waiting
     if (!serverProcess) {
-      throw new Error(`Server process exited unexpectedly during startup. Last error: ${lastError || 'unknown'}`);
+      const outputSummary = serverOutput ? `\n--- Server output ---\n${serverOutput.slice(-4000)}\n--- End ---` : '';
+      throw new Error(`Server process exited unexpectedly during startup. Last error: ${lastError || 'unknown'}${outputSummary}`);
     }
 
     try {
@@ -133,7 +142,7 @@ export async function startTestServer(options = {}) {
     retries--;
   }
 
-  throw new Error(`Test server failed to start within 30 seconds. Last error: ${lastError}`);
+  throw new Error(`Test server failed to start within 30 seconds. Last error: ${lastError}\n--- Server output ---\n${serverOutput.slice(-4000)}\n--- End ---`);
 }
 
 /**
