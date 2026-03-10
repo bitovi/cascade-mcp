@@ -110,6 +110,11 @@ export async function startTestServer(options = {}) {
   let retries = 30;
   let lastError = null;
   while (retries > 0) {
+    // Fast-fail: if the process already exited, don't keep waiting
+    if (!serverProcess) {
+      throw new Error(`Server process exited unexpectedly during startup. Last error: ${lastError || 'unknown'}`);
+    }
+
     try {
       const response = await fetch(`${serverUrl}/health`);
       if (response.ok) {

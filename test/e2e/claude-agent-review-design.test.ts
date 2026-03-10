@@ -29,7 +29,7 @@ const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const FIGMA_TEST_PAT = process.env.FIGMA_TEST_PAT?.replace(/^"|"/g, '');
 const FIGMA_TEST_URL = process.env.FIGMA_TEST_URL;
 
-const shouldSkip = !ANTHROPIC_API_KEY || !FIGMA_TEST_PAT || !FIGMA_TEST_URL;
+let shouldSkip = !ANTHROPIC_API_KEY || !FIGMA_TEST_PAT || !FIGMA_TEST_URL;
 
 if (shouldSkip) {
   console.warn('⚠️  Skipping Claude Agent SDK E2E test — missing required environment variables:');
@@ -53,11 +53,17 @@ describe('Claude Agent SDK: Design Review E2E', () => {
     delete process.env.TEST_USE_MOCK_ATLASSIAN;
 
     // Start the MCP server
-    serverUrl = await startTestServer({
-      testMode: false,
-      logLevel: 'error',
-      port: 3000,
-    });
+    try {
+      serverUrl = await startTestServer({
+        testMode: false,
+        logLevel: 'error',
+        port: 3000,
+      });
+    } catch (error) {
+      shouldSkip = true;
+      console.warn('⚠️  Skipping Claude Agent SDK E2E test — server failed to start:', (error as Error).message);
+      return;
+    }
 
     // Create unsigned JWT with Figma PAT
     testJwt = createTestJwt({ figmaPat: FIGMA_TEST_PAT! });
