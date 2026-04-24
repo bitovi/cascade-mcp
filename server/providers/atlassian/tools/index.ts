@@ -21,12 +21,12 @@ export function registerAtlassianTools(mcp: McpServer, authContext: any): void {
   registerAtlassianGetAttachmentsTool(mcp);
   registerAtlassianUpdateIssueDescriptionTool(mcp);
   
+  // Confluence tools
+  registerConfluenceAnalyzePageTool(mcp);
+  
   // ChatGPT-compatible tools (follow OpenAI MCP patterns)
   registerAtlassianFetchTool(mcp);
   registerAtlassianSearchTool(mcp);
-  
-  // Debug tools (gated behind environment variable)
-  registerConfluenceAnalyzePageTool(mcp);
   
   console.log('  All Atlassian tools registered (including ChatGPT-compatible fetch/search)');
 }

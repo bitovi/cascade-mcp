@@ -10,6 +10,7 @@ import { registerWriteNextStoryTool } from './tools/write-next-story/index.js';
 import { registerWriteStoryTool } from './tools/write-story/index.js';
 import { registerAnalyzeFeatureScopeTool } from './tools/analyze-feature-scope/index.js';
 import { registerReviewWorkItemTool } from './tools/review-work-item/index.js';
+import { registerWriteStoryContextTool } from './tools/write-story-context/index.js';
 // import { registerTestJiraUpdateTool } from './tools/writing-shell-stories/test-jira-update.js';
 
 /**
@@ -28,6 +29,7 @@ export const combinedProvider = {
     registerWriteStoryTool(mcp);
     registerAnalyzeFeatureScopeTool(mcp);
     registerReviewWorkItemTool(mcp);
+    registerWriteStoryContextTool(mcp);  // context tool (spec 061)
     // registerTestJiraUpdateTool(mcp); // Quick test tool for debugging
   },
 };

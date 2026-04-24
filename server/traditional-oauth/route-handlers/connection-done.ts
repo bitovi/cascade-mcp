@@ -47,10 +47,23 @@ export async function handleConnectionDone(req: Request, res: Response): Promise
   const providerTokens = req.session.providerTokens || {};
   
   try {
+    const debugFigmaToken = process.env.DEBUG_FIGMA_TOKEN === 'true';
+    
     // Build multi-provider tokens structure for JWT creation
     const atlassianTokens = providerTokens['atlassian'];
     const figmaTokens = providerTokens['figma'];
     const googleTokens = providerTokens['google'];
+    
+    if (debugFigmaToken && figmaTokens) {
+      console.log(`[DEBUG_FIGMA] Figma tokens from session:`, {
+        access_token_prefix: figmaTokens.access_token?.substring(0, 20) || 'missing',
+        access_token_length: figmaTokens.access_token?.length || 0,
+        refresh_token_prefix: figmaTokens.refresh_token?.substring(0, 20) || 'missing',
+        refresh_token_length: figmaTokens.refresh_token?.length || 0,
+        expires_at: figmaTokens.expires_at,
+        scope: figmaTokens.scope,
+      });
+    }
     
     // Build MultiProviderTokens structure
     const multiProviderTokens: MultiProviderTokens = {};

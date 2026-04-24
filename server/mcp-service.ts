@@ -442,10 +442,21 @@ async function getAuthInfoFromQueryToken(req: Request, res: Response): Promise<V
 function validateAndExtractJwt(token: string, req: Request, res: Response, source: string, strictLabel: string): ValidationResult {
   try {
     const payload = parseJWT(token) as JWTPayload & Partial<AuthContext>;
+    const debugFigmaToken = process.env.DEBUG_FIGMA_TOKEN === 'true';
 
     // Log which providers are present (no longer require at least one)
     if (!payload.atlassian && !payload.figma && !payload.google) {
       console.log(`JWT payload has no provider credentials (${source}) - only utility tools will be available`);
+    }
+    
+    if (debugFigmaToken && payload.figma) {
+      console.log(`[DEBUG_FIGMA] Figma credentials from JWT (${source}):`, {
+        access_token_prefix: payload.figma.access_token?.substring(0, 20) || 'missing',
+        access_token_length: payload.figma.access_token?.length || 0,
+        refresh_token_present: !!payload.figma.refresh_token,
+        expires_at: payload.figma.expires_at,
+        scope: payload.figma.scope,
+      });
     }
 
     // Only enforce JWT expiration if CHECK_JWT_EXPIRATION is set to 'true'.
