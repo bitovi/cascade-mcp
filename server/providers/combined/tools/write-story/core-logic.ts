@@ -32,6 +32,7 @@ import {
 import { handleJiraAuthError, resolveCloudId, fetchAllComments } from '../../../atlassian/atlassian-helpers.js';
 import { 
   generateStoryContentPrompt, 
+  mapJiraHierarchyToContext,
   STORY_CONTENT_SYSTEM_PROMPT, 
   STORY_CONTENT_MAX_TOKENS 
 } from './prompt-story-content.js';
@@ -324,7 +325,7 @@ export async function executeWriteStory(
   const prompt = generateStoryContentPrompt({
     issueSummary: hierarchy.target.fields.summary,
     existingDescription: isFirstRun ? undefined : existingDescriptionMarkdown,
-    hierarchy,
+    hierarchy: mapJiraHierarchyToContext(hierarchy),
     allComments: isFirstRun ? allComments : (changedContext?.changedComments || []),
     loadedContext,
     changedContext,

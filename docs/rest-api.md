@@ -312,6 +312,21 @@ console.log(`Total stories written: ${storiesWritten}`);
 
 ---
 
+## Agent Workflow Tools (MCP Only)
+
+Cascade MCP exposes **prompt + context tool pairs** for agents that want to drive workflows with their own LLM instead of MCP sampling:
+
+| Prompt | Context Tool | Purpose |
+|--------|--------------|---------|
+| `prompt-figma-page-questions` | `figma-page-questions-context` | Design review → frame analysis → scope → questions |
+| `prompt-write-story` | `write-story-context` | Fetch issue context → generate story content |
+
+These are available via the **MCP protocol only**, not as REST endpoints. Agents discover prompts via `prompts/list`, then call the corresponding context tool which returns all data + embedded prompts in a single response.
+
+**For REST API access**: Use the E2E/monolithic endpoints above (`write-story`, `figma-review-design`, etc.) which provide complete workflows in a single call.
+
+---
+
 ## Error Handling
 
 All endpoints return JSON responses with appropriate HTTP status codes:

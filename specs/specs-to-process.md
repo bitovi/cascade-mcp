@@ -1,0 +1,66 @@
+# Specs to Process
+
+Summaries are written to `specs/summaries/`. Each subagent reads the spec and the codebase, then produces a summary file with status and analysis.
+
+## Progress
+
+- [x] `3-implement-strategies.md` — status: Not Implemented
+- [x] `4-tiers.md` — status: Implemented
+- [x] `6-simplify-logging.md` — status: Partial
+- [x] `7-deferred-handling.md` — status: Implemented
+- [x] `8-groupings-with-low-priority.md` — status: Partial
+- [x] `9-shell-stories-with-scope-analysis.md` — status: Implemented
+- [x] `10-large-jira-descriptions.md` — status: Implemented
+- [x] `11-out-of-scope` — status: Implemented
+- [x] `12-looping-story-writer.md` — status: Not Implemented
+- [x] `14-questions-into-stories.md` — status: Not Implemented
+- [x] `15-e2e-test-helper.md` — status: Implemented
+- [x] `16-contributing-env.md` — status: Implemented
+- [x] `17-contributing-split.md` — status: Implemented
+- [x] `18-jira-test-cloud-id.md` — status: Implemented
+- [x] `20-dynamic-llm-providers.md` — status: Implemented
+- [x] `23-auto-connect.md` — status: Implemented
+- [x] `24-section-handling.md` — status: Implemented
+- [x] `25-section-handling-expand.md` — status: Implemented
+- [x] `26-parallel-analysis.md` — status: Implemented
+- [x] `27-file-error.md` — status: Partial
+- [x] `28-confluence.md` — status: Implemented
+- [x] `29-work-item-review.md` — status: Implemented
+- [x] `30-markdown-result.md` — status: Implemented
+- [x] `31-generate-parallel-or-sequential.md` — status: Implemented
+- [x] `32-context-reduction-strategy.md` — status: Partial
+- [x] `33-google-service-account-encryption.md` — status: Implemented
+- [x] `36-gdocs-markdown` — status: Implemented (folder)
+- [x] `38-semantic-figma-structure.md` — status: Implemented
+- [x] `39-self-healing-tools` — status: Implemented (folder)
+- [x] `43-timeout.md` — status: Partial
+- [x] `44-write-story-parallel-load-project.md` — status: Implemented
+- [x] `45-consolidate-screen-analyses.md` — status: Implemented
+- [x] `47-figma-screen-analyses-workflow.md` — status: Implemented
+- [x] `48-multi-file-figma-loading.md` — status: Not Implemented
+- [x] `49-meta-then-nodes.md` — status: Implemented
+- [x] `50-integrate-screen-analyses-workflow.md` — status: Implemented
+- [x] `52-prompt-align.md` — status: Implemented
+- [x] `53-tasks-shell-stories-improvements.md` — status: Implemented
+- [x] `53-unattached-comments.md` — status: Implemented
+- [x] `54-prevent-duplicate-automation-runs.md` — status: Implemented
+- [x] `55-reducing-api-requests.md` — status: Partial
+- [x] `56-writing-shell-stories-rate-limit.md` — status: Not Implemented
+- [x] `57-prompts.md` — status: Implemented
+- [x] `60-get-analysis.md` — status: Not Implemented
+- [x] `62-workflow-patterns.md` — status: Partial
+- [x] `63-questions-subagents.md` — status: Implemented
+- [x] `64-claude-code-typescript.md` — status: Implemented
+- [x] `65-figma-plugin-remote-mcp-research.md` — status: Not Implemented
+- [x] `65-write-to-figma` — status: Not Implemented (folder)
+- [x] `67-agent-workflow` — status: Implemented (folder)
+- [x] `001-figma-comments` — status: Implemented (folder)
+- [x] `001-google-docs-context` — status: Implemented (folder)
+- [x] `001-static-encryption-keys` — status: Partial (folder)
+- [x] `624-llm-token-fallback.md` — status: Implemented
+- [x] `625-story-to-shell-story.md` — status: Not Implemented
+- [x] `626-generic-text-encryption` — status: Partial (folder)
+- [x] `778-post-event-stream.md` — status: Implemented
+- [x] `778-reconnection-support.md` — status: Implemented
+- [x] `778b-reconnection-support.md` — status: Partial
+- [x] `778c-reconnection-support.md` — status: Implemented

@@ -84,7 +84,7 @@ if (process.env.DEV_CACHE_DIR) {
 }
 
 const sessionMiddleware = session({
-  secret: process.env.SESSION_SECRET!,
+  secret: process.env.SESSION_SECRET || 'changeme',
   resave: false,
   saveUninitialized: true,
   cookie: {

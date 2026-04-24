@@ -115,10 +115,23 @@ export async function hubCallbackHandler(
   tokens: StandardTokenResponse,
   providerName: string
 ): Promise<void> {
+  const debugFigmaToken = process.env.DEBUG_FIGMA_TOKEN === 'true';
+  
   console.log(`[HUB] Storing ${providerName} tokens`, {
     hasRefreshToken: !!tokens.refresh_token,
     expiresIn: tokens.expires_in,
   });
+  
+  if (debugFigmaToken && providerName === 'figma') {
+    console.log(`[DEBUG_FIGMA] Figma OAuth tokens received:`, {
+      access_token_prefix: tokens.access_token?.substring(0, 20) || 'missing',
+      access_token_length: tokens.access_token?.length || 0,
+      refresh_token_prefix: tokens.refresh_token?.substring(0, 20) || 'missing',
+      refresh_token_length: tokens.refresh_token?.length || 0,
+      scope: tokens.scope,
+      expires_in: tokens.expires_in,
+    });
+  }
 
   // Store tokens in session (keyed by provider name)
   if (!req.session.providerTokens) {

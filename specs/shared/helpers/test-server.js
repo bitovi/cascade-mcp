@@ -46,6 +46,11 @@ export async function startTestServer(options = {}) {
     PORT: port.toString(),
     LOG_LEVEL: logLevel,
     ...(registerUtilityTools && { REGISTER_UTILITY_TOOLS: 'true' }),
+    // Strip --experimental-vm-modules from NODE_OPTIONS so Jest's flags don't
+    // leak into the spawned server process and break the ts-node ESM loader.
+    NODE_OPTIONS: (process.env.NODE_OPTIONS || '')
+      .replace('--experimental-vm-modules', '')
+      .trim(),
   };
 
   // Start mock Atlassian server if needed

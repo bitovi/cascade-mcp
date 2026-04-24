@@ -260,14 +260,22 @@ npm run dev:client
 
 - **providers/figma/screen-analyses-workflow/** - Consolidated Figma Screen Analysis  
   Unified workflow for analyzing Figma screens with AI-generated documentation.
-  - **Main Entry Point**: `analyzeScreens(urls, figmaClient, generateText, options)` - Complete workflow from URLs to documented frames
+  - **Shared Pipeline**: `fetchFrameData(urls, figmaClient, options)` - Shared data-fetching pipeline (URL parsing → node fetching → images → annotations → ordering). Used by both `analyzeScreens` and `figma-ask-scope-questions-for-page`.
+  - **Main Entry Point**: `analyzeScreens(urls, figmaClient, generateText, options)` - Complete workflow from URLs to documented frames. Delegates to `fetchFrameData()` then adds LLM-powered analysis.
   - **Features**: Semantic XML generation, meta-first caching (tier 3 API), node caching, comment/note association
   - **Options**: `imageOptions` (format, scale), `analysisOptions` (contextMarkdown, systemPrompt), `notify` (progress callback)
   - **Returns**: `FrameAnalysisResult` with `frames: AnalyzedFrame[]` and `figmaFileUrl`
-  - **Types**: `AnalyzedFrame`, `FrameAnnotation`, `ScreenAnalysisOptions`
-  - **Modules**: url-processor, frame-expander, annotation-associator, cache-validator, image-downloader, screen-analyzer
-  - *Used by*: `write-story`, `review-work-item` (via context-loader adapter)
+  - **Types**: `AnalyzedFrame`, `FrameAnnotation`, `ScreenAnalysisOptions`, `FetchFrameDataResult`, `FetchFrameDataOptions`
+  - **Modules**: frame-data-fetcher, url-processor, frame-expander, annotation-associator, cache-validator, image-downloader, screen-analyzer
+  - *Used by*: `figma-review-design`, `figma-ask-scope-questions-for-page`, `write-story`, `review-work-item` (via context-loader adapter)
   - *Example*: `analyzeScreens(['https://figma.com/...'], client, generateText, { analysisOptions: { contextMarkdown } })`
+
+- **providers/figma/scope-cache.ts** 🆕 - Server-Side Scope Cache (spec 067)
+  - Short-lived cache for design review workflow — stores frame data while agents process frames one at a time
+  - **TTL**: 10-minute lifetime, 5-minute extension on access, lazy cleanup on next write
+  - **Structure**: `cache/figma-scope/{fileKey}/frames/{nodeId}/` with `image.png`, `context.md`, `structure.xml` + `prompts/` dir
+  - **cacheToken format**: `{fileKey}-{timestamp}` — used by `figma-frame-analysis` to retrieve cached data
+  - **Exports**: `createScopeCache(input)`, `getScopeCacheEntry(cacheToken, fileKey)`, `readCachedFrameData(fileKey, nodeId)`, `cleanupExpiredScopeCaches()`
 
 - **llm-client/** - LLM Client Integration (Vercel AI SDK)  
   Abstracts LLM access for API routes (Anthropic via AI SDK). MCP tools use MCP sampling separately.
@@ -291,13 +299,94 @@ npm run dev:client
   - **Always Logs**: Console.log() backup ensures progress is always visible
   *Example*: `createProgressCommentManager(context)` - Create manager for an operation
 
+## MCP Prompts
+
+Cascade MCP exposes prompts as agent entry points for end-to-end workflows. Each prompt tells the agent to call a corresponding context tool that returns all necessary data and embedded prompts.
+
+**Pattern: Prompt + Context Tool Pairs (spec 061)**
+
+Each workflow = 1 MCP prompt (discovered via `prompts/list`) + 1 context tool (returns all data + all embedded prompts):
+
+> **Note:** `figma-ask-scope-questions-for-page` uses a self-contained pattern instead — the tool returns workflow instructions directly in its response, with no separate prompt needed.
+
+### prompt-write-story
+- **Purpose**: Generate or refine a Jira story description from hierarchy context
+- **Arguments**: `issueKey` (required), `siteName` (required)
+- **Context Tool**: `write-story-context`
+- **Workflow**: Agent calls context tool → receives issue hierarchy, comments, existing description, linked resource URLs, and embedded story-writing prompt → generates story content → updates Jira via `atlassian-update-issue-description`
+
+**Architecture:** Context tools return data as `text` blocks and prompts as `resource` blocks with `annotations.audience: ['assistant']` and `priority` ordering.
+
+## MCP Resources
+
+Cascade MCP exposes static resources that agents can read via `resources/list` and `resources/read`. Resources require no authentication — they return static text (prompt instructions or workflow orchestration documents).
+
+**Source:** `server/mcp-resources/` — registered in `server/mcp-core/server-factory.ts` via `registerAllResources()`.
+
+### Prompt Resources
+
+Prompt resources expose the same prompt text that `figma-ask-scope-questions-for-page` embeds in its tool response, as independently readable MCP resources. Both share the same source constants (`prompt-constants.ts`) to maintain a single source of truth.
+
+| URI | Description |
+|-----|-------------|
+| `prompt://frame-analysis` | Frame analysis instructions — how to analyze a single Figma frame using its image, context, and semantic XML |
+| `prompt://scope-synthesis` | Scope synthesis instructions — how to combine frame analyses into a cross-screen scope analysis |
+| `prompt://generate-questions` | Question generation instructions — how to produce frame-specific clarifying questions from analyses |
+| `prompt://write-story-content` | Story writing instructions — how to write or refine a Jira story from hierarchy context |
+
+### Workflow Resources
+
+Workflow resources are multi-step orchestration documents that instruct agents how to execute complex workflows, including subagent parallelization.
+
+| URI | Description |
+|-----|-------------|
+| `workflow://review-design` | Design review questions workflow — batch fetch Figma data → cache on server → fork MCP-capable subagent per frame → join → synthesize scope → generate questions |
+
+**Hybrid Pattern (spec 063):** The `workflow://review-design` resource implements a "Server Batch + Local Files + Subagents" pattern:
+1. Server efficiently batch-fetches all Figma data (2 Tier 1 + 1 Tier 2 + 1 Tier 3 API calls)
+2. Server writes frame data to scope cache (`cache/figma-scope/`), returns lightweight manifest
+3. One subagent per frame analyzes independently (parallel) — subagents MUST have MCP tool access (not read-only/explore agents)
+4. Orchestrating agent synthesizes and generates questions
+
 ## Available MCP Tools
 
 ### Standard Atlassian Tools
+
 - **atlassian-get-sites** - List accessible Atlassian cloud sites
 - **atlassian-get-issue** - Retrieve complete Jira issue details with ADF description
 - **atlassian-get-attachments** - Fetch issue attachments by ID
 - **atlassian-update-issue-description** - Update issue description with markdown (converts to ADF)
+
+### Figma Tools
+
+- **figma-get-layers-for-page** - Get list of frames/layers from a Figma page
+  - Returns frame metadata with node IDs
+  - Parameters: `url` (Figma page URL)
+  - Use with: orchestration workflows to discover frames for analysis
+
+- **figma-get-image-download** - Download frame screenshot as base64 image
+  - Returns base64 image data + MIME type
+  - Parameters: `url`, `nodeId`, `format` (png/jpg/svg/pdf), `scale` (1-4)
+
+- **figma-get-metadata-for-layer** - Get full node metadata including tree structure
+  - Returns complete node metadata
+  - Parameters: `url`, `nodeId`
+
+- **figma-ask-scope-questions-for-page** 🆕 - Self-contained design review scope questions tool
+  - Uses shared `fetchFrameData()` pipeline for data fetching (same as `figma-review-design`)
+  - Fetches all frame data, writes to server-side scope cache (`cache/figma-scope/`), returns lightweight manifest (~3-5KB)
+  - Manifest includes cacheToken, frame metadata, and workflow instructions referencing `figma-frame-analysis` and MCP resources (`prompt://scope-synthesis`, `prompt://generate-questions`)
+  - Sends progress notifications during data fetching (via `createProgressNotifier`)
+  - Workflow supports parallel subagent processing: one MCP-capable agent per frame, each calling `figma-frame-analysis` (instructions explicitly require MCP tool access, not read-only/explore subagents)
+  - Parameters: `url` (Figma page URL), `context` (optional description)
+  - Returns spatial ordering manifest for consistent left-to-right, top-to-bottom processing
+
+- **figma-frame-analysis** 🆕 - Per-frame analysis retrieval tool (spec 067)
+  - Returns one frame's image + context markdown + semantic XML + analysis prompt
+  - With `cacheToken`: reads from server-side scope cache (0 Figma API calls)
+  - Without `cacheToken`: fetches directly from Figma API (standalone mode, scale:1)
+  - Parameters: `url` (Figma frame URL, required), `cacheToken` (optional string)
+  - Includes XML truncation for large frames (>50KB) via `truncateSemanticXml()`
 
 ### Google Drive Tools
 
@@ -313,8 +402,52 @@ npm run dev:client
   - Available as MCP tool only
   - Limitations: Google Docs only (not Sheets/Slides/PDFs), max 10MB document size
 
+### Google Sheets Tools
+
+- **sheets-list-spreadsheets** - List spreadsheets accessible to the authenticated user
+  - Uses Drive API `files.list` with spreadsheet mimeType filter
+  - Optional name substring filtering to narrow results
+  - Sorted by most recently modified
+  - Parameters: `nameFilter` (optional, substring search), `maxResults` (optional, default 25)
+  - Example: `sheets-list-spreadsheets({ nameFilter: "Budget" })`
+  - Returns: spreadsheet name, ID, modified time, and link for each result
+
+- **sheets-get-info** - Get spreadsheet metadata
+  - Retrieves title, locale, URL, and details for each sheet tab (name, dimensions, frozen rows/columns)
+  - Parameters: `spreadsheetId` (required)
+  - Example: `sheets-get-info({ spreadsheetId: "1a2b3c4d..." })`
+  - Returns: formatted metadata including per-tab grid dimensions
+
+- **sheets-read-values** - Read cell values from a range
+  - Reads values using A1 notation and returns a formatted markdown table
+  - Large results (>100 data rows) are truncated with a row count summary
+  - Parameters: `spreadsheetId` (required), `range` (optional, default `A1:Z1000`)
+  - Example: `sheets-read-values({ spreadsheetId: "1a2b3c4d...", range: "Sheet1!A1:D10" })`
+  - Returns: markdown table of cell values with row count
+
+- **sheets-write-values** - Write or clear cell values
+  - Writes a 2D array of values to a range, or clears a range
+  - Supports `USER_ENTERED` (parses formulas/formats) and `RAW` input modes
+  - Parameters: `spreadsheetId` (required), `range` (required), `values` (JSON 2D array string), `valueInputOption` (optional, default `USER_ENTERED`), `clearValues` (optional boolean)
+  - Example (write): `sheets-write-values({ spreadsheetId: "1a2b3c4d...", range: "Sheet1!A1:B2", values: "[[\\"Name\\",\\"Age\\"],[\\"Alice\\",\\"30\\"]]" })`
+  - Example (clear): `sheets-write-values({ spreadsheetId: "1a2b3c4d...", range: "Sheet1!A1:B2", clearValues: true })`
+  - Returns: updated range, row/column/cell counts
+
+### Utility Tools
+
+- **utility-test-sampling** - Test MCP sampling functionality
+- **utility-notifications** - Test MCP notification patterns
+- **utility-test-multi-step-workflow** - Test multi-step workflows and subagent behavior
+
 ### Combined Provider Tools
 Advanced workflow tools that integrate multiple services:
+
+- **write-story-context** 🆕 - Context tool for story writing workflow
+  - Returns all data needed by `prompt-write-story`: issue hierarchy, comments, existing description, linked resource URLs
+  - Bundles embedded story-writing prompt with system instructions and all context
+  - Parameters: `issueKey`, `siteName`
+  - Does NOT call LLMs or update Jira — agent handles generation and updates
+  - Returns linked Figma/Confluence/Google Docs URLs for agent to fetch separately if needed
 
 - **analyze-feature-scope** ⚠️ **DEPRECATED** - Use `write-shell-stories` instead
   - **Migration**: `write-shell-stories` now includes automatic scope analysis (see below)
@@ -574,6 +707,14 @@ Supports browser reconnection after page refresh during long-running tool execut
 
 **E2E test (`test/e2e/reconnection.test.ts`):**
 - Validates the full flow: connect → start tool → destroy client → reconnect → receive remaining events
+
+**E2E test (`test/e2e/claude-agent-review-design.test.ts`):** 🆕
+- Uses [Claude Agent SDK](https://platform.claude.com/docs/en/agent-sdk/typescript) (`@anthropic-ai/claude-agent-sdk`) to connect to MCP server
+- Runs the full design review workflow: `figma-ask-scope-questions-for-page` → `figma-frame-analysis` per frame → synthesis → questions
+- Auth: unsigned test JWT with Figma PAT (works because `parseJWT()` doesn't verify signatures)
+- Required env vars: `ANTHROPIC_API_KEY`, `FIGMA_TEST_PAT`, `FIGMA_TEST_URL`
+- Run: `npm run test:e2e:claude-agent`
+- Test output saved to `temp/claude-agent-review-design-*.json` for inspection
 
 ## References
 

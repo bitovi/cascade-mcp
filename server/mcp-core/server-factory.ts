@@ -11,6 +11,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { logger } from '../observability/logger.ts';
 import type { AuthContext } from './auth-context-store.ts';
+import { registerAllPrompts } from '../mcp-prompts/index.js';
+import { registerAllResources } from '../mcp-resources/index.js';
 
 // Import provider implementations
 import { atlassianProvider } from '../providers/atlassian/index.js';
@@ -51,6 +53,8 @@ export function createMcpServer(authContext: AuthContext): McpServer {
     {
       capabilities: {
         tools: {},
+        prompts: {}, // Enable prompt discovery for agent-friendly workflows
+        resources: {}, // Enable resource discovery for prompt text and workflow orchestration
         logging: {},
         sampling: {}, // Support agent callbacks (used by utility-test-sampling)
         // ChatGPT-compatible capabilities (added for OpenAI MCP client support)
@@ -60,6 +64,12 @@ export function createMcpServer(authContext: AuthContext): McpServer {
       } as any,
     },
   );
+
+  // Always register prompts (no auth required - they only return text)
+  registerAllPrompts(mcp, authContext);
+
+  // Always register resources (no auth required - they only return static text)
+  registerAllResources(mcp);
 
   // Always register utility tools (no auth required)
   console.log('  Registering utility tools');
