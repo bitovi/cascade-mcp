@@ -1,0 +1,11 @@
+{
+  "name": "cascade-mcp-marketplace",
+  "owner": { "name": "Bitovi" },
+  "plugins": [
+    {
+      "name": "cascade-mcp",
+      "source": "./plugins/cascade-mcp",
+      "description": "Skills for Jira/Figma/Google workflow orchestration with Cascade MCP"
+    }
+  ]
+}

@@ -356,6 +356,7 @@ Workflow resources are multi-step orchestration documents that instruct agents h
 - **atlassian-get-issue** - Retrieve complete Jira issue details with ADF description
 - **atlassian-get-attachments** - Fetch issue attachments by ID
 - **atlassian-update-issue-description** - Update issue description with markdown (converts to ADF)
+- **atlassian-add-comment** 🆕 - Post a comment to a Jira issue (accepts markdown, converts to ADF)
 
 ### Figma Tools
 
@@ -387,6 +388,24 @@ Workflow resources are multi-step orchestration documents that instruct agents h
   - Without `cacheToken`: fetches directly from Figma API (standalone mode, scale:1)
   - Parameters: `url` (Figma frame URL, required), `cacheToken` (optional string)
   - Includes XML truncation for large frames (>50KB) via `truncateSemanticXml()`
+
+- **figma-batch-load** 🆕 - Batch-fetch Figma data for multiple URLs across files
+  - Returns a one-time download URL for a zip containing frame images, semantic XML, and analysis prompts
+  - Agent uses `curl` + `unzip` to extract to `.temp/cascade/figma/`
+  - API budget per file: 1 Tier 3 (meta) + 1 Tier 1 (nodes) + 1 Tier 1 (images)
+  - Comments NOT included — use `figma-get-comments` separately
+  - Parameters: `requests` (array of `{ url, label? }`), `context` (optional)
+  - Returns: `{ downloadUrl, expiresAt, manifest, saveInstructions }`
+
+- **figma-post-comment** 🆕 - Post a comment to a Figma file
+  - Optionally pin to a specific node via `nodeId`
+  - Parameters: `fileKey`, `message`, `nodeId` (optional)
+  - Returns: `{ success, commentId, fileKey, nodeId }`
+
+- **figma-get-comments** 🆕 - Read existing comment threads from a Figma file
+  - Always fetches fresh (no caching — comments have no timestamp invalidation)
+  - Returns formatted markdown of comment threads
+  - Parameters: `fileKey`, `nodeId` (optional filter)
 
 ### Google Drive Tools
 
@@ -541,6 +560,67 @@ These tools follow OpenAI's MCP specification patterns for optimal ChatGPT integ
 - **ChatGPT tools**: Return simplified document format with markdown text
 - **Combined tools**: Multi-service workflows with AI-powered analysis
 - **All tools are always available** - use based on client needs (VS Code Copilot vs ChatGPT)
+
+## REST API Endpoints (PAT Authentication)
+
+All REST endpoints accept PAT (Personal Access Token) authentication via headers.
+
+### Figma Endpoints
+
+- **POST /api/figma-batch-load** — Batch-fetch Figma frames → zip download URL
+  - Header: `X-Figma-Token`
+  - Body: `{ requests: [{ url, label? }], context? }`
+
+- **POST /api/figma-post-comment** — Post a comment to a Figma file
+  - Header: `X-Figma-Token`
+  - Body: `{ fileKey, message, nodeId? }`
+
+- **GET /api/figma-get-comments** — Read comment threads from a Figma file
+  - Header: `X-Figma-Token`
+  - Query: `?fileKey=abc123&nodeId=123:456` (nodeId optional)
+
+### Atlassian Endpoints
+
+- **POST /api/atlassian-add-comment** — Post a comment to a Jira issue
+  - Header: `X-Atlassian-Token` (format: `email:api-token`)
+  - Body: `{ issueKey, comment, cloudId?, siteName? }`
+
+### Download Endpoint
+
+- **GET /dl/:token** — One-time zip download (no auth header required)
+  - Token is the auth mechanism (UUID, single-use, 10-minute TTL)
+  - Returns the zip file as `application/zip` with `Content-Disposition: attachment`
+  - Used by agent skills to download `figma-batch-load` results via `curl`
+
+## Plugin Skills
+
+The `plugins/cascade-mcp/` directory contains AI agent skills packaged as a `.claude-plugin` plugin. Skills are SKILL.md instruction files that guide agents through multi-step workflows.
+
+### Plugin Structure
+
+```
+plugins/cascade-mcp/
+├── .claude-plugin/
+│   └── plugin.json          # Plugin manifest + MCP server config
+├── README.md                 # Install instructions
+└── skills/
+    ├── load-content/         # Sub-skill: batch-fetch data
+    ├── analyze-content/      # Sub-skill: orchestrate frame analysis
+    ├── analyze-figma-frame/  # Sub-skill: per-frame subagent analysis
+    ├── scope-analysis/       # Sub-skill: synthesize feature scope
+    ├── generate-questions/   # Parent: load → analyze → generate questions
+    ├── post-questions-to-figma/  # Parent: post questions as Figma comments
+    ├── post-questions-to-jira/   # Parent: post questions as Jira comment
+    ├── review-design/        # Parent: end-to-end review workflow
+    └── write-story/          # Parent: write story from design analysis
+```
+
+### How Skills Interact with MCP Tools
+
+1. Skills call `figma-batch-load` to get a zip download URL
+2. Agent runs `curl` + `unzip` to save data to `.temp/cascade/figma/`
+3. Sub-skills read from the local filesystem (no further MCP calls for cached data)
+4. Results posted via `figma-post-comment`, `atlassian-add-comment`, or `atlassian-update-issue-description`
 
 ## Key Authentication Patterns
 

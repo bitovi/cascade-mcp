@@ -6,6 +6,9 @@ import { registerFigmaGetLayersForPageTool } from './figma-get-layers-for-page.j
 import { registerFigmaReviewDesignTool } from './figma-review-design/index.js';
 import { registerFigmaAskScopeQuestionsForPageTool } from './figma-ask-scope-questions-for-page/index.js';
 import { registerFigmaFrameAnalysisTool } from './figma-frame-analysis/index.js';
+import { registerFigmaBatchLoadTool } from './figma-batch-load/index.js';
+import { registerFigmaPostCommentTool } from './figma-post-comment.js';
+import { registerFigmaGetCommentsTool } from './figma-get-comments.js';
 
 /**
  * Register all Figma-specific tools with the MCP server
@@ -36,5 +39,12 @@ export function registerFigmaTools(mcp: McpServer, authContext: any): void {
   // Per-frame analysis retrieval tool (spec 067 — server-side cache approach)
   registerFigmaFrameAnalysisTool(mcp);
   
-  console.log('  All Figma tools registered (7 tools)');
+  // Batch load Figma frames to zip (spec 068 — plugin skills)
+  registerFigmaBatchLoadTool(mcp);
+  
+  // Comment tools (spec 068 — plugin skills)
+  registerFigmaPostCommentTool(mcp);
+  registerFigmaGetCommentsTool(mcp);
+  
+  console.log('  All Figma tools registered (10 tools)');
 }

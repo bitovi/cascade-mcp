@@ -6,6 +6,7 @@ import { registerAtlassianUpdateIssueDescriptionTool } from './atlassian-update-
 import { registerAtlassianFetchTool } from './atlassian-fetch.js';
 import { registerAtlassianSearchTool } from './atlassian-search.js';
 import { registerConfluenceAnalyzePageTool } from './confluence-analyze-page.js';
+import { registerAtlassianAddCommentTool } from './atlassian-add-comment.js';
 
 /**
  * Register all Atlassian-specific tools with the MCP server
@@ -28,5 +29,8 @@ export function registerAtlassianTools(mcp: McpServer, authContext: any): void {
   registerAtlassianFetchTool(mcp);
   registerAtlassianSearchTool(mcp);
   
-  console.log('  All Atlassian tools registered (including ChatGPT-compatible fetch/search)');
+  // Comment tool (spec 068 — plugin skills)
+  registerAtlassianAddCommentTool(mcp);
+  
+  console.log('  All Atlassian tools registered (8 tools)');
 }

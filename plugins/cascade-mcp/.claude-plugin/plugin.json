@@ -1,0 +1,11 @@
+{
+  "name": "cascade-mcp",
+  "description": "Skills for generating design review questions, posting to Figma/Jira, and writing user stories via Cascade MCP",
+  "author": { "name": "Bitovi" },
+  "mcpServers": {
+    "cascade-mcp": {
+      "type": "http",
+      "url": "https://cascade.bitovi.com/mcp"
+    }
+  }
+}

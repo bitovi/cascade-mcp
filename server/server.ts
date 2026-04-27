@@ -30,6 +30,7 @@ import { figmaProvider } from './providers/figma/index.js';
 import { googleProvider } from './providers/google/index.js';
 import { logEnvironmentInfo } from './debug-helpers.js';
 import { registerRestApiRoutes } from './api/index.js';
+import { registerDownloadEndpoint } from './api/download.js';
 import { getProjectRoot } from './utils/file-paths.js';
 import { handleEncryptionRequest } from './encrypt.js';
 import { encryptionManager, InvalidKeyFormatError } from './utils/encryption-manager.js';
@@ -261,6 +262,9 @@ app.delete('/mcp', handleSessionRequest);
 
 // --- REST API Endpoints (PAT Authentication) ---
 registerRestApiRoutes(app);
+
+// --- Download Endpoint (one-time token auth) ---
+registerDownloadEndpoint(app);
 
 // --- Encryption Endpoint (POST only, GET handled by React) ---
 app.post('/encrypt', express.urlencoded({ extended: true }), handleEncryptionRequest);
