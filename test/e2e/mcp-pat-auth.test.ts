@@ -76,6 +76,7 @@ describe('MCP PAT Header Authentication', () => {
     serverUrl = await startTestServer({
       testMode: false,
       logLevel: 'error',
+      port: 3000,
     });
   }, 30000);
 
@@ -128,11 +129,12 @@ describe('MCP PAT Header Authentication', () => {
     });
 
     // Should get a successful response with issue data
-    expect(result.content).toBeDefined();
-    expect(Array.isArray(result.content)).toBe(true);
-    expect(result.content.length).toBeGreaterThan(0);
+    const content = result.content as any[];
+    expect(content).toBeDefined();
+    expect(Array.isArray(content)).toBe(true);
+    expect(content.length).toBeGreaterThan(0);
 
-    const textContent = (result.content as any[]).find(c => c.type === 'text');
+    const textContent = content.find(c => c.type === 'text');
     expect(textContent).toBeDefined();
 
     // Should contain the issue key in the response
