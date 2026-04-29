@@ -47,6 +47,7 @@
     "@types/turndown": "^5.0.6",
     "ai": "^6.0.121",
     "ajv": "^8.17.1",
+    "archiver": "^7.0.1",
     "aws-sdk": "^2.1692.0",
     "axios": "^1.1.2",
     "cors": "^2.8.5",
@@ -81,6 +82,7 @@
   "devDependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.71",
     "@jest/globals": "^30.1.2",
+    "@types/archiver": "^7.0.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/express-session": "^1.18.2",

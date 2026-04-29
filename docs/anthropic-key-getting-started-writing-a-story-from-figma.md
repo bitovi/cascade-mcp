@@ -60,7 +60,11 @@ Even the most detailed Figma design - full of notes and comments - will leave a 
 
 
 > [!NOTE]
-> There are multiple ways to call CascadeMCP tools. Any [MCP](https://modelcontextprotocol.io/) AI Agent with [Sampling](https://modelcontextprotocol.io/specification/2025-06-18/client/sampling) (like Copilot) can be configured to call CascadeMCP. However, for these guides, we will be using the MiniMCP client hosted on Cascade's homepage: [https://cascade.bitovi.com/](https://cascade.bitovi.com/). You will need an [Anthropic API Key](https://platform.claude.com/settings/keys).
+> There are 4 ways to call CascadeMCP tools:
+> - with a skill-supporting coding agent like Claude or Copilot (see [Agent Getting Started](./agent-getting-started-writing-a-story-from-figma.md))
+> - with the MiniMCP client using an Anthropic API key — **this guide** ([https://cascade.bitovi.com/](https://cascade.bitovi.com/))
+> - with any MCP-compatible client (Claude Desktop, VS Code MCP extension, etc.)
+> - with the [REST API](./rest-api.md)
 
 To call `figma-review-design`, you need to:
 
@@ -140,7 +144,7 @@ When complete, refresh the Jira story. You'll find a _very_ detailed story, comp
 
 
 > [!WARNING]
-> If your feature is too big and needs to be broken up into multiple stories, checkout [Getting Started Building Epics and Stories from Figma](./getting-started-building-epics-and-stories-from-figma.md)
+> If your feature is too big and needs to be broken up into multiple stories, checkout [Getting Started Building Epics and Stories from Figma](./anthropic-key-getting-started-building-epics-and-stories-from-figma.md)
 
 > [!NOTE]
 > If you want to automate the development of this feature, checkout [Cloud AI implements Figma and Jira](https://wiki.at.bitovi.com/wiki/spaces/AIEnabledDevelopment/pages/1517289538/Cascading+v2+Cloud+AI+implements+Figma+and+Jira)

@@ -13,6 +13,12 @@ import { handleIdentifyFeatures } from './identify-features.js';
 import { handleAnalyzeFeatureScope } from './analyze-feature-scope.js';
 import { handleFigmaReviewDesign } from './figma-review-design.js';
 import { handleReviewWorkItem } from './review-work-item.js';
+import { handleFigmaBatchLoad } from './figma-batch-load.js';
+import { handleFigmaPostComment } from './figma-post-comment.js';
+import { handleFigmaGetComments } from './figma-get-comments.js';
+import { handleAtlassianAddComment } from './atlassian-add-comment.js';
+import { handleAtlassianUpdateComment } from './atlassian-update-comment.js';
+import { handleExtractLinkedResources } from './extract-linked-resources.js';
 import { debounce } from './debounce-middleware.js';
 import { encryptionManager } from '../utils/encryption-manager.js';
 
@@ -78,6 +84,29 @@ export function registerRestApiRoutes(app: Express): void {
   // Review work item completeness and post questions as comments
   app.post('/api/review-work-item', (req, res) => handleReviewWorkItem(req, res));
   console.log('  ✓ POST /api/review-work-item');
+  
+  // Batch load Figma frames to zip (spec 068 — plugin skills)
+  app.post('/api/figma-batch-load', (req, res) => handleFigmaBatchLoad(req, res));
+  console.log('  ✓ POST /api/figma-batch-load');
+  
+  // Post a comment to a Figma file
+  app.post('/api/figma-post-comment', (req, res) => handleFigmaPostComment(req, res));
+  console.log('  ✓ POST /api/figma-post-comment');
+  
+  // Get comments from a Figma file
+  app.get('/api/figma-get-comments', (req, res) => handleFigmaGetComments(req, res));
+  console.log('  ✓ GET /api/figma-get-comments');
+  
+  // Add a comment to a Jira issue
+  app.post('/api/atlassian-add-comment', (req, res) => handleAtlassianAddComment(req, res));
+  console.log('  ✓ POST /api/atlassian-add-comment');
+
+  app.put('/api/atlassian-update-comment', (req, res) => handleAtlassianUpdateComment(req, res));
+  console.log('  ✓ PUT /api/atlassian-update-comment');
+  
+  // Extract content + discovered links from any URL (Jira, Confluence, Google Docs)
+  app.post('/api/extract-linked-resources', (req, res) => handleExtractLinkedResources(req, res));
+  console.log('  ✓ POST /api/extract-linked-resources');
   
   console.log('REST API routes registered successfully');
 }

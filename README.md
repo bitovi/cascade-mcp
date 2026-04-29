@@ -14,9 +14,11 @@ Checkout our introduction video to understand what it can do:
 
 ## Getting Started
 
-Read our [Getting Started Writing a Story from Figma](./docs/getting-started-writing-a-story-from-figma.md) on how to set up your Figma designs and Jira story for best results.
+Read our [Agent Getting Started: Writing a Story from Figma](./docs/agent-getting-started-writing-a-story-from-figma.md) on how to use Claude or Copilot to write stories from Figma.
 
-Read our [Getting Started Building Epics and Stories from Figma](./docs/getting-started-building-epics-and-stories-from-figma.md) on how to set up your Figma designs and Jira story for best results.
+Read our [Getting Started Writing a Story from Figma](./docs/anthropic-key-getting-started-writing-a-story-from-figma.md) on how to set up your Figma designs and Jira story for best results.
+
+Read our [Getting Started Building Epics and Stories from Figma](./docs/anthropic-key-getting-started-building-epics-and-stories-from-figma.md) on how to set up your Figma designs and Jira story for best results.
 
 
 

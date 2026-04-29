@@ -68,7 +68,11 @@ Even the most detailed Figma design - full of notes and comments - will leave a 
 
 
 > [!NOTE]
-> There are multiple ways to call CascadeMCP tools. Any [MCP](https://modelcontextprotocol.io/) AI Agent with [Sampling](https://modelcontextprotocol.io/specification/2025-06-18/client/sampling) (like Copilot) can be configured to call CascadeMCP. However, for these guides, we will be using the MiniMCP client hosted on Cascade's homepage: [https://cascade.bitovi.com/](https://cascade.bitovi.com/). You will need an [Anthropic API Key](https://platform.claude.com/settings/keys).
+> There are 4 ways to call CascadeMCP tools:
+> - with a skill-supporting coding agent like Claude or Copilot (see [Agent Getting Started: Epics and Stories](./agent-getting-started-writing-a-story-from-figma.md))
+> - with the MiniMCP client using an Anthropic API key — **this guide** ([https://cascade.bitovi.com/](https://cascade.bitovi.com/))
+> - with any MCP-compatible client (Claude Desktop, VS Code MCP extension, etc.)
+> - with the [REST API](./rest-api.md)
 
 To call `figma-review-design`, you need to:
 
@@ -217,4 +221,4 @@ Once all shell stories have been written in detail, running `write-next-story` w
 | 7 | `write-next-story` (repeated) | Each story written in detail |
 
 > [!NOTE]
-> If you have a small feature that only needs one story, see [Getting Started Writing a Story from Figma](./getting-started-writing-a-story-from-figma.md) instead. 
+> If you have a small feature that only needs one story, see [Getting Started Writing a Story from Figma](./anthropic-key-getting-started-writing-a-story-from-figma.md) instead. 
