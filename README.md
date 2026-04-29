@@ -12,14 +12,6 @@ Checkout our introduction video to understand what it can do:
 
 👉 Btw, Bitovi can help you integrate this into your own SDLC workflow: [AI for Software Teams](https://www.bitovi.com/ai-for-software-teams)
 
-## Getting Started
-
-Read our [Agent Getting Started: Writing a Story from Figma](./docs/agent-getting-started-writing-a-story-from-figma.md) on how to use Claude or Copilot to write stories from Figma.
-
-Read our [Getting Started Writing a Story from Figma](./docs/anthropic-key-getting-started-writing-a-story-from-figma.md) on how to set up your Figma designs and Jira story for best results.
-
-Read our [Getting Started Building Epics and Stories from Figma](./docs/anthropic-key-getting-started-building-epics-and-stories-from-figma.md) on how to set up your Figma designs and Jira story for best results.
-
 
 
 
@@ -32,6 +24,8 @@ Supported tools at the `https://cascade.bitovi.com/mcp` endpoint:
 - **[`analyze-feature-scope`](./server/providers/combined/tools/analyze-feature-scope/README.md)** - Generate scope analysis from Figma designs linked in a Jira epic (identifies features, establishes scope boundaries, surfaces questions before implementation)
 - **[`write-shell-stories`](./server/providers/combined/tools/writing-shell-stories/README.md)** - Generate shell stories from Figma designs linked in a Jira epic (analyzes screens, downloads assets, creates prioritized user stories using AI)
 - **[`write-epics-next-story`](./server/providers/combined/tools/write-next-story/README.md)** - Write the next Jira story from shell stories in an epic (validates dependencies, generates full story content, creates Jira issue with acceptance criteria)
+- **[`write-story`](./server/providers/combined/tools/write-story/write-story.ts)** - Generate or refine a Jira story by gathering comprehensive context (parent hierarchy, comments, linked Figma/Confluence/Google Docs) and writing the best possible story
+- **[`extract-linked-resources`](./server/providers/combined/tools/extract-linked-resources/extract-linked-resources.ts)** - Fetch a URL (Jira issue, Confluence page, Google Doc) and return its content as markdown with YAML frontmatter listing all discovered linked resources
 - **[`review-work-item`](./server/providers/combined/tools/review-work-item/README.md)** - Review a Jira work item and generate questions identifying gaps, ambiguities, and missing information (posts review as Jira comment)
 
 **Atlassian/Jira Tools**:
@@ -39,14 +33,30 @@ Supported tools at the `https://cascade.bitovi.com/mcp` endpoint:
 - **[`atlassian-get-issue`](./server/providers/atlassian/tools/atlassian-get-issue.md)** - Retrieve complete details of a Jira issue by ID or key, including description, attachments, comments, and full field data
 - **[`atlassian-get-attachments`](./server/providers/atlassian/tools/atlassian-get-attachments.md)** - Fetch Jira attachments by attachment ID (returns base64-encoded content)
 - **[`atlassian-update-issue-description`](./server/providers/atlassian/tools/atlassian-update-issue-description.md)** - Update a Jira issue description with markdown content (automatically converted to ADF)
+- **[`atlassian-add-comment`](./server/providers/atlassian/tools/atlassian-add-comment.ts)** - Post a comment to a Jira issue (markdown automatically converted to ADF)
+- **[`atlassian-update-comment`](./server/providers/atlassian/tools/atlassian-update-comment.ts)** - Update an existing Jira comment (markdown automatically converted to ADF)
+- **[`confluence-analyze-page`](./server/providers/atlassian/tools/confluence-analyze-page.ts)** - Fetch a Confluence page, convert to markdown, score relevance with LLM, and cache the result
 - **[`search`](./server/providers/atlassian/tools/atlassian-search.md)** - Search Jira issues using JQL (Jira Query Language) with standardized document format output
 - **[`fetch`](./server/providers/atlassian/tools/atlassian-fetch.md)** - Fetch Jira issue details by issue key/ID in standardized document format (ChatGPT-compatible)
 
 **Figma Tools**:
 - **[`figma-get-user`](./server/providers/figma/tools/figma-get-user.md)** - Get information about the authenticated Figma user (test tool for OAuth validation)
+- **[`figma-review-design`](./server/providers/figma/tools/figma-review-design/figma-review-design.ts)** - Analyze Figma screen designs and post clarifying questions as comments on relevant frames
+- **[`figma-batch-load`](./server/providers/figma/tools/figma-batch-load/figma-batch-load.ts)** - Batch-fetch Figma data for multiple URLs; returns a zip download containing per-frame images, structure XML, comments, notes, and analysis prompts
+- **[`figma-ask-scope-questions-for-page`](./server/providers/figma/tools/figma-ask-scope-questions-for-page/figma-ask-scope-questions-for-page.ts)** - Analyze a Figma page and generate design scope questions with frame data and embedded analysis prompts
+- **[`figma-post-comment`](./server/providers/figma/tools/figma-post-comment.ts)** - Post a comment to a Figma file, optionally pinned to a specific frame node
+- **[`figma-get-comments`](./server/providers/figma/tools/figma-get-comments.ts)** - Read existing comments from a Figma file, grouped into threads
 - **[`figma-get-image-download`](./server/providers/figma/tools/figma-get-image-download.md)** - Download images from Figma design URLs (returns base64-encoded image and metadata)
 - **[`figma-get-metadata-for-layer`](./server/providers/figma/tools/figma-get-metadata-for-layer.md)** - Get detailed metadata for a specific Figma layer including positioning and visual properties
 - **[`figma-get-layers-for-page`](./server/providers/figma/tools/figma-get-layers-for-page.md)** - List all top-level layers from a Figma page with layer IDs, names, types, and download URLs
+
+**Google Tools**:
+- **[`drive-about-user`](./server/providers/google/tools/drive-about-user.ts)** - Retrieve information about the authenticated Google Drive user (test tool for OAuth validation)
+- **[`drive-doc-to-markdown`](./server/providers/google/tools/drive-doc-to-markdown/)** - Convert a Google Docs document to Markdown format (supports headings, formatting, lists, and hyperlinks)
+- **[`sheets-list-spreadsheets`](./server/providers/google/tools/sheets-list-spreadsheets.ts)** - List Google Spreadsheets accessible to the authenticated user, with optional name filtering
+- **[`sheets-get-info`](./server/providers/google/tools/sheets-get-info.ts)** - Get spreadsheet metadata including title, locale, and details about each sheet tab
+- **[`sheets-read-values`](./server/providers/google/tools/sheets-read-values.ts)** - Read cell values from a range in a Google Spreadsheet using A1 notation
+- **[`sheets-write-values`](./server/providers/google/tools/sheets-write-values.ts)** - Write values to or clear a range in a Google Spreadsheet
 
 **Utility Tools**:
 - **[`utility-test-sampling`](./server/providers/utility/tools/utility-test-sampling.md)** - Test sampling functionality by sending prompts to the agent and logging the interaction (enables testing of agent capabilities and inter-MCP tool communication)
@@ -66,8 +76,9 @@ See the **[LLM Provider Guide](./server/llm-client/README.md)** for complete doc
 
 ## Use
 
-There are two main ways to use CascadeMCP:
+There are four main ways to use CascadeMCP:
 
+- With a skill-supporting coding agent like Claude or Copilot (see [Agent Getting Started](./docs/agent-getting-started-writing-a-story-from-figma.md))
 - With the mini MCP client hosted at [https://cascade.bitovi.com/](https://cascade.bitovi.com/)
 - With an MCP client that has sampling capabilities (like VSCode Copilot), shown below.
 - With a Jira automation, shown [here](https://bitovi.atlassian.net/wiki/spaces/AIEnabledDevelopment/pages/1734148141/Jira+Automation+Setup).
