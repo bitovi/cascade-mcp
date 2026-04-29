@@ -183,11 +183,12 @@ npm run dev:client
   Creates pre-configured clients for making authenticated Atlassian API requests.
   - `createAtlassianClient(accessToken)` - OAuth client (routes through api.atlassian.com gateway)
   - `createAtlassianClientWithPAT(base64Credentials)` - PAT client (direct site URLs)
+  - `createAtlassianClientFromAuth(providerAuthInfo, siteName?)` - Routes to OAuth or PAT client based on `authType`
   - `client.fetch(url, options)` - Makes authenticated requests with token in closure
   - `client.getJiraBaseUrl(cloudId)` - Returns Jira API base URL for cloud ID
   - `client.getConfluenceBaseUrl(cloudId)` - Returns Confluence API base URL for cloud ID
   - *Note*: OAuth tokens **must** route through `api.atlassian.com/ex/{product}/{cloudId}/` gateway
-  - *Example*: `const client = createAtlassianClient(token); await client.fetch(client.getJiraBaseUrl(cloudId) + '/issue/PROJ-123')`
+  - *Example*: `const client = createAtlassianClientFromAuth(authInfo.atlassian, siteName); await client.fetch(client.getJiraBaseUrl(cloudId) + '/issue/PROJ-123')`
 
 - **providers/atlassian/markdown-converter.ts** - Markdown ↔ ADF Conversion  
   Converts between Markdown and ADF (Atlassian Document Format) for Jira descriptions.
@@ -653,6 +654,44 @@ plugins/cascade-mcp/
 4. Results posted via `figma-post-comment`, `atlassian-add-comment`, or `atlassian-update-issue-description`
 
 ## Key Authentication Patterns
+
+### MCP PAT Authentication (Personal Access Tokens)
+
+MCP clients can authenticate using Personal Access Tokens via HTTP headers instead of the OAuth PKCE flow. This enables headless/cloud-hosted AI agents (e.g., GitHub Copilot agent), programmatic MCP clients, and simpler local development.
+
+**Supported headers:**
+- `X-Atlassian-Token` — Base64-encoded `email:api_token` for Jira/Confluence
+- `X-Figma-Token` — Figma personal access token
+- `X-Google-Token` — RSA-encrypted Google service account JSON
+
+At least one provider token must be present. PAT auth bypasses the OAuth PKCE flow entirely.
+
+**Auth fallback chain:** JWT Bearer → Query param JWT → PAT headers. If a JWT is present, PAT headers are ignored. A session is either fully OAuth or fully PAT.
+
+**Key differences from OAuth:**
+- PATs don't expire in the auth store (no `expires_at` / `refresh_token`)
+- Invalid PATs return tool errors, not `WWW-Authenticate` 401s (no OAuth re-auth flow)
+- Atlassian PATs require `siteName` in tool parameters (PAT clients use `{siteName}.atlassian.net` directly instead of the OAuth API gateway)
+
+**Example: Initialize an MCP session with PATs:**
+```bash
+curl -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -H "X-Atlassian-Token: base64(email:api_token)" \
+  -H "X-Figma-Token: figd_..." \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2025-03-26",
+      "capabilities": {},
+      "clientInfo": { "name": "my-client", "version": "1.0" }
+    },
+    "id": 1
+  }'
+```
+
+**Internal routing:** MCP tools use `createAtlassianClientFromAuth(authInfo.atlassian, siteName)` which automatically selects `Bearer` auth (OAuth) or `Basic` auth (PAT) based on `authType`.
 
 ### Environment Variables
 

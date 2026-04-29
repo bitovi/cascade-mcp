@@ -8,7 +8,7 @@
 import { z } from 'zod';
 import type { McpServer } from '../../../../mcp-core/mcp-types.js';
 import { getAuthInfoSafe } from '../../../../mcp-core/auth-helpers.js';
-import { createAtlassianClient } from '../../../atlassian/atlassian-api-client.js';
+import { createAtlassianClientFromAuth } from '../../../atlassian/atlassian-api-client.js';
 import { logger } from '../../../../observability/logger.js';
 import { executeWriteStoryContext } from './core-logic.js';
 
@@ -61,7 +61,7 @@ export function registerWriteStoryContextTool(mcp: McpServer): void {
           };
         }
 
-        const atlassianClient = createAtlassianClient(atlassianToken);
+        const atlassianClient = createAtlassianClientFromAuth(authInfo.atlassian!, siteName);
 
         // Execute core logic
         const result = await executeWriteStoryContext(

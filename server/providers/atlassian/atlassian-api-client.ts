@@ -161,3 +161,21 @@ export function createAtlassianClientWithPAT(base64Credentials: string, siteName
     },
   };
 }
+
+/**
+ * Create an Atlassian API client from a ProviderAuthInfo object.
+ * Routes to OAuth or PAT client based on authType.
+ * 
+ * @param atlassian - Provider auth info containing access_token and authType
+ * @param siteName - Site name required for PAT auth (e.g., "mycompany" from mycompany.atlassian.net)
+ * @returns AtlassianClient configured for the appropriate auth method
+ */
+export function createAtlassianClientFromAuth(
+  atlassian: { access_token: string; authType?: 'oauth' | 'pat' },
+  siteName?: string,
+): AtlassianClient {
+  if (atlassian.authType === 'pat') {
+    return createAtlassianClientWithPAT(atlassian.access_token, siteName);
+  }
+  return createAtlassianClient(atlassian.access_token);
+}

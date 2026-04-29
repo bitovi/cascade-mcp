@@ -8,7 +8,7 @@
 import { z } from 'zod';
 import type { McpServer } from '../../../../mcp-core/mcp-types.js';
 import { getAuthInfoSafe } from '../../../../mcp-core/auth-helpers.js';
-import { createAtlassianClient } from '../../../atlassian/atlassian-api-client.js';
+import { createAtlassianClientFromAuth } from '../../../atlassian/atlassian-api-client.js';
 import { createFigmaClient } from '../../../figma/figma-api-client.js';
 import { createGoogleClient } from '../../../google/google-api-client.js';
 import { createMcpLLMClient } from '../../../../llm-client/mcp-sampling-client.js';
@@ -75,7 +75,7 @@ export function registerWriteNextStoryTool(mcp: McpServer): void {
 
       try {
         // Create API clients with tokens captured in closures
-        const atlassianClient = createAtlassianClient(atlassianToken);
+        const atlassianClient = createAtlassianClientFromAuth(authInfo.atlassian!, siteName);
         const figmaClient = createFigmaClient(figmaToken);
         const googleClient = googleToken ? createGoogleClient(googleToken) : undefined;
         const generateText = createQueuedGenerateText(createMcpLLMClient(context));

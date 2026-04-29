@@ -97,7 +97,7 @@ Tools are exposed via **both** MCP protocol and REST API without code duplicatio
 ### Atlassian API Client Pattern
 
 All Atlassian API requests go through `AtlassianClient` (`server/providers/atlassian/atlassian-api-client.ts`):
-- `createAtlassianClient(token)` for OAuth, `createAtlassianClientWithPAT(credentials)` for PAT
+- `createAtlassianClient(token)` for OAuth, `createAtlassianClientWithPAT(credentials)` for PAT, `createAtlassianClientFromAuth(providerAuthInfo, siteName?)` for auto-routing
 - Use `client.getJiraBaseUrl(cloudId)` / `client.getConfluenceBaseUrl(cloudId)` for API URLs
 - Use `resolveCloudId(client, undefined, siteName)` to get cloudId from site name
 

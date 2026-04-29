@@ -9,7 +9,7 @@ import { resolveCloudId } from '../atlassian-helpers.ts';
 import { sanitizeObjectWithJWTs } from '../../../tokens.ts';
 import type { McpServer } from '../../../mcp-core/mcp-types.ts';
 import { getJiraIssue } from '../atlassian-helpers.ts';
-import { createAtlassianClient } from '../atlassian-api-client.ts';
+import { createAtlassianClientFromAuth } from '../atlassian-api-client.ts';
 import type { JiraIssue } from '../types.ts';
 
 // Tool parameters interface
@@ -73,7 +73,7 @@ export function registerAtlassianGetIssueTool(mcp: McpServer): void {
 
       try {
         // Create Atlassian API client
-        const client = createAtlassianClient(token);
+        const client = createAtlassianClientFromAuth(authInfo.atlassian!, siteName);
         
         // Resolve the target cloud ID using the utility function
         let siteInfo;

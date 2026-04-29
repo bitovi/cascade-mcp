@@ -294,6 +294,18 @@ async function validateAuthFromRequest(req: Request, res: Response): Promise<Val
     if (errored) { return { authInfo: null, errored: true }; }
   }
   
+  // Fall back to PAT headers
+  if (!authInfo) {
+    authInfo = getAuthInfoFromPatHeaders(req);
+    if (authInfo) {
+      console.log('🔑 Using PAT header authentication', {
+        providers: Object.keys(authInfo).filter(k => 
+          ['atlassian', 'figma', 'google'].includes(k) && authInfo![k as keyof AuthContext]
+        ),
+      });
+    }
+  }
+
   // No auth found anywhere
   if (!authInfo) {
     sendMissingAtlassianAccessToken(res, req, 'anywhere');
@@ -301,6 +313,50 @@ async function validateAuthFromRequest(req: Request, res: Response): Promise<Val
   }
   
   return { authInfo, errored: false };
+}
+
+/**
+ * Extract authentication info from PAT (Personal Access Token) headers.
+ * Supports X-Atlassian-Token, X-Figma-Token, and X-Google-Token headers.
+ * 
+ * @param req - Express request object
+ * @returns AuthContext with PAT credentials, or null if no PAT headers present
+ */
+function getAuthInfoFromPatHeaders(req: Request): AuthContext | null {
+  const atlassianToken = req.headers['x-atlassian-token'] as string | undefined;
+  const figmaToken = req.headers['x-figma-token'] as string | undefined;
+  const googleToken = req.headers['x-google-token'] as string | undefined;
+
+  // At least one provider token must be present
+  if (!atlassianToken && !figmaToken && !googleToken) {
+    return null;
+  }
+
+  const authContext: AuthContext = {};
+
+  if (atlassianToken) {
+    // Atlassian PATs use Basic Auth: base64(email:api_token)
+    authContext.atlassian = {
+      access_token: atlassianToken,
+      authType: 'pat',
+    };
+  }
+
+  if (figmaToken) {
+    authContext.figma = {
+      access_token: figmaToken,
+      authType: 'pat',
+    };
+  }
+
+  if (googleToken) {
+    authContext.google = {
+      access_token: googleToken,
+      authType: 'pat',
+    };
+  }
+
+  return authContext;
 }
 
 /**
