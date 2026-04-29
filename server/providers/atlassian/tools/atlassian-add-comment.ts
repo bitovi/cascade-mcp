@@ -8,7 +8,7 @@
 import { z } from 'zod';
 import { getAuthInfoSafe } from '../../../mcp-core/auth-helpers.js';
 import { resolveCloudId, addIssueComment } from '../atlassian-helpers.js';
-import { createAtlassianClient } from '../atlassian-api-client.js';
+import { createAtlassianClientFromAuth } from '../atlassian-api-client.js';
 import type { McpServer } from '../../../mcp-core/mcp-types.js';
 
 interface AtlassianAddCommentParams {
@@ -52,7 +52,7 @@ export function registerAtlassianAddCommentTool(mcp: McpServer): void {
           };
         }
 
-        const client = createAtlassianClient(token);
+        const client = createAtlassianClientFromAuth(authInfo.atlassian!, siteName);
 
         console.log('  Resolving cloud ID...');
         const siteInfo = await resolveCloudId(client, cloudId, siteName);

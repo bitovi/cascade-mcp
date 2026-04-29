@@ -9,7 +9,7 @@
 import { z } from 'zod';
 import type { McpServer } from '../../../../mcp-core/mcp-types.js';
 import { getAuthInfoSafe } from '../../../../mcp-core/auth-helpers.js';
-import { createAtlassianClient } from '../../../atlassian/atlassian-api-client.js';
+import { createAtlassianClientFromAuth } from '../../../atlassian/atlassian-api-client.js';
 import { createFigmaClient } from '../../../figma/figma-api-client.js';
 import { createMcpLLMClient } from '../../../../llm-client/mcp-sampling-client.js';
 import { createQueuedGenerateText } from '../../../../llm-client/queued-generate-text.js';
@@ -75,7 +75,7 @@ export function registerReviewWorkItemTool(mcp: McpServer): void {
 
       try {
         // Create API clients with tokens
-        const atlassianClient = createAtlassianClient(atlassianToken);
+        const atlassianClient = createAtlassianClientFromAuth(authInfo.atlassian!, siteName);
         const figmaClient = figmaToken ? createFigmaClient(figmaToken) : createFigmaClient(''); // Figma optional
         const generateText = createQueuedGenerateText(createMcpLLMClient(context));
         const notify = createProgressNotifier(context, 6); // 6 phases total

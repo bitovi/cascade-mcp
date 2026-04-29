@@ -4,7 +4,7 @@ import { getAuthInfoSafe, handleJiraAuthError } from '../../../mcp-core/auth-hel
 import { resolveCloudId } from '../atlassian-helpers.ts';
 import { convertMarkdownToAdf, validateAdf, type ADFDocument } from '../markdown-converter.ts';
 import type { McpServer } from '../../../mcp-core/mcp-types.ts';
-import { createAtlassianClient } from '../atlassian-api-client.ts';
+import { createAtlassianClientFromAuth } from '../atlassian-api-client.ts';
 
 // Tool parameters interface
 interface UpdateIssueDescriptionParams {
@@ -94,7 +94,7 @@ export function registerAtlassianUpdateIssueDescriptionTool(mcp: McpServer): voi
         }
 
         // Create Atlassian API client
-        const client = createAtlassianClient(token);
+        const client = createAtlassianClientFromAuth(authInfo.atlassian!, siteName);
         
         // Resolve the target cloud ID
         let siteInfo;

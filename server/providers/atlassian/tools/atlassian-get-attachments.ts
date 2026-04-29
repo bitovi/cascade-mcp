@@ -7,7 +7,7 @@ import { logger } from '../../../observability/logger.ts';
 import { getAuthInfoSafe, handleJiraAuthError } from '../../../mcp-core/auth-helpers.ts';
 import { resolveCloudId } from '../atlassian-helpers.ts';
 import type { McpServer } from '../../../mcp-core/mcp-types.ts';
-import { createAtlassianClient } from '../atlassian-api-client.ts';
+import { createAtlassianClientFromAuth } from '../atlassian-api-client.ts';
 
 // Tool parameters interface
 interface GetJiraAttachmentsParams {
@@ -96,7 +96,7 @@ export function registerAtlassianGetAttachmentsTool(mcp: McpServer): void {
 
       try {
         // Create Atlassian API client
-        const client = createAtlassianClient(token);
+        const client = createAtlassianClientFromAuth(authInfo.atlassian!, siteName);
         
         // Resolve the target cloud ID using the utility function
         let siteInfo;

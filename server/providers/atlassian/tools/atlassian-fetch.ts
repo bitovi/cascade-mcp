@@ -13,7 +13,7 @@ import { resolveCloudId, getAuthHeader } from '../atlassian-helpers.ts';
 import { sanitizeObjectWithJWTs } from '../../../tokens.ts';
 import type { McpServer } from '../../../mcp-core/mcp-types.ts';
 import { convertAdfToMarkdown } from '../markdown-converter.ts';
-import { createAtlassianClient } from '../atlassian-api-client.ts';
+import { createAtlassianClientFromAuth } from '../atlassian-api-client.ts';
 
 // Tool parameters interface
 interface FetchParams {
@@ -84,7 +84,7 @@ export function registerAtlassianFetchTool(mcp: McpServer): void {
 
       try {
         // Create Atlassian API client
-        const client = createAtlassianClient(token);
+        const client = createAtlassianClientFromAuth(authInfo.atlassian!, siteName);
         
         // Resolve the target cloud ID using the utility function
         let siteInfo;

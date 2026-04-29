@@ -16,6 +16,9 @@ import {
 import { handleJiraAuthError as handleJiraAuthErrorHelper } from '../providers/atlassian/atlassian-helpers.ts';
 import { PROVIDER_KEYS } from '../pkce/token-helpers.js';
 
+// Re-export ProviderAuthInfo for consumers
+export type { ProviderAuthInfo } from './auth-context-store.ts';
+
 /**
  * Helper function to safely log token information without exposing sensitive data
  * @param token - The token to log info about
@@ -46,7 +49,10 @@ let testForcingTokenExpired = false;
  * @returns True if provider token is valid and not expired
  */
 function hasValidProviderToken(provider: ProviderAuthInfo | undefined, now: number): boolean {
-  return provider?.expires_at != null && provider.expires_at > now;
+  if (!provider?.access_token) return false;
+  // PATs don't have expires_at — treat as always valid
+  if (provider.expires_at == null) return true;
+  return provider.expires_at > now;
 }
 
 /**
@@ -119,7 +125,12 @@ export function handleJiraAuthError(response: Response, operation: string = 'Jir
 export function getAuthInfo(context: any): AuthContext | null {
   const authInfo = getAuthInfoFromStore(context);
 
-  if (authInfo && isTokenExpired(authInfo)) {
+  // Skip expiration check for PAT auth — PATs don't have expiration in our store
+  const isPat = authInfo?.atlassian?.authType === 'pat' || 
+                authInfo?.figma?.authType === 'pat' || 
+                authInfo?.google?.authType === 'pat';
+
+  if (authInfo && !isPat && isTokenExpired(authInfo)) {
     throw new InvalidTokenError('The access token expired and re-authentication is needed.');
   }
 

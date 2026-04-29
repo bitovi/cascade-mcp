@@ -14,7 +14,8 @@ import { z } from 'zod';
 import { logger } from '../../../observability/logger.ts';
 import { getAuthInfoSafe } from '../../../mcp-core/auth-helpers.ts';
 import type { McpServer } from '../../../mcp-core/mcp-types.ts';
-import { createAtlassianClient } from '../atlassian-api-client.ts';
+import { createAtlassianClientFromAuth } from '../atlassian-api-client.ts';
+import type { ProviderAuthInfo } from '../../../mcp-core/auth-helpers.ts';
 import { convertAdfNodesToMarkdown } from '../markdown-converter.ts';
 import { createMcpLLMClient, type McpToolContext } from '../../../llm-client/mcp-sampling-client.ts';
 import { createQueuedGenerateText } from '../../../llm-client/queued-generate-text.ts';
@@ -115,7 +116,7 @@ interface AnalyzePageResult {
  */
 async function analyzeConfluencePage(
   params: AnalyzePageParams,
-  atlassianToken: string,
+  atlassianAuth: ProviderAuthInfo,
   generateText: GenerateTextFn
 ): Promise<AnalyzePageResult> {
   const result: AnalyzePageResult = {
@@ -138,7 +139,7 @@ async function analyzeConfluencePage(
 
     // Handle short links
     if (parsed.wasShortLink) {
-      const client = createAtlassianClient(atlassianToken);
+      const client = createAtlassianClientFromAuth(atlassianAuth, parsed.siteName);
       const resolved = await resolveConfluenceShortLink(client, parsed);
       if (!resolved) {
         result.parseError = `Could not resolve short link: ${params.pageUrl}`;
@@ -165,7 +166,7 @@ async function analyzeConfluencePage(
 
   // Step 2: Fetch page from Confluence API
   console.log(`  📄 Fetching Confluence page: ${pageId} from ${siteName}`);
-  const client = createAtlassianClient(atlassianToken);
+  const client = createAtlassianClientFromAuth(atlassianAuth, siteName);
 
   let pageData: ConfluencePageData;
   try {
@@ -470,7 +471,7 @@ export function registerConfluenceAnalyzePageTool(mcp: McpServer): void {
       const generateText = createQueuedGenerateText(createMcpLLMClient(context as McpToolContext));
 
       try {
-        const result = await analyzeConfluencePage(params, token, generateText);
+        const result = await analyzeConfluencePage(params, authInfo.atlassian!, generateText);
         const formattedOutput = formatAnalysisResult(result);
 
         return {

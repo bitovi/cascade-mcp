@@ -12,7 +12,7 @@
 import { z } from 'zod';
 import { logger } from '../../../../observability/logger.ts';
 import { getAuthInfoSafe } from '../../../../mcp-core/auth-helpers.ts';
-import { createAtlassianClient } from '../../../atlassian/atlassian-api-client.ts';
+import { createAtlassianClientFromAuth } from '../../../atlassian/atlassian-api-client.ts';
 import { resolveCloudId, getJiraIssue } from '../../../atlassian/atlassian-helpers.ts';
 import { convertAdfToMarkdown } from '../../../atlassian/markdown-converter.ts';
 import { extractAllUrlsFromADF } from '../../../atlassian/adf-utils.ts';
@@ -158,7 +158,7 @@ async function handleJiraUrl(
     return textResult(`Error: Could not determine site name from URL: ${url}. Please provide siteName parameter.`);
   }
 
-  const client = createAtlassianClient(token);
+  const client = createAtlassianClientFromAuth(authInfo.atlassian!, siteName);
   const siteInfo = await resolveCloudId(client, undefined, siteName);
   const cloudId = siteInfo.cloudId;
 
@@ -289,7 +289,7 @@ async function handleConfluenceUrl(
   }
 
   const siteName = siteNameOverride || parsed.siteName;
-  const client = createAtlassianClient(token);
+  const client = createAtlassianClientFromAuth(authInfo.atlassian!, siteName);
 
   // Resolve short links if needed
   let pageInfo = parsed;

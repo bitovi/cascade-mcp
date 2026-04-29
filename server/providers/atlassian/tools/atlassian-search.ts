@@ -12,7 +12,7 @@ import { getAuthInfoSafe, handleJiraAuthError } from '../../../mcp-core/auth-hel
 import { resolveCloudId, getAuthHeader } from '../atlassian-helpers.ts';
 import { sanitizeObjectWithJWTs } from '../../../tokens.ts';
 import type { McpServer } from '../../../mcp-core/mcp-types.ts';
-import { createAtlassianClient } from '../atlassian-api-client.ts';
+import { createAtlassianClientFromAuth } from '../atlassian-api-client.ts';
 
 // Tool parameters interface
 interface SearchParams {
@@ -87,7 +87,7 @@ export function registerAtlassianSearchTool(mcp: McpServer): void {
 
       try {
         // Create Atlassian API client
-        const client = createAtlassianClient(token);
+        const client = createAtlassianClientFromAuth(authInfo.atlassian!, siteName);
         
         // Resolve the target cloud ID using the utility function
         let siteInfo;

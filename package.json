@@ -17,6 +17,7 @@
     "test:watch": "jest --watch",
     "test:e2e": "NODE_OPTIONS='--experimental-vm-modules' jest test/e2e --testTimeout=600000 --runInBand --testMatch='**/test/e2e/**/*.test.ts'",
     "test:e2e:rest-api": "jest test/e2e/api-workflow.test.ts --testTimeout=600000 --runInBand --testMatch='**/test/e2e/**/*.test.ts'",
+    "test:e2e:mcp-pat-auth": "jest test/e2e/mcp-pat-auth.test.ts --testTimeout=600000 --runInBand --testMatch='**/test/e2e/**/*.test.ts'",
     "test:e2e:claude-agent": "NODE_OPTIONS='--experimental-vm-modules' jest test/e2e/claude-agent-review-design.test.ts --testTimeout=600000 --runInBand --testMatch='**/test/e2e/**/*.test.ts'",
     "test:e2e:mcp-sdk:mock": "TEST_USE_MOCK_ATLASSIAN=true jest specs/mcp-sdk --testTimeout=30000 --runInBand --testMatch='**/specs/**/*.test.js' --testMatch='**/specs/**/*.test.ts' --testPathIgnorePatterns='/node_modules/'",
     "validate-pat-tokens": "node --import ./loader.mjs scripts/validate-pat-tokens.ts"

@@ -10,12 +10,13 @@ import { logger } from '../observability/logger.ts';
  */
 export interface ProviderAuthInfo {
   access_token: string;
-  refresh_token: string;
-  expires_at: number;
+  refresh_token?: string;   // Optional: PATs don't have refresh tokens
+  expires_at?: number;      // Optional: PATs don't expire in our store
   scope?: string;
   // Provider-specific optional fields
   cloudId?: string; // Atlassian
   user_id?: string; // Figma
+  authType?: 'oauth' | 'pat';  // Distinguish auth method for downstream routing
 }
 
 /**
