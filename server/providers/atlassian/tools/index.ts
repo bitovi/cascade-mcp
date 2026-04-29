@@ -7,6 +7,7 @@ import { registerAtlassianFetchTool } from './atlassian-fetch.js';
 import { registerAtlassianSearchTool } from './atlassian-search.js';
 import { registerConfluenceAnalyzePageTool } from './confluence-analyze-page.js';
 import { registerAtlassianAddCommentTool } from './atlassian-add-comment.js';
+import { registerAtlassianUpdateCommentTool } from './atlassian-update-comment.js';
 
 /**
  * Register all Atlassian-specific tools with the MCP server
@@ -29,8 +30,9 @@ export function registerAtlassianTools(mcp: McpServer, authContext: any): void {
   registerAtlassianFetchTool(mcp);
   registerAtlassianSearchTool(mcp);
   
-  // Comment tool (spec 068 — plugin skills)
+  // Comment tools (spec 068 — plugin skills)
   registerAtlassianAddCommentTool(mcp);
+  registerAtlassianUpdateCommentTool(mcp);
   
-  console.log('  All Atlassian tools registered (8 tools)');
+  console.log('  All Atlassian tools registered (9 tools)');
 }

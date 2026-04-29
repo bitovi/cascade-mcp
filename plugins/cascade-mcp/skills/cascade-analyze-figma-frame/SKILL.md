@@ -1,5 +1,5 @@
 ---
-name: analyze-figma-frame
+name: cascade-analyze-figma-frame
 description: "Sub-skill: Analyze a single Figma design frame from local files. Reads image.png (vision), structure.xml (component tree), and context.md (comments/annotations) from .temp/cascade/figma/{fileKey}/frames/{name}/. Writes analysis.md. Designed to run as a subagent — no MCP tools needed, pure filesystem."
 ---
 
@@ -9,7 +9,7 @@ Analyze a single Figma design frame using local files. This skill is designed to
 
 ## When to Use
 
-This is a **sub-skill** called as a subagent by parent skills (generate-questions, write-story) during parallel frame analysis. Each subagent instance analyzes one frame.
+This is a **sub-skill** called as a subagent by parent skills (generate-behavior-questions, write-jira-story) during parallel frame analysis. Each subagent instance analyzes one frame.
 
 ## Prerequisites
 

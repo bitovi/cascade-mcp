@@ -16,6 +16,7 @@ interface FigmaPostCommentParams {
   fileKey: string;
   message: string;
   nodeId?: string;
+  nodeOffset?: { x: number; y: number };
 }
 
 /**
@@ -34,9 +35,14 @@ export function registerFigmaPostCommentTool(mcp: McpServer): void {
           .describe('Comment text to post'),
         nodeId: z.string().optional()
           .describe('Node ID to pin the comment to a specific frame (e.g., "123:456"). If omitted, posts as a file-level comment.'),
+        nodeOffset: z.object({
+          x: z.number(),
+          y: z.number(),
+        }).optional()
+          .describe('Position offset within the frame (relative to frame origin). Use x: -50 for left edge. Distribute y values evenly between 50 and (frameHeight - 50) for multiple comments. Defaults to {x: 0, y: 0}.'),
       },
     },
-    async ({ fileKey, message, nodeId }: FigmaPostCommentParams, context) => {
+    async ({ fileKey, message, nodeId, nodeOffset }: FigmaPostCommentParams, context) => {
       console.log('figma-post-comment called');
       console.log('  Parameters:', { fileKey, nodeId: nodeId || '(file-level)', messageLength: message.length });
 
@@ -56,7 +62,7 @@ export function registerFigmaPostCommentTool(mcp: McpServer): void {
         if (nodeId) {
           request.client_meta = {
             node_id: nodeId,
-            node_offset: { x: 0, y: 0 },
+            node_offset: nodeOffset || { x: 0, y: 0 },
           };
         }
 

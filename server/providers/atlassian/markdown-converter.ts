@@ -39,11 +39,86 @@ export interface ADFDocument {
   content: ADFNode[];
 }
 
+interface ExpandBlock {
+  placeholder: string;
+  title: string;
+  innerMarkdown: string;
+}
+
+/**
+ * Extract <details><summary>Title</summary>content</details> blocks from markdown,
+ * replacing each with a unique placeholder string that marklassian will emit as a
+ * paragraph node. The placeholder can then be located in the ADF and replaced with
+ * an expand node containing the converted inner content.
+ *
+ * @param markdown - Raw markdown string
+ * @returns processedMarkdown with placeholders, and expandBlocks metadata
+ */
+function extractExpandBlocks(markdown: string): { processedMarkdown: string; expandBlocks: ExpandBlock[] } {
+  const expandBlocks: ExpandBlock[] = [];
+  // Match <details>...<summary>Title</summary>...content...</details> (non-greedy, dotAll)
+  const detailsRegex = /<details>\s*<summary>([\s\S]*?)<\/summary>([\s\S]*?)<\/details>/gi;
+
+  const processedMarkdown = markdown.replace(detailsRegex, (_match, title, inner) => {
+    const index = expandBlocks.length;
+    const placeholder = `%%EXPAND_${index}%%`;
+    expandBlocks.push({
+      placeholder,
+      title: title.trim(),
+      innerMarkdown: inner.trim(),
+    });
+    return `\n${placeholder}\n`;
+  });
+
+  return { processedMarkdown, expandBlocks };
+}
+
+/**
+ * Walk ADF content and replace placeholder paragraphs with ADF expand nodes.
+ * Each placeholder was produced by extractExpandBlocks and corresponds to an entry
+ * in expandBlocks. The expand node's content is the ADF conversion of the block's
+ * inner markdown.
+ *
+ * @param adfContent - Top-level ADF content array
+ * @param expandBlocks - Expand block metadata from extractExpandBlocks
+ * @returns New content array with placeholders replaced by expand nodes
+ */
+function spliceExpandNodes(adfContent: ADFNode[], expandBlocks: ExpandBlock[]): ADFNode[] {
+  if (expandBlocks.length === 0) return adfContent;
+
+  return adfContent.map((node) => {
+    // Look for a paragraph whose sole text content matches a placeholder
+    if (node.type === 'paragraph' && node.content?.length === 1) {
+      const textNode = node.content[0];
+      if (textNode.type === 'text' && textNode.text) {
+        const match = expandBlocks.find((b) => b.placeholder === textNode.text!.trim());
+        if (match) {
+          // Convert inner markdown to ADF nodes synchronously using marklassian
+          const innerAdf = markdownToAdf(match.innerMarkdown) as ADFDocument;
+          return {
+            type: 'expand',
+            attrs: { title: match.title },
+            content: innerAdf.content,
+          } as ADFNode;
+        }
+      }
+    }
+    // Recurse into nested content
+    if (node.content && node.content.length > 0) {
+      return { ...node, content: spliceExpandNodes(node.content, expandBlocks) };
+    }
+    return node;
+  });
+}
+
 /**
  * Converts new Markdown content to ADF (AI output, error messages, user-written strings).
  * 
  * ⚠️ NEVER use for round-trip conversions of existing Jira content.
  * For manipulating existing Jira ADF, use ADF operations directly.
+ * 
+ * Supports <details><summary>Title</summary>content</details> blocks, which are
+ * converted to collapsible ADF expand nodes.
  * 
  * @param markdown - Markdown string to convert
  * @returns ADF document structure
@@ -61,7 +136,14 @@ export async function convertMarkdownToAdf(markdown: string): Promise<ADFDocumen
   });
 
   try {
-    const adf = markdownToAdf(markdown) as ADFDocument;
+    // Pre-process: extract <details>/<summary> blocks before marklassian sees them
+    const { processedMarkdown, expandBlocks } = extractExpandBlocks(markdown);
+
+    if (expandBlocks.length > 0) {
+      logger.info(`Extracted ${expandBlocks.length} expand block(s) for ADF conversion`);
+    }
+
+    const adf = markdownToAdf(processedMarkdown) as ADFDocument;
     
     logger.info('Markdown converted to ADF successfully with marklassian', {
       adfVersion: adf.version,
@@ -69,8 +151,13 @@ export async function convertMarkdownToAdf(markdown: string): Promise<ADFDocumen
       contentBlocks: adf.content?.length || 0
     });
 
+    // Post-process: replace placeholder paragraphs with ADF expand nodes
+    const expandedAdf: ADFDocument = expandBlocks.length > 0
+      ? { ...adf, content: spliceExpandNodes(adf.content, expandBlocks) }
+      : adf;
+
     // Post-process: Enhance resource links (inlineCards for Confluence/Google Docs, emoji for Figma)
-    const enhancedAdf = enhanceResourceLinks(adf);
+    const enhancedAdf = enhanceResourceLinks(expandedAdf);
 
     return enhancedAdf;
   } catch (error: any) {

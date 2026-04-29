@@ -17,6 +17,8 @@ import { handleFigmaBatchLoad } from './figma-batch-load.js';
 import { handleFigmaPostComment } from './figma-post-comment.js';
 import { handleFigmaGetComments } from './figma-get-comments.js';
 import { handleAtlassianAddComment } from './atlassian-add-comment.js';
+import { handleAtlassianUpdateComment } from './atlassian-update-comment.js';
+import { handleExtractLinkedResources } from './extract-linked-resources.js';
 import { debounce } from './debounce-middleware.js';
 import { encryptionManager } from '../utils/encryption-manager.js';
 
@@ -98,6 +100,13 @@ export function registerRestApiRoutes(app: Express): void {
   // Add a comment to a Jira issue
   app.post('/api/atlassian-add-comment', (req, res) => handleAtlassianAddComment(req, res));
   console.log('  ✓ POST /api/atlassian-add-comment');
+
+  app.put('/api/atlassian-update-comment', (req, res) => handleAtlassianUpdateComment(req, res));
+  console.log('  ✓ PUT /api/atlassian-update-comment');
+  
+  // Extract content + discovered links from any URL (Jira, Confluence, Google Docs)
+  app.post('/api/extract-linked-resources', (req, res) => handleExtractLinkedResources(req, res));
+  console.log('  ✓ POST /api/extract-linked-resources');
   
   console.log('REST API routes registered successfully');
 }

@@ -56,20 +56,21 @@ https://github.com/bitovi/cascade-mcp
 
 | Skill | Trigger Phrases | Description |
 |-------|----------------|-------------|
-| **generate-questions** | "generate questions for PROJ-123", "what questions should we ask about this design" | Loads Figma/Jira data, analyzes frames, generates clarifying questions |
-| **post-questions-to-figma** | "post questions to Figma" | Takes generated questions and posts them as pinned Figma comments |
-| **post-questions-to-jira** | "post questions to Jira" | Takes generated questions and posts them as a Jira issue comment |
-| **review-design** | "review the design for PROJ-123" | End-to-end: load → analyze → generate → post questions |
-| **write-story** | "write story PROJ-456" | Generates a full user story description from Figma analysis + Jira context |
+| **generate-behavior-questions** | "generate questions for PROJ-123", "what questions should we ask about this design" | Loads Figma/Jira data, analyzes frames, generates clarifying behavior questions |
+| **post-design-questions-to-figma** | "post questions to Figma" | Takes generated questions and posts them as pinned Figma comments |
+| **post-design-questions-to-jira** | "post questions to Jira" | Takes generated questions and posts them as a Jira issue comment |
+| **answer-design-questions-post-to-figma** | "answer questions here and post to Figma" | Interactive Q&A: asks each question, posts Q&A pairs as Figma comments |
+| **answer-design-questions-post-to-jira** | "answer questions here and post to Jira" | Interactive Q&A: asks each question, builds growing Q&A comment on Jira |
+| **write-jira-story** | "write story PROJ-456" | Generates a full user story description from Figma analysis + Jira context |
 
 ### Sub-Skills (building blocks)
 
 | Skill | Purpose |
 |-------|---------|
-| **load-content** | Batch-fetch Figma frames + Jira/Google data to `.temp/cascade/` |
-| **analyze-content** | Orchestrate per-frame analysis using subagents |
+| **load-linked-resource-content** | Batch-fetch Figma frames + Jira/Google data to `.temp/cascade/` |
+| **summarize-document-content** | Orchestrate per-frame analysis using subagents |
 | **analyze-figma-frame** | Subagent skill: analyze a single frame's image + structure XML |
-| **scope-analysis** | Synthesize frame analyses into feature scope with evidence markers |
+| **analyze-feature-scope** | Synthesize frame analyses into feature scope with evidence markers |
 
 ## How Skills Work
 

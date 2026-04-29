@@ -11,6 +11,7 @@ import { registerWriteStoryTool } from './tools/write-story/index.js';
 import { registerAnalyzeFeatureScopeTool } from './tools/analyze-feature-scope/index.js';
 import { registerReviewWorkItemTool } from './tools/review-work-item/index.js';
 import { registerWriteStoryContextTool } from './tools/write-story-context/index.js';
+import { registerExtractLinkedResourcesTool } from './tools/extract-linked-resources/index.js';
 // import { registerTestJiraUpdateTool } from './tools/writing-shell-stories/test-jira-update.js';
 
 /**
@@ -30,6 +31,7 @@ export const combinedProvider = {
     registerAnalyzeFeatureScopeTool(mcp);
     registerReviewWorkItemTool(mcp);
     registerWriteStoryContextTool(mcp);  // context tool (spec 061)
+    registerExtractLinkedResourcesTool(mcp);  // universal URL fetcher (spec 068)
     // registerTestJiraUpdateTool(mcp); // Quick test tool for debugging
   },
 };

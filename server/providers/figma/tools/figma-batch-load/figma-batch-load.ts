@@ -2,13 +2,13 @@
  * Figma Batch Load Tool
  * 
  * Batch-fetches Figma data for multiple URLs (pages or frames, across files),
- * builds a zip containing frame images, structure, and prompts,
+ * builds a zip containing frame images, structure, context, and prompts,
  * and returns a one-time download URL.
  * 
  * The agent uses `curl` + `unzip` to save everything to `.temp/cascade/figma/`.
  * 
  * API budget per file: 1 Tier 3 (meta) + 1 Tier 1 (nodes) + 1 Tier 1 (images)
- * Comments are NOT included — fetched separately via figma-get-comments.
+ * Each frame directory includes context.md with associated comments, notes, and connections.
  */
 
 import { z } from 'zod';
@@ -20,6 +20,7 @@ import { generateSemanticXml } from '../../semantic-xml-generator.js';
 import { fetchFigmaFileMetadata } from '../../figma-helpers.js';
 import { toKebabCase } from '../../figma-helpers.js';
 import { buildFigmaUrl } from '../../screen-analyses-workflow/url-processor.js';
+import { buildFrameContextMarkdown, findConnections } from '../figma-ask-scope-questions-for-page/frame-context-builder.js';
 import { buildZip, type ZipFileData, type ZipFrameData } from './zip-builder.js';
 import { registerDownload } from '../../../../api/download.js';
 
@@ -61,6 +62,9 @@ async function fetchFileData(
   // Get file name
   const metadata = await fetchFigmaFileMetadata(figmaClient, fileKey);
 
+  // Build reference list for prototype connection resolution
+  const allFrameRefs = result.frames.map(f => ({ id: f.nodeId, name: f.frameName || f.name }));
+
   // Build per-frame zip data
   const frames: ZipFrameData[] = [];
   for (const frame of result.frames) {
@@ -74,6 +78,19 @@ async function fetchFileData(
     const nodeData = result.nodesDataMap.get(frame.nodeId);
     const structureXml = nodeData ? generateSemanticXml(nodeData) : `<!-- No node data for ${frame.name} -->`;
 
+    // Build context markdown (comments, notes, section info, prototype connections)
+    const connections = nodeData ? findConnections(nodeData, allFrameRefs) : [];
+    const contextMd = buildFrameContextMarkdown(
+      {
+        id: frame.nodeId,
+        name: frame.frameName || frame.name,
+        sectionName: frame.sectionName,
+        url: frame.url,
+      },
+      frame.annotations,
+      connections
+    );
+
     const dirName = frameDirName(frame.nodeId, frame.name);
     const url = buildFigmaUrl(fileKey, frame.nodeId);
 
@@ -83,9 +100,13 @@ async function fetchFileData(
       dirName,
       imageBase64: image.base64Data,
       structureXml,
+      contextMd,
       url,
       order: frame.order ?? 0,
       section: frame.sectionName,
+      annotationCount: frame.annotations.length,
+      width: frame.position?.width,
+      height: frame.position?.height,
     });
   }
 
@@ -106,7 +127,7 @@ export function registerFigmaBatchLoadTool(mcp: McpServer): void {
     'figma-batch-load',
     {
       title: 'Batch Load Figma Data',
-      description: 'Batch-fetch Figma data for multiple URLs (pages or frames, across files). Returns a one-time download URL for a zip containing frame images, semantic XML structure, and analysis prompts. Use curl + unzip to extract to .temp/cascade/figma/. Comments are NOT included — use figma-get-comments separately.',
+      description: 'Batch-fetch Figma data for multiple URLs (pages or frames, across files). Returns a one-time download URL for a zip containing per-frame image.png, structure.xml, context.md (comments, notes, prototype connections), and analysis prompts. Use curl + unzip to extract to .temp/cascade/figma/.',
       inputSchema: {
         requests: z.array(z.object({
           url: z.string().describe('Figma URL — page-level or frame-level'),

@@ -357,6 +357,9 @@ Workflow resources are multi-step orchestration documents that instruct agents h
 - **atlassian-get-attachments** - Fetch issue attachments by ID
 - **atlassian-update-issue-description** - Update issue description with markdown (converts to ADF)
 - **atlassian-add-comment** 🆕 - Post a comment to a Jira issue (accepts markdown, converts to ADF)
+- **atlassian-update-comment** 🆕 - Update an existing Jira comment by ID (accepts markdown, replaces full body)
+  - Parameters: `issueKey`, `commentId` (from atlassian-add-comment), `comment` (markdown), optional `cloudId`, `siteName`
+  - Used by: `answer-questions` sub-skill for incremental Q&A comment building
 
 ### Figma Tools
 
@@ -392,6 +395,7 @@ Workflow resources are multi-step orchestration documents that instruct agents h
 - **figma-batch-load** 🆕 - Batch-fetch Figma data for multiple URLs across files
   - Returns a one-time download URL for a zip containing frame images, semantic XML, and analysis prompts
   - Agent uses `curl` + `unzip` to extract to `.temp/cascade/figma/`
+  - Manifest includes per-frame `width` and `height` (from Figma `absoluteBoundingBox`) for comment positioning
   - API budget per file: 1 Tier 3 (meta) + 1 Tier 1 (nodes) + 1 Tier 1 (images)
   - Comments NOT included — use `figma-get-comments` separately
   - Parameters: `requests` (array of `{ url, label? }`), `context` (optional)
@@ -399,7 +403,9 @@ Workflow resources are multi-step orchestration documents that instruct agents h
 
 - **figma-post-comment** 🆕 - Post a comment to a Figma file
   - Optionally pin to a specific node via `nodeId`
-  - Parameters: `fileKey`, `message`, `nodeId` (optional)
+  - Optionally position within frame via `nodeOffset` (`{ x, y }` relative to frame origin)
+  - Use `x: -50` for left edge placement, distribute `y` between 50 and (height-50) for spacing
+  - Parameters: `fileKey`, `message`, `nodeId` (optional), `nodeOffset` (optional)
   - Returns: `{ success, commentId, fileKey, nodeId }`
 
 - **figma-get-comments** 🆕 - Read existing comment threads from a Figma file
@@ -460,6 +466,19 @@ Workflow resources are multi-step orchestration documents that instruct agents h
 
 ### Combined Provider Tools
 Advanced workflow tools that integrate multiple services:
+
+- **extract-linked-resources** 🆕 - Universal URL fetcher that returns content + discovered links
+  - Takes a single URL (Jira, Confluence, Google Doc, Google Sheet) and returns markdown with YAML frontmatter
+  - Frontmatter includes `discoveredLinks` categorized by type (figma, confluence, jira, googleDocs, googleSheets)
+  - For Jira: includes relationship info (parent, blocks, relates-to) on discovered Jira links
+  - For Jira: includes paginated comments with `hasMoreComments` / `commentsStartAt` support
+  - For Confluence: extracts links from page body ADF
+  - For Google Docs: extracts URLs via regex from markdown content
+  - For Figma URLs: returns a message to use `figma-batch-load` instead
+  - Auto-routes auth: Atlassian token for Jira/Confluence, Google token for Docs/Sheets
+  - Parameters: `url` (required), `siteName` (optional), `commentsStartAt` (optional)
+  - REST API: `POST /api/extract-linked-resources`
+  - Used by: generate-questions, write-story, review-design skills (Phase 1 + iterative loading)
 
 - **write-story-context** 🆕 - Context tool for story writing workflow
   - Returns all data needed by `prompt-write-story`: issue hierarchy, comments, existing description, linked resource URLs
@@ -584,6 +603,17 @@ All REST endpoints accept PAT (Personal Access Token) authentication via headers
 - **POST /api/atlassian-add-comment** — Post a comment to a Jira issue
   - Header: `X-Atlassian-Token` (format: `email:api-token`)
   - Body: `{ issueKey, comment, cloudId?, siteName? }`
+
+- **PUT /api/atlassian-update-comment** — Update an existing Jira comment
+  - Header: `X-Atlassian-Token` (format: `email:api-token`)
+  - Body: `{ issueKey, commentId, comment, cloudId?, siteName? }`
+
+### Cross-Provider Endpoints
+
+- **POST /api/extract-linked-resources** — Fetch a URL and return content + discovered links
+  - Header: `X-Atlassian-Token` for Jira/Confluence, `X-Google-Token` for Google Docs/Sheets
+  - Body: `{ url, siteName?, commentsStartAt? }`
+  - Returns: `{ success, content }` where `content` is markdown with YAML frontmatter
 
 ### Download Endpoint
 

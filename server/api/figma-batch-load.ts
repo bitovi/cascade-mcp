@@ -20,6 +20,7 @@ import { fetchFrameData } from '../providers/figma/screen-analyses-workflow/fram
 import { generateSemanticXml } from '../providers/figma/semantic-xml-generator.js';
 import { fetchFigmaFileMetadata, toKebabCase } from '../providers/figma/figma-helpers.js';
 import { buildFigmaUrl } from '../providers/figma/screen-analyses-workflow/url-processor.js';
+import { buildFrameContextMarkdown, findConnections } from '../providers/figma/tools/figma-ask-scope-questions-for-page/frame-context-builder.js';
 import { buildZip, type ZipFileData, type ZipFrameData } from '../providers/figma/tools/figma-batch-load/zip-builder.js';
 import { registerDownload } from './download.js';
 
@@ -70,6 +71,7 @@ export async function handleFigmaBatchLoad(req: Request, res: Response): Promise
       Array.from(urlsByFile.entries()).map(async ([fileKey, urls]) => {
         const result = await fetchFrameData(urls, figmaClient, { imageOptions: { format: 'png', scale: 2 } });
         const metadata = await fetchFigmaFileMetadata(figmaClient, fileKey);
+        const allFrameRefs = result.frames.map(f => ({ id: f.nodeId, name: f.frameName || f.name }));
 
         const frames: ZipFrameData[] = [];
         for (const frame of result.frames) {
@@ -77,15 +79,23 @@ export async function handleFigmaBatchLoad(req: Request, res: Response): Promise
           if (!image?.base64Data) continue;
           const nodeData = result.nodesDataMap.get(frame.nodeId);
           const structureXml = nodeData ? generateSemanticXml(nodeData) : `<!-- No node data for ${frame.name} -->`;
+          const connections = nodeData ? findConnections(nodeData, allFrameRefs) : [];
+          const contextMd = buildFrameContextMarkdown(
+            { id: frame.nodeId, name: frame.frameName || frame.name, sectionName: frame.sectionName, url: frame.url },
+            frame.annotations,
+            connections
+          );
           frames.push({
             nodeId: frame.nodeId,
             name: frame.name,
             dirName: frameDirName(frame.nodeId, frame.name),
             imageBase64: image.base64Data,
             structureXml,
+            contextMd,
             url: buildFigmaUrl(fileKey, frame.nodeId),
             order: frame.order ?? 0,
             section: frame.sectionName,
+            annotationCount: frame.annotations.length,
           });
         }
 

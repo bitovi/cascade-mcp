@@ -1,19 +1,19 @@
 ---
-name: analyze-content
-description: "Sub-skill: Summarize and categorize fetched content from .temp/cascade/context/. Extracts key information, identifies newly discovered links, and writes analysis summaries. Used as a building block by parent skills like generate-questions and write-story."
+name: cascade-summarize-document-content
+description: "Sub-skill: Summarize and categorize fetched content from .temp/cascade/context/. Extracts key information, identifies newly discovered links, and writes analysis summaries. Used as a building block by parent skills like generate-questions and write-jira-story."
 ---
 
 # Analyze Content
 
-Summarize and categorize raw content previously fetched by the `load-content` sub-skill. Extract key information and discover any additional links embedded in the content.
+Summarize and categorize raw content previously fetched by the `load-linked-resource-content` sub-skill. Extract key information and discover any additional links embedded in the content.
 
 ## When to Use
 
-This is a **sub-skill** — called by parent skills after `load-content` has fetched raw content. Use when the parent skill needs summarized, structured content before synthesis or generation steps.
+This is a **sub-skill** — called by parent skills after `load-linked-resource-content` has fetched raw content. Use when the parent skill needs summarized, structured content before synthesis or generation steps.
 
 ## Prerequisites
 
-- Raw content files exist in `.temp/cascade/context/` (written by `load-content`)
+- Raw content files exist in `.temp/cascade/context/` (written by `load-linked-resource-content`)
 - `.temp/cascade/context/to-load.md` exists with loading manifest
 
 ## Procedure
@@ -54,8 +54,8 @@ Save each summary alongside the raw content file with a `-summary.md` suffix:
 
 ```
 .temp/cascade/context/
-├── jira-PROJ-123.md              ← raw content (from load-content)
-├── jira-PROJ-123-summary.md      ← summary (from analyze-content)
+├── jira-PROJ-123.md              ← raw content (from load-linked-resource-content)
+├── jira-PROJ-123-summary.md      ← summary (from summarize-document-content)
 ├── confluence-design-spec.md
 ├── confluence-design-spec-summary.md
 ├── gdoc-requirements.md

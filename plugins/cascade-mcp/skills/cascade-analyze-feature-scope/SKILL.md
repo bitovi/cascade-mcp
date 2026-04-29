@@ -1,5 +1,5 @@
 ---
-name: scope-analysis
+name: cascade-analyze-feature-scope
 description: "Sub-skill: Produce a Scope Analysis from frame analyses and all gathered context. This is the critical step that takes per-frame analyses + epic context + Confluence/Google Docs + Figma comments and categorizes every feature by scope (☐/✅/⏬/❌/❓/💬). Groups features by user workflow, not by screen. Supports self-healing ❓→💬 flipping on re-runs. Output drives all downstream work (questions, shell stories, story writing)."
 ---
 
@@ -11,14 +11,14 @@ This is the most critical step in the pipeline. Questions, shell stories, and st
 
 ## When to Use
 
-This is a **sub-skill** — called by parent skills after all content has been loaded, analyzed, and all Figma frames have been analyzed. Every parent skill (generate-questions, review-design, write-story) needs scope analysis before proceeding.
+This is a **sub-skill** — called by parent skills after all content has been loaded, analyzed, and all Figma frames have been analyzed. Every parent skill (generate-questions, write-jira-story) needs scope analysis before proceeding.
 
 ## Prerequisites
 
 - Figma frame analyses exist at `.temp/cascade/figma/{fileKey}/frames/*/analysis.md`
 - Content summaries exist at `.temp/cascade/context/*-summary.md`
 - All content loading iterations are complete (no unloaded URLs remain in `to-load.md`)
-- Epic context is available (from the Jira issue loaded by `load-content`)
+- Epic context is available (from the Jira issue loaded by `load-linked-resource-content`)
 
 ## Procedure
 
@@ -38,11 +38,51 @@ Read these files:
 - All `*-summary.md` files from `.temp/cascade/context/` (Confluence, Google Docs summaries)
 - Read the full content files too if summaries are insufficient
 
-**Figma comments:**
-- `.temp/cascade/figma/{fileKey}/comments/context.md` — latest comments from Figma
+**Figma annotations (per-frame):**
+- `.temp/cascade/figma/{fileKey}/frames/*/context.md` — comments, notes, and connections per frame
 - These may contain answers to previously asked questions
 
-### 2. Produce the Scope Analysis
+### 2. Check the codebase (if available)
+
+**This step is conditional** — only perform if the agent has access to a local codebase (e.g. workspace file access in VS Code Copilot, Claude Code, or similar). If no codebase is accessible, skip to step 3.
+
+When codebase is available, use it as the **primary source of truth for what is already implemented**. This replaces the need for the epic description to enumerate existing vs. new features — the code tells you directly.
+
+#### What to search for
+
+For each feature area identified from the Figma frame analyses:
+
+1. **UI components** — search for component file names, component identifiers, or CSS class names that match the feature (e.g. `VoteButton`, `thumbs-up`, `upvote`)
+2. **API routes / handlers** — search for route definitions, endpoint names, or controller methods related to the feature (e.g. `/comments/:id/vote`, `voteComment`)
+3. **Feature flags** — search for flags or config keys related to the feature
+4. **Data models / types** — search for type definitions or schema fields related to the feature (e.g. `upvoteCount`, `voteDirection`)
+
+Use semantic search, grep, or file search as appropriate. Cast a wide net — look for partial matches and synonyms.
+
+#### How to use the findings
+
+- **Feature found in code and appears complete** → mark ✅ (note the file/component as evidence)
+- **Feature found in code but appears partial or stubbed** → mark ☐ with a note: "Partial: {what exists}"
+- **Feature not found in code** → mark ☐ (new work)
+- **Feature explicitly excluded in epic context** → keep ❌ regardless of codebase state
+- **Conflict between codebase and epic** → flag with ⚠️ in the feature description
+
+#### Codebase check summary
+
+After searching, write a brief summary to `.temp/cascade/codebase-check.md`:
+```
+## Codebase Check Summary
+- Searched: {what you searched for}
+- Found implemented: {list of features with file references}
+- Found partial: {list with notes}
+- Not found: {list}
+```
+
+This summary is used to inform ✅ categorization and Developer Notes in the final story.
+
+
+
+### 3. Produce the Scope Analysis
 
 #### FUNDAMENTAL RULE: EVIDENCE-BASED ONLY
 
@@ -51,7 +91,7 @@ Every feature listed MUST reference actual UI elements or functionality explicit
 #### Categorization Rules
 
 - **☐ In-Scope**: Features explicitly in-scope in epic context AND not listed as existing/out-of-scope/low-priority. Only mark ☐ if they are new capabilities being added. When the epic provides scope context, existing UI elements may be shown for context but aren't new features.
-- **✅ Already Done**: Existing functionality mentioned in epic context. These features are visible in screens but explicitly stated as already implemented. Keep descriptions brief.
+- **✅ Already Done**: Features confirmed as already implemented. Source of truth (in priority order): (1) codebase — if found in code, mark ✅ with file reference; (2) epic context — if epic explicitly states something is already done. Keep descriptions brief.
 - **⏬ Low Priority**: Features the epic explicitly says to implement later/at the end. These WILL be implemented in this epic, just after core features. If visible in screens but not mentioned in epic, assume ☐ instead.
 - **❌ Out-of-Scope**: Features explicitly excluded from epic OR marked for future epics. These will NOT be implemented in this epic. Keep brief.
 - **❓ Questions**: Ambiguous behaviors, unclear requirements, missing information that has NO ANSWER in any context source. Mark ❓ ONLY if truly unanswered across all context.
@@ -70,17 +110,18 @@ Every feature listed MUST reference actual UI elements or functionality explicit
 #### Question Answering — Check ALL Sources Before Marking ❓
 
 Before marking any question as ❓, check ALL context sources:
-1. Epic description — may contain inline answers or clarifications
-2. Confluence docs and Google Docs — may have detailed specifications
-3. Figma comments — resolved threads often contain decisions
-4. Previous scope analysis — if regenerating, check for inline answers added after ❓ items
+1. Codebase — existing implementation may answer behavioral questions directly
+2. Epic description — may contain inline answers or clarifications
+3. Confluence docs and Google Docs — may have detailed specifications
+4. Figma per-frame annotations — resolved threads often contain decisions
+5. Previous scope analysis — if regenerating, check for inline answers added after ❓ items
 
 If ANY source provides a clear answer → mark 💬, NOT ❓.
 
 #### Regeneration Rules (❓ → 💬 Flipping)
 
 When a previous scope analysis exists (the epic already has a `## Scope Analysis` section):
-- If a ❓ question now has an answer (inline text added after the ❓, or new Figma comment reply, or new Confluence/Google Doc content) → flip to 💬 with the answer
+- If a ❓ question now has an answer (inline text added after the ❓, or new Figma comment reply in per-frame `context.md`, or new Confluence/Google Doc content) → flip to 💬 with the answer
 - If a ❓ question remains unanswered → keep as ❓
 - Preserve all other content (features, groupings) unless new information changes them
 
@@ -104,7 +145,7 @@ When a previous scope analysis exists (the epic already has a `## Scope Analysis
 - If a question is relevant to multiple areas, list only in the FIRST area
 - Questions not associated with a specific area → "Remaining Questions" section
 
-### 3. Write the scope analysis
+### 4. Write the scope analysis
 
 Save to `.temp/cascade/scope-analysis.md`:
 
@@ -117,12 +158,13 @@ Save to `.temp/cascade/scope-analysis.md`:
 │   └── confluence-spec-summary.md
 └── figma/
     └── {fileKey}/
-        ├── comments/context.md
         └── frames/
-            └── */analysis.md       ← frame analyses
+            └── */
+                ├── context.md
+                └── analysis.md       ← frame analyses
 ```
 
-### 4. Self-healing decision (report to parent skill)
+### 5. Self-healing decision (report to parent skill)
 
 Count the ❓ markers in the scope analysis. Report:
 

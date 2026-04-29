@@ -1,6 +1,6 @@
 ---
-name: generate-questions
-description: "Generate frame-specific clarifying questions from a Jira epic and its linked Figma designs, Confluence pages, and Google Docs. Uses iterative content loading, parallel Figma frame analysis, and cross-content synthesis to produce targeted questions organized by Figma frame."
+name: generate-behavior-questions
+description: "Generate frame-specific clarifying questions about ambiguous UI behaviors from a Jira epic and its linked Figma designs, Confluence pages, and Google Docs. Uses iterative content loading, parallel Figma frame analysis, and cross-content synthesis to produce targeted behavior questions organized by Figma frame."
 ---
 
 # Generate Questions
@@ -12,7 +12,7 @@ Generate frame-specific clarifying questions for a feature by gathering all cont
 Use when the user wants to:
 - Review a feature's designs and generate clarifying questions
 - Identify gaps, ambiguities, or contradictions in a feature spec
-- Prepare for a design review by listing what needs clarification
+- Prepare for a feature review by listing what needs clarification
 
 Typical trigger: "Generate questions for PROJ-123" or "What questions do we have about this feature?"
 
@@ -22,24 +22,26 @@ Typical trigger: "Generate questions for PROJ-123" or "What questions do we have
 
 ## Procedure
 
-### Phase 1: Extract Links from Jira
+### Phase 1: Fetch the Starting Issue
 
-Call MCP tool `extract-linked-resources` with the Jira issue key.
+Call MCP tool `extract-linked-resources` with the Jira issue URL (e.g., `https://myco.atlassian.net/browse/PROJ-123`).
 
-This returns all URLs linked from the issue: Figma files, Confluence pages, Google Docs, linked Jira issues.
+This returns the issue content as **markdown with YAML frontmatter** — save it directly to `.temp/cascade/context/jira-PROJ-123.md`.
 
-Save the returned URLs to `.temp/cascade/context/to-load.md`.
+The frontmatter contains `discoveredLinks` grouped by type (figma, confluence, jira, googleDocs) with relationship info (parent, blocks, etc.). Parse these to build your initial `.temp/cascade/context/to-load.md`.
+
+If `hasMoreComments: true`, call again with `commentsStartAt` to get additional comment pages.
 
 ### Phase 2: Iterative Content Loading
 
-Run the **load-content → analyze-content** loop:
+For each non-Figma URL in `to-load.md` (prioritize `parent` and `blocks` relationships first):
 
-1. Use sub-skill `load-content` to fetch all non-Figma URLs
-2. Use sub-skill `analyze-content` to summarize fetched content and discover new links
-3. Check `to-load.md` — if new `[ ]` URLs exist, repeat from step 1
-4. Continue until no new unloaded URLs remain
+1. Call `extract-linked-resources` with the URL
+2. Save the returned markdown to `.temp/cascade/context/{type}-{identifier}.md`
+3. Parse `discoveredLinks` from frontmatter — add any new URLs to `to-load.md`
+4. Repeat until no unloaded non-Figma URLs remain
 
-**Important**: Figma URLs discovered during this phase are collected but NOT loaded yet — they go in the `## Figma` section of `to-load.md`.
+**Important**: Figma URLs are collected but NOT loaded here — they go in the `## Figma` section of `to-load.md` for Phase 3.
 
 ### Phase 3: Figma Batch Load
 
@@ -66,40 +68,33 @@ For each Figma URL collected:
        └── ...
    ```
 
-### Phase 4: Fetch Fresh Comments
-
-For each Figma file loaded:
-
-1. Call MCP tool `figma-get-comments` with the file key
-2. Save comments to `.temp/cascade/figma/{fileKey}/comments/context.md`
-
-Comments are always fetched fresh (not from cache) because they change frequently.
-
-### Phase 5: Parallel Frame Analysis
+### Phase 4: Parallel Frame Analysis
 
 For each frame listed in `manifest.json`:
 
 1. Launch a **subagent** using the `analyze-figma-frame` sub-skill
-2. Each subagent receives the frame directory path and analyzes independently
+2. Pass only the **frame directory path** (e.g., `.temp/cascade/figma/{fileKey}/frames/{dirName}/`) — the subagent reads the files itself
 3. Subagents write `analysis.md` to their frame directory
+
+**Do NOT read context.md, structure.xml, or image.png yourself.** The subagent handles all file reading. You only pass the path.
 
 **Run all frame subagents in parallel** — they are independent of each other.
 
 Wait for all subagents to complete before proceeding.
 
-### Phase 6: Scope Analysis
+### Phase 5: Scope Analysis
 
-Use sub-skill `scope-analysis` to produce the scope analysis. This:
-- Combines all frame analyses with epic context, reference docs, and Figma comments
+Use sub-skill `analyze-feature-scope` to produce the scope analysis. This:
+- Combines all frame analyses with epic context, reference docs, and per-frame annotations
 - Categorizes every feature: ☐ In-Scope, ✅ Already Done, ⏬ Low Priority, ❌ Out-of-Scope, ❓ Questions, 💬 Answered
 - Groups features by user workflow (not by screen)
 - Returns a self-healing recommendation based on ❓ count
 
 This produces `.temp/cascade/scope-analysis.md`.
 
-**Self-healing check**: If the `scope-analysis` sub-skill recommends **CLARIFY** (>5 unanswered ❓), present the scope analysis to the user and ask them to answer questions before generating design review questions. Only proceed to Phase 7 if the user confirms or if ≤5 ❓ remain.
+**Self-healing check**: If the `analyze-feature-scope` sub-skill recommends **CLARIFY** (>5 unanswered ❓), present the scope analysis to the user and ask them to answer questions before generating behavior questions. Only proceed to Phase 6 if the user confirms or if ≤5 ❓ remain.
 
-### Phase 7: Generate Questions
+### Phase 6: Generate Questions
 
 Using the scope analysis and all frame analyses, generate frame-specific clarifying questions.
 
@@ -108,7 +103,7 @@ Using the scope analysis and all frame analyses, generate frame-specific clarify
 1. **Cross-Screen Awareness**: If ANY screen shows a behavior (component style, position, interaction pattern), that behavior is DEFINED — do NOT ask about it
 2. **Scope Markers**: Only ask about ☐ (in-scope) features. Skip ✅ (already done) and ❌ (out-of-scope)
 3. **Context First**: If any context source (Jira comments, Confluence, Google Docs, Figma annotations) answers a question, don't ask it
-4. **No Duplicates**: Don't repeat questions already present in Figma comments (check `.temp/cascade/figma/{fileKey}/comments/context.md`)
+4. **No Duplicates**: Don't repeat questions already present in Figma comments (check per-frame `context.md` files)
 5. **Check answered questions**: If a question was previously asked (as a Figma comment) and has a reply, mark it 💬 — don't re-ask
 
 #### Question Assignment Rules
@@ -122,16 +117,16 @@ Using the scope analysis and all frame analyses, generate frame-specific clarify
 Present questions to the user in this format:
 
 ```markdown
-# Design Review Questions
+# Behavior Questions
 
 ## [Frame: Screen Name (nodeId: 123:456)](https://www.figma.com/design/{fileKey}?node-id=123-456)
 
-1. What is the expected behavior when the user clicks the "Submit" button with invalid data?
-2. Should the filter panel persist its state across page navigation?
+1. ❓ What is the expected behavior when the user clicks the "Submit" button with invalid data?
+2. ❓ Should the filter panel persist its state across page navigation?
 
 ## [Frame: Another Screen (nodeId: 789:012)](https://www.figma.com/design/{fileKey}?node-id=789-012)
 
-1. Is the data table sortable by all columns or only specific ones?
+1. ❓ Is the data table sortable by all columns or only specific ones?
 ```
 
 **Important formatting:**
@@ -140,17 +135,22 @@ Present questions to the user in this format:
 - Only include frames that have questions
 - Number questions within each frame section
 
-### Phase 8: Present to User
+### Phase 7: Present Questions and Ask Next Action
 
-Present the generated questions to the user. After presenting:
+Present the generated questions to the user.
 
-- Ask if they want to **post these questions to Figma** (use `post-questions-to-figma` skill)
-- Ask if they want to **post these questions to Jira** (use `post-questions-to-jira` skill)
-- Ask if they want to modify any questions before posting
+After presenting, ask the user what they'd like to do next. Present these options clearly (use structured question UI if available — e.g., `askQuestions` in Copilot, `AskUserQuestion` in Claude Code):
+
+1. **Post questions to Figma** — Post as comments pinned to each frame (use `post-design-questions-to-figma` sub-skill)
+2. **Post questions to Jira** — Post as a single structured comment on the issue (use `post-design-questions-to-jira` sub-skill)
+3. **Answer questions here, post Q&A to Figma** — Walk through each question interactively, post answered Q&A pairs as Figma comments (use `answer-design-questions-post-to-figma` sub-skill)
+4. **Answer questions here, post Q&A to Jira** — Walk through each question interactively, build a growing Q&A comment on Jira (use `answer-design-questions-post-to-jira` sub-skill)
+
+**Do NOT offer "modify questions" as an option** — if the user wants to modify, they'll say so naturally.
 
 ## Important Notes
 
 - **Subagent depth**: Frame analysis subagents are leaf tasks — they do NOT launch further subagents
 - **Cache efficiency**: If `.temp/cascade/figma/{fileKey}/` already has valid data, `figma-batch-load` may return cached data — don't re-download unnecessarily
 - **Error resilience**: If a single frame analysis fails, report the error and continue with remaining frames
-- **Figma comments are separate**: Always fetch fresh via `figma-get-comments`, never rely on the batch-load zip for comments
+- **Fresh comments**: To get the latest Figma comments (e.g., replies to previously posted questions), re-run `figma-batch-load` — it always fetches fresh annotation data per frame

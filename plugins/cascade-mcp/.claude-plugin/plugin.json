@@ -5,7 +5,7 @@
   "mcpServers": {
     "cascade-mcp": {
       "type": "http",
-      "url": "https://cascade.bitovi.com/mcp"
+      "url": "http://localhost:3000/mcp"
     }
   }
 }

@@ -7,8 +7,7 @@
  * - prompts/scope-synthesis.md (synthesis instructions) 
  * - frames/{dirName}/image.png (actual PNG binary per frame)
  * - frames/{dirName}/structure.xml (semantic component tree per frame)
- * 
- * Comments are NOT included — fetched separately via figma-get-comments.
+ * - frames/{dirName}/context.md (comments, notes, prototype connections per frame)
  */
 
 import archiver from 'archiver';
@@ -23,9 +22,13 @@ export interface ZipFrameData {
   dirName: string;
   imageBase64: string;
   structureXml: string;
+  contextMd: string;
   url: string;
   order: number;
   section?: string;
+  annotationCount: number;
+  width?: number;
+  height?: number;
 }
 
 export interface ZipFileData {
@@ -46,6 +49,10 @@ export interface ZipBuildResult {
         dirName: string;
         url: string;
         order: number;
+        section?: string;
+        annotationCount: number;
+        width?: number;
+        height?: number;
       }>;
     }>;
     totalFrames: number;
@@ -78,6 +85,10 @@ export async function buildZip(files: ZipFileData[]): Promise<ZipBuildResult> {
             dirName: fr.dirName,
             url: fr.url,
             order: fr.order,
+            section: fr.section,
+            annotationCount: fr.annotationCount,
+            width: fr.width,
+            height: fr.height,
           })),
         })),
         totalFrames: files.reduce((sum, f) => sum + f.frames.length, 0),
@@ -104,6 +115,8 @@ export async function buildZip(files: ZipFileData[]): Promise<ZipBuildResult> {
           url: fr.url,
           order: fr.order,
           section: fr.section,
+          width: fr.width,
+          height: fr.height,
         })),
       };
       archive.append(JSON.stringify(fileManifest, null, 2), { name: `${prefix}manifest.json` });
@@ -116,6 +129,7 @@ export async function buildZip(files: ZipFileData[]): Promise<ZipBuildResult> {
       for (const frame of file.frames) {
         archive.append(Buffer.from(frame.imageBase64, 'base64'), { name: `${prefix}frames/${frame.dirName}/image.png` });
         archive.append(frame.structureXml, { name: `${prefix}frames/${frame.dirName}/structure.xml` });
+        archive.append(frame.contextMd, { name: `${prefix}frames/${frame.dirName}/context.md` });
       }
     }
 
