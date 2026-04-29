@@ -219,6 +219,18 @@ export async function handleSessionRequest(req: Request, res: Response): Promise
       ({ authInfo, errored } = await getAuthInfoFromQueryToken(req, res));
     }
     if (errored) { return; }
+
+    // Fall back to PAT headers
+    if (!authInfo) {
+      authInfo = getAuthInfoFromPatHeaders(req);
+      if (authInfo) {
+        console.log('🔑 Using PAT header authentication for GET request', {
+          providers: Object.keys(authInfo).filter(k => 
+            ['atlassian', 'figma', 'google'].includes(k) && authInfo![k as keyof AuthContext]
+          ),
+        });
+      }
+    }
     
     if (!authInfo) {
       // For GET requests, send 401 with invalid_token to trigger re-auth

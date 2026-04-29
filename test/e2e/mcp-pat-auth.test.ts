@@ -276,4 +276,57 @@ describe('MCP PAT Header Authentication', () => {
 
     await client.close();
   }, 30000);
+
+  test('should authenticate GET /mcp SSE stream with PAT headers', async () => {
+    if (shouldSkip) return;
+
+    // First, establish a session via POST (initialize)
+    const initRes = await fetch(`${serverUrl}/mcp`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json, text/event-stream',
+        'X-Atlassian-Token': ATLASSIAN_PAT!,
+        'X-Figma-Token': FIGMA_PAT!,
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'initialize',
+        params: {
+          protocolVersion: '2025-03-26',
+          capabilities: {},
+          clientInfo: { name: 'sse-test-client', version: '1.0' },
+        },
+        id: 1,
+      }),
+    });
+
+    expect(initRes.status).toBe(200);
+    const sessionId = initRes.headers.get('mcp-session-id');
+    expect(sessionId).toBeTruthy();
+
+    // Now open a GET SSE stream with PAT headers — this is what VS Code does
+    // and what was failing before the fix (returned 401, triggered PKCE)
+    const abortController = new AbortController();
+    const sseRes = await fetch(`${serverUrl}/mcp`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'text/event-stream',
+        'X-Atlassian-Token': ATLASSIAN_PAT!,
+        'X-Figma-Token': FIGMA_PAT!,
+        'mcp-session-id': sessionId!,
+      },
+      signal: abortController.signal,
+    });
+
+    // Should NOT be 401 — that's the bug we're guarding against
+    expect(sseRes.status).not.toBe(401);
+    // Should be 200 (SSE stream opened) or 204 (no content yet)
+    expect([200, 204]).toContain(sseRes.status);
+
+    // Clean up the SSE stream to avoid open handle warnings
+    abortController.abort();
+
+    console.log(`  ✅ GET /mcp SSE stream authenticated with PAT headers (status: ${sseRes.status})`);
+  }, 30000);
 });
