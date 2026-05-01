@@ -1,39 +1,37 @@
 /**
- * MCP Tool: figma-frame-analysis
+ * MCP Tool: figma-frame-data
  *
- * Analyzes a single Figma frame. Returns one frame's image, context, structure,
- * and analysis prompt — everything a subagent needs to analyze one frame.
+ * Returns one frame's image, context markdown, semantic XML, and metadata.
+ * Data only — no prompt text, no save instructions.
  *
  * Two modes:
- * - **Standalone**: Pass a Figma URL. The tool fetches from Figma, caches, and returns.
- * - **Orchestrated**: Pass URL + cacheToken. Reads from server cache (0 API calls).
+ * - **Cached**: Pass URL + batchToken from figma-batch-cache. Reads from server cache (0 API calls).
+ * - **Standalone**: Pass URL only. Fetches from Figma API directly (costs API calls).
  *
- * If the cache is expired, silently falls back to a live Figma fetch via the URL.
+ * Falls back to live fetch if cache is expired.
  */
 
 import { z } from 'zod';
 import type { McpServer } from '../../../../mcp-core/mcp-types.js';
 import { getAuthInfoSafe } from '../../../../mcp-core/auth-helpers.js';
-import { createFigmaClient, type FigmaClient } from '../../figma-api-client.js';
-import { parseFigmaUrl, convertNodeIdToApiFormat, fetchFigmaNodesBatch, downloadFigmaImagesBatch } from '../../figma-helpers.js';
-import { generateSemanticXml } from '../../semantic-xml-generator.js';
+import { createFigmaClient } from '../../figma-api-client.js';
 import {
-  getScopeCacheEntry,
-  readCachedFrameData,
-  type ScopeCacheFrameData,
-} from '../../scope-cache.js';
-import { buildFrameContextMarkdown, findConnections } from '../figma-ask-scope-questions-for-page/frame-context-builder.js';
-import { FRAME_ANALYSIS_PROMPT_TEXT } from '../figma-ask-scope-questions-for-page/prompt-constants.js';
-import { fetchAndAssociateAnnotations } from '../../screen-analyses-workflow/annotation-associator.js';
+  parseFigmaUrl,
+  convertNodeIdToApiFormat,
+  fetchFigmaNodesBatch,
+  downloadFigmaImagesBatch,
+} from '../../figma-helpers.js';
+import { generateSemanticXml } from '../../semantic-xml-generator.js';
+import { getBatchCacheEntry, readBatchFrameData, type BatchCacheFrameData } from '../../batch-cache.js';
 import type { ContentBlock, ImageContent, TextContent, EmbeddedResource } from '../../../../utils/embedded-prompt-builder.js';
 
 // ============================================================================
 // Types
 // ============================================================================
 
-interface FrameAnalysisParams {
+interface FrameDataParams {
   url: string;
-  cacheToken?: string;
+  batchToken?: string;
   includeStructure?: boolean;
   maxStructureSize?: number;
 }
@@ -42,25 +40,23 @@ interface FrameAnalysisParams {
 // Tool Registration
 // ============================================================================
 
-export function registerFigmaFrameAnalysisTool(mcp: McpServer): void {
+export function registerFigmaFrameDataTool(mcp: McpServer): void {
   mcp.registerTool(
-    'figma-frame-analysis',
+    'figma-frame-data',
     {
-      title: '[DEPRECATED] Analyze Single Figma Frame',
+      title: 'Get Figma Frame Data',
       description:
-        '[DEPRECATED — use figma-frame-data instead] ' +
-        'Returns one frame\'s image, context markdown, semantic XML, and analysis prompt. ' +
-        'Use standalone with any Figma frame URL, or pass a cacheToken from ' +
-        'figma-ask-scope-questions-for-page to read from server cache (faster, 0 API calls). ' +
-        'Everything needed to analyze one frame is returned in a single call.',
+        'Returns one frame\'s image, context markdown, semantic XML, and metadata — data only, no prompts or save instructions. ' +
+        'Pass a batchToken from figma-batch-cache to read from server cache (0 API calls). ' +
+        'Without batchToken, fetches directly from Figma API. Falls back to live fetch if cache expired.',
       inputSchema: {
         url: z
           .string()
-          .describe('Figma URL pointing to a specific frame (must contain node-id). The canonical identifier — always works even if cache expired.'),
-        cacheToken: z
+          .describe('Figma URL pointing to a specific frame (must contain node-id).'),
+        batchToken: z
           .string()
           .optional()
-          .describe('Optional cache token from figma-ask-scope-questions-for-page. Reads from server cache instead of hitting Figma API. Falls back to live fetch if expired.'),
+          .describe('Batch token from figma-batch-cache. Reads from server cache (0 API calls). Falls back to live fetch if expired.'),
         includeStructure: z
           .boolean()
           .optional()
@@ -73,11 +69,10 @@ export function registerFigmaFrameAnalysisTool(mcp: McpServer): void {
           .describe('Max characters for semantic XML before truncation (default: 50000).'),
       },
     },
-    async ({ url, cacheToken, includeStructure = true, maxStructureSize = 50000 }: FrameAnalysisParams, mcpContext) => {
-      console.log('figma-frame-analysis called');
-      console.log('  ⚠️ DEPRECATED: Use figma-frame-data instead');
+    async ({ url, batchToken, includeStructure = true, maxStructureSize = 50000 }: FrameDataParams, mcpContext) => {
+      console.log('figma-frame-data called');
       console.log(`  URL: ${url}`);
-      if (cacheToken) console.log(`  cacheToken: ${cacheToken}`);
+      if (batchToken) console.log(`  batchToken: ${batchToken}`);
 
       try {
         // Parse URL to extract fileKey and nodeId
@@ -91,14 +86,14 @@ export function registerFigmaFrameAnalysisTool(mcp: McpServer): void {
         const fileKey = parsed.fileKey;
         const nodeId = convertNodeIdToApiFormat(parsed.nodeId);
 
-        // Try to resolve data from cache first, then fall back to live fetch
+        // Resolve data from cache or live fetch
         const frameData = await resolveFrameData(
-          { fileKey, nodeId, cacheToken, url },
+          { fileKey, nodeId, batchToken, url },
           mcpContext
         );
 
-        // Build response content
-        const content = buildFrameAnalysisResponse(frameData, {
+        // Build response content (data only — no prompts)
+        const content = buildFrameDataResponse(frameData, {
           fileKey,
           url,
           includeStructure,
@@ -107,10 +102,9 @@ export function registerFigmaFrameAnalysisTool(mcp: McpServer): void {
 
         return { content };
       } catch (error: any) {
-        // Re-throw InvalidTokenError for MCP re-auth
         if (error.constructor?.name === 'InvalidTokenError') throw error;
 
-        console.error('figma-frame-analysis error:', error.message);
+        console.error('figma-frame-data error:', error.message);
         return {
           content: [{ type: 'text', text: JSON.stringify({ error: error.message || String(error) }) }],
           isError: true,
@@ -125,22 +119,21 @@ export function registerFigmaFrameAnalysisTool(mcp: McpServer): void {
 // ============================================================================
 
 /**
- * Resolve frame data — try cache first, fall back to live Figma fetch.
- * Cache expiration is invisible to the caller.
+ * Resolve frame data — try batch cache first, fall back to live Figma fetch.
  */
 async function resolveFrameData(
-  params: { fileKey: string; nodeId: string; cacheToken?: string; url: string },
+  params: { fileKey: string; nodeId: string; batchToken?: string; url: string },
   mcpContext: any
-): Promise<ScopeCacheFrameData> {
-  const { fileKey, nodeId, cacheToken } = params;
+): Promise<BatchCacheFrameData> {
+  const { nodeId, batchToken } = params;
 
-  // Attempt 1: Read from scope cache
-  if (cacheToken) {
-    const cacheEntry = await getScopeCacheEntry(cacheToken, fileKey);
+  // Attempt 1: Read from batch cache
+  if (batchToken) {
+    const cacheEntry = await getBatchCacheEntry(batchToken);
     if (cacheEntry) {
-      const cachedFrame = await readCachedFrameData(fileKey, nodeId);
+      const cachedFrame = await readBatchFrameData(batchToken, nodeId);
       if (cachedFrame) {
-        console.log('  ✅ Resolved from scope cache');
+        console.log('  ✅ Resolved from batch cache');
         return cachedFrame;
       }
     }
@@ -157,11 +150,10 @@ async function resolveFrameData(
 async function fetchSingleFrameData(
   params: { fileKey: string; nodeId: string; url: string },
   mcpContext: any
-): Promise<ScopeCacheFrameData> {
+): Promise<BatchCacheFrameData> {
   const { fileKey, nodeId } = params;
 
-  // Get auth
-  const authInfo = getAuthInfoSafe(mcpContext, 'figma-frame-analysis');
+  const authInfo = getAuthInfoSafe(mcpContext, 'figma-frame-data');
   const figmaToken = authInfo?.figma?.access_token;
   if (!figmaToken) {
     throw new Error('No Figma access token found in authentication context.');
@@ -200,8 +192,8 @@ async function fetchSingleFrameData(
     imageMimeType = imageData.mimeType || 'image/png';
   }
 
-  // Build simple context (no annotations from comments API for standalone mode to save API calls)
-  const contextMd = `# ${frameName} (Frame ${nodeId})\n\n_Standalone frame analysis — call figma-ask-scope-questions-for-page for full annotations._\n`;
+  // Build simple context (no full annotations in standalone mode)
+  const contextMd = `# ${frameName} (Frame ${nodeId})\n\n_Standalone frame data — use figma-batch-cache for full annotations and context._\n`;
 
   return {
     nodeId,
@@ -217,8 +209,11 @@ async function fetchSingleFrameData(
 // Response Builder
 // ============================================================================
 
-function buildFrameAnalysisResponse(
-  frameData: ScopeCacheFrameData,
+/**
+ * Build data-only response content blocks — no prompts, no save instructions.
+ */
+function buildFrameDataResponse(
+  frameData: BatchCacheFrameData,
   options: {
     fileKey: string;
     url: string;
@@ -230,29 +225,7 @@ function buildFrameAnalysisResponse(
   const { nodeId, name: frameName, imageBase64, imageMimeType, contextMd, semanticXml } = frameData;
   const content: ContentBlock[] = [];
 
-  // Sanitize frame name for filesystem
-  const safeName = frameName
-    .toLowerCase()
-    .replace(/[^a-z0-9-_]/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-    .substring(0, 80) || 'unnamed';
-
-  const outputDir = `temp/cascade/${fileKey}/frames/${safeName}`;
-
-  // 1. Analysis prompt with save instructions
-  const analysisPrompt = buildAnalysisPromptWithSaveInstructions(
-    undefined, // featureContext is in the cached prompt if available
-    outputDir,
-    frameName
-  );
-
-  content.push({
-    type: 'text',
-    text: analysisPrompt,
-  } as TextContent);
-
-  // 2. Image (one frame = ~500KB, manageable)
+  // 1. Image
   if (imageBase64) {
     content.push({
       type: 'image',
@@ -261,7 +234,7 @@ function buildFrameAnalysisResponse(
     } as ImageContent);
   }
 
-  // 3. Context markdown
+  // 2. Context markdown
   content.push({
     type: 'resource',
     resource: {
@@ -271,7 +244,7 @@ function buildFrameAnalysisResponse(
     },
   } as EmbeddedResource);
 
-  // 4. Semantic XML (with truncation)
+  // 3. Semantic XML (with truncation)
   if (includeStructure && semanticXml) {
     const xml = truncateSemanticXml(semanticXml, maxStructureSize);
     content.push({
@@ -284,45 +257,19 @@ function buildFrameAnalysisResponse(
     } as EmbeddedResource);
   }
 
-  // 5. Metadata
+  // 4. Metadata
   content.push({
     type: 'text',
     text: JSON.stringify({
       frameId: nodeId,
       frameName,
       fileKey,
-      outputPath: `${outputDir}/analysis.md`,
       structureTruncated: semanticXml.length > maxStructureSize,
       structureOriginalSize: semanticXml.length,
     }, null, 2),
   } as TextContent);
 
   return content;
-}
-
-function buildAnalysisPromptWithSaveInstructions(
-  featureContext: string | undefined,
-  outputDir: string,
-  frameName: string
-): string {
-  return `# Frame Analysis Instructions
-
-You are analyzing a single UI frame from a Figma design: **${frameName}**
-
-${FRAME_ANALYSIS_PROMPT_TEXT}
-
-${featureContext ? `## Feature Context\n\n${featureContext}\n\n` : ''}## Save Your Analysis
-
-Write your complete analysis as markdown to:
-
-\`${outputDir}/analysis.md\`
-
-The analysis should follow the format specified above. If the output directory
-doesn't exist, create it first.
-
-This file will be collected by the orchestrating agent for scope synthesis
-across all frames. If you are working standalone (not part of a multi-frame
-workflow), the analysis is still saved for reference and re-use.`;
 }
 
 // ============================================================================
@@ -332,7 +279,6 @@ workflow), the analysis is still saved for reference and re-use.`;
 function truncateSemanticXml(xml: string, maxSize: number): string {
   if (xml.length <= maxSize) return xml;
 
-  // Find a reasonable truncation point — try to cut at a closing tag
   const cutPoint = xml.lastIndexOf('</', maxSize - 200);
   const endTagEnd = cutPoint > 0 ? xml.indexOf('>', cutPoint) + 1 : maxSize;
   const truncated = xml.substring(0, endTagEnd > 0 ? endTagEnd : maxSize);

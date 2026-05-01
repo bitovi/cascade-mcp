@@ -1,8 +1,8 @@
 /**
- * REST API Handler for Figma Batch Load (figma-batch-zip)
+ * REST API Handler for Figma Batch Cache
  *
- * Batch-fetches Figma data for multiple URLs, builds a zip,
- * and returns a one-time download URL.
+ * Batch-fetches Figma data for multiple URLs into server-side cache.
+ * Returns a batchToken + manifest for subsequent figma-frame-data calls.
  *
  * Required Headers:
  *   X-Figma-Token: figd_...
@@ -17,10 +17,9 @@
 import type { Request, Response } from 'express';
 import { createFigmaClient } from '../providers/figma/figma-api-client.js';
 import { fetchBatchData } from '../providers/figma/tools/figma-batch-fetch.js';
-import { buildZip } from '../providers/figma/tools/figma-batch-load/zip-builder.js';
-import { registerDownload } from './download.js';
+import { createBatchCache } from '../providers/figma/batch-cache.js';
 
-export async function handleFigmaBatchZip(req: Request, res: Response): Promise<void> {
+export async function handleFigmaBatchCache(req: Request, res: Response): Promise<void> {
   try {
     const { requests, context } = req.body;
 
@@ -45,19 +44,19 @@ export async function handleFigmaBatchZip(req: Request, res: Response): Promise<
       return;
     }
 
-    const { zipPath, manifest } = await buildZip(fileDataResults);
-    const baseUrl = process.env.VITE_AUTH_SERVER_URL || `${req.protocol}://${req.get('host')}`;
-    const { token, expiresAt } = registerDownload(zipPath);
-    const downloadUrl = `${baseUrl}/dl/${token}`;
+    // Write to batch cache
+    const { batchToken, manifest } = await createBatchCache(fileDataResults);
 
     res.json({
       success: true,
-      downloadUrl,
-      expiresAt: expiresAt.toISOString(),
-      manifest,
+      batchToken,
+      manifest: {
+        files: manifest.files,
+        totalFrames: manifest.totalFrames,
+      },
     });
   } catch (error: any) {
-    console.error('REST API: figma-batch-zip failed:', error.message);
+    console.error('REST API: figma-batch-cache failed:', error.message);
     if (error.message?.includes('403') || error.message?.includes('unauthorized')) {
       res.status(401).json({ success: false, error: 'Figma authentication failed.' });
       return;

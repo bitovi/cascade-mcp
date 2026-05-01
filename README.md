@@ -42,8 +42,10 @@ Supported tools at the `https://cascade.bitovi.com/mcp` endpoint:
 **Figma Tools**:
 - **[`figma-get-user`](./server/providers/figma/tools/figma-get-user.md)** - Get information about the authenticated Figma user (test tool for OAuth validation)
 - **[`figma-review-design`](./server/providers/figma/tools/figma-review-design/figma-review-design.ts)** - Analyze Figma screen designs and post clarifying questions as comments on relevant frames
-- **[`figma-batch-load`](./server/providers/figma/tools/figma-batch-load/figma-batch-load.ts)** - Batch-fetch Figma data for multiple URLs; returns a zip download containing per-frame images, structure XML, comments, notes, and analysis prompts
-- **[`figma-ask-scope-questions-for-page`](./server/providers/figma/tools/figma-ask-scope-questions-for-page/figma-ask-scope-questions-for-page.ts)** - Analyze a Figma page and generate design scope questions with frame data and embedded analysis prompts
+- **[`figma-batch-zip`](./server/providers/figma/tools/figma-batch-load/figma-batch-load.ts)** - Batch-fetch Figma data for multiple URLs; returns a zip download containing per-frame images, structure XML, comments, notes, and analysis prompts (was `figma-batch-load`)
+- **[`figma-batch-cache`](./server/providers/figma/tools/figma-batch-cache/figma-batch-cache.ts)** - Batch-fetch Figma data into server-side cache; returns a batchToken for retrieval via `figma-frame-data` (cloud environments)
+- **[`figma-frame-data`](./server/providers/figma/tools/figma-frame-data/figma-frame-data.ts)** - Retrieve a single frame's data (image, context, XML) from batch cache or live Figma
+- **[`figma-ask-scope-questions-for-page`](./server/providers/figma/tools/figma-ask-scope-questions-for-page/figma-ask-scope-questions-for-page.ts)** - [DEPRECATED] Analyze a Figma page and generate design scope questions with frame data and embedded analysis prompts
 - **[`figma-post-comment`](./server/providers/figma/tools/figma-post-comment.ts)** - Post a comment to a Figma file, optionally pinned to a specific frame node
 - **[`figma-get-comments`](./server/providers/figma/tools/figma-get-comments.ts)** - Read existing comments from a Figma file, grouped into threads
 - **[`figma-get-image-download`](./server/providers/figma/tools/figma-get-image-download.md)** - Download images from Figma design URLs (returns base64-encoded image and metadata)

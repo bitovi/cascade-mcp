@@ -49,7 +49,7 @@ This returns **markdown with YAML frontmatter** containing:
 - For Jira: `relationship` on each link (parent, blocks, relates-to, etc.)
 - For Jira: `hasMoreComments` / `commentsStartAt` for comment pagination
 
-**Figma URLs**: If a Figma URL is passed, the tool returns a message to use `figma-batch-load` instead. Figma URLs should NOT be loaded by this skill.
+**Figma URLs**: If a Figma URL is passed, the tool returns a message to use `figma-batch-zip` instead. Figma URLs should NOT be loaded by this skill.
 
 ### 3. Save fetched content
 
@@ -94,7 +94,7 @@ Mark loaded URLs as `[x]` and append any newly discovered URLs as `[ ]`:
 - https://www.figma.com/design/abc123/Designs?node-id=0-1
 ```
 
-**Important**: Figma URLs should be listed in a separate "Figma" section — they are NOT loaded by this skill. The parent skill handles Figma loading via `figma-batch-load`.
+**Important**: Figma URLs should be listed in a separate "Figma" section — they are NOT loaded by this skill. The parent skill handles Figma loading via `figma-batch-zip` (or `figma-batch-cache` in cloud environments).
 
 ### 6. Return to parent skill
 
@@ -107,7 +107,7 @@ The parent skill decides whether to call `load-linked-resource-content` again (i
 
 ## Important Notes
 
-- **Do NOT load Figma URLs** — they require batch loading via `figma-batch-load` + `curl`/`unzip`, which the parent skill handles
+- **Do NOT load Figma URLs** — they require batch loading via `figma-batch-zip` + `curl`/`unzip` (or `figma-batch-cache` in cloud environments), which the parent skill handles
 - **Do NOT analyze or summarize content** — that's the `summarize-document-content` sub-skill's job
 - **Deduplicate URLs** — don't add a URL to `to-load.md` if it's already there (loaded or unloaded)
 - **Handle errors gracefully** — if a tool call fails, mark the URL with `[!]` in the manifest and continue with other URLs

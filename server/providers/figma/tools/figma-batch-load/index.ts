@@ -1,1 +1,1 @@
-export { registerFigmaBatchLoadTool } from './figma-batch-load.js';
+export { registerFigmaBatchZipTool } from './figma-batch-load.js';

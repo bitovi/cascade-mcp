@@ -386,14 +386,14 @@ Workflow resources are multi-step orchestration documents that instruct agents h
   - Parameters: `url` (Figma page URL), `context` (optional description)
   - Returns spatial ordering manifest for consistent left-to-right, top-to-bottom processing
 
-- **figma-frame-analysis** 🆕 - Per-frame analysis retrieval tool (spec 067)
+- **figma-frame-analysis** ⚠️ **DEPRECATED** — Use `figma-frame-data` instead
   - Returns one frame's image + context markdown + semantic XML + analysis prompt
   - With `cacheToken`: reads from server-side scope cache (0 Figma API calls)
   - Without `cacheToken`: fetches directly from Figma API (standalone mode, scale:1)
   - Parameters: `url` (Figma frame URL, required), `cacheToken` (optional string)
   - Includes XML truncation for large frames (>50KB) via `truncateSemanticXml()`
 
-- **figma-batch-load** 🆕 - Batch-fetch Figma data for multiple URLs across files
+- **figma-batch-zip** (was `figma-batch-load`) - Batch-fetch Figma data for multiple URLs across files
   - Returns a one-time download URL for a zip containing frame images, semantic XML, and analysis prompts
   - Agent uses `curl` + `unzip` to extract to `.temp/cascade/figma/`
   - Manifest includes per-frame `width` and `height` (from Figma `absoluteBoundingBox`) for comment positioning
@@ -401,6 +401,19 @@ Workflow resources are multi-step orchestration documents that instruct agents h
   - Comments NOT included — use `figma-get-comments` separately
   - Parameters: `requests` (array of `{ url, label? }`), `context` (optional)
   - Returns: `{ downloadUrl, expiresAt, manifest, saveInstructions }`
+
+- **figma-batch-cache** 🆕 - Batch-fetch Figma data into server-side cache (no zip/curl needed)
+  - Ideal for cloud environments where `curl` is blocked
+  - Returns a `batchToken` + `manifest` — frames retrieved individually via `figma-frame-data`
+  - Cache TTL: 10 minutes, extended by 5 minutes on each read
+  - Parameters: `requests` (array of `{ url, label? }`), `context` (optional)
+  - Returns: `{ batchToken, manifest: { files, totalFrames } }`
+
+- **figma-frame-data** 🆕 - Retrieve a single frame's data (image, context, structure)
+  - Two modes: cached (`batchToken` from `figma-batch-cache`) or standalone (live Figma fetch)
+  - Returns raw data only — no prompts or save instructions
+  - Parameters: `url` (Figma frame URL), `batchToken` (optional), `includeStructure` (optional), `maxStructureSize` (optional)
+  - Returns: image + context markdown + semantic XML + metadata content blocks
 
 - **figma-post-comment** 🆕 - Post a comment to a Figma file
   - Optionally pin to a specific node via `nodeId`
@@ -475,7 +488,7 @@ Advanced workflow tools that integrate multiple services:
   - For Jira: includes paginated comments with `hasMoreComments` / `commentsStartAt` support
   - For Confluence: extracts links from page body ADF
   - For Google Docs: extracts URLs via regex from markdown content
-  - For Figma URLs: returns a message to use `figma-batch-load` instead
+  - For Figma URLs: returns a message to use `figma-batch-zip` instead
   - Auto-routes auth: Atlassian token for Jira/Confluence, Google token for Docs/Sheets
   - Parameters: `url` (required), `siteName` (optional), `commentsStartAt` (optional)
   - REST API: `POST /api/extract-linked-resources`
@@ -587,9 +600,22 @@ All REST endpoints accept PAT (Personal Access Token) authentication via headers
 
 ### Figma Endpoints
 
-- **POST /api/figma-batch-load** — Batch-fetch Figma frames → zip download URL
+- **POST /api/figma-batch-zip** — Batch-fetch Figma frames → zip download URL
   - Header: `X-Figma-Token`
   - Body: `{ requests: [{ url, label? }], context? }`
+
+- **POST /api/figma-batch-load** — Legacy alias for `/api/figma-batch-zip` (deprecated)
+  - Same interface as `figma-batch-zip`
+
+- **POST /api/figma-batch-cache** — Batch-fetch Figma frames into server-side cache
+  - Header: `X-Figma-Token`
+  - Body: `{ requests: [{ url, label? }], context? }`
+  - Returns: `{ success, batchToken, manifest }`
+
+- **POST /api/figma-frame-data** — Retrieve one frame's data from cache or live Figma
+  - Header: `X-Figma-Token` (only needed on cache miss)
+  - Body: `{ url, batchToken?, includeStructure?, maxStructureSize? }`
+  - Returns: `{ success, frameData: { frameId, frameName, fileKey, image, context, structure, metadata } }`
 
 - **POST /api/figma-post-comment** — Post a comment to a Figma file
   - Header: `X-Figma-Token`
@@ -621,7 +647,7 @@ All REST endpoints accept PAT (Personal Access Token) authentication via headers
 - **GET /dl/:token** — One-time zip download (no auth header required)
   - Token is the auth mechanism (UUID, single-use, 10-minute TTL)
   - Returns the zip file as `application/zip` with `Content-Disposition: attachment`
-  - Used by agent skills to download `figma-batch-load` results via `curl`
+  - Used by agent skills to download `figma-batch-zip` results via `curl`
 
 ## Plugin Skills
 
@@ -648,10 +674,11 @@ plugins/cascade-mcp/
 
 ### How Skills Interact with MCP Tools
 
-1. Skills call `figma-batch-load` to get a zip download URL
-2. Agent runs `curl` + `unzip` to save data to `.temp/cascade/figma/`
-3. Sub-skills read from the local filesystem (no further MCP calls for cached data)
-4. Results posted via `figma-post-comment`, `atlassian-add-comment`, or `atlassian-update-issue-description`
+1. Skills call `figma-batch-zip` (or `figma-batch-cache` for cloud environments) to get frame data
+2. **Zip path**: Agent runs `curl` + `unzip` to save data to `.temp/cascade/figma/`
+3. **Cache path**: Agent uses `figma-frame-data` with a `batchToken` to retrieve frames via MCP
+4. Sub-skills read from the local filesystem (zip) or MCP (cache) — no further API calls for cached data
+5. Results posted via `figma-post-comment`, `atlassian-add-comment`, or `atlassian-update-issue-description`
 
 ## Key Authentication Patterns
 

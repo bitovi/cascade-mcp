@@ -13,7 +13,9 @@ import { handleIdentifyFeatures } from './identify-features.js';
 import { handleAnalyzeFeatureScope } from './analyze-feature-scope.js';
 import { handleFigmaReviewDesign } from './figma-review-design.js';
 import { handleReviewWorkItem } from './review-work-item.js';
-import { handleFigmaBatchLoad } from './figma-batch-load.js';
+import { handleFigmaBatchZip } from './figma-batch-load.js';
+import { handleFigmaBatchCache } from './figma-batch-cache.js';
+import { handleFigmaFrameData } from './figma-frame-data.js';
 import { handleFigmaPostComment } from './figma-post-comment.js';
 import { handleFigmaGetComments } from './figma-get-comments.js';
 import { handleAtlassianAddComment } from './atlassian-add-comment.js';
@@ -85,9 +87,21 @@ export function registerRestApiRoutes(app: Express): void {
   app.post('/api/review-work-item', (req, res) => handleReviewWorkItem(req, res));
   console.log('  ✓ POST /api/review-work-item');
   
-  // Batch load Figma frames to zip (spec 068 — plugin skills)
-  app.post('/api/figma-batch-load', (req, res) => handleFigmaBatchLoad(req, res));
-  console.log('  ✓ POST /api/figma-batch-load');
+  // Batch load Figma frames to zip (spec 068/069 — plugin skills)
+  app.post('/api/figma-batch-zip', (req, res) => handleFigmaBatchZip(req, res));
+  console.log('  ✓ POST /api/figma-batch-zip');
+  
+  // Legacy endpoint for backward compatibility
+  app.post('/api/figma-batch-load', (req, res) => handleFigmaBatchZip(req, res));
+  console.log('  ✓ POST /api/figma-batch-load (legacy → figma-batch-zip)');
+  
+  // Batch cache Figma frames for MCP retrieval (spec 069)
+  app.post('/api/figma-batch-cache', (req, res) => handleFigmaBatchCache(req, res));
+  console.log('  ✓ POST /api/figma-batch-cache');
+  
+  // Get single frame data (spec 069)
+  app.post('/api/figma-frame-data', (req, res) => handleFigmaFrameData(req, res));
+  console.log('  ✓ POST /api/figma-frame-data');
   
   // Post a comment to a Figma file
   app.post('/api/figma-post-comment', (req, res) => handleFigmaPostComment(req, res));

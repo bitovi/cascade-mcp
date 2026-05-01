@@ -90,7 +90,7 @@ export function registerExtractLinkedResourcesTool(mcp: McpServer): void {
           'URL to fetch. Supports: Jira issues (https://site.atlassian.net/browse/PROJ-123), ' +
           'Confluence pages (https://site.atlassian.net/wiki/...), ' +
           'Google Docs (https://docs.google.com/document/...). ' +
-          'For Figma URLs, returns a message to use figma-batch-load instead.'
+          'For Figma URLs, returns a message to use figma-batch-zip instead.'
         ),
         siteName: z.string().optional().describe(
           'Atlassian site name (e.g., "mycompany" from mycompany.atlassian.net). ' +

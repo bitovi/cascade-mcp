@@ -26,8 +26,9 @@ export function registerFigmaAskScopeQuestionsForPageTool(mcp: McpServer): void 
   mcp.registerTool(
     'figma-ask-scope-questions-for-page',
     {
-      title: 'Ask Scope Questions for Figma Page',
+      title: '[DEPRECATED] Ask Scope Questions for Figma Page',
       description:
+        '[DEPRECATED — use figma-batch-cache + figma-frame-data instead] ' +
         'Analyze a Figma page and generate design scope questions. ' +
         'Returns all frame data (images, annotations, semantic XML), embedded prompts for ' +
         'frame analysis, scope synthesis, and question generation, plus workflow instructions ' +
@@ -49,6 +50,7 @@ export function registerFigmaAskScopeQuestionsForPageTool(mcp: McpServer): void 
     },
     async ({ url, context }: ToolParams, mcpContext) => {
       console.log('figma-ask-scope-questions-for-page called');
+      console.log('  ⚠️ DEPRECATED: Use figma-batch-cache + figma-frame-data instead');
       console.log(`  URL: ${url}`);
       if (context) console.log(`  Context: ${context.substring(0, 100)}...`);
 
