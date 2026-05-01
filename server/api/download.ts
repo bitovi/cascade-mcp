@@ -1,7 +1,7 @@
 /**
  * Download Endpoint
  * 
- * One-time zip download endpoint for figma-batch-load.
+ * One-time zip download endpoint for figma-batch-zip.
  * Not an MCP tool — a plain HTTP endpoint the agent hits via `curl`.
  * 
  * Security:

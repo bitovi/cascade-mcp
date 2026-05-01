@@ -47,14 +47,13 @@ For each non-Figma URL in `to-load.md` (prioritize `parent` and `blocks` relatio
 
 For each Figma URL collected:
 
-1. Call MCP tool `figma-batch-load` with the Figma file URL
-   - This returns a download URL for a zip file
-2. Download and extract the zip:
+1. Call MCP tool `figma-batch-zip` with the Figma file URL
+   - This returns a `downloadUrl` for a zip file and a `manifest`
+2. Try to download and extract the zip:
    ```
-   curl -o .temp/cascade/figma/{fileKey}/batch.zip "{downloadUrl}"
-   cd .temp/cascade/figma/{fileKey} && unzip -o batch.zip
+   curl -sL "{downloadUrl}" -o /tmp/cascade-figma.zip && unzip -qo /tmp/cascade-figma.zip -d .temp/cascade/figma/ && rm /tmp/cascade-figma.zip
    ```
-3. The extracted zip contains:
+3. **If curl succeeds** (exit code 0), the extracted data is at:
    ```
    .temp/cascade/figma/{fileKey}/
    ├── manifest.json              ← frame list with metadata
@@ -67,16 +66,34 @@ For each Figma URL collected:
        │   └── context.md          ← annotations/connections
        └── ...
    ```
+   → Proceed to Phase 4 (filesystem path).
+
+4. **If curl fails** (e.g., DNS resolution blocked in cloud environments):
+   - Call MCP tool `figma-batch-cache` with the same Figma URLs
+   - Note the `batchToken` and `manifest` from the response
+   → Proceed to Phase 4 (MCP path).
 
 ### Phase 4: Parallel Frame Analysis
 
+**Choose the matching path based on Phase 3 outcome:**
+
+#### Path A: Local files available (zip succeeded)
+
 For each frame listed in `manifest.json`:
 
-1. Launch a **subagent** using the `analyze-figma-frame` sub-skill
+1. Launch a **subagent** using the `cascade-analyze-figma-frame` sub-skill
 2. Pass only the **frame directory path** (e.g., `.temp/cascade/figma/{fileKey}/frames/{dirName}/`) — the subagent reads the files itself
 3. Subagents write `analysis.md` to their frame directory
 
 **Do NOT read context.md, structure.xml, or image.png yourself.** The subagent handles all file reading. You only pass the path.
+
+#### Path B: MCP cache (curl failed, using batch cache)
+
+For each frame in the `manifest` from `figma-batch-cache`:
+
+1. Launch a **subagent** using the `cascade-analyze-figma-frame-mcp` sub-skill
+2. Pass the frame's **Figma URL** and the **batchToken**
+3. The subagent calls `figma-frame-data(url, batchToken)` to retrieve its data via MCP, then returns its analysis as text
 
 **Run all frame subagents in parallel** — they are independent of each other.
 
@@ -151,6 +168,7 @@ After presenting, ask the user what they'd like to do next. Present these option
 ## Important Notes
 
 - **Subagent depth**: Frame analysis subagents are leaf tasks — they do NOT launch further subagents
-- **Cache efficiency**: If `.temp/cascade/figma/{fileKey}/` already has valid data, `figma-batch-load` may return cached data — don't re-download unnecessarily
+- **Cache efficiency**: If `.temp/cascade/figma/{fileKey}/` already has valid data, `figma-batch-zip` may return cached data — don't re-download unnecessarily
 - **Error resilience**: If a single frame analysis fails, report the error and continue with remaining frames
-- **Fresh comments**: To get the latest Figma comments (e.g., replies to previously posted questions), re-run `figma-batch-load` — it always fetches fresh annotation data per frame
+- **Fresh comments**: To get the latest Figma comments (e.g., replies to previously posted questions), re-run `figma-batch-zip` — it always fetches fresh annotation data per frame
+- **Two frame analysis paths**: Use `cascade-analyze-figma-frame` for local files (zip path) and `cascade-analyze-figma-frame-mcp` for MCP cache path. The parent skill chooses based on whether the zip download succeeded

@@ -77,7 +77,7 @@ https://github.com/bitovi/cascade-mcp
 Skills are SKILL.md instruction files that guide the AI agent through multi-step workflows. The agent:
 
 1. Reads the SKILL.md for step-by-step instructions
-2. Calls MCP tools (e.g., `figma-batch-load`, `atlassian-get-issue`) for data and side-effects
+2. Calls MCP tools (e.g., `figma-batch-zip`, `atlassian-get-issue`) for data and side-effects
 3. Uses its own LLM for generation (no sampling dependency)
 4. Saves intermediate results to `.temp/cascade/` for caching
 
@@ -85,7 +85,9 @@ Skills are SKILL.md instruction files that guide the AI agent through multi-step
 
 | Tool | Purpose |
 |------|---------|
-| `figma-batch-load` | Batch-fetch Figma frames → zip with images, structure XML, prompts |
+| `figma-batch-zip` | Batch-fetch Figma frames → zip with images, structure XML, prompts |
+| `figma-batch-cache` | Batch-fetch Figma frames into server-side cache (cloud environments) |
+| `figma-frame-data` | Retrieve one frame's data from cache or live Figma |
 | `figma-post-comment` | Post a comment to a Figma file (optionally pinned to a node) |
 | `figma-get-comments` | Read comment threads from a Figma file |
 | `atlassian-add-comment` | Post a markdown comment to a Jira issue |

@@ -80,20 +80,33 @@ Record the story's:
 
 For each Figma URL in the target story's **SCREENS** list only (do NOT load all epic Figma files):
 
-1. Call MCP tool `figma-batch-load` with the Figma URL
-2. Download and extract:
+1. Call MCP tool `figma-batch-zip` with the Figma URL
+   - This returns a `downloadUrl` and `manifest`
+2. Try to download and extract:
    ```
-   curl -o .temp/cascade/figma/{fileKey}/batch.zip "{downloadUrl}"
-   cd .temp/cascade/figma/{fileKey} && unzip -o batch.zip
+   curl -sL "{downloadUrl}" -o /tmp/cascade-figma.zip && unzip -qo /tmp/cascade-figma.zip -d .temp/cascade/figma/ && rm /tmp/cascade-figma.zip
    ```
+3. **If curl fails** (e.g., DNS blocked in cloud environments):
+   - Call `figma-batch-cache` with the same Figma URLs
+   - Note the `batchToken` and `manifest` from the response
 
 If frames for these screens were already analyzed in a prior run (`.temp/cascade/figma/{fileKey}/frames/{dirName}/analysis.md` exists), skip re-downloading for that file.
 
 ### Phase 5: Parallel Frame Analysis
 
+**Choose the matching path based on Phase 4 outcome:**
+
+#### Path A: Local files available (zip succeeded)
+
 For each frame in the target story's screens, launch a **subagent** using the `cascade-analyze-figma-frame` sub-skill.
 
 **Pass only the frame directory path** (e.g., `.temp/cascade/figma/{fileKey}/frames/{dirName}/`). Do NOT read `context.md`, `structure.xml`, or `image.png` yourself — the subagent reads all files internally.
+
+#### Path B: MCP cache (curl failed, using batch cache)
+
+For each frame in the `manifest` from `figma-batch-cache`, launch a **subagent** using the `cascade-analyze-figma-frame-mcp` sub-skill.
+
+Pass the frame's **Figma URL** and the **batchToken**. The subagent calls `figma-frame-data(url, batchToken)` to retrieve data via MCP.
 
 Run all subagents in parallel. Wait for all to complete before proceeding.
 

@@ -6,7 +6,9 @@ import { registerFigmaGetLayersForPageTool } from './figma-get-layers-for-page.j
 import { registerFigmaReviewDesignTool } from './figma-review-design/index.js';
 import { registerFigmaAskScopeQuestionsForPageTool } from './figma-ask-scope-questions-for-page/index.js';
 import { registerFigmaFrameAnalysisTool } from './figma-frame-analysis/index.js';
-import { registerFigmaBatchLoadTool } from './figma-batch-load/index.js';
+import { registerFigmaBatchZipTool } from './figma-batch-load/index.js';
+import { registerFigmaBatchCacheTool } from './figma-batch-cache/index.js';
+import { registerFigmaFrameDataTool } from './figma-frame-data/index.js';
 import { registerFigmaPostCommentTool } from './figma-post-comment.js';
 import { registerFigmaGetCommentsTool } from './figma-get-comments.js';
 
@@ -40,11 +42,17 @@ export function registerFigmaTools(mcp: McpServer, authContext: any): void {
   registerFigmaFrameAnalysisTool(mcp);
   
   // Batch load Figma frames to zip (spec 068 — plugin skills)
-  registerFigmaBatchLoadTool(mcp);
+  registerFigmaBatchZipTool(mcp);
+  
+  // Batch cache Figma frames for MCP retrieval (spec 069 — cloud fallback)
+  registerFigmaBatchCacheTool(mcp);
+  
+  // Per-frame data retrieval, data only (spec 069 — works with batch cache)
+  registerFigmaFrameDataTool(mcp);
   
   // Comment tools (spec 068 — plugin skills)
   registerFigmaPostCommentTool(mcp);
   registerFigmaGetCommentsTool(mcp);
   
-  console.log('  All Figma tools registered (10 tools)');
+  console.log('  All Figma tools registered (12 tools)');
 }

@@ -194,7 +194,7 @@ export function formatFigmaResponse(data: FigmaResponseData): string {
     '---',
   ];
 
-  return `${frontmatter.join('\n')}\n\nThis is a Figma URL. Use the \`figma-batch-load\` tool to fetch Figma design data instead.`;
+  return `${frontmatter.join('\n')}\n\nThis is a Figma URL. Use the \`figma-batch-zip\` tool to fetch Figma design data instead.`;
 }
 
 export function formatUnsupportedResponse(url: string): string {
