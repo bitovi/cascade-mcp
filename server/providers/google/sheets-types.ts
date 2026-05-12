@@ -69,3 +69,42 @@ export interface DriveFilesListResponse {
   files: DriveFileEntry[];
   nextPageToken?: string;
 }
+
+/** Request body for spreadsheets.create */
+export interface CreateSpreadsheetRequest {
+  properties: {
+    title: string;
+  };
+  sheets?: Array<{
+    properties: {
+      title: string;
+    };
+  }>;
+}
+
+/** Response from spreadsheets.create */
+export interface CreateSpreadsheetResponse {
+  spreadsheetId: string;
+  spreadsheetUrl: string;
+  properties: {
+    title: string;
+    locale?: string;
+  };
+  sheets?: Sheet[];
+}
+
+/** Response from spreadsheets.batchUpdate */
+export interface SpreadsheetBatchUpdateResponse {
+  spreadsheetId: string;
+  replies?: Array<Record<string, unknown>>;
+}
+
+/** Response from spreadsheets.values.batchUpdate */
+export interface BatchUpdateValuesResponse {
+  spreadsheetId: string;
+  totalUpdatedRows?: number;
+  totalUpdatedColumns?: number;
+  totalUpdatedCells?: number;
+  totalUpdatedSheets?: number;
+  responses?: UpdateValuesResponse[];
+}

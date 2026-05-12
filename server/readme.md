@@ -472,6 +472,101 @@ Workflow resources are multi-step orchestration documents that instruct agents h
   - Example (clear): `sheets-write-values({ spreadsheetId: "1a2b3c4d...", range: "Sheet1!A1:B2", clearValues: true })`
   - Returns: updated range, row/column/cell counts
 
+- **sheets-create-spreadsheet** 🆕 - Create a new spreadsheet
+  - Creates a spreadsheet with a title and optional initial tab names
+  - Parameters: `title` (required), `sheetNames` (optional string array)
+  - Returns: created spreadsheet ID, title, and URL
+
+- **sheets-create-sheet** 🆕 - Add a new sheet tab
+  - Adds a tab to an existing spreadsheet using `spreadsheets.batchUpdate`
+  - Parameters: `spreadsheetId` (required), `title` (required)
+  - Returns: confirmation text
+
+- **sheets-rename-sheet** 🆕 - Rename an existing sheet tab
+  - Resolves tab name to `sheetId`, then updates tab title
+  - Parameters: `spreadsheetId` (required), `sheetName` (required), `newName` (required)
+  - Returns: confirmation text
+
+- **sheets-add-rows** 🆕 - Insert rows into a tab
+  - Inserts empty rows at a target row index
+  - Parameters: `spreadsheetId` (required), `sheetName` (required), `count` (required), `startIndex` (optional, default `0`)
+  - Returns: confirmation text
+
+- **sheets-add-columns** 🆕 - Insert columns into a tab
+  - Inserts empty columns at a target column index
+  - Parameters: `spreadsheetId` (required), `sheetName` (required), `count` (required), `startIndex` (optional, default `0`)
+  - Returns: confirmation text
+
+- **sheets-batch-update-cells** 🆕 - Update multiple ranges in one call
+  - Writes values to multiple A1 ranges via `spreadsheets.values.batchUpdate`
+  - Parameters: `spreadsheetId` (required), `ranges` (required JSON object string), `valueInputOption` (optional, `USER_ENTERED` or `RAW`)
+  - Returns: updated totals and per-range results
+
+- **sheets-get-formulas** 🆕 - Read formulas from a range
+  - Reads formulas using `valueRenderOption=FORMULA`
+  - Parameters: `spreadsheetId` (required), `range` (optional, default `A1:Z1000`)
+  - Returns: range and formula matrix
+
+- **sheets-create-chart** 🆕 - Create a basic chart from sheet data
+  - Creates a chart using one domain range plus one or more series ranges
+  - Parameters: `spreadsheetId` (required), `sheetName` (required), `chartType` (optional: `LINE|AREA|COLUMN|BAR|SCATTER|COMBO`), `domain` (required range object), `series` (required range array), `title` (optional), `anchorRowIndex` (optional), `anchorColumnIndex` (optional)
+  - Returns: `chartId` (when returned by Google) and batch update response
+
+- **sheets-copy-sheet** 🆕 - Copy a sheet tab between spreadsheets
+  - Copies a source tab into a destination spreadsheet and can rename the copied tab
+  - Parameters: `srcSpreadsheetId`, `srcSheetName`, `dstSpreadsheetId`, `dstSheetName` (optional)
+
+- **sheets-share** 🆕 - Share spreadsheet permissions
+  - Shares a spreadsheet with a user role (`reader`, `commenter`, `writer`)
+  - Parameters: `spreadsheetId`, `email`, `role`, `sendNotification` (optional)
+
+- **sheets-get-multiple-data** 🆕 - Read multiple ranges in one tool call
+  - Executes multiple reads across one or more spreadsheets
+  - Parameters: `queries` (JSON array of `{ spreadsheetId, range }`)
+
+- **sheets-append-rows** 🆕 - Append rows to a tab
+  - Appends 2D value arrays at the end of an existing tab
+  - Parameters: `spreadsheetId`, `sheetName`, `values`, `valueInputOption` (optional)
+
+- **sheets-find** 🆕 - Find text in spreadsheet cells
+  - Searches one tab or all tabs and returns cell matches
+  - Parameters: `spreadsheetId`, `searchText`, `sheetName` (optional)
+
+- **sheets-format-range** 🆕 - Format a range
+  - Applies text/background formatting using A1 ranges
+  - Parameters: `spreadsheetId`, `sheetName`, `range`, formatting fields (`bold`, `italic`, `fontSize`, `fontColor`, `backgroundColor`)
+
+- **sheets-add-chart** 🆕 - Create chart from A1 range inputs
+  - Creates a chart from an A1 data range and optional axis/title fields
+  - Parameters: `spreadsheetId`, `sheetName`, `chartType`, `dataRange`, `title?`, `xAxisLabel?`, `yAxisLabel?`, `positionX?`, `positionY?`
+
+- **sheets-manage-conditional-formatting** 🆕 - Add/delete conditional rules
+  - Adds boolean conditional formatting rules or deletes existing rules by index
+  - Parameters: `spreadsheetId`, `sheetName`, `range`, `action`, and rule fields
+
+- **sheets-move-rows** 🆕 - Move rows between tabs
+  - Moves rows by reading source rows, writing destination rows, then clearing source
+  - Parameters: `spreadsheetId`, `srcSheetName`, `srcRange`, `dstSheetName`, `dstStartRow?`
+
+- REST API endpoints for the new Sheets operations (requires `X-Google-Token` header with Google OAuth access token):
+  - `POST /api/sheets-create-spreadsheet`
+  - `POST /api/sheets-create-sheet`
+  - `POST /api/sheets-rename-sheet`
+  - `POST /api/sheets-add-rows`
+  - `POST /api/sheets-add-columns`
+  - `POST /api/sheets-batch-update-cells`
+  - `POST /api/sheets-get-formulas`
+  - `POST /api/sheets-copy-sheet`
+  - `POST /api/sheets-share`
+  - `POST /api/sheets-get-multiple-data`
+  - `POST /api/sheets-append-rows`
+  - `POST /api/sheets-find`
+  - `POST /api/sheets-format-range`
+  - `POST /api/sheets-add-chart`
+  - `POST /api/sheets-manage-conditional-formatting`
+  - `POST /api/sheets-move-rows`
+  - `POST /api/sheets-create-chart`
+
 ### Utility Tools
 
 - **utility-test-sampling** - Test MCP sampling functionality
@@ -641,6 +736,76 @@ All REST endpoints accept PAT (Personal Access Token) authentication via headers
   - Header: `X-Atlassian-Token` for Jira/Confluence, `X-Google-Token` for Google Docs/Sheets
   - Body: `{ url, siteName?, commentsStartAt? }`
   - Returns: `{ success, content }` where `content` is markdown with YAML frontmatter
+
+### Google Sheets Endpoints
+
+- **POST /api/sheets-create-spreadsheet** — Create a spreadsheet
+  - Header: `X-Google-Token`
+  - Body: `{ title, sheetNames? }`
+
+- **POST /api/sheets-create-sheet** — Create a sheet tab
+  - Header: `X-Google-Token`
+  - Body: `{ spreadsheetId, title }`
+
+- **POST /api/sheets-rename-sheet** — Rename a sheet tab
+  - Header: `X-Google-Token`
+  - Body: `{ spreadsheetId, sheetName, newName }`
+
+- **POST /api/sheets-add-rows** — Insert rows into a tab
+  - Header: `X-Google-Token`
+  - Body: `{ spreadsheetId, sheetName, count, startIndex? }`
+
+- **POST /api/sheets-add-columns** — Insert columns into a tab
+  - Header: `X-Google-Token`
+  - Body: `{ spreadsheetId, sheetName, count, startIndex? }`
+
+- **POST /api/sheets-batch-update-cells** — Update multiple ranges in one call
+  - Header: `X-Google-Token`
+  - Body: `{ spreadsheetId, ranges, valueInputOption? }`
+
+- **POST /api/sheets-get-formulas** — Read formulas from a range
+  - Header: `X-Google-Token`
+  - Body: `{ spreadsheetId, range? }`
+
+- **POST /api/sheets-copy-sheet** — Copy a tab to another spreadsheet
+  - Header: `X-Google-Token`
+  - Body: `{ srcSpreadsheetId, srcSheetName, dstSpreadsheetId, dstSheetName? }`
+
+- **POST /api/sheets-share** — Share spreadsheet with an email permission
+  - Header: `X-Google-Token`
+  - Body: `{ spreadsheetId, email, role, sendNotification? }`
+
+- **POST /api/sheets-get-multiple-data** — Read multiple ranges
+  - Header: `X-Google-Token`
+  - Body: `{ queries }` where `queries` is JSON or array of `{ spreadsheetId, range }`
+
+- **POST /api/sheets-append-rows** — Append rows to a sheet tab
+  - Header: `X-Google-Token`
+  - Body: `{ spreadsheetId, sheetName, values, valueInputOption? }`
+
+- **POST /api/sheets-find** — Find text across spreadsheet cells
+  - Header: `X-Google-Token`
+  - Body: `{ spreadsheetId, searchText, sheetName? }`
+
+- **POST /api/sheets-format-range** — Apply formatting to an A1 range
+  - Header: `X-Google-Token`
+  - Body: `{ spreadsheetId, sheetName, range, bold?, italic?, fontSize?, fontColor?, backgroundColor? }`
+
+- **POST /api/sheets-add-chart** — Create chart from A1 range inputs
+  - Header: `X-Google-Token`
+  - Body: `{ spreadsheetId, sheetName, chartType, dataRange, title?, xAxisLabel?, yAxisLabel?, positionX?, positionY? }`
+
+- **POST /api/sheets-manage-conditional-formatting** — Manage conditional rules
+  - Header: `X-Google-Token`
+  - Body: `{ spreadsheetId, sheetName, range, action, ruleIndex?, conditionType?, conditionValue?, backgroundColor? }`
+
+- **POST /api/sheets-move-rows** — Move row ranges between tabs
+  - Header: `X-Google-Token`
+  - Body: `{ spreadsheetId, srcSheetName, srcRange, dstSheetName, dstStartRow? }`
+
+- **POST /api/sheets-create-chart** — Create a basic chart from range definitions
+  - Header: `X-Google-Token`
+  - Body: `{ spreadsheetId, sheetName, chartType?, title?, domain, series, anchorRowIndex?, anchorColumnIndex? }`
 
 ### Download Endpoint
 
