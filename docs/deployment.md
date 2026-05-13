@@ -58,6 +58,16 @@ Before deploying, you need to create OAuth applications for the services you wan
    - Click **Create**
 5. Note your `Client ID` and `Client Secret` from the confirmation dialog
 
+#### Miro OAuth App
+
+1. Sign in to Miro and go to [Your apps](https://miro.com/app/settings/user-profile/apps)
+2. Click **Create new app**
+3. Enter an app name (e.g., "Cascade MCP Server")
+4. Select your Developer team
+5. Under **Redirect URI for OAuth2.0**, add `https://your-domain.com/auth/callback/miro`
+6. Under **Permissions**, select `boards:read`
+7. Note your Client ID and Client Secret
+
 ---
 
 ## Environment Configuration
@@ -96,6 +106,11 @@ FIGMA_OAUTH_SCOPES="file_content:read file_comments:read file_comments:write cur
 GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 GOOGLE_OAUTH_SCOPES="https://www.googleapis.com/auth/drive"
+
+# Miro OAuth
+MIRO_CLIENT_ID=your-miro-client-id
+MIRO_CLIENT_SECRET=your-miro-client-secret
+MIRO_OAUTH_SCOPES="boards:read"
 
 # RSA Encryption Keys (Required - enables /encrypt endpoint)
 # Generate keys locally: ./scripts/generate-rsa-keys.sh

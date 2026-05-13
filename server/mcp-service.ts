@@ -226,7 +226,7 @@ export async function handleSessionRequest(req: Request, res: Response): Promise
       if (authInfo) {
         console.log('🔑 Using PAT header authentication for GET request', {
           providers: Object.keys(authInfo).filter(k => 
-            ['atlassian', 'figma', 'google'].includes(k) && authInfo![k as keyof AuthContext]
+            ['atlassian', 'figma', 'google', 'miro'].includes(k) && authInfo![k as keyof AuthContext]
           ),
         });
       }
@@ -513,8 +513,16 @@ function validateAndExtractJwt(token: string, req: Request, res: Response, sourc
     const debugFigmaToken = process.env.DEBUG_FIGMA_TOKEN === 'true';
 
     // Log which providers are present (no longer require at least one)
-    if (!payload.atlassian && !payload.figma && !payload.google) {
-      console.log(`JWT payload has no provider credentials (${source}) - only utility tools will be available`);
+    const presentProviders = ['atlassian', 'figma', 'google', 'miro'].filter(p => !!(payload as any)[p]);
+    console.log(`JWT payload providers (${source}):`, presentProviders.length > 0 ? presentProviders : 'none - only utility tools will be available');
+    if (payload.miro) {
+      console.log(`[MIRO] JWT contains Miro credentials:`, {
+        access_token_prefix: payload.miro.access_token?.substring(0, 20) || 'missing',
+        access_token_length: payload.miro.access_token?.length || 0,
+        refresh_token_present: !!payload.miro.refresh_token,
+        expires_at: payload.miro.expires_at,
+        scope: payload.miro.scope,
+      });
     }
     
     if (debugFigmaToken && payload.figma) {

@@ -36,6 +36,7 @@ import {
 import { atlassianProvider } from '../providers/atlassian/index.ts';
 import { figmaProvider } from '../providers/figma/index.ts';
 import { googleProvider } from '../providers/google/index.ts';
+import { miroProvider } from '../providers/miro/index.js';
 import type { OAuthProvider, StandardTokenResponse } from '../providers/provider-interface.ts';
 import type { OAuthHandler, OAuthErrorResponse } from './types.ts';
 
@@ -113,6 +114,7 @@ export const refreshToken: OAuthHandler = async (req: Request, res: Response): P
       atlassian: atlassianProvider,
       figma: figmaProvider,
       google: googleProvider,
+      miro: miroProvider,
     };
 
     // Refresh all providers dynamically
@@ -120,6 +122,7 @@ export const refreshToken: OAuthHandler = async (req: Request, res: Response): P
       atlassian: null,
       figma: null,
       google: null,
+      miro: null,
     };
 
     try {

@@ -53,6 +53,16 @@ export async function handleConnectionDone(req: Request, res: Response): Promise
     const atlassianTokens = providerTokens['atlassian'];
     const figmaTokens = providerTokens['figma'];
     const googleTokens = providerTokens['google'];
+    const miroTokens = providerTokens['miro'];
+
+    console.log('[DONE] Provider tokens from session:', {
+      atlassian: !!atlassianTokens,
+      figma: !!figmaTokens,
+      google: !!googleTokens,
+      miro: !!miroTokens,
+      miroHasAccessToken: !!miroTokens?.access_token,
+      miroHasRefreshToken: !!miroTokens?.refresh_token,
+    });
     
     if (debugFigmaToken && figmaTokens) {
       console.log(`[DEBUG_FIGMA] Figma tokens from session:`, {
@@ -71,6 +81,12 @@ export async function handleConnectionDone(req: Request, res: Response): Promise
     addProviderTokensIfValid(multiProviderTokens, 'atlassian', atlassianTokens);
     addProviderTokensIfValid(multiProviderTokens, 'figma', figmaTokens);
     addProviderTokensIfValid(multiProviderTokens, 'google', googleTokens);
+    addProviderTokensIfValid(multiProviderTokens, 'miro', miroTokens);
+
+    console.log('[DONE] MultiProviderTokens after building:', {
+      keys: Object.keys(multiProviderTokens),
+      hasMiro: !!multiProviderTokens.miro,
+    });
     
     // Create JWT access token with nested provider structure
     const tokenOptions = {

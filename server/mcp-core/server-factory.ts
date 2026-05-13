@@ -18,6 +18,7 @@ import { registerAllResources } from '../mcp-resources/index.js';
 import { atlassianProvider } from '../providers/atlassian/index.js';
 import { figmaProvider } from '../providers/figma/index.js';
 import { googleProvider } from '../providers/google/index.js';
+import { miroProvider } from '../providers/miro/index.js';
 import { utilityProvider } from '../providers/utility/index.js';
 import { combinedProvider } from '../providers/combined/index.js';
 
@@ -77,6 +78,13 @@ export function createMcpServer(authContext: AuthContext): McpServer {
 
   // Dynamically register provider tools based on authenticated providers
   const registeredProviders: string[] = [];
+  console.log('  Auth context provider keys:', {
+    atlassian: !!authContext.atlassian,
+    figma: !!authContext.figma,
+    google: !!authContext.google,
+    miro: !!authContext.miro,
+    allKeys: Object.keys(authContext),
+  });
 
   if (authContext.atlassian) {
     console.log('  Registering Atlassian tools');
@@ -94,6 +102,12 @@ export function createMcpServer(authContext: AuthContext): McpServer {
     console.log('  Registering Google Drive tools');
     googleProvider.registerTools(mcp, authContext);
     registeredProviders.push('google');
+  }
+
+  if (authContext.miro) {
+    console.log('  Registering Miro tools');
+    miroProvider.registerTools(mcp, authContext);
+    registeredProviders.push('miro');
   }
 
   // Register combined tools only if BOTH providers are available
