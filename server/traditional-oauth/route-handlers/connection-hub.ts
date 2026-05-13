@@ -23,7 +23,7 @@ import crypto from 'crypto';
 
 // All providers that must be connected for auto-redirect to /auth/done
 // If only some providers are connected, user can manually click "Done" button
-const REQUIRED_PROVIDERS = ['atlassian', 'figma', 'google'] as const;
+const REQUIRED_PROVIDERS = ['atlassian', 'figma', 'google', 'miro'] as const;
 
 /**
  * Renders the connection hub UI
@@ -181,6 +181,15 @@ export function renderConnectionHub(req: Request, res: Response): void {
           ${connectedProviders.includes('google') 
             ? '<span class="status">✓ Connected</span>'
             : '<button onclick="location.href=\'/auth/connect/google\'">Connect Google Drive</button>'
+          }
+        </div>
+        
+        <div class="provider ${connectedProviders.includes('miro') ? 'connected' : ''}">
+          <h2>Miro</h2>
+          <p>Access Miro boards, items, and whiteboard content</p>
+          ${connectedProviders.includes('miro') 
+            ? '<span class="status">✓ Connected</span>'
+            : '<button onclick="location.href=\'/auth/connect/miro\'">Connect Miro</button>'
           }
         </div>
         

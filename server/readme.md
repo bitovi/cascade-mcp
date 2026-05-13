@@ -472,6 +472,22 @@ Workflow resources are multi-step orchestration documents that instruct agents h
   - Example (clear): `sheets-write-values({ spreadsheetId: "1a2b3c4d...", range: "Sheet1!A1:B2", clearValues: true })`
   - Returns: updated range, row/column/cell counts
 
+### Miro Tools
+
+- **miro-list-boards** — List accessible Miro boards
+- **miro-get-board** — Get board details (name, description, owner, dates)
+- **miro-get-board-items** — List items on a board (supports type filtering and pagination)
+- **miro-get-item** — Get specific item details (content, position, style)
+- **miro-get-frame-items** — Get items within a specific frame
+- **miro-get-connectors** — List connectors/arrows between items
+- **miro-get-tags** — List tags defined on a board
+- **miro-board-overview** — Visual overview of an entire Miro board. Returns a PNG image with numbered item labels plus a Mermaid flowchart graph and item index table. Uses board-level timestamp caching for performance. Item numbers can be referenced in `miro-board-region` for zoom.
+  - Input: `boardId` (string)
+  - Returns: PNG image (1200×900) + Mermaid text graph with item index
+- **miro-board-region** — Zoom into specific items on a Miro board by their numbered IDs from the overview. Returns a high-resolution PNG of the selected region plus detailed item descriptions with connections. Downloads and embeds actual images for image-type items.
+  - Input: `boardId` (string), `itemNums` (number[]), optional `padding` (number, default 0.15)
+  - Returns: PNG image (1600×1200) + detailed item/connection text
+
 ### Utility Tools
 
 - **utility-test-sampling** - Test MCP sampling functionality
@@ -690,6 +706,7 @@ MCP clients can authenticate using Personal Access Tokens via HTTP headers inste
 - `X-Atlassian-Token` — Base64-encoded `email:api_token` for Jira/Confluence
 - `X-Figma-Token` — Figma personal access token
 - `X-Google-Token` — RSA-encrypted Google service account JSON
+- `X-Miro-Token` — Miro personal access token or OAuth access token
 
 At least one provider token must be present. PAT auth bypasses the OAuth PKCE flow entirely.
 
