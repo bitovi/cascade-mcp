@@ -2,7 +2,7 @@ FROM node:20-alpine
 ENV PORT=3000
 
 # Install fonts required for SVG-to-PNG text rendering (sharp/librsvg)
-RUN apk add --no-cache fontconfig ttf-dejavu ttf-liberation font-noto-core \
+RUN apk add --no-cache fontconfig ttf-dejavu ttf-liberation font-noto \
     && fc-cache -f
 
 WORKDIR /app
