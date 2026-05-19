@@ -48,6 +48,10 @@ jobs:
           echo "GOOGLE_OAUTH_SCOPES=${{ vars.GOOGLE_OAUTH_SCOPES }}" >> repo_env
           echo "GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}" >> repo_env
           ####
+          echo "MIRO_CLIENT_ID=${{ vars.MIRO_CLIENT_ID }}" >> repo_env
+          echo "MIRO_OAUTH_SCOPES=${{ vars.MIRO_OAUTH_SCOPES }}" >> repo_env
+          echo "MIRO_CLIENT_SECRET=${{ secrets.MIRO_CLIENT_SECRET }}" >> repo_env
+          ####
           echo "RSA_PUBLIC_KEY=${{ secrets.RSA_PUBLIC_KEY }}" >> repo_env
           echo "RSA_PRIVATE_KEY=${{ secrets.RSA_PRIVATE_KEY }}" >> repo_env
           ####

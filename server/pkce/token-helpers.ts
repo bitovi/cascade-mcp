@@ -33,7 +33,7 @@ import type { AtlassianTokenResponse } from '../providers/atlassian/config.js';
  * Array of all supported provider keys
  * Use this constant to iterate over all providers consistently
  */
-export const PROVIDER_KEYS = ['atlassian', 'figma', 'google'] as const;
+export const PROVIDER_KEYS = ['atlassian', 'figma', 'google', 'miro'] as const;
 
 /**
  * Supported OAuth provider keys (derived from PROVIDER_KEYS array)
@@ -58,6 +58,7 @@ export interface MultiProviderTokens {
   atlassian?: ProviderTokenData;
   figma?: ProviderTokenData;
   google?: ProviderTokenData;
+  miro?: ProviderTokenData;
 }
 
 // Extended interface to handle optional refresh token expiration

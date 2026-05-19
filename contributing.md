@@ -246,7 +246,22 @@ If you want to use Google Drive integration, you'll need to create OAuth credent
      - Click **Create**
 5. Note your `Client ID` and `Client Secret` from the confirmation dialog
 
-### 4. Configure Google Encryption Keys (Optional - For REST API Testing)
+### 4. Create a Miro OAuth App (Optional)
+
+If you want to use Miro board integration, you'll need to create an OAuth app in Miro.
+
+**Steps:**
+
+1. Sign in to Miro and go to [Your apps](https://miro.com/app/settings/user-profile/apps).
+2. Click **Create new app**.
+3. Enter an app name (e.g., `Cascade MCP - Miro Local`).
+4. Select your Developer team.
+5. Under **Redirect URI for OAuth2.0**, add:
+   - `http://localhost:3000/auth/callback/miro`
+6. Under **Permissions**, select `boards:read`.
+7. Note your **Client ID** and **Client Secret**.
+
+### 5. Configure Google Encryption Keys (Optional - For REST API Testing)
 
 If you want to test REST API endpoints that accept encrypted Google service account credentials (e.g., testing `/api/write-shell-stories` with Google Docs context):
 
@@ -296,6 +311,12 @@ If you want to test REST API endpoints that accept encrypted Google service acco
    - `GOOGLE_CLIENT_SECRET` - Your Google OAuth Client Secret
    - `GOOGLE_OAUTH_SCOPES` - Should be `"https://www.googleapis.com/auth/drive"`
 
+   **Miro OAuth** (from Step 4, optional):
+
+   - `MIRO_CLIENT_ID` - Your Miro OAuth Client ID
+   - `MIRO_CLIENT_SECRET` - Your Miro OAuth Client Secret
+   - `MIRO_OAUTH_SCOPES` - Should be `"boards:read"`
+
    **Note:** The `ANTHROPIC_API_KEY`, `SESSION_SECRET`, and `JWT_SECRET` variables were already set during API setup.
 
 3. **Understanding Callback URLs**: The application uses provider-specific callback URLs following the pattern:
@@ -307,6 +328,7 @@ If you want to test REST API endpoints that accept encrypted Google service acco
    - Atlassian: `http://localhost:3000/auth/callback/atlassian`
    - Figma: `http://localhost:3000/auth/callback/figma`
    - Google: `http://localhost:3000/auth/callback/google`
+   - Miro: `http://localhost:3000/auth/callback/miro`
 
    These URLs **must match exactly** in your OAuth app configurations.
 

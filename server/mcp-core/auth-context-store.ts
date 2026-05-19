@@ -30,6 +30,7 @@ export interface AuthContext {
   atlassian?: ProviderAuthInfo;
   figma?: ProviderAuthInfo;
   google?: ProviderAuthInfo;
+  miro?: ProviderAuthInfo;
   // JWT metadata (preserved for compatibility)
   iss?: string;
   aud?: string;
@@ -71,6 +72,7 @@ export function setAuthContext(transportId: string, authInfo: AuthContext): void
   const atlassianToken = authInfo?.atlassian?.access_token;
   const figmaToken = authInfo?.figma?.access_token;
   const googleToken = authInfo?.google?.access_token;
+  const miroToken = authInfo?.miro?.access_token;
   const now = Math.floor(Date.now() / 1000);
 
   // Calculate expiry for Atlassian tokens
@@ -102,6 +104,13 @@ export function setAuthContext(transportId: string, authInfo: AuthContext): void
             ...getTokenLogInfo(googleToken, 'googleToken'),
             hasRefreshToken: !!authInfo.google.refresh_token,
             scope: authInfo.google.scope,
+          }
+        : null,
+      miro: authInfo?.miro
+        ? {
+            ...getTokenLogInfo(miroToken, 'miroToken'),
+            hasRefreshToken: !!authInfo.miro.refresh_token,
+            scope: authInfo.miro.scope,
           }
         : null,
     },
@@ -159,7 +168,7 @@ export function getAuthContext(transportId: string): AuthContext | undefined {
  */
 export function getAuthInfo(context: any): AuthContext | null {
   // First try to get from context if it's directly available
-  if (context?.authInfo && (context.authInfo.atlassian || context.authInfo.figma || context.authInfo.google)) {
+  if (context?.authInfo && (context.authInfo.atlassian || context.authInfo.figma || context.authInfo.google || context.authInfo.miro)) {
     return context.authInfo;
   }
 
@@ -169,7 +178,7 @@ export function getAuthInfo(context: any): AuthContext | null {
   if (sessionId) {
     const authInfo = authContextStore.get(sessionId);
 
-    if (authInfo && (authInfo.atlassian || authInfo.figma || authInfo.google)) {
+    if (authInfo && (authInfo.atlassian || authInfo.figma || authInfo.google || authInfo.miro)) {
       return authInfo;
     }
     

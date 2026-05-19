@@ -1,0 +1,1658 @@
+{
+  "items": [
+    {
+      "id": "3458764653559439556",
+      "type": "card",
+      "position": {
+        "x": 1546.5087276945917,
+        "y": 1366.7888332425919,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 101.9390625
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>Assignment</p>"
+      }
+    },
+    {
+      "id": "3458764653559439748",
+      "type": "card",
+      "position": {
+        "x": 1546.5087276945917,
+        "y": 1147.7549061570853,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 101.9390625
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>Role</p>"
+      }
+    },
+    {
+      "id": "3458764653559439780",
+      "type": "card",
+      "position": {
+        "x": 1354.05163344453,
+        "y": 807.4872821406474,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 101.9390625
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>SOW</p>"
+      }
+    },
+    {
+      "id": "3458764653559568130",
+      "type": "card",
+      "position": {
+        "x": 2333.455665116663,
+        "y": 1147.7549061570853,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 101.9390625
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>Skill</p>"
+      }
+    },
+    {
+      "id": "3458764653559568226",
+      "type": "card",
+      "position": {
+        "x": 2659.5282346824656,
+        "y": 328.01002648245003,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 101.9390625
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>Person</p>"
+      }
+    },
+    {
+      "id": "3458764653559568244",
+      "type": "card",
+      "position": {
+        "x": 2977.759747036737,
+        "y": 692.6202734521357,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 69.50390625
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>User</p>"
+      }
+    },
+    {
+      "id": "3458764653559568432",
+      "type": "card",
+      "position": {
+        "x": 1354.05163344453,
+        "y": 566.7562274531474,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 69.50390625
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>Organization</p>"
+      }
+    },
+    {
+      "id": "3458764653559568697",
+      "type": "card",
+      "position": {
+        "x": 2333.455665116663,
+        "y": 1347.3179920945852,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 69.50390625
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>Employee</p>"
+      }
+    },
+    {
+      "id": "3458764653559668181",
+      "type": "card",
+      "position": {
+        "x": 1926.142724776197,
+        "y": 1147.7549061570853,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 108.889453125
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>RoleSkill</p>"
+      }
+    },
+    {
+      "id": "3458764653559668524",
+      "type": "sticky_note",
+      "position": {
+        "x": 1094.453211902597,
+        "y": 831.53393546751,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 148.354038932586,
+        "height": 96.64205964751318
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "content": "<p>Needs a status</p>",
+        "shape": "rectangle"
+      },
+      "style": {
+        "fillColor": "light_yellow"
+      }
+    },
+    {
+      "id": "3458764653559668619",
+      "type": "card",
+      "position": {
+        "x": 456.13992828065943,
+        "y": 1563.499944510388,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 101.9390625
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>Invoice</p>"
+      }
+    },
+    {
+      "id": "3458764653559754242",
+      "type": "card",
+      "position": {
+        "x": 1546.4330339122494,
+        "y": 1563.499944510388,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 101.9390625
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>TimeEntry</p>"
+      }
+    },
+    {
+      "id": "3458764653559861987",
+      "type": "card",
+      "position": {
+        "x": 814.3871113145874,
+        "y": 1563.499944510388,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 101.9390625
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>InvoiceLineItem</p>"
+      }
+    },
+    {
+      "id": "3458764653559862175",
+      "type": "card",
+      "position": {
+        "x": 1316.90523136889,
+        "y": 1687.8976903828964,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 101.9390625
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>MaterialEntry</p>"
+      }
+    },
+    {
+      "id": "3458764653561574679",
+      "type": "card",
+      "position": {
+        "x": 1726.084288644406,
+        "y": 644.0536664563415,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 69.50390625
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>Activity</p>"
+      }
+    },
+    {
+      "id": "3458764653561649323",
+      "type": "card",
+      "position": {
+        "x": 603.809146496933,
+        "y": 787.7945087031474,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 69.50390625
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>Lead</p>"
+      }
+    },
+    {
+      "id": "3458764653561738934",
+      "type": "card",
+      "position": {
+        "x": 1428.1452708664829,
+        "y": 308.3172530449499,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 69.50390625
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>Contact</p>"
+      }
+    },
+    {
+      "id": "3458764653561739546",
+      "type": "sticky_note",
+      "position": {
+        "x": 1465.108487215753,
+        "y": 703.0505834103734,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 74.43629245755405,
+        "height": 48.489927658063785
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "content": "<p>genesis</p>",
+        "shape": "rectangle"
+      },
+      "style": {
+        "fillColor": "light_yellow"
+      }
+    },
+    {
+      "id": "3458764653562465478",
+      "type": "card",
+      "position": {
+        "x": 2181.131009776368,
+        "y": 2592.8289754331417,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 69.50390625
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>JobRole</p>"
+      }
+    },
+    {
+      "id": "3458764653562465524",
+      "type": "card",
+      "position": {
+        "x": 2592.0946882559992,
+        "y": 2565.77131271295,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 69.50390625
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>JobLevel</p>"
+      }
+    },
+    {
+      "id": "3458764653562465818",
+      "type": "card",
+      "position": {
+        "x": 2358.2062139909476,
+        "y": 1949.0938474030256,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 69.50390625
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>EmployeeJob</p>"
+      }
+    },
+    {
+      "id": "3458764653562552525",
+      "type": "shape",
+      "position": {
+        "x": 2382.9171659143594,
+        "y": 2265.557258075938,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 849.7721375362124,
+        "height": 890.055796749569
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "content": "<p><span style=\"color:rgb(2,53,56)\">Job Architecture</span></p>",
+        "shape": "round_rectangle"
+      },
+      "style": {
+        "fillColor": "#fbfcfc",
+        "borderColor": "#a3adad"
+      }
+    },
+    {
+      "id": "3458764653562638200",
+      "type": "card",
+      "position": {
+        "x": 3168.3111161003217,
+        "y": 1738.9040156072974,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 69.50390625
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>ManagerRelationship</p>"
+      }
+    },
+    {
+      "id": "3458764653562714159",
+      "type": "card",
+      "position": {
+        "x": 2358.2062139909476,
+        "y": 2293.6465306805703,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 69.50390625
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>Job</p>"
+      }
+    },
+    {
+      "id": "3458764653563130215",
+      "type": "shape",
+      "position": {
+        "x": 1459.410782470075,
+        "y": 2255.833201581344,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 849.7721375362124,
+        "height": 890.055796749569
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "content": "<p><span style=\"color:rgb(2,53,56)\">R</span>eviews</p>",
+        "shape": "round_rectangle"
+      },
+      "style": {
+        "fillColor": "#fbfcfc",
+        "borderColor": "#a3adad"
+      }
+    },
+    {
+      "id": "3458764653563130412",
+      "type": "card",
+      "position": {
+        "x": 1425.602044152504,
+        "y": 2064.8929341906405,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 101.9390625
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>Review Cycle</p>"
+      }
+    },
+    {
+      "id": "3458764653563130903",
+      "type": "card",
+      "position": {
+        "x": 1425.602044152504,
+        "y": 2251.886788078614,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 101.9390625
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>EmployeeReview</p>"
+      }
+    },
+    {
+      "id": "3458764653563268278",
+      "type": "card",
+      "position": {
+        "x": 1597.2500507589266,
+        "y": 2595.070430664093,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 101.9390625
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>FeedbackTemplate</p>"
+      }
+    },
+    {
+      "id": "3458764653563268793",
+      "type": "card",
+      "position": {
+        "x": 1225.3226487805352,
+        "y": 2478.301045891114,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 108.889453125
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>EmployeeReviewFeedback</p>"
+      }
+    },
+    {
+      "id": "3458764653565628500",
+      "type": "card",
+      "position": {
+        "x": 2333.455665116663,
+        "y": 1237.8140858445852,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 69.50390625
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>EmployeeSkill</p>"
+      }
+    },
+    {
+      "id": "3458764653565628916",
+      "type": "card",
+      "position": {
+        "x": 843.2285667805497,
+        "y": 2478.301045891114,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 69.50390625
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>Employee</p>"
+      }
+    },
+    {
+      "id": "3458764653566312970",
+      "type": "card",
+      "position": {
+        "x": 2620.503652391658,
+        "y": 2112.6273342413633,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 69.50390625
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>EmployeeJobSkill</p>"
+      }
+    },
+    {
+      "id": "3458764653566313047",
+      "type": "card",
+      "position": {
+        "x": 3036.9953820383425,
+        "y": 1902.437502445635,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 69.50390625
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>Skill</p>"
+      }
+    },
+    {
+      "id": "3458764653567069137",
+      "type": "shape",
+      "position": {
+        "x": 992.5548721287903,
+        "y": 1603.9864623784038,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 1505.9403572602728,
+        "height": 303.31086829517045
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "content": "<p>\u2003\u2003TimeKeeping and Invoicing</p>",
+        "shape": "round_rectangle"
+      },
+      "style": {
+        "fillColor": "#fbfcfc",
+        "borderColor": "#a3adad"
+      }
+    },
+    {
+      "id": "3458764653567069395",
+      "type": "shape",
+      "position": {
+        "x": 1913.9728602582402,
+        "y": 1223.18601448098,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 1273.291632211472,
+        "height": 392.12152010115756
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "content": "<p>\u2003\u2003\u2003Delivery</p>",
+        "shape": "round_rectangle"
+      },
+      "style": {
+        "fillColor": "#fbfcfc",
+        "borderColor": "#a3adad"
+      }
+    },
+    {
+      "id": "3458764653567171158",
+      "type": "shape",
+      "position": {
+        "x": 1260.7364827120612,
+        "y": 540.9014533341324,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 1535.2798800706132,
+        "height": 722.962176815087
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "content": "<p>\u2003\u2003\u2003Sales</p>",
+        "shape": "round_rectangle"
+      },
+      "style": {
+        "fillColor": "#fbfcfc",
+        "borderColor": "#a3adad"
+      }
+    },
+    {
+      "id": "3458764653567171351",
+      "type": "frame",
+      "position": {
+        "x": 15.994784014318611,
+        "y": 206.75614348831914,
+        "origin": "center",
+        "relativeTo": "canvas_center"
+      },
+      "geometry": {
+        "width": 3452.168577288812,
+        "height": 2836.0521774158087
+      },
+      "data": {
+        "title": "Frame 1"
+      },
+      "style": {
+        "fillColor": "#ffffff"
+      }
+    },
+    {
+      "id": "3458764653726081807",
+      "type": "text",
+      "position": {
+        "x": 3159.709957908941,
+        "y": 5037.013737747582,
+        "origin": "center",
+        "relativeTo": "canvas_center"
+      },
+      "geometry": {
+        "width": 78
+      },
+      "data": {
+        "content": "<p><strong style=\"color:rgb(10,10,10)\">Senior</strong></p>"
+      },
+      "style": {
+        "fillColor": "#ffffff"
+      }
+    },
+    {
+      "id": "3458764653726081808",
+      "type": "text",
+      "position": {
+        "x": 3911.041386480369,
+        "y": 5019.513737747582,
+        "origin": "center",
+        "relativeTo": "canvas_center"
+      },
+      "geometry": {
+        "width": 304.66285714285715
+      },
+      "data": {
+        "content": "<p><strong style=\"color:rgb(10,10,10)\">Dec 31, 2023- Dec 25, 2025</strong></p>"
+      },
+      "style": {
+        "fillColor": "#ffffff"
+      }
+    },
+    {
+      "id": "3458764653726081810",
+      "type": "text",
+      "position": {
+        "x": 3908.3728150517977,
+        "y": 3373.8907986600407,
+        "origin": "center",
+        "relativeTo": "canvas_center"
+      },
+      "geometry": {
+        "width": 201.42571427999997
+      },
+      "data": {
+        "content": "<p><strong style=\"color:rgb(10,10,10)\">Staff Engineer</strong></p>"
+      },
+      "style": {
+        "fillColor": "#ffffff"
+      }
+    },
+    {
+      "id": "3458764653799857855",
+      "type": "card",
+      "position": {
+        "x": 2630.0056651166633,
+        "y": 1514.0644804135427,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 69.50390625
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>Department</p>"
+      }
+    },
+    {
+      "id": "3458764653981239222",
+      "type": "card",
+      "position": {
+        "x": 872.0011924363042,
+        "y": 1684.1731260517522,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 101.9390625
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>Payments</p>"
+      }
+    },
+    {
+      "id": "3458764654026853481",
+      "type": "card",
+      "position": {
+        "x": 1913.9728602582402,
+        "y": 468.857226614096,
+        "origin": "center",
+        "relativeTo": "parent_top_left"
+      },
+      "geometry": {
+        "width": 296.55,
+        "height": 101.9390625
+      },
+      "parent": {
+        "id": "3458764653567171351"
+      },
+      "data": {
+        "title": "<p>Address</p>"
+      }
+    }
+  ],
+  "connectors": [
+    {
+      "id": "3458764653559439796",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653559439748"
+      },
+      "endItem": {
+        "id": "3458764653559439780"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653559439797",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653559439556"
+      },
+      "endItem": {
+        "id": "3458764653559439748"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653559568184",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653559439748"
+      },
+      "endItem": {
+        "id": "3458764653559668181"
+      },
+      "style": {
+        "startStrokeCap": "diamond",
+        "endStrokeCap": "diamond",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653559568485",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653559439780"
+      },
+      "endItem": {
+        "id": "3458764653559568432"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653559568532",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653559439556"
+      },
+      "endItem": {
+        "id": "3458764653559568697"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653559568718",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653559568697"
+      },
+      "endItem": {
+        "id": "3458764653559568226"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "dashed",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653559667934",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653559568130"
+      },
+      "endItem": {
+        "id": "3458764653565628500"
+      },
+      "style": {
+        "startStrokeCap": "diamond",
+        "endStrokeCap": "diamond",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653559668236",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653559668181"
+      },
+      "endItem": {
+        "id": "3458764653559568130"
+      },
+      "style": {
+        "startStrokeCap": "diamond",
+        "endStrokeCap": "diamond",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653559668834",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653559668619"
+      },
+      "endItem": {
+        "id": "3458764653559439780"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653559754269",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653559754242"
+      },
+      "endItem": {
+        "id": "3458764653559439556"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653561649370",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653559439780"
+      },
+      "endItem": {
+        "id": "3458764653561649323"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653561649413",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653561649323"
+      },
+      "endItem": {
+        "id": "3458764653559568432"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653561649817",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653561649323"
+      },
+      "endItem": {
+        "id": "3458764653561738934"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653561739081",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653561738934"
+      },
+      "endItem": {
+        "id": "3458764653559568226"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "dashed",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653561739122",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653559568244"
+      },
+      "endItem": {
+        "id": "3458764653559568226"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "dashed",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653561739526",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653559439780"
+      },
+      "endItem": {
+        "id": "3458764653559439780"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653561838251",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653559439780"
+      },
+      "endItem": {
+        "id": "3458764653561574679"
+      },
+      "style": {
+        "startStrokeCap": "diamond",
+        "endStrokeCap": "diamond",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653562465882",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653562465818"
+      },
+      "endItem": {
+        "id": "3458764653559568697"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653562551931",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653562714159"
+      },
+      "endItem": {
+        "id": "3458764653562465478"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653562551939",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653562714159"
+      },
+      "endItem": {
+        "id": "3458764653562465524"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653562638248",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653562465818"
+      },
+      "endItem": {
+        "id": "3458764653562638200"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653562638371",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653562638200"
+      },
+      "endItem": {
+        "id": "3458764653562465818"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653562714207",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653562465818"
+      },
+      "endItem": {
+        "id": "3458764653562714159"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653563201172",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653563130903"
+      },
+      "endItem": {
+        "id": "3458764653563130412"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653563201251",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653563130903"
+      },
+      "endItem": {
+        "id": "3458764653559568697"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653563268435",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653563268278"
+      },
+      "endItem": {
+        "id": "3458764653562714159"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      },
+      "captions": [
+        {
+          "content": "<p>FOr</p>",
+          "position": "50%",
+          "textAlignVertical": "middle"
+        }
+      ]
+    },
+    {
+      "id": "3458764653563268489",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653563268278"
+      },
+      "endItem": {
+        "id": "3458764653562714159"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      },
+      "captions": [
+        {
+          "content": "<p>From</p>",
+          "position": "50%",
+          "textAlignVertical": "middle"
+        }
+      ]
+    },
+    {
+      "id": "3458764653563268802",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653563268793"
+      },
+      "endItem": {
+        "id": "3458764653563130903"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653563268813",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653563268793"
+      },
+      "endItem": {
+        "id": "3458764653563268278"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653563367094",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653563130903"
+      },
+      "endItem": {
+        "id": "3458764653562465818"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653565628562",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653565628500"
+      },
+      "endItem": {
+        "id": "3458764653559568697"
+      },
+      "style": {
+        "startStrokeCap": "diamond",
+        "endStrokeCap": "diamond",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653565762930",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653563268793"
+      },
+      "endItem": {
+        "id": "3458764653565628916"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653566313010",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653562465818"
+      },
+      "endItem": {
+        "id": "3458764653566312970"
+      },
+      "style": {
+        "startStrokeCap": "diamond",
+        "endStrokeCap": "diamond",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653566313079",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653566312970"
+      },
+      "endItem": {
+        "id": "3458764653566313047"
+      },
+      "style": {
+        "startStrokeCap": "diamond",
+        "endStrokeCap": "diamond",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653567392656",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653561649323"
+      },
+      "endItem": {
+        "id": "3458764653561574679"
+      },
+      "style": {
+        "startStrokeCap": "diamond",
+        "endStrokeCap": "diamond",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653799857887",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653562465818"
+      },
+      "endItem": {
+        "id": "3458764653799857855"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653799857912",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653559439748"
+      },
+      "endItem": {
+        "id": "3458764653799857855"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653981135963",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653559862175"
+      },
+      "endItem": {
+        "id": "3458764653559439780"
+      },
+      "style": {
+        "startStrokeCap": "diamond",
+        "endStrokeCap": "diamond",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764653981238959",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653559862175"
+      },
+      "endItem": {
+        "id": "3458764653559568697"
+      },
+      "style": {
+        "startStrokeCap": "diamond",
+        "endStrokeCap": "diamond",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764654026374825",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653559754242"
+      },
+      "endItem": {
+        "id": "3458764653559861987"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764654026374828",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653559862175"
+      },
+      "endItem": {
+        "id": "3458764653559861987"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764654026496941",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653559861987"
+      },
+      "endItem": {
+        "id": "3458764653559668619"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764654026496965",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764653981239222"
+      },
+      "endItem": {
+        "id": "3458764653559668619"
+      },
+      "style": {
+        "startStrokeCap": "none",
+        "endStrokeCap": "rounded_stealth",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    },
+    {
+      "id": "3458764654318314843",
+      "type": "connector",
+      "shape": "curved",
+      "startItem": {
+        "id": "3458764654026853481"
+      },
+      "endItem": {
+        "id": "3458764653561738934"
+      },
+      "style": {
+        "startStrokeCap": "oval",
+        "endStrokeCap": "oval",
+        "strokeStyle": "normal",
+        "strokeColor": "#333333"
+      }
+    }
+  ]
+}

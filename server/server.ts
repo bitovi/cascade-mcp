@@ -28,6 +28,7 @@ import {
 import { atlassianProvider } from './providers/atlassian/index.js';
 import { figmaProvider } from './providers/figma/index.js';
 import { googleProvider } from './providers/google/index.js';
+import { miroProvider } from './providers/miro/index.js';
 import { logEnvironmentInfo } from './debug-helpers.js';
 import { registerRestApiRoutes } from './api/index.js';
 import { registerDownloadEndpoint } from './api/download.js';
@@ -250,6 +251,8 @@ app.get('/auth/connect/figma', makeAuthorize(figmaProvider));
 app.get('/auth/callback/figma', makeCallback(figmaProvider, { onSuccess: hubCallbackHandler }));
 app.get('/auth/connect/google', makeAuthorize(googleProvider));
 app.get('/auth/callback/google', makeCallback(googleProvider, { onSuccess: hubCallbackHandler }));
+app.get('/auth/connect/miro', makeAuthorize(miroProvider));
+app.get('/auth/callback/miro', makeCallback(miroProvider, { onSuccess: hubCallbackHandler }));
 app.get('/auth/done', handleConnectionDone);
 
 // --- MCP HTTP Endpoints ---
