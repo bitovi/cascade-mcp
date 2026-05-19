@@ -21,6 +21,23 @@ import { handleFigmaGetComments } from './figma-get-comments.js';
 import { handleAtlassianAddComment } from './atlassian-add-comment.js';
 import { handleAtlassianUpdateComment } from './atlassian-update-comment.js';
 import { handleExtractLinkedResources } from './extract-linked-resources.js';
+import { handleSheetsCreateSpreadsheet } from './sheets-create-spreadsheet.js';
+import { handleSheetsCreateSheet } from './sheets-create-sheet.js';
+import { handleSheetsRenameSheet } from './sheets-rename-sheet.js';
+import { handleSheetsAddRows } from './sheets-add-rows.js';
+import { handleSheetsAddColumns } from './sheets-add-columns.js';
+import { handleSheetsBatchUpdateCells } from './sheets-batch-update-cells.js';
+import { handleSheetsGetFormulas } from './sheets-get-formulas.js';
+import { handleSheetsCreateChart } from './sheets-create-chart.js';
+import { handleSheetsCopySheet } from './sheets-copy-sheet.js';
+import { handleSheetsShare } from './sheets-share.js';
+import { handleSheetsGetMultipleData } from './sheets-get-multiple-data.js';
+import { handleSheetsAppendRows } from './sheets-append-rows.js';
+import { handleSheetsFind } from './sheets-find.js';
+import { handleSheetsFormatRange } from './sheets-format-range.js';
+import { handleSheetsAddChart } from './sheets-add-chart.js';
+import { handleSheetsManageConditionalFormatting } from './sheets-manage-conditional-formatting.js';
+import { handleSheetsMoveRows } from './sheets-move-rows.js';
 import { debounce } from './debounce-middleware.js';
 import { encryptionManager } from '../utils/encryption-manager.js';
 
@@ -121,6 +138,58 @@ export function registerRestApiRoutes(app: Express): void {
   // Extract content + discovered links from any URL (Jira, Confluence, Google Docs)
   app.post('/api/extract-linked-resources', (req, res) => handleExtractLinkedResources(req, res));
   console.log('  ✓ POST /api/extract-linked-resources');
+
+  // Google Sheets endpoints
+  app.post('/api/sheets-create-spreadsheet', (req, res) => handleSheetsCreateSpreadsheet(req, res));
+  console.log('  ✓ POST /api/sheets-create-spreadsheet');
+
+  app.post('/api/sheets-create-sheet', (req, res) => handleSheetsCreateSheet(req, res));
+  console.log('  ✓ POST /api/sheets-create-sheet');
+
+  app.post('/api/sheets-rename-sheet', (req, res) => handleSheetsRenameSheet(req, res));
+  console.log('  ✓ POST /api/sheets-rename-sheet');
+
+  app.post('/api/sheets-add-rows', (req, res) => handleSheetsAddRows(req, res));
+  console.log('  ✓ POST /api/sheets-add-rows');
+
+  app.post('/api/sheets-add-columns', (req, res) => handleSheetsAddColumns(req, res));
+  console.log('  ✓ POST /api/sheets-add-columns');
+
+  app.post('/api/sheets-batch-update-cells', (req, res) => handleSheetsBatchUpdateCells(req, res));
+  console.log('  ✓ POST /api/sheets-batch-update-cells');
+
+  app.post('/api/sheets-get-formulas', (req, res) => handleSheetsGetFormulas(req, res));
+  console.log('  ✓ POST /api/sheets-get-formulas');
+
+  app.post('/api/sheets-copy-sheet', (req, res) => handleSheetsCopySheet(req, res));
+  console.log('  ✓ POST /api/sheets-copy-sheet');
+
+  app.post('/api/sheets-share', (req, res) => handleSheetsShare(req, res));
+  console.log('  ✓ POST /api/sheets-share');
+
+  app.post('/api/sheets-get-multiple-data', (req, res) => handleSheetsGetMultipleData(req, res));
+  console.log('  ✓ POST /api/sheets-get-multiple-data');
+
+  app.post('/api/sheets-append-rows', (req, res) => handleSheetsAppendRows(req, res));
+  console.log('  ✓ POST /api/sheets-append-rows');
+
+  app.post('/api/sheets-find', (req, res) => handleSheetsFind(req, res));
+  console.log('  ✓ POST /api/sheets-find');
+
+  app.post('/api/sheets-format-range', (req, res) => handleSheetsFormatRange(req, res));
+  console.log('  ✓ POST /api/sheets-format-range');
+
+  app.post('/api/sheets-add-chart', (req, res) => handleSheetsAddChart(req, res));
+  console.log('  ✓ POST /api/sheets-add-chart');
+
+  app.post('/api/sheets-manage-conditional-formatting', (req, res) => handleSheetsManageConditionalFormatting(req, res));
+  console.log('  ✓ POST /api/sheets-manage-conditional-formatting');
+
+  app.post('/api/sheets-move-rows', (req, res) => handleSheetsMoveRows(req, res));
+  console.log('  ✓ POST /api/sheets-move-rows');
+
+  app.post('/api/sheets-create-chart', (req, res) => handleSheetsCreateChart(req, res));
+  console.log('  ✓ POST /api/sheets-create-chart');
   
   console.log('REST API routes registered successfully');
 }
