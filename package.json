@@ -58,7 +58,7 @@
     "express": "^4.18.2",
     "express-session": "^1.18.1",
     "google-auth-library": "^9.0.0",
-    "hono": "^4.11.3",
+    "hono": "^4.12.23",
     "jose": "^6.0.12",
     "linkedom": "^0.18.12",
     "marklassian": "^1.0.4",
