@@ -74,7 +74,7 @@
     "sharp": "^0.34.5",
     "tmp-promise": "^3.0.3",
     "turndown": "^7.2.2",
-    "undici": "^6.19.5",
+    "undici": "^6.27.0",
     "undici-types": "^6.19.5",
     "uuid": "^11.0.3",
     "winston": "^3.17.0",
