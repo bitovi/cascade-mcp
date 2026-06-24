@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 import { config } from "dotenv";
 
 // Set up error handlers BEFORE loading any modules
+// This lets us see the actual errors
 process.on('uncaughtException', (error) => {
   console.error('\n💥 Uncaught Exception During Module Loading:');
   console.error('Error:', error);
